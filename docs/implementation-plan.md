@@ -307,6 +307,12 @@ xai-grok-provider/src/providers/
 | 移除 Provider | `/providers` → 选中 → `x` 确认移除 |
 | 无头模式 | `grok -p "hello" --provider openai --api-key sk-...` |
 
+> ⚠️ **实现备注**: Providers 模态框的完整实现涉及 `app/modals.rs`（2800+ 行）中 5 个独立的 dispatch 点：
+> `draw_active_modal()`（渲染）、`handle_modal_key()`（键盘）、`handle_modal_mouse()`（鼠标）、
+> `active_modal_height()`（尺寸）、`modal_can_drain()`（状态）。每个点都需要为新变体添加匹配分支。
+> 当前状态：`ActiveModal::Providers` 已注册到枚举、`Action::OpenProviders` 可分派打开模态框，
+> 但渲染为简单的文字列表存根，尚无完整的 `ModalWindowState` 集成、键盘交互、状态指示器、API Key 编辑表单。
+
 **组件实现**（参照现有 modal 模式）：
 
 | 组件 | 文件 | 参照 |
@@ -365,7 +371,7 @@ xai-grok-pager/src/
 | 5.3 | `--model` 格式扩展 | 支持 `provider/model`，向后兼容裸名 | — |
 | 5.4 | 实现 startup 流程中的 Provider 初始化 | `ProviderRegistry` + 6 层配置合并 + env 自动检测 | Arch §9 |
 | 5.5 | 重写 `resolve_model_list()` 以包含 Provider 层 | `[model.*]` > `[provider.*]` > 内嵌 Provider 默认值 | Arch §6.1 |
-| 5.6 | 创建 TUI Providers 模态框 | `views/providers_modal.rs` + `ActiveModal::Providers` | Extensions Modal |
+| 5.6 | 创建 TUI Providers 模态框 | `views/providers_modal.rs` + `ActiveModal::Providers` + `app/modals.rs` 5 处 dispatch | 需修改 `draw_active_modal`、`handle_modal_key`、`handle_modal_mouse`、`active_modal_height`、`modal_can_drain` |
 | 5.7 | 实现 `/providers` 斜杠命令 | `slash/commands/providers.rs` | `/mcps` 模式 |
 | 5.8 | 模型选择器增强 | `Ctrl+M` 列表显示 `provider/model`，未配置时自动弹出配置 | — |
 | 5.9 | 保留 `[endpoints]` 向后兼容 | 旧配置映射到 `XaiProvider` | Arch §8 |

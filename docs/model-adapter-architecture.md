@@ -1024,15 +1024,22 @@ route.with({
 
 ### 7.1 Overview
 
-The TUI provides an interactive Provider management interface accessible via:
-- `/providers` slash command → Provider list modal
-- `F2` → Settings → Models → Provider sub-section
-- `Ctrl+M` → Model picker (shows `provider/model`, auto-configures on first use)
+The TUI provides an interactive Provider management interface. The following
+entry points and components are **designed** but may be partially implemented:
+
+| Entry | Status | Description |
+|-------|--------|-------------|
+| `/providers` command | ✅ Done | Opens Providers list modal via `Action::OpenProviders` |
+| `Action::OpenProviders` | ✅ Done | Dispatch action, creates `ActiveModal::Providers` |
+| `ActiveModal::Providers` | ✅ Done | Variant registered in modal enum |
+| Providers modal UI | ⚠️ Stub | Renders hardcoded 5-row list, no keyboard interaction |
+| Provider Detail panel | ❌ Not started | API Key / Base URL / Models editing form |
+| `F2` → Settings → Providers | ❌ Not started | Settings `defs.rs` not modified |
+| `Ctrl+M` provider prefix | ⚠️ Partial | Parser supports `provider/model`, picker display not extended |
 
 ### 7.2 Providers Modal
 
-A standalone modal (similar to Extensions modal) that shows all registered
-providers with their connection status:
+Target design (not yet fully implemented):
 
 ```
 ┌─ Providers ────────────────────────────────────────────[✗]─┐
@@ -1049,9 +1056,21 @@ providers with their connection status:
 └──────────────────────────────────────────────────────────────┘
 ```
 
+**Implementation status**: `ActiveModal::Providers` variant and `ProvidersModalState`
+struct exist. The modal can be opened via `/providers` command but rendering is
+a static hardcoded list. Keyboard interaction (↑↓/Enter/Esc), `ModalWindowState`
+chrome, status indicators, and live data from `ProviderRegistry` are not yet
+implemented. Full implementation requires modifying 5 dispatch points in
+`app/modals.rs` (2800+ lines):
+- `draw_active_modal()` — render the provider list and detail panel
+- `handle_modal_key()` — keyboard navigation and API key input
+- `handle_modal_mouse()` — mouse click handling
+- `active_modal_height()` — modal sizing
+- `modal_can_drain()` — state management
+
 ### 7.3 Provider Detail Panel
 
-Selected provider opens a configuration panel with form fields:
+Target design (not implemented):
 
 | Field | Type | Behavior |
 |-------|------|----------|
@@ -1060,33 +1079,37 @@ Selected provider opens a configuration panel with form fields:
 | Status | Display | Connected / Not configured / Needs auth |
 | Models | Display | Known models from `ProviderDefaults.known_models` |
 
+API Key input should follow the existing `ModalInput` pattern used by the
+Extensions modal for MCP server configuration (inline form with Tab/BackTab
+field switching, readline-style editing).
+
 ### 7.4 Model Picker Enhancement
 
-The existing `Ctrl+M` model picker and `/model` slash command are extended:
+Target design (partially implemented):
 
 ```
 Before:  grok-build              gpt-4o              claude-sonnet
 After:   xai/grok-build          openai/gpt-4o       anthropic/claude-sonnet
 ```
 
-When a model from an unconfigured provider is selected:
-1. Picker shows the model as `dimmed` with `(needs key)` indicator
-2. On selection → transitions to Provider configuration panel for that provider
-3. After API key is entered → refreshes model list → selects the model
+**`--model` CLI flag** supports `provider/model` format via `parse_model_ref()`
+in `xai-grok-provider/src/types.rs`. The `Ctrl+M` picker display enhancement
+awaits ACP protocol extension to include `provider` field in `acp::ModelInfo`.
 
 ### 7.5 Slash Command: `/providers`
 
 ```
-/providers           → Opens Provider list modal
-/providers <name>    → Opens configuration panel for that provider
+/providers           → Opens Provider list modal (stub)
+/providers <name>    → Opens configuration panel for that provider (not implemented)
 ```
 
-Implements `SlashCommand` trait with `suggest_args()` returning all registered
-Provider IDs for tab completion.
+Implements `SlashCommand` trait. `run()` returns `CommandResult::Action(Action::OpenProviders)`.
+`suggest_args()` returns all built-in Provider IDs (`xai`, `openai`, `anthropic`,
+`opencode`, `ollama`) for tab completion.
 
 ### 7.6 Settings Integration
 
-In the existing Settings modal (F2), under the `Models` category:
+Target design (not implemented):
 
 ```
 Models
@@ -1095,7 +1118,11 @@ Models
   └── Providers ›           (Group → opens provider list)
 ```
 
+Requires adding a `Provider` setting category entry in `settings/defs.rs`.
+
 ### 7.7 Status Indicators
+
+Target design (not yet used in UI):
 
 | Status | Badge | Color | Condition |
 |--------|-------|-------|-----------|
@@ -1109,8 +1136,13 @@ Models
 
 ```
 First-time user:  Welcome → /providers → Select Provider → Enter API Key → Verify → Chat
+                  (Welcome screen integration not implemented)
+
 Switch provider:  Ctrl+M → select model → (if unconfigured: enter key) → Switch
+                  (auto-config prompt not implemented)
+
 CLI headless:     grok -p "hello" --provider openai --api-key sk-...
+                  (fully supported)
 ```
 
 ---

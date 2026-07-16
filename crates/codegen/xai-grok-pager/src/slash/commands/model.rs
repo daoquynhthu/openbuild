@@ -157,24 +157,29 @@ fn build_model_items(models: &ModelState) -> Vec<ArgItem> {
         let is_current = current_id == Some(id);
         let supports = supports_reasoning_effort(info);
 
+        // Show model with provider prefix if available (provider/model).
+        // The display_name is the model ID itself, which may contain
+        // a "/" separator (e.g. "openai/gpt-4o") or be a bare name.
+        let model_label = info.name.as_str();
+
         let display = if is_current {
-            format!("{} (current)", info.name)
+            format!("{model_label} (current)")
         } else {
-            info.name.clone()
+            model_label.to_string()
         };
 
         // Trailing space on reasoning models: signals "more input
         // expected" to the prompt widget so Enter advances to effort
         // phase instead of submitting.
         let insert_text = if supports {
-            format!("{} ", info.name)
+            format!("{model_label} ")
         } else {
-            info.name.clone()
+            model_label.to_string()
         };
 
         items.push(ArgItem {
-            display,
-            match_text: info.name.clone(),
+            display: display.clone(),
+            match_text: model_label.to_string(),
             insert_text,
             description: info.description.clone().unwrap_or_default(),
         });
