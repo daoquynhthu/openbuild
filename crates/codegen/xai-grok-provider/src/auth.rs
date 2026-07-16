@@ -122,7 +122,11 @@ impl Credential {
     }
 
     pub fn or_else(self, other: Credential) -> Credential {
-        if self.resolve().is_some() { self } else { other }
+        if self.resolve().is_some() {
+            self
+        } else {
+            other
+        }
     }
 
     pub fn bearer(self) -> Box<dyn AuthFn> {
@@ -179,8 +183,7 @@ mod tests {
 
     #[test]
     fn header_auth_sets_custom_header() {
-        let auth = Credential::optional(Some("ant-key".into()), "api_key")
-            .header("x-api-key");
+        let auth = Credential::optional(Some("ant-key".into()), "api_key").header("x-api-key");
         let headers = auth.apply(&test_input()).unwrap();
         assert_eq!(headers.get("x-api-key").unwrap(), "ant-key");
     }
@@ -215,12 +218,16 @@ mod tests {
     #[test]
     fn session_credential_resolves_env() {
         // SAFETY: test-only env mutation, single-threaded test.
-        unsafe { std::env::set_var("XAI_SESSION_TOKEN", "sess-abc"); }
+        unsafe {
+            std::env::set_var("XAI_SESSION_TOKEN", "sess-abc");
+        }
         let auth = Credential::session().bearer();
         let headers = auth.apply(&test_input()).unwrap();
         assert_eq!(headers.get("Authorization").unwrap(), "Bearer sess-abc");
         // SAFETY: test-only env cleanup.
-        unsafe { std::env::remove_var("XAI_SESSION_TOKEN"); }
+        unsafe {
+            std::env::remove_var("XAI_SESSION_TOKEN");
+        }
     }
 
     #[test]

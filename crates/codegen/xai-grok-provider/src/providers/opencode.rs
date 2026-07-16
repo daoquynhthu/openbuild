@@ -7,7 +7,9 @@ use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
-use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef};
+use crate::types::{
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+};
 
 fn opencode_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -58,7 +60,10 @@ impl Provider for OpenCodeProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides.base_url.clone().unwrap_or_else(|| self.defaults.base_url.clone());
+        let base_url = overrides
+            .base_url
+            .clone()
+            .unwrap_or_else(|| self.defaults.base_url.clone());
         // No API key → public free-tier fallback (sends apiKey="public").
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("OPENCODE_API_KEY"))
@@ -81,7 +86,14 @@ impl Provider for OpenCodeProvider {
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| Model::make(ModelId::new(id), ProviderId::new(ProviderId::OPENCODE), std::sync::Arc::new(route.clone()), None),
+            model: |id, route| {
+                Model::make(
+                    ModelId::new(id),
+                    ProviderId::new(ProviderId::OPENCODE),
+                    std::sync::Arc::new(route.clone()),
+                    None,
+                )
+            },
             configure: move |c| OpenCodeProvider::new().configure(c),
         }
     }

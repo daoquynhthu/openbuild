@@ -274,14 +274,8 @@ mod tests {
     #[test]
     fn detect_from_url_xai() {
         let registry = ProviderRegistry::new();
-        assert_eq!(
-            registry.detect_from_url("https://api.x.ai/v1").0,
-            "xai"
-        );
-        assert_eq!(
-            registry.detect_from_url("https://api.grok.com/v1").0,
-            "xai"
-        );
+        assert_eq!(registry.detect_from_url("https://api.x.ai/v1").0, "xai");
+        assert_eq!(registry.detect_from_url("https://api.grok.com/v1").0, "xai");
     }
 
     #[test]

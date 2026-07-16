@@ -23,10 +23,10 @@ use crate::client::SamplingClient;
 use crate::config::{RetryPolicy, SamplerConfig};
 use crate::events::{SamplingErrorInfo, SamplingErrorKind, SamplingEvent};
 use crate::metrics::InferenceLatencyStats;
+use crate::protocols;
 use crate::retry::{
     self as retry_mod, RetryDecision, classify_error, clone_error, resolve_max_retries,
 };
-use crate::protocols;
 use crate::stream::{stream_chat_completions, stream_messages, stream_responses};
 use crate::types::RequestId;
 

@@ -39,9 +39,9 @@ impl AuthFn for AuthManagerAsAuthFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parking_lot::RwLock;
-    use crate::auth::model::GrokAuth;
     use crate::auth::AuthManager;
+    use crate::auth::model::GrokAuth;
+    use parking_lot::RwLock;
 
     struct MockManager;
 

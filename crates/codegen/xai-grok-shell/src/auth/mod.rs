@@ -1,7 +1,6 @@
 pub(crate) mod attribution;
 mod config;
 pub mod credential_provider;
-pub mod provider_adapter;
 #[path = "devbox_login_stub.rs"]
 pub(crate) mod devbox_login;
 pub mod device_code;
@@ -12,6 +11,7 @@ mod jwt;
 pub(crate) mod manager;
 mod model;
 pub mod oidc;
+pub mod provider_adapter;
 pub(crate) mod recovery;
 pub(crate) mod refresh;
 mod storage;

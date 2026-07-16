@@ -7,7 +7,9 @@ use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
-use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef};
+use crate::types::{
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+};
 
 pub fn openai_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -79,7 +81,10 @@ impl Provider for OpenAIProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides.base_url.clone().unwrap_or_else(|| self.defaults.base_url.clone());
+        let base_url = overrides
+            .base_url
+            .clone()
+            .unwrap_or_else(|| self.defaults.base_url.clone());
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("OPENAI_API_KEY"))
             .bearer();
@@ -100,7 +105,14 @@ impl Provider for OpenAIProvider {
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| Model::make(ModelId::new(id), ProviderId::new(ProviderId::OPENAI), std::sync::Arc::new(route.clone()), None),
+            model: |id, route| {
+                Model::make(
+                    ModelId::new(id),
+                    ProviderId::new(ProviderId::OPENAI),
+                    std::sync::Arc::new(route.clone()),
+                    None,
+                )
+            },
             configure: move |c| OpenAIProvider::new().configure(c),
         }
     }

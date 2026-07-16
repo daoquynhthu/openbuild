@@ -19,7 +19,6 @@ use std::path::Path;
 #[cfg(unix)]
 use xai_grok_sandbox::{ProfileName, SandboxManager};
 
-
 #[cfg(not(unix))]
 fn main() {
     eprintln!("sandbox_smoke_test is Unix-only");
@@ -140,10 +139,7 @@ fn test_read(label: &str, path: &Path) {
     if path.is_file() {
         match std::fs::read(path) {
             Ok(_) => println!("  ✅ {label}: OK (read)"),
-            Err(e)
-                if e.raw_os_error() == Some(13)
-                    || e.raw_os_error() == Some(1) =>
-            {
+            Err(e) if e.raw_os_error() == Some(13) || e.raw_os_error() == Some(1) => {
                 println!("  🔒 {label}: BLOCKED ({e})");
             }
             Err(e) => println!("  ❌ {label}: ERROR ({e})"),

@@ -7,7 +7,9 @@ use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
-use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef};
+use crate::types::{
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+};
 
 fn anthropic_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -79,7 +81,10 @@ impl Provider for AnthropicProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides.base_url.clone().unwrap_or_else(|| self.defaults.base_url.clone());
+        let base_url = overrides
+            .base_url
+            .clone()
+            .unwrap_or_else(|| self.defaults.base_url.clone());
         // Anthropic uses x-api-key header (not Bearer), demonstrating the composable auth pattern.
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("ANTHROPIC_API_KEY"))
@@ -97,13 +102,22 @@ impl Provider for AnthropicProvider {
             },
             auth: Some(auth),
             framing: Box::new(SseFraming),
-            defaults: Some(crate::route::RouteDefaults { headers: Some(route_headers) }),
+            defaults: Some(crate::route::RouteDefaults {
+                headers: Some(route_headers),
+            }),
         });
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| Model::make(ModelId::new(id), ProviderId::new(ProviderId::ANTHROPIC), std::sync::Arc::new(route.clone()), None),
+            model: |id, route| {
+                Model::make(
+                    ModelId::new(id),
+                    ProviderId::new(ProviderId::ANTHROPIC),
+                    std::sync::Arc::new(route.clone()),
+                    None,
+                )
+            },
             configure: move |c| AnthropicProvider::new().configure(c),
         }
     }

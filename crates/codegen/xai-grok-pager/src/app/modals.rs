@@ -1518,12 +1518,8 @@ impl AgentView {
 
         // Providers: route through ModalWindow chrome, then delegate.
         if let Some(ActiveModal::Providers { state: prov_state }) = &mut self.active_modal {
-            let outcome = mw::handle_modal_mouse(
-                &mut prov_state.window,
-                mouse.kind,
-                mouse.column,
-                mouse.row,
-            );
+            let outcome =
+                mw::handle_modal_mouse(&mut prov_state.window, mouse.kind, mouse.column, mouse.row);
             match outcome {
                 ModalWindowOutcome::CloseRequested => {
                     self.active_modal = None;
@@ -2289,11 +2285,7 @@ impl AgentView {
                 crate::views::memory_modal::render_memory_modal(buf, area, mem_state, compact);
             } else if let modal::ActiveModal::Providers { state: prov_state } = active_modal {
                 crate::views::providers_modal::render_providers_modal(
-                    buf,
-                    area,
-                    prov_state,
-                    compact,
-                    &theme,
+                    buf, area, prov_state, compact, &theme,
                 );
             } else if let modal::ActiveModal::Settings {
                 state: settings_state,

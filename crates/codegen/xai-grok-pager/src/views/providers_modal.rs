@@ -93,7 +93,11 @@ fn builtin_providers() -> Vec<ProviderEntry> {
         ProviderEntry {
             id: "xai".into(),
             name: "xAI".into(),
-            status: if xai_ok { "Connected" } else { "Not configured" },
+            status: if xai_ok {
+                "Connected"
+            } else {
+                "Not configured"
+            },
             status_color: if xai_ok { Color::Green } else { Color::Red },
             endpoint: "api.x.ai".into(),
             configured: xai_ok,
@@ -101,7 +105,11 @@ fn builtin_providers() -> Vec<ProviderEntry> {
         ProviderEntry {
             id: "openai".into(),
             name: "OpenAI".into(),
-            status: if openai_ok { "Connected" } else { "Not configured" },
+            status: if openai_ok {
+                "Connected"
+            } else {
+                "Not configured"
+            },
             status_color: if openai_ok { Color::Green } else { Color::Red },
             endpoint: "api.openai.com".into(),
             configured: openai_ok,
@@ -109,8 +117,16 @@ fn builtin_providers() -> Vec<ProviderEntry> {
         ProviderEntry {
             id: "anthropic".into(),
             name: "Anthropic".into(),
-            status: if anthropic_ok { "Connected" } else { "Not configured" },
-            status_color: if anthropic_ok { Color::Green } else { Color::Red },
+            status: if anthropic_ok {
+                "Connected"
+            } else {
+                "Not configured"
+            },
+            status_color: if anthropic_ok {
+                Color::Green
+            } else {
+                Color::Red
+            },
             endpoint: "api.anthropic.com".into(),
             configured: anthropic_ok,
         },
@@ -122,7 +138,11 @@ fn builtin_providers() -> Vec<ProviderEntry> {
             } else {
                 "Free tier"
             },
-            status_color: if opencode_ok { Color::Green } else { Color::Gray },
+            status_color: if opencode_ok {
+                Color::Green
+            } else {
+                Color::Gray
+            },
             endpoint: "opencode.ai".into(),
             configured: opencode_ok,
         },
@@ -242,7 +262,11 @@ fn handle_detail_key(
             ProvidersKeyOutcome::Changed
         }
         KeyCode::BackTab => {
-            *focused_field = if *focused_field == 0 { 2 } else { *focused_field - 1 };
+            *focused_field = if *focused_field == 0 {
+                2
+            } else {
+                *focused_field - 1
+            };
             ProvidersKeyOutcome::Changed
         }
         KeyCode::Char(c) if key.modifiers.is_empty() => {
@@ -255,13 +279,21 @@ fn handle_detail_key(
         }
         KeyCode::Backspace => {
             match *focused_field {
-                0 => { api_key.pop(); }
-                1 => { base_url.pop(); }
+                0 => {
+                    api_key.pop();
+                }
+                1 => {
+                    base_url.pop();
+                }
                 _ => {}
             }
             ProvidersKeyOutcome::Changed
         }
-        KeyCode::Char('r') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+        KeyCode::Char('r')
+            if key
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL) =>
+        {
             *show_api_key = !*show_api_key;
             ProvidersKeyOutcome::Changed
         }
@@ -303,9 +335,21 @@ fn render_list(
     theme: &Theme,
 ) {
     let shortcuts: &[Shortcut<'static>] = &[
-        Shortcut { label: "\u{2191}/\u{2193} nav", clickable: false, id: 0 },
-        Shortcut { label: "Enter configure", clickable: false, id: 1 },
-        Shortcut { label: "Esc close", clickable: false, id: 2 },
+        Shortcut {
+            label: "\u{2191}/\u{2193} nav",
+            clickable: false,
+            id: 0,
+        },
+        Shortcut {
+            label: "Enter configure",
+            clickable: false,
+            id: 1,
+        },
+        Shortcut {
+            label: "Esc close",
+            clickable: false,
+            id: 2,
+        },
     ];
 
     let cfg = mw::ModalWindowConfig {
@@ -329,9 +373,7 @@ fn render_list(
         return;
     };
 
-    let header_style = Style::default()
-        .fg(theme.gray)
-        .add_modifier(Modifier::BOLD);
+    let header_style = Style::default().fg(theme.gray).add_modifier(Modifier::BOLD);
     let header = Line::styled(
         format!("{:<14} {:>16}  {}", "Provider", "Status", "Endpoint"),
         header_style,
@@ -357,8 +399,16 @@ fn render_list(
         let y = row_area.top() + i as u16;
         let is_selected = idx == state.selected;
 
-        let bg = if is_selected { theme.bg_light } else { theme.bg_base };
-        let fg = if is_selected { theme.text_primary } else { theme.gray_bright };
+        let bg = if is_selected {
+            theme.bg_light
+        } else {
+            theme.bg_base
+        };
+        let fg = if is_selected {
+            theme.text_primary
+        } else {
+            theme.gray_bright
+        };
 
         let status_style = Style::default().fg(provider.status_color).bg(bg);
         let row_style = Style::default().fg(fg).bg(bg);
@@ -386,7 +436,13 @@ fn render_detail(
             base_url,
             focused_field,
             show_api_key,
-        } => (*provider_idx, api_key.clone(), base_url.clone(), *focused_field, *show_api_key),
+        } => (
+            *provider_idx,
+            api_key.clone(),
+            base_url.clone(),
+            *focused_field,
+            *show_api_key,
+        ),
         _ => return,
     };
     let (provider_idx, api_key_str, base_url_str, focused_field, show_api_key) = detail;
@@ -398,10 +454,26 @@ fn render_detail(
     let title = format!("Configure: {}", provider.name);
 
     let shortcuts: &[Shortcut<'static>] = &[
-        Shortcut { label: "Tab next", clickable: false, id: 0 },
-        Shortcut { label: "Ctrl+R reveal", clickable: false, id: 1 },
-        Shortcut { label: "Enter save", clickable: false, id: 2 },
-        Shortcut { label: "Esc back", clickable: false, id: 3 },
+        Shortcut {
+            label: "Tab next",
+            clickable: false,
+            id: 0,
+        },
+        Shortcut {
+            label: "Ctrl+R reveal",
+            clickable: false,
+            id: 1,
+        },
+        Shortcut {
+            label: "Enter save",
+            clickable: false,
+            id: 2,
+        },
+        Shortcut {
+            label: "Esc back",
+            clickable: false,
+            id: 3,
+        },
     ];
 
     let cfg = mw::ModalWindowConfig {
@@ -434,11 +506,29 @@ fn render_detail(
     } else {
         "\u{25cf}".repeat(api_key_str.len().min(20))
     };
-    render_field(buf, content.inner_x, render_y, content.inner_width, field_label, &display_val, focused_field == 0, theme);
+    render_field(
+        buf,
+        content.inner_x,
+        render_y,
+        content.inner_width,
+        field_label,
+        &display_val,
+        focused_field == 0,
+        theme,
+    );
     render_y += 1;
 
     let field_label = "Base URL:";
-    render_field(buf, content.inner_x, render_y, content.inner_width, field_label, &base_url_str, focused_field == 1, theme);
+    render_field(
+        buf,
+        content.inner_x,
+        render_y,
+        content.inner_width,
+        field_label,
+        &base_url_str,
+        focused_field == 1,
+        theme,
+    );
     render_y += 1;
 
     let field_label = "Status:";
@@ -450,7 +540,10 @@ fn render_detail(
         ),
         ratatui::text::Span::styled(provider.status, status_style),
     ]);
-    status_line.render(Rect::new(content.inner_x, render_y, content.inner_width, 1), buf);
+    status_line.render(
+        Rect::new(content.inner_x, render_y, content.inner_width, 1),
+        buf,
+    );
     render_y += 1;
 
     let endpoint_line = Line::from(vec![
@@ -458,12 +551,12 @@ fn render_detail(
             "  Endpoint:  ",
             Style::default().fg(theme.gray).add_modifier(Modifier::BOLD),
         ),
-        ratatui::text::Span::styled(
-            &provider.endpoint,
-            Style::default().fg(theme.gray_bright),
-        ),
+        ratatui::text::Span::styled(&provider.endpoint, Style::default().fg(theme.gray_bright)),
     ]);
-    endpoint_line.render(Rect::new(content.inner_x, render_y, content.inner_width, 1), buf);
+    endpoint_line.render(
+        Rect::new(content.inner_x, render_y, content.inner_width, 1),
+        buf,
+    );
     render_y += 1;
 
     let hint = Line::styled(
@@ -487,13 +580,21 @@ fn render_field(
     focused: bool,
     theme: &Theme,
 ) {
-    let bg = if focused { theme.bg_light } else { theme.bg_base };
+    let bg = if focused {
+        theme.bg_light
+    } else {
+        theme.bg_base
+    };
     let label_style = Style::default()
         .fg(theme.gray)
         .add_modifier(Modifier::BOLD)
         .bg(bg);
     let value_style = Style::default()
-        .fg(if focused { theme.text_primary } else { theme.gray_bright })
+        .fg(if focused {
+            theme.text_primary
+        } else {
+            theme.gray_bright
+        })
         .bg(bg);
 
     let line = Line::from(vec![

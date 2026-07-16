@@ -3342,9 +3342,7 @@ fn provider_known_models(
             xai_grok_provider::types::ApiBackend::Responses => {
                 crate::sampling::ApiBackend::Responses
             }
-            xai_grok_provider::types::ApiBackend::Messages => {
-                crate::sampling::ApiBackend::Messages
-            }
+            xai_grok_provider::types::ApiBackend::Messages => crate::sampling::ApiBackend::Messages,
         }
     }
     fn to_auth_scheme(s: xai_grok_provider::types::AuthScheme) -> xai_grok_sampler::AuthScheme {
@@ -3370,7 +3368,10 @@ fn provider_known_models(
 
         for model_def in known {
             let key = format!("{}/{}", pid.0, model_def.model);
-            let provider_api_backend = model_def.api_backend.clone().unwrap_or_else(|| defaults.api_backend.clone());
+            let provider_api_backend = model_def
+                .api_backend
+                .clone()
+                .unwrap_or_else(|| defaults.api_backend.clone());
             let entry = ModelEntry {
                 info: ModelInfo {
                     id: Some(key.clone()),

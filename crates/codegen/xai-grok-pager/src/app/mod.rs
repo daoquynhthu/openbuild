@@ -909,11 +909,12 @@ pub(crate) mod win_native_selection {
                 return;
             };
             if let Some((handle, current)) = stdin_console_mode()
-                && current != saved {
-                    unsafe {
-                        let _ = SetConsoleMode(handle, saved);
-                    }
+                && current != saved
+            {
+                unsafe {
+                    let _ = SetConsoleMode(handle, saved);
                 }
+            }
         }
     }
     #[cfg(test)]

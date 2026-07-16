@@ -97,7 +97,12 @@ mod tests {
     #[test]
     fn model_make_sets_fields() {
         let route = Arc::new(dummy_route());
-        let model = Model::make(ModelId::new("gpt-4o"), ProviderId::new("openai"), route, None);
+        let model = Model::make(
+            ModelId::new("gpt-4o"),
+            ProviderId::new("openai"),
+            route,
+            None,
+        );
         assert_eq!(model.id.0, "gpt-4o");
         assert_eq!(model.provider.0, "openai");
         assert!(model.defaults.is_none());
@@ -124,7 +129,12 @@ mod tests {
             provider_options: None,
             http: None,
         };
-        let model = Model::make(ModelId::new("gpt-4o"), ProviderId::new("openai"), route, Some(defaults));
+        let model = Model::make(
+            ModelId::new("gpt-4o"),
+            ProviderId::new("openai"),
+            route,
+            Some(defaults),
+        );
         assert_eq!(model.id.0, "gpt-4o");
         assert!(model.defaults.is_some());
     }

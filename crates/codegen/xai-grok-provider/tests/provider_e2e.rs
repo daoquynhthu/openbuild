@@ -62,8 +62,7 @@ fn openai_provider_full_pipeline() {
     };
     assert_eq!(sampler.protocol_id.as_deref(), Some("chat_completions"));
 
-    let client = xai_grok_sampler::SamplingClient::new(sampler)
-        .expect("SamplingClient::new");
+    let client = xai_grok_sampler::SamplingClient::new(sampler).expect("SamplingClient::new");
     assert_eq!(client.protocol_id(), "chat_completions");
 }
 
@@ -110,5 +109,3 @@ fn configure_stores_api_key() {
     // OpenAI got its key from TOML. xAI may have one from XAI_API_KEY env var
     // (set in dev environments), so we only check the TOML-sourced provider.
 }
-
-

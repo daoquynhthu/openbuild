@@ -54,7 +54,9 @@ mod tests {
     use super::*;
     use futures::StreamExt;
 
-    fn stream_from_chunks(chunks: Vec<&str>) -> Box<dyn Stream<Item = Result<Bytes, String>> + Send + Unpin> {
+    fn stream_from_chunks(
+        chunks: Vec<&str>,
+    ) -> Box<dyn Stream<Item = Result<Bytes, String>> + Send + Unpin> {
         let items: Vec<Result<Bytes, String>> = chunks
             .into_iter()
             .map(|s| Ok(Bytes::copy_from_slice(s.as_bytes())))

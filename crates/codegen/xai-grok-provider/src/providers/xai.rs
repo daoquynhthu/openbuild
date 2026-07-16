@@ -9,7 +9,9 @@ use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
-use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef};
+use crate::types::{
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+};
 
 pub(crate) fn xai_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -29,18 +31,16 @@ pub(crate) fn xai_defaults() -> ProviderDefaults {
         supports_tool_calling: true,
         supports_structured_output: true,
         extra_headers: IndexMap::new(),
-        known_models: vec![
-            ProviderModelDef {
-                id: "grok-build".into(),
-                model: "grok-build".into(),
-                name: "Grok Build".into(),
-                description: Some("Best for advanced coding tasks".into()),
-                context_window: NonZeroU64::new(500_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: None,
-            },
-        ],
+        known_models: vec![ProviderModelDef {
+            id: "grok-build".into(),
+            model: "grok-build".into(),
+            name: "Grok Build".into(),
+            description: Some("Best for advanced coding tasks".into()),
+            context_window: NonZeroU64::new(500_000).unwrap(),
+            hidden: false,
+            api_backend: None,
+            supports_reasoning_effort: None,
+        }],
     }
 }
 
@@ -71,13 +71,19 @@ impl Provider for XaiProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides.base_url.clone().unwrap_or_else(|| self.defaults.base_url.clone());
+        let base_url = overrides
+            .base_url
+            .clone()
+            .unwrap_or_else(|| self.defaults.base_url.clone());
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("XAI_API_KEY"))
             .or_else(Credential::session())
             .bearer();
         let mut xai_headers = std::collections::HashMap::new();
-        xai_headers.insert("x-grok-client-identifier".into(), "xai-grok-provider".into());
+        xai_headers.insert(
+            "x-grok-client-identifier".into(),
+            "xai-grok-provider".into(),
+        );
         let route = Route::make(RouteInput {
             id: "xai-responses".into(),
             provider: Some(self.defaults.id.clone()),
@@ -89,13 +95,22 @@ impl Provider for XaiProvider {
             },
             auth: Some(auth),
             framing: Box::new(SseFraming),
-            defaults: Some(crate::route::RouteDefaults { headers: Some(xai_headers) }),
+            defaults: Some(crate::route::RouteDefaults {
+                headers: Some(xai_headers),
+            }),
         });
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| Model::make(ModelId::new(id), ProviderId::new(ProviderId::XAI), std::sync::Arc::new(route.clone()), None),
+            model: |id, route| {
+                Model::make(
+                    ModelId::new(id),
+                    ProviderId::new(ProviderId::XAI),
+                    std::sync::Arc::new(route.clone()),
+                    None,
+                )
+            },
             configure: move |c| XaiProvider::new().configure(c),
         }
     }

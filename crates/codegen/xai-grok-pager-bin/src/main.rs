@@ -898,22 +898,16 @@ async fn run_agent_command(
     // Initialize ProviderRegistry with built-in providers, user config,
     // environment variables, and CLI overrides.
     let provider_registry = {
-        let reg = std::sync::Arc::new(
-            xai_grok_provider::registry::ProviderRegistry::new(),
-        );
+        let reg = std::sync::Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
         xai_grok_provider::providers::register_all(&reg);
 
         // Determine which provider the CLI overrides target.
-        let cli_provider_name: Option<String> = agent_args
-            .provider
-            .clone()
-            .or_else(|| {
-                agent_args.model.as_ref().and_then(|m| {
-                    xai_grok_provider::types::parse_model_ref(m)
-                        .0
-                        .map(|p| p.0)
-                })
-            });
+        let cli_provider_name: Option<String> = agent_args.provider.clone().or_else(|| {
+            agent_args
+                .model
+                .as_ref()
+                .and_then(|m| xai_grok_provider::types::parse_model_ref(m).0.map(|p| p.0))
+        });
 
         // Build CLI override ProviderConfig when a target provider is known.
         let cli_override = cli_provider_name.clone().map(|provider_name| {

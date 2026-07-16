@@ -64,10 +64,7 @@ impl<Body> Endpoint<Body> {
     }
 }
 
-pub fn merge_endpoints<Body>(
-    base: &Endpoint<Body>,
-    patch: &EndpointPatch<Body>,
-) -> Endpoint<Body>
+pub fn merge_endpoints<Body>(base: &Endpoint<Body>, patch: &EndpointPatch<Body>) -> Endpoint<Body>
 where
     EndpointPart<Body>: Clone,
 {
@@ -99,7 +96,12 @@ mod tests {
             query: None,
         };
         let input = EndpointInput {
-            request: LLMRequest { model: "gpt-4o".into(), messages: vec![], max_tokens: None, temperature: None },
+            request: LLMRequest {
+                model: "gpt-4o".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
             body: (),
         };
         let url = ep.render(&input);
@@ -114,7 +116,12 @@ mod tests {
             query: Some(HashMap::from([("limit".into(), "10".into())])),
         };
         let input = EndpointInput {
-            request: LLMRequest { model: "gpt-4o".into(), messages: vec![], max_tokens: None, temperature: None },
+            request: LLMRequest {
+                model: "gpt-4o".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
             body: (),
         };
         let url = ep.render(&input);
@@ -129,7 +136,12 @@ mod tests {
             query: None,
         };
         let input = EndpointInput {
-            request: LLMRequest { model: "test".into(), messages: vec![], max_tokens: None, temperature: None },
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
             body: (),
         };
         let url = ep.render(&input);

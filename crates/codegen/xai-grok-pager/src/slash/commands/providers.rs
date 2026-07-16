@@ -40,7 +40,11 @@ impl SlashCommand for ProvidersCommand {
         true
     }
 
-    fn suggest_args(&self, _ctx: &crate::slash::command::AppCtx, _query: &str) -> Option<Vec<ArgItem>> {
+    fn suggest_args(
+        &self,
+        _ctx: &crate::slash::command::AppCtx,
+        _query: &str,
+    ) -> Option<Vec<ArgItem>> {
         Some(vec![
             ArgItem {
                 display: "xai".into(),

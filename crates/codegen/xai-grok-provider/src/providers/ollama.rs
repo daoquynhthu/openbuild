@@ -6,7 +6,9 @@ use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
-use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef};
+use crate::types::{
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+};
 
 fn ollama_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -57,7 +59,10 @@ impl Provider for OllamaProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides.base_url.clone().unwrap_or_else(|| self.defaults.base_url.clone());
+        let base_url = overrides
+            .base_url
+            .clone()
+            .unwrap_or_else(|| self.defaults.base_url.clone());
         // Ollama requires no authentication.
         let route = Route::make(RouteInput {
             id: "ollama-chat".into(),
@@ -76,7 +81,14 @@ impl Provider for OllamaProvider {
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| Model::make(ModelId::new(id), ProviderId::new(ProviderId::OLLAMA), std::sync::Arc::new(route.clone()), None),
+            model: |id, route| {
+                Model::make(
+                    ModelId::new(id),
+                    ProviderId::new(ProviderId::OLLAMA),
+                    std::sync::Arc::new(route.clone()),
+                    None,
+                )
+            },
             configure: move |c| OllamaProvider::new().configure(c),
         }
     }

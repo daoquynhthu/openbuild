@@ -70,7 +70,10 @@ impl Route {
             provider: input.provider,
             protocol: input.protocol,
             endpoint: input.endpoint,
-            auth: input.auth.map(Arc::<dyn AuthFn>::from).unwrap_or_else(|| Arc::new(crate::auth::NoopAuth)),
+            auth: input
+                .auth
+                .map(Arc::<dyn AuthFn>::from)
+                .unwrap_or_else(|| Arc::new(crate::auth::NoopAuth)),
             framing: Arc::<dyn Framing<String>>::from(input.framing),
             defaults: input.defaults.unwrap_or(RouteDefaults { headers: None }),
             headers: None,

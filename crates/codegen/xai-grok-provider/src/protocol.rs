@@ -94,11 +94,15 @@ mod tests {
     #[test]
     fn protocol_new_sets_id() {
         let body = ProtocolBody::<()> {
-            schema: Schema { validate: |_| Ok(()) },
+            schema: Schema {
+                validate: |_| Ok(()),
+            },
             from: |_| Ok(()),
         };
         let stream = ProtocolStream::<(), (), ()> {
-            event: Schema { validate: |_| Ok(()) },
+            event: Schema {
+                validate: |_| Ok(()),
+            },
             initial: |_| (),
             step: |_, _| Ok(vec![]),
             terminal: None,
@@ -121,13 +125,23 @@ mod tests {
 
     #[test]
     fn schema_validate_passes() {
-        let s = Schema::<()> { validate: |_| Ok(()) };
+        let s = Schema::<()> {
+            validate: |_| Ok(()),
+        };
         assert!((s.validate)(&()).is_ok());
     }
 
     #[test]
     fn schema_validate_fails() {
-        let s = Schema::<String> { validate: |v| if v.is_empty() { Err("empty".into()) } else { Ok(()) } };
+        let s = Schema::<String> {
+            validate: |v| {
+                if v.is_empty() {
+                    Err("empty".into())
+                } else {
+                    Ok(())
+                }
+            },
+        };
         assert!((s.validate)(&String::new()).is_err());
         assert!((s.validate)(&"ok".to_owned()).is_ok());
     }
