@@ -544,6 +544,7 @@ impl SamplingClient {
     }
 
     /// The configured API backend for this client.
+    #[deprecated(note = "use protocol_id() instead — api_backend enum will be removed in a future phase")]
     pub fn api_backend(&self) -> ApiBackend {
         self.defaults.api_backend.clone()
     }
