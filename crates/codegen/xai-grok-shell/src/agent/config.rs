@@ -4616,6 +4616,7 @@ pub fn sampling_config_for_model(
         temperature,
         top_p,
         api_backend,
+        protocol_id: None,
         auth_scheme: credentials.auth_scheme,
         extra_headers,
         context_window: info.context_window.get(),

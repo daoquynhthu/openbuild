@@ -13744,6 +13744,7 @@ dependencies = [
  "xai-grok-models",
  "xai-grok-paths",
  "xai-grok-plugin-marketplace",
+ "xai-grok-provider",
  "xai-grok-sampler",
  "xai-grok-sampling-types",
  "xai-grok-sandbox",

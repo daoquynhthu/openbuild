@@ -55,9 +55,9 @@ pub struct SamplerConfig {
     pub top_p: Option<f32>,
     pub api_backend: ApiBackend,
     /// Protocol identifier for stream dispatch.
-    /// Derived from `api_backend` at construction; can be overridden.
+    /// `None` falls back to the protocol derived from `api_backend`.
     #[serde(default)]
-    pub protocol_id: String,
+    pub protocol_id: Option<String>,
     #[serde(default)]
     pub auth_scheme: AuthScheme,
     /// Extra request headers applied verbatim. The sampler never inspects
@@ -142,7 +142,7 @@ impl Default for SamplerConfig {
             temperature: None,
             top_p: None,
             api_backend: ApiBackend::default(),
-            protocol_id: crate::protocols::api_backend_to_protocol_id(&ApiBackend::default()).into(),
+            protocol_id: None,
             auth_scheme: AuthScheme::default(),
             extra_headers: IndexMap::new(),
             context_window: 0,

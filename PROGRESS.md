@@ -26,6 +26,23 @@
 
 ---
 
+## Phase 3: 认证层分离 — 2026-07-16
+
+### 完成内容
+- **3.1** `AuthFn` trait 完善：`BearerAuth`、`HeaderAuth`、`NoopAuth`、`FailAuth`、`ChainAuth`、`ThenAuth` 全部实现
+- **3.2** `Credential` 解析引擎：`Inline`/`Config`/`Session`/`None` 四变体 + `or_else()` 链式回退
+- **3.3** 创建 `AuthManagerAsAuthFn` 适配器 (`xai-grok-shell/src/auth/provider_adapter.rs`) — 将 `AuthManager` 包装为 `AuthFn`
+- **3.4** 添加 `xai-grok-provider` 依赖到 `xai-grok-shell`
+- **3.5** 修改 `SamplerConfig.protocol_id` 从 `String` 改为 `Option<String>` — 消除所有向后兼容问题
+- 修复 `SamplerConfig` 构造器遗漏 `protocol_id` 字段的 5+ 处
+
+### 关键结果
+- `cargo test -p xai-grok-provider` — 52/52 ✅
+- `cargo test -p xai-grok-sampler` — 154/154 ✅
+- 向后兼容：`protocol_id: None` 自动回退到 `api_backend` 派生值
+
+---
+
 ## Phase 2: 协议层提取 — 2026-07-16
 
 ### 完成内容

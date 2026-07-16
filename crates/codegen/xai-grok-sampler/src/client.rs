@@ -313,7 +313,7 @@ struct ClientDefaults {
     temperature: Option<f32>,
     top_p: Option<f32>,
     api_backend: ApiBackend,
-    protocol_id: String,
+    protocol_id: Option<String>,
     auth_scheme: AuthScheme,
     stream_tool_calls: bool,
     doom_loop_recovery: Option<xai_grok_sampling_types::DoomLoopRecoveryPolicy>,
@@ -549,11 +549,9 @@ impl SamplingClient {
     }
 
     pub fn protocol_id(&self) -> &str {
-        if self.defaults.protocol_id.is_empty() {
-            // Fallback to api_backend-derived protocol for backward compatibility.
-            crate::protocols::api_backend_to_protocol_id(&self.defaults.api_backend)
-        } else {
-            &self.defaults.protocol_id
+        match &self.defaults.protocol_id {
+            Some(id) if !id.is_empty() => id.as_str(),
+            _ => crate::protocols::api_backend_to_protocol_id(&self.defaults.api_backend),
         }
     }
 
@@ -2039,7 +2037,7 @@ mod tests {
             temperature: None,
             top_p: None,
             api_backend: ApiBackend::ChatCompletions,
-            protocol_id: "chat_completions".into(),
+            protocol_id: None,
             auth_scheme: AuthScheme::Bearer,
             extra_headers: IndexMap::new(),
             context_window: 8192,
