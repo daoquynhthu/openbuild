@@ -26,6 +26,36 @@
 
 ---
 
+## Phase 5-7: 配置集成 + 清理收尾 — 2026-07-16
+
+### Phase 5 完成内容
+- CLI 标志: `--provider` / `--api-key` / `--base-url` 到 `PagerArgs` + `AgentArgs`
+- `[provider.*]` TOML 配置解析 (`config.rs:parse_provider_toml()`)
+- `ProviderRegistry` 启动初始化 (`main.rs:904`)
+- `/providers` 斜杠命令 + `Action::OpenProviders` dispatch
+- `views/providers_modal.rs` — Provider 管理模态框 (stub)
+- `register_from_config()` — 从 TOML 配置 Provider
+
+### Phase 6 完成内容
+- `protocol_id` → `SamplerConfig` 全链路贯通
+- xAI OAuth 通过 `Credential::session()` 回退
+- `detect_from_url()` URL 模式匹配全部 6 个 Provider
+- 环境变量自动检测 (XAI_API_KEY, OPENAI_API_KEY 等)
+
+### Phase 7 完成内容
+- 移除 `main.rs` 顶层的 `#![allow(unused_imports, unreachable_code, ...)]`
+- `cargo audit` 尝试运行 (Windows 环境安装失败)
+- 最终编译验证: `cargo check -p xai-grok-pager-bin` ✅
+
+### 最终关键结果
+- `cargo test -p xai-grok-provider` — 55/55 ✅
+- `cargo test -p xai-grok-sampler` — 154/154 ✅
+- `cargo clippy -p xai-grok-provider -- -D warnings` ✅
+- `cargo clippy -p xai-grok-sampler -- -D warnings` ✅
+- 分支 34 次 commit，总计约 3,500+ 行新增代码
+
+---
+
 ## Phase 3: 认证层分离 — 2026-07-16
 
 ### 完成内容
