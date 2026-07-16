@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::types::ToolResultValue;
+
 /// Normalized event from a provider stream.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -16,7 +18,7 @@ pub enum LLMEvent {
     ToolInputDelta { id: String, text: String },
     ToolInputEnd { id: String, name: String },
     ToolCall { id: String, name: String, input: serde_json::Value },
-    ToolResult { id: String, name: String, result: serde_json::Value },
+    ToolResult { id: String, name: String, result: ToolResultValue },
     ToolError { id: String, name: String, message: String },
     StepFinish { index: u32, reason: FinishReason, usage: Option<Usage> },
     Finish { reason: FinishReason, usage: Option<Usage> },
@@ -90,7 +92,7 @@ mod tests {
             LLMEvent::ToolInputDelta { id: "tc1".into(), text: r#"{"city": "Lo"#.into() },
             LLMEvent::ToolInputEnd { id: "tc1".into(), name: "get_weather".into() },
             LLMEvent::ToolCall { id: "tc1".into(), name: "get_weather".into(), input: serde_json::json!({"city": "London"}) },
-            LLMEvent::ToolResult { id: "tc1".into(), name: "get_weather".into(), result: serde_json::json!({"temp": 20}) },
+            LLMEvent::ToolResult { id: "tc1".into(), name: "get_weather".into(), result: crate::types::ToolResultValue::Json(serde_json::json!({"temp": 20})) },
             LLMEvent::ToolError { id: "tc1".into(), name: "get_weather".into(), message: "timeout".into() },
             LLMEvent::StepFinish { index: 0, reason: FinishReason::ToolCalls, usage: None },
             LLMEvent::Finish { reason: FinishReason::Stop, usage: None },

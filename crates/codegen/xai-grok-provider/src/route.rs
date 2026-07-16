@@ -1,17 +1,19 @@
 use std::sync::Arc;
 
-use crate::auth::{AuthFn, NoopAuth};
+use crate::auth::AuthFn;
 use crate::endpoint::{Endpoint, EndpointPatch};
 use crate::framing::Framing;
 use crate::model::Model;
-use crate::types::{ModelId, ProviderId};
+use crate::types::{HeaderMap, LLMRequest, ModelId, ProviderId};
 
+/// Static defaults for a Route.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct RouteDefaults {
-    pub headers: Option<std::collections::HashMap<String, String>>,
+    pub headers: Option<HeaderMap>,
 }
 
+/// Input for constructing a Route.
 pub struct RouteInput {
     pub id: String,
     pub provider: Option<ProviderId>,
@@ -34,6 +36,8 @@ impl core::fmt::Debug for RouteInput {
     }
 }
 
+/// A Route composes the four orthogonal deployment axes:
+/// Protocol + Endpoint + Auth + Framing.
 #[derive(Clone)]
 pub struct Route {
     pub id: String,
@@ -43,6 +47,7 @@ pub struct Route {
     pub auth: Arc<dyn AuthFn>,
     pub framing: Arc<dyn Framing<String>>,
     pub defaults: RouteDefaults,
+    pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
 }
 
 impl core::fmt::Debug for Route {
@@ -64,23 +69,24 @@ impl Route {
             provider: input.provider,
             protocol: input.protocol,
             endpoint: input.endpoint,
-            auth: input.auth.map(Arc::<dyn AuthFn>::from).unwrap_or_else(|| Arc::new(NoopAuth)),
+            auth: input.auth.map(Arc::<dyn AuthFn>::from).unwrap_or_else(|| Arc::new(crate::auth::NoopAuth)),
             framing: Arc::<dyn Framing<String>>::from(input.framing),
-            defaults: input.defaults.unwrap_or(RouteDefaults {
-                headers: None,
-            }),
+            defaults: input.defaults.unwrap_or(RouteDefaults { headers: None }),
+            headers: None,
         }
     }
 
-    pub fn with(&self, patch: RoutePatch) -> Self {
+    pub fn with(self, patch: RoutePatch) -> Self {
+        let endpoint = match patch.endpoint {
+            Some(ref ep) => crate::endpoint::merge_endpoints(&self.endpoint, ep),
+            None => self.endpoint,
+        };
         Self {
-            endpoint: patch.endpoint.as_ref().map_or_else(
-                || self.endpoint.clone(),
-                |ep| crate::endpoint::merge_endpoints(&self.endpoint, ep),
-            ),
-            provider: patch.provider.or_else(|| self.provider.clone()),
-            defaults: patch.defaults.unwrap_or_else(|| self.defaults.clone()),
-            ..self.clone()
+            endpoint,
+            provider: patch.provider.or(self.provider),
+            defaults: patch.defaults.unwrap_or(self.defaults),
+            headers: patch.headers.or(self.headers),
+            ..self
         }
     }
 
@@ -97,19 +103,22 @@ impl Route {
     }
 }
 
-#[derive(Debug, Clone)]
+/// Partial overrides for Route::with().
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct RoutePatch {
     pub provider: Option<ProviderId>,
     pub endpoint: Option<EndpointPatch<()>>,
     pub defaults: Option<RouteDefaults>,
+    pub auth: Option<Box<dyn AuthFn>>,
+    pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::auth::Credential;
-    use crate::endpoint::{EndpointPatch, EndpointPart};
+    use crate::endpoint::EndpointPart;
     use crate::framing::SseFraming;
     use crate::types::ProviderId;
 
@@ -125,9 +134,7 @@ mod tests {
             },
             auth: Some(Credential::optional(Some("sk-test".into()), "api_key").bearer()),
             framing: Box::new(SseFraming),
-            defaults: Some(RouteDefaults {
-                headers: None,
-            }),
+            defaults: Some(RouteDefaults { headers: None }),
         })
     }
 
@@ -156,6 +163,8 @@ mod tests {
                 query: None,
             }),
             defaults: None,
+            auth: None,
+            headers: None,
         });
         assert_eq!(
             patched.endpoint.base_url.unwrap(),

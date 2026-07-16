@@ -86,14 +86,12 @@ impl ProviderRegistry {
     }
 
     pub fn detect_from_url(&self, base_url: &str) -> ProviderId {
-        let host = base_url
-            .trim_start_matches("https://")
-            .trim_start_matches("http://")
-            .split('/')
-            .next()
-            .unwrap_or("");
+        let host = url::Url::parse(base_url)
+            .ok()
+            .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
+            .unwrap_or_default();
 
-        match host {
+        match host.as_str() {
             h if h == "api.x.ai" || h == "api.grok.com" || h.ends_with(".grok.com") => {
                 ProviderId::new(ProviderId::XAI)
             }

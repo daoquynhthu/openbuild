@@ -107,6 +107,9 @@ impl Default for ProviderDefaults {
     }
 }
 
+/// Shared header map type used across the provider crate.
+pub type HeaderMap = std::collections::HashMap<String, String>;
+
 /// A portable, provider-independent request body for an LLM call.
 /// Protocol implementations convert this to their native wire format.
 #[derive(Debug, Clone)]
@@ -118,7 +121,8 @@ pub struct LLMRequest {
 }
 
 /// Result value from a provider-executed tool call.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ToolResultValue {
     Text(String),
     Json(serde_json::Value),
