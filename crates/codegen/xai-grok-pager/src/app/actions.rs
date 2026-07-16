@@ -331,6 +331,8 @@ pub enum Action {
     CopyBlockMeta,
     /// Open the selected block in the fullscreen viewer.
     OpenBlockViewer,
+    /// Open the providers configuration dialog.
+    OpenProviders,
     /// Open the extensions modal dialog on a specific tab.
     OpenExtensionsModal {
         tab: crate::views::extensions_modal::ExtensionsTab,

@@ -591,6 +591,10 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             }
             vec![]
         }
+        Action::OpenProviders => {
+            // TODO: implement providers modal
+            vec![]
+        }
         Action::OpenExtensionsModal { tab, trigger } => {
             if app.appearance.disable_plugins {
                 return vec![];

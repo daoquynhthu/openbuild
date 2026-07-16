@@ -42,6 +42,7 @@ pub mod personas;
 pub mod plan;
 pub mod plugin;
 pub mod privacy;
+pub mod providers;
 pub mod queue;
 pub mod recap;
 pub mod release_notes;
@@ -123,6 +124,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(toggle_mouse_reporting::ToggleMouseReportingCommand),
         Arc::new(settings_cmd::SettingsCommand),
         Arc::new(privacy::PrivacyCommand),
+        Arc::new(providers::ProvidersCommand),
         Arc::new(rewind::RewindCommand),
         Arc::new(login::LoginCommand),
         Arc::new(logout::LogoutCommand),
