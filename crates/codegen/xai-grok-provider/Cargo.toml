@@ -16,5 +16,8 @@ tokio-stream = { workspace = true }
 indexmap = { workspace = true }
 url = { workspace = true }
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+
 [lints]
 workspace = true

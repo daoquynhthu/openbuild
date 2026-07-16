@@ -9,7 +9,15 @@ pub struct ConfiguredProvider {
     pub id: ProviderId,
     pub route: Route,
     pub model: fn(&str, &Route) -> Model,
-    pub configure: fn(ProviderConfig) -> ConfiguredProvider,
+}
+
+impl core::fmt::Debug for ConfiguredProvider {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ConfiguredProvider")
+            .field("id", &self.id)
+            .field("route", &self.route)
+            .finish()
+    }
 }
 
 pub trait Provider: Send + Sync + core::fmt::Debug {

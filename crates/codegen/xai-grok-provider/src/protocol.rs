@@ -1,15 +1,17 @@
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use crate::events::LLMEvent;
+use crate::types::LLMRequest;
 
 pub type ProtocolId = String;
 
 pub struct ProtocolBody<Body> {
-    pub from: fn(crate::types::LLMRequest) -> Result<Body, String>,
+    pub from: fn(LLMRequest) -> Result<Body, String>,
 }
 
 pub struct ProtocolStream<Frame, Event, State> {
-    pub initial: fn(crate::types::LLMRequest) -> State,
+    pub initial: fn(LLMRequest) -> State,
     pub step: fn(&mut State, Event) -> Result<Vec<LLMEvent>, String>,
     pub terminal: Option<fn(&Event) -> bool>,
     pub on_halt: Option<fn(&State) -> Vec<LLMEvent>>,
@@ -40,21 +42,56 @@ impl<B, F, E, S> Protocol<B, F, E, S> {
 
 #[derive(Debug, Default)]
 pub struct ProtocolTable {
-    protocols: Vec<String>,
+    protocols: HashMap<ProtocolId, String>,
 }
 
 impl ProtocolTable {
     pub fn new() -> Self {
         Self {
-            protocols: Vec::new(),
+            protocols: HashMap::new(),
         }
     }
 
     pub fn register(&mut self, id: impl Into<ProtocolId>) {
-        self.protocols.push(id.into());
+        self.protocols.insert(id.into(), String::new());
     }
 
-    pub fn contains(&self, id: &ProtocolId) -> bool {
-        self.protocols.contains(id)
+    pub fn contains(&self, id: &str) -> bool {
+        self.protocols.contains_key(id)
+    }
+
+    pub fn all_ids(&self) -> Vec<ProtocolId> {
+        self.protocols.keys().cloned().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn protocol_new_sets_id() {
+        let body = ProtocolBody::<()> {
+            from: |_| Ok(()),
+        };
+        let stream = ProtocolStream::<(), (), ()> {
+            initial: |_| (),
+            step: |_, _| Ok(vec![]),
+            terminal: None,
+            on_halt: None,
+            _frame: PhantomData,
+        };
+        let protocol = Protocol::new("test", body, stream);
+        assert_eq!(protocol.id, "test");
+    }
+
+    #[test]
+    fn protocol_table_register_and_contains() {
+        let mut table = ProtocolTable::new();
+        assert!(!table.contains("chat"));
+        table.register("chat");
+        assert!(table.contains("chat"));
+        table.register("responses");
+        assert_eq!(table.all_ids().len(), 2);
     }
 }
