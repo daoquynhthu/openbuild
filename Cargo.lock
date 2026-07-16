@@ -13532,6 +13532,8 @@ dependencies = [
  "toml",
  "tracing",
  "url",
+ "xai-grok-sampler",
+ "xai-grok-sampling-types",
 ]
 
 [[package]]

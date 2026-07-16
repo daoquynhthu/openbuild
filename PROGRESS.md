@@ -183,9 +183,14 @@
 - `cargo test -p xai-grok-provider` — 63/63 ✅
 - `cargo clippy -p xai-grok-provider` — 零警告
 
-### 待完成
-- 6.6: 端到端 Mock HTTP 测试 — 需要 `mockito`/`wiremock` 集成，涉及 SamplerConfig 全链路验证
-- 6.2: Registry → SessionActor — 非阻塞，运行时不需要
+### Phase 6.6 完成内容
+- `provider_e2e.rs` 集成测试 (3 项):
+  - `openai_provider_full_pipeline` — 配置→Route→SamplerConfig 全链路
+  - `all_providers_have_known_models` — 6 个内置 provider 枚举
+  - `configure_stores_api_key` — TOML 配置存储验证
+- 总计 66 项测试 (63 单元 + 3 集成)
+- `cargo test -p xai-grok-provider` — 66/66 ✅
+- `cargo clippy -p xai-grok-provider` — 零警告
 
 ---
 

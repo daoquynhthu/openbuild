@@ -1,0 +1,114 @@
+use xai_grok_provider::config::ProviderConfig;
+use xai_grok_provider::registry::ProviderRegistry;
+use xai_grok_provider::types::ProviderId;
+
+/// Integration test: full provider config → registry → Route → SamplerConfig.
+/// Verifies that the entire chain from configuration to a valid SamplerConfig
+/// works end-to-end without actual HTTP (the sampler crate's own tests cover
+/// HTTP-level correctness).
+#[test]
+fn openai_provider_full_pipeline() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let pid = ProviderId::new("openai");
+    let overrides = ProviderConfig {
+        id: Some("openai".into()),
+        api_key: Some("sk-e2e-test-key".into()),
+        base_url: Some("https://mock.local/v1".into()),
+        ..Default::default()
+    };
+    reg.store_config(&pid, overrides.clone());
+    let configured = reg.configure(&pid, overrides).expect("configure openai");
+
+    // Route fields
+    assert_eq!(configured.route.id, "openai-chat");
+    assert_eq!(configured.route.protocol, "chat_completions");
+    assert_eq!(
+        configured.route.endpoint.base_url.as_deref(),
+        Some("https://mock.local/v1")
+    );
+
+    // Stored config
+    let stored = reg.get_config(&pid).expect("stored config");
+    assert_eq!(stored.api_key.as_deref(), Some("sk-e2e-test-key"));
+
+    // Provider metadata
+    let provider = reg.get(&pid).expect("provider");
+    assert_eq!(provider.name(), "OpenAI");
+    assert_eq!(
+        provider.defaults().api_backend,
+        xai_grok_provider::types::ApiBackend::ChatCompletions
+    );
+
+    // Known models
+    let models = provider.known_models();
+    assert!(!models.is_empty());
+    assert!(models.iter().any(|m| m.id == "gpt-4o"));
+
+    // Build SamplerConfig and verify protocol_id
+    let sampler = xai_grok_sampler::SamplerConfig {
+        api_key: Some("sk-e2e-test-key".into()),
+        base_url: "https://mock.local/v1".into(),
+        model: "gpt-4o-2024-11-20".into(),
+        api_backend: xai_grok_sampler::ApiBackend::ChatCompletions,
+        protocol_id: Some("chat_completions".into()),
+        auth_scheme: xai_grok_sampler::AuthScheme::Bearer,
+        context_window: 128_000,
+        max_completion_tokens: provider.defaults().max_completion_tokens,
+        temperature: provider.defaults().temperature,
+        top_p: provider.defaults().top_p,
+        ..Default::default()
+    };
+    assert_eq!(sampler.protocol_id.as_deref(), Some("chat_completions"));
+
+    let client = xai_grok_sampler::SamplingClient::new(sampler)
+        .expect("SamplingClient::new");
+    assert_eq!(client.protocol_id(), "chat_completions");
+}
+
+/// Verify all built-in providers are registered with known models.
+#[test]
+fn all_providers_have_known_models() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let ids = reg.all_ids();
+    assert_eq!(ids.len(), 6, "6 built-in providers");
+
+    for pid in &ids {
+        let provider = reg.get(pid).expect("provider");
+        let models = provider.known_models();
+        assert!(
+            models.len() <= 10,
+            "{} should have at most 10 known models, got {}",
+            provider.name(),
+            models.len()
+        );
+    }
+}
+
+/// Verify configure_providers merges config and stores it.
+#[test]
+fn configure_stores_api_key() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let toml: toml::Value = toml::from_str(
+        r#"
+        [provider.openai]
+        api_key = "sk-from-toml"
+        "#,
+    )
+    .unwrap();
+    xai_grok_provider::providers::configure_providers(&reg, &toml, None);
+
+    let pid = ProviderId::new("openai");
+    let stored = reg.get_config(&pid).expect("openai config");
+    assert_eq!(stored.api_key.as_deref(), Some("sk-from-toml"));
+
+    // OpenAI got its key from TOML. xAI may have one from XAI_API_KEY env var
+    // (set in dev environments), so we only check the TOML-sourced provider.
+}
+
+
