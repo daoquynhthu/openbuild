@@ -101,6 +101,8 @@ pub enum Credential {
     Inline(Option<String>),
     Config(String),
     Session,
+    /// Always succeeds with a sentinel value (e.g. "public" for free tiers).
+    PublicKey(String),
     None,
 }
 
@@ -117,13 +119,17 @@ impl Credential {
         Credential::Session
     }
 
+    pub fn public_key(value: &str) -> Self {
+        Credential::PublicKey(value.to_owned())
+    }
+
     pub fn or_else(self, other: Credential) -> Credential {
         if self.resolve().is_some() { self } else { other }
     }
 
     pub fn bearer(self) -> Box<dyn AuthFn> {
         match self {
-            Credential::None => Box::new(NoopAuth),
+            Credential::None | Credential::PublicKey(_) => Box::new(NoopAuth),
             _ => match self.resolve() {
                 Some(key) => Box::new(BearerAuth(key)),
                 None => Box::new(FailAuth("no credential resolved".into())),
@@ -134,7 +140,7 @@ impl Credential {
     pub fn header(self, name: &str) -> Box<dyn AuthFn> {
         let n = name.to_owned();
         match self {
-            Credential::None => Box::new(NoopAuth),
+            Credential::None | Credential::PublicKey(_) => Box::new(NoopAuth),
             _ => match self.resolve() {
                 Some(value) => Box::new(HeaderAuth { name: n, value }),
                 None => Box::new(FailAuth("no credential resolved".into())),

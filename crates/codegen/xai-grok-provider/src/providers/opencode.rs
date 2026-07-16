@@ -59,9 +59,10 @@ impl Provider for OpenCodeProvider {
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
         let base_url = overrides.base_url.clone().unwrap_or_else(|| self.defaults.base_url.clone());
-        // No API key → public free-tier fallback.
+        // No API key → public free-tier fallback (sends apiKey="public").
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("OPENCODE_API_KEY"))
+            .or_else(Credential::public_key("public"))
             .bearer();
         let route = Route::make(RouteInput {
             id: "opencode-chat".into(),

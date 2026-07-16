@@ -29,7 +29,18 @@ pub(crate) fn xai_defaults() -> ProviderDefaults {
         supports_tool_calling: true,
         supports_structured_output: true,
         extra_headers: IndexMap::new(),
-        known_models: vec![],
+        known_models: vec![
+            ProviderModelDef {
+                id: "grok-build".into(),
+                model: "grok-build".into(),
+                name: "Grok Build".into(),
+                description: Some("Best for advanced coding tasks".into()),
+                context_window: NonZeroU64::new(500_000).unwrap(),
+                hidden: false,
+                api_backend: None,
+                supports_reasoning_effort: None,
+            },
+        ],
     }
 }
 
@@ -63,7 +74,10 @@ impl Provider for XaiProvider {
         let base_url = overrides.base_url.clone().unwrap_or_else(|| self.defaults.base_url.clone());
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("XAI_API_KEY"))
+            .or_else(Credential::session())
             .bearer();
+        let mut xai_headers = std::collections::HashMap::new();
+        xai_headers.insert("x-grok-client-identifier".into(), "xai-grok-provider".into());
         let route = Route::make(RouteInput {
             id: "xai-responses".into(),
             provider: Some(self.defaults.id.clone()),
@@ -75,7 +89,7 @@ impl Provider for XaiProvider {
             },
             auth: Some(auth),
             framing: Box::new(SseFraming),
-            defaults: None,
+            defaults: Some(crate::route::RouteDefaults { headers: Some(xai_headers) }),
         });
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
