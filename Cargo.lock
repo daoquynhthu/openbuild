@@ -13518,6 +13518,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "xai-grok-provider"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "http 1.4.0",
+ "indexmap",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio-stream",
+ "url",
+]
+
+[[package]]
 name = "xai-grok-sampler"
 version = "0.1.0"
 dependencies = [
