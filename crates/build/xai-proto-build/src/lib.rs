@@ -114,10 +114,16 @@ impl XaiProtoBuilder {
 
         // Can only process one input file when using --dependency_out=FILE.
         for proto in protos {
+            let dep_out = tempfile::NamedTempFile::new()
+                .context("failed to create temp file for protoc dependency output")?;
+            let dev_null_out = tempfile::NamedTempFile::new()
+                .context("failed to create temp file for protoc descriptor output")?;
+            let dev_null_path = dev_null_out.path().to_str()
+                .context("dev_null_out path is not valid UTF-8")?.to_owned();
             let mut command = Command::new(protoc.unwrap_or(Path::new("protoc")));
             command
-                .arg("--dependency_out=/dev/stdout")
-                .arg("--descriptor_set_out=/dev/null");
+                .arg(format!("--dependency_out={}", dep_out.path().display()))
+                .arg(format!("--descriptor_set_out={dev_null_path}"));
 
             // Add protoc's well-known types include directory first (if found).
             // This is needed for Bazel sandboxed builds where protoc and its
@@ -143,14 +149,16 @@ impl XaiProtoBuilder {
                 return Err(anyhow::anyhow!("protoc command failed"));
             }
 
-            let output =
-                String::from_utf8(output.stdout).context("protoc command output not UTF-8")?;
+            let dep_content = fs::read_to_string(dep_out.path())
+                .context("failed to read protoc dependency output")?;
 
-            let mut lines = output.lines();
-            let first_line = lines.next().context("protoc command output is empty")?;
-            let prefix = "/dev/null:";
+            let mut lines = dep_content.lines();
+            let first_line = lines.next().context("protoc dependency output is empty")?;
+            let prefix = &format!("{dev_null_path}:");
             let rem = first_line.strip_prefix(prefix).with_context(|| {
-                format!("protoc command output must start with /dev/null: {output:?}")
+                format!(
+                    "protoc dependency output must start with '{dev_null_path}:': {dep_content:?}"
+                )
             })?;
             for line in iter::once(rem).chain(lines) {
                 let line = line.trim();

@@ -21,4 +21,5 @@
 - 新增文件 13 个，修改 `Cargo.toml` 2 处
 
 ### 阻塞项
-- `xai-grok-tools-api` 需要 protoc，Windows 上不可用。不影响 xai-grok-provider 开发
+- `xai-grok-tools-api` 需要 protoc，Windows 上需 `winget install Google.Protobuf`（已解决）
+- `xai-grok-shell` 在 Windows 上有 tracing crate const eval bug（Rust 1.92.0，不影响开发）

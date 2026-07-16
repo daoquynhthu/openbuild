@@ -86,7 +86,7 @@ xai-grok-provider/src/
 
 - 单元测试覆盖率 ≥ 95%（`cargo tarpaulin -p xai-grok-provider`）
 - `cargo clippy -p xai-grok-provider` 零警告
-- `cargo check --workspace` 零错误
+- `cargo check --workspace` 零错误（Windows: 已知 `xai-grok-shell` 中 tracing crate const eval bug，不影响开发）
 - 所有 trait 和 struct 均带有 `#[non_exhaustive]`（应对外来扩展）
 
 ---
@@ -429,7 +429,7 @@ main
 
 每个 Phase 完成后，必须执行以下收尾序列：
 
-1. **门禁检查**：`cargo check --workspace` + `cargo clippy --workspace` + `cargo test --workspace`
+1. **门禁检查**：`cargo check --workspace`（Windows 上使用 `.\check.ps1` 代替）+ `cargo clippy --workspace` + `cargo test --workspace`
 2. **更新 PROGRESS.md**：追加 Phase 摘要（完成内容、关键结果、阻塞项）
 3. **提交**：`git add PROGRESS.md && git commit -m "progress: phase N <名称>"`
 4. **提交 Phase**：若还有未提交的代码变更，一并进行

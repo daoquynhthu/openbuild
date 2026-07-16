@@ -1,3 +1,8 @@
 /target
+
+# Windows reserved device names — git sees these as untracked files on all dirs
+NUL
+
+
 **/*.rs.bk
 .DS_Store
