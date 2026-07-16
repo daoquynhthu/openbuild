@@ -117,6 +117,10 @@ impl Credential {
         Credential::Session
     }
 
+    pub fn or_else(self, other: Credential) -> Credential {
+        if self.resolve().is_some() { self } else { other }
+    }
+
     pub fn bearer(self) -> Box<dyn AuthFn> {
         match self {
             Credential::None => Box::new(NoopAuth),
@@ -178,12 +182,23 @@ mod tests {
     }
 
     #[test]
-    fn chain_auth_falls_through() {
+    fn optional_none_falls_through_chain() {
         let auth = Credential::optional(None, "first")
-            .bearer()
-            .or_else(Credential::optional(Some("fallback".into()), "second").bearer());
-        let headers = auth.apply(&test_input()).unwrap();
+            .or_else(Credential::optional(Some("fallback".into()), "second"))
+            .bearer();
+        let input = test_input();
+        let headers = auth.apply(&input).unwrap();
         assert_eq!(headers.get("Authorization").unwrap(), "Bearer fallback");
+    }
+
+    #[test]
+    fn credential_or_else_uses_credential_style() {
+        // Verify the Arch §3.9 pattern: Credential::opt().or_else().bearer()
+        let auth = Credential::optional(Some("primary".into()), "p")
+            .or_else(Credential::optional(Some("fallback".into()), "f"))
+            .bearer();
+        let headers = auth.apply(&test_input()).unwrap();
+        assert_eq!(headers.get("Authorization").unwrap(), "Bearer primary");
     }
 
     #[test]

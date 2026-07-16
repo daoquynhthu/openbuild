@@ -25,6 +25,7 @@ impl<T> Clone for Schema<T> {
     }
 }
 
+/// Body construction for a Protocol: schema validation + request lowering.
 pub struct ProtocolBody<Body> {
     pub schema: Schema<Body>,
     pub from: fn(LLMRequest) -> Result<Body, String>,
