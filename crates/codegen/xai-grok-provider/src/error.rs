@@ -2,6 +2,7 @@ use thiserror::Error;
 
 /// Errors that can occur in the provider layer.
 #[derive(Debug, Clone, Error)]
+#[non_exhaustive]
 pub enum ProviderError {
     #[error("authentication failed: {0}")]
     Auth(String),

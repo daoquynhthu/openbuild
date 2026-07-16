@@ -51,6 +51,7 @@ pub enum AuthScheme {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ProviderModelDef {
     pub id: String,
     pub model: String,
@@ -63,6 +64,7 @@ pub struct ProviderModelDef {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ProviderDefaults {
     pub id: ProviderId,
     pub name: String,

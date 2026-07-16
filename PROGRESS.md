@@ -214,6 +214,16 @@
 - 移除 `main.rs` 顶层的 `#![allow(unused_imports, unreachable_code, ...)]`
 - `cargo audit` 尝试运行 (Windows 环境安装失败)
 
+### Phase 7.1 完成内容
+- 移除 `SamplingClient::api_backend()` 废弃方法（无生产调用者）
+- 更新 4 处测试调用改为 `protocol_id()` 匹配
+- `ExtraHeaderProvider` 已在早期 Phase 移除（无需操作）
+- `is_cli_chat_proxy_url`、`stream/` 仍在活跃使用，保留
+
+### Phase 7.5 完成内容
+- 添加 `#[non_exhaustive]` 到: `ProviderModelDef`、`ProviderDefaults`、`RouteInput`、`ProviderError`
+- 余下 8 个类型待下一轮（部分需处理跨 crate 构造兼容性）
+
 ---
 
 ## Phase 1: 核心类型层 — 2026-07-16

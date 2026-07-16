@@ -14,6 +14,7 @@ pub struct RouteDefaults {
 }
 
 /// Input for constructing a Route.
+#[non_exhaustive]
 pub struct RouteInput {
     pub id: String,
     pub provider: Option<ProviderId>,

@@ -1353,12 +1353,11 @@ async fn test_single_request_per_stream() {
 
 #[tokio::test]
 async fn test_api_backend_getter_returns_configured_value() {
-    // Verify that the client correctly reports its configured API backend
     let client_responses = create_test_client("http://localhost/v1", ApiBackend::Responses);
-    assert_eq!(client_responses.api_backend(), ApiBackend::Responses);
+    assert_eq!(client_responses.protocol_id(), "responses");
 
     let client_chat = create_test_client("http://localhost/v1", ApiBackend::ChatCompletions);
-    assert_eq!(client_chat.api_backend(), ApiBackend::ChatCompletions);
+    assert_eq!(client_chat.protocol_id(), "chat_completions");
 }
 
 #[tokio::test]
@@ -1377,20 +1376,20 @@ async fn test_responses_backend_hits_responses_endpoint_not_chat_completions() {
     server.set_response("OK");
     let client = create_test_client(&server.url(), ApiBackend::Responses);
 
-    // Simulate the routing logic from acp_session.rs
-    match client.api_backend() {
-        ApiBackend::Responses => {
+    match client.protocol_id() {
+        "responses" => {
             let request = ConversationRequest::from_items(vec![ConversationItem::user("Hello")]);
             let (mut stream, _metadata, _) =
                 client.conversation_stream_responses(request).await.unwrap();
             while stream.next().await.is_some() {}
         }
-        ApiBackend::ChatCompletions => {
+        "chat_completions" => {
             panic!("Expected Responses backend but got ChatCompletions");
         }
-        ApiBackend::Messages => {
+        "messages" => {
             panic!("Expected Responses backend but got Messages");
         }
+        _ => panic!("Unknown protocol: {}", client.protocol_id()),
     }
 
     assert!(
@@ -1416,19 +1415,19 @@ async fn test_chat_completions_backend_hits_chat_endpoint_not_responses() {
     server.set_response("OK");
     let client = create_test_client(&server.url(), ApiBackend::ChatCompletions);
 
-    // Simulate the routing logic from acp_session.rs
-    match client.api_backend() {
-        ApiBackend::ChatCompletions => {
+    match client.protocol_id() {
+        "chat_completions" => {
             let request = ConversationRequest::from_items(vec![ConversationItem::user("Hello")]);
             let (mut stream, _metadata) = client.conversation_stream(request).await.unwrap();
             while stream.next().await.is_some() {}
         }
-        ApiBackend::Responses => {
+        "responses" => {
             panic!("Expected ChatCompletions backend but got Responses");
         }
-        ApiBackend::Messages => {
+        "messages" => {
             panic!("Expected ChatCompletions backend but got Messages");
         }
+        _ => panic!("Unknown protocol: {}", client.protocol_id()),
     }
 
     assert!(

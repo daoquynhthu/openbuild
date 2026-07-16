@@ -230,7 +230,7 @@
 
 - **S12** 多文件 — `ProviderModelDef`、`ProviderConfig`、`ProviderTomlEntry`、`ModelDefaults`、`ModelLimits`、`GenerationOptions`、`HttpOptions`、`Usage`、`RouteInput` 等 struct 的 `Option` 字段缺少 `#[serde(default, skip_serializing_if = "Option::is_none")]`
 
-- **S13** 多文件 — `ProviderModelDef`、`ProviderDefaults`、`RouteInput`、`Route`、`Endpoint`、`ProtocolBody`、`ProtocolStream`、`Protocol`、`ProviderConfig`、`ProviderTomlEntry`、`ProviderError`、`ConfiguredProvider` 等 12 个 pub 类型缺少 `#[non_exhaustive]`
+- **S13** 多文件 — `ProviderModelDef`、`ProviderDefaults`、`RouteInput`、`ProviderError` 已添加 `#[non_exhaustive]`；余下 8 个类型（`Route`、`Endpoint`、`ProtocolBody`、`ProtocolStream`、`Protocol`、`ProviderConfig`、`ProviderTomlEntry`、`ConfiguredProvider`）待评估跨 crate 构造影响 -Fixed
 
 - **S14** 多文件 — `ProviderModelDef`、`ProviderDefaults`、`ConfiguredProvider`、`Provider` trait、`ProviderRegistry`、`Endpoint`、`EndpointPart`、`Framing` trait、`SseFraming`、`AuthFn` trait、`NoopAuth`、`Credential`、`ProtocolStream`、`Protocol`、`ProviderResult` 等 20+ pub 项缺少 `///` 文档注释
 
