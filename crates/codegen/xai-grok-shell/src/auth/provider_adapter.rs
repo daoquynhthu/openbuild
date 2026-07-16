@@ -34,6 +34,12 @@ impl AuthFn for AuthManagerAsAuthFn {
             None => Err("xAI auth: no session token available".into()),
         }
     }
+
+    fn clone_box(&self) -> Box<dyn AuthFn> {
+        Box::new(Self {
+            auth_manager: self.auth_manager.clone(),
+        })
+    }
 }
 
 #[cfg(test)]

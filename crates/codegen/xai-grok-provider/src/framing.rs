@@ -7,6 +7,7 @@ pub trait Framing<Frame>: Send + Sync + core::fmt::Debug {
         &self,
         bytes: Box<dyn Stream<Item = Result<Bytes, String>> + Send + Unpin>,
     ) -> Box<dyn Stream<Item = Frame> + Send + Unpin>;
+    fn clone_box(&self) -> Box<dyn Framing<Frame>>;
 }
 
 #[derive(Debug)]
@@ -15,6 +16,10 @@ pub struct SseFraming;
 impl Framing<String> for SseFraming {
     fn id(&self) -> &str {
         "sse"
+    }
+
+    fn clone_box(&self) -> Box<dyn Framing<String>> {
+        Box::new(SseFraming)
     }
 
     fn frame(

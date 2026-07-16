@@ -12,6 +12,7 @@ pub struct AuthInput {
 
 pub trait AuthFn: Send + Sync + core::fmt::Debug + 'static {
     fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String>;
+    fn clone_box(&self) -> Box<dyn AuthFn>;
 }
 
 impl dyn AuthFn {
@@ -31,6 +32,10 @@ impl AuthFn for ChainAuth {
     fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
         self.0.apply(input).or_else(|_| self.1.apply(input))
     }
+
+    fn clone_box(&self) -> Box<dyn AuthFn> {
+        Box::new(ChainAuth(self.0.clone_box(), self.1.clone_box()))
+    }
 }
 
 #[derive(Debug)]
@@ -48,6 +53,10 @@ impl AuthFn for ThenAuth {
         };
         self.1.apply(&chained_input)
     }
+
+    fn clone_box(&self) -> Box<dyn AuthFn> {
+        Box::new(ThenAuth(self.0.clone_box(), self.1.clone_box()))
+    }
 }
 
 #[derive(Debug)]
@@ -58,6 +67,10 @@ impl AuthFn for BearerAuth {
         let mut headers = input.headers.clone();
         headers.insert("Authorization".into(), format!("Bearer {}", self.0));
         Ok(headers)
+    }
+
+    fn clone_box(&self) -> Box<dyn AuthFn> {
+        Box::new(Self(self.0.clone()))
     }
 }
 
@@ -73,6 +86,13 @@ impl AuthFn for HeaderAuth {
         headers.insert(self.name.clone(), self.value.clone());
         Ok(headers)
     }
+
+    fn clone_box(&self) -> Box<dyn AuthFn> {
+        Box::new(Self {
+            name: self.name.clone(),
+            value: self.value.clone(),
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -82,6 +102,10 @@ impl AuthFn for NoopAuth {
     fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
         Ok(input.headers.clone())
     }
+
+    fn clone_box(&self) -> Box<dyn AuthFn> {
+        Box::new(NoopAuth)
+    }
 }
 
 #[derive(Debug)]
@@ -90,6 +114,10 @@ struct FailAuth(String);
 impl AuthFn for FailAuth {
     fn apply(&self, _input: &AuthInput) -> Result<HeaderMap, String> {
         Err(self.0.clone())
+    }
+
+    fn clone_box(&self) -> Box<dyn AuthFn> {
+        Box::new(Self(self.0.clone()))
     }
 }
 

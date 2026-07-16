@@ -16,7 +16,7 @@ fn ollama_defaults() -> ProviderDefaults {
         name: "Ollama".into(),
         base_url: "http://localhost:11434/v1".into(),
         api_backend: ApiBackend::ChatCompletions,
-        auth_scheme: AuthScheme::Bearer,
+        auth_scheme: AuthScheme::None,
         env_key: vec![],
         context_window: NonZeroU64::new(128_000).unwrap(),
         temperature: Some(0.7),

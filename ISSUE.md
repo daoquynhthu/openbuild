@@ -308,13 +308,13 @@
 
 ### 严重 (C) — 架构契约破坏 / 功能必损
 
-- **C12** `xai-grok-provider/src/route.rs:48-49` — `Route` 使用 `Arc<dyn AuthFn>` 和 `Arc<dyn Framing>` 而非 Arch §3.4 要求的 `Box<dyn ...>`. `Arc` 表示共享所有权 (可在 `Route::with` 的 `Clone` 中重用), 但 Arch 签约为 `Box` 表示所有权转移。实际行为兼容, 但接口契约偏离
+- **C12** `xai-grok-provider/src/route.rs:48-49` — `Route` 使用 `Arc<dyn AuthFn>` 和 `Arc<dyn Framing>` 而非 Arch §3.4 要求的 `Box<dyn ...>`. `Arc` 表示共享所有权 (可在 `Route::with` 的 `Clone` 中重用), 但 Arch 签约为 `Box` 表示所有权转移。实际行为兼容, 但接口契约偏离 -Fixed
 
 - **C13** `xai-grok-provider/src/registry.rs:13-16` — `ProviderRegistry` 包含 Arch §4 未指定的 `configs: RwLock<HashMap<ProviderId, ProviderConfig>>` 字段及 `store_config()`/`get_config()`/`register_route()`/`get_route()` 四个额外方法。功能上必要, 但公开 API 面与文档差异
 
-- **C14** `xai-grok-provider/src/providers/openai.rs:32-53` — 仅定义 2 个已知模型 (`gpt-4o`, `gpt-4o-mini`), Arch §5.2 要求 6 个 (`gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini`)。缺少 4 个模型
+- **C14** `xai-grok-provider/src/providers/openai.rs:32-53` — 仅定义 2 个已知模型 (`gpt-4o`, `gpt-4o-mini`), Arch §5.2 要求 6 个 (`gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini`)。缺少 4 个模型 -Fixed
 
-- **C15** `xai-grok-provider/src/providers/ollama.rs:19` — `auth_scheme: AuthScheme::Bearer`. Arch §5.5 要求 `None`。Ollama 不需要认证, 声明 Bearer scheme 会导致上游代码添加空的 `Authorization: Bearer` 头
+- **C15** `xai-grok-provider/src/providers/ollama.rs:19` — `auth_scheme: AuthScheme::Bearer`. Arch §5.5 要求 `None`。Ollama 不需要认证, 声明 Bearer scheme 会导致上游代码添加空的 `Authorization: Bearer` 头 -Fixed
 
 - **C16** `xai-grok-provider/src/providers/ollama.rs:31` — `known_models: vec![]`. Arch §5.5 至少列出 3 个示例模型 (`llama3.1`, `codellama`, `deepseek-coder`)
 

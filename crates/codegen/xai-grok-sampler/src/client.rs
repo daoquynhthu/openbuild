@@ -431,6 +431,7 @@ impl SamplingClient {
                     })?;
                     headers.insert(AUTHORIZATION, header_value);
                 }
+                AuthScheme::None => {}
             }
         }
 
@@ -569,6 +570,7 @@ impl SamplingClient {
                         headers.insert(AUTHORIZATION, v);
                     }
                 }
+                AuthScheme::None => {}
             }
         }
         {
@@ -627,6 +629,7 @@ impl SamplingClient {
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.strip_prefix("Bearer "))
                 .map(|s| s.to_string()),
+            AuthScheme::None => None,
         };
         raw.map(|mut s| {
             // Truncate in-place so we never materialize a heap-resident
@@ -664,6 +667,7 @@ impl SamplingClient {
         let auth_type = match (&self.defaults.auth_scheme, &auth_prefix) {
             (AuthScheme::XApiKey, Some(_)) => "x-api-key",
             (AuthScheme::Bearer, Some(_)) => "bearer",
+            (AuthScheme::None, _) => "none",
             (_, None) => "none",
         };
         crate::sampling_log::AuthInfo {

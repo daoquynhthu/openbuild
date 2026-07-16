@@ -43,11 +43,13 @@ pub enum ApiBackend {
 
 /// HTTP auth scheme for API requests.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum AuthScheme {
     #[default]
     Bearer,
     XApiKey,
+    None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

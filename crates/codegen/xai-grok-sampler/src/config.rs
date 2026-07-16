@@ -16,11 +16,13 @@ use crate::attribution::SharedAttributionCallback;
 use crate::retry::{DEFAULT_MAX_RETRIES, RATE_LIMIT_RETRY_THRESHOLD};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum AuthScheme {
     #[default]
     Bearer,
     XApiKey,
+    None,
 }
 
 /// All knobs that control a single sampling request.

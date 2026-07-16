@@ -275,3 +275,19 @@
 
 ### 移除条件
 Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复为 crates.io 依赖。
+
+---
+
+## Round 1 Fix Batch: C12/C14/C15 — 2026-07-16
+
+### 完成内容
+- **C12** (Critical): `Route` 从 `Arc<dyn AuthFn>`/`Arc<dyn Framing>` 改为 `Box<dyn AuthFn>`/`Box<dyn Framing>`，符合 Arch §3.4 的接口契约。为 `AuthFn` 和 `Framing` trait 添加 `clone_box()` 方法，所有 6 个实现者均已更新
+- **C14** (Critical): OpenAI provider 已知模型从 2 个扩展到 6 个（`gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini`）
+- **C15** (Critical): Ollama provider `auth_scheme` 从 `Bearer` 改为 `None`；`xai-grok-provider` 和 `xai-grok-sampler` 的 `AuthScheme` 枚举均添加 `None` 变体；shell `to_auth_scheme()` bridge 更新；sampler client 添加 4 个 match arm 处理 `AuthScheme::None`
+- `ISSUE.md` 中 C12/C14/C15 标记为 `-Fixed`
+
+### 关键结果
+- `cargo test -p xai-grok-provider` — 66/66 ✅
+- `cargo clippy -p xai-grok-provider -p xai-grok-sampler` — 零警告 ✅
+- `cargo fmt --all --check` — 通过 ✅
+- 修改 14 个文件（route.rs, auth.rs, framing.rs, 6 个 provider, types.rs x2, client.rs, provider_adapter.rs, ISSUE.md, PROGRESS.md）

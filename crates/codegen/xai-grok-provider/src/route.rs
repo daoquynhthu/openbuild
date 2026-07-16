@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::auth::AuthFn;
+use crate::auth::{AuthFn, NoopAuth};
 use crate::endpoint::{Endpoint, EndpointPatch};
 use crate::framing::Framing;
 use crate::model::Model;
@@ -39,16 +39,30 @@ impl core::fmt::Debug for RouteInput {
 
 /// A Route composes the four orthogonal deployment axes:
 /// Protocol + Endpoint + Auth + Framing.
-#[derive(Clone)]
 pub struct Route {
     pub id: String,
     pub provider: Option<ProviderId>,
     pub protocol: String,
     pub endpoint: Endpoint<()>,
-    pub auth: Arc<dyn AuthFn>,
-    pub framing: Arc<dyn Framing<String>>,
+    pub auth: Box<dyn AuthFn>,
+    pub framing: Box<dyn Framing<String>>,
     pub defaults: RouteDefaults,
     pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
+}
+
+impl Clone for Route {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            provider: self.provider.clone(),
+            protocol: self.protocol.clone(),
+            endpoint: self.endpoint.clone(),
+            auth: self.auth.clone_box(),
+            framing: self.framing.clone_box(),
+            defaults: self.defaults.clone(),
+            headers: self.headers,
+        }
+    }
 }
 
 impl core::fmt::Debug for Route {
@@ -70,11 +84,8 @@ impl Route {
             provider: input.provider,
             protocol: input.protocol,
             endpoint: input.endpoint,
-            auth: input
-                .auth
-                .map(Arc::<dyn AuthFn>::from)
-                .unwrap_or_else(|| Arc::new(crate::auth::NoopAuth)),
-            framing: Arc::<dyn Framing<String>>::from(input.framing),
+            auth: input.auth.unwrap_or_else(|| Box::new(NoopAuth)),
+            framing: input.framing,
             defaults: input.defaults.unwrap_or(RouteDefaults { headers: None }),
             headers: None,
         }
@@ -87,6 +98,7 @@ impl Route {
         };
         Self {
             endpoint,
+            auth: patch.auth.unwrap_or(self.auth),
             provider: patch.provider.or(self.provider),
             defaults: patch.defaults.unwrap_or(self.defaults),
             headers: patch.headers.or(self.headers),

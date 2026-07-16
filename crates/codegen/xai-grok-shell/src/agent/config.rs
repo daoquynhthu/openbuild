@@ -3349,6 +3349,8 @@ fn provider_known_models(
         match s {
             xai_grok_provider::types::AuthScheme::Bearer => xai_grok_sampler::AuthScheme::Bearer,
             xai_grok_provider::types::AuthScheme::XApiKey => xai_grok_sampler::AuthScheme::XApiKey,
+            xai_grok_provider::types::AuthScheme::None => xai_grok_sampler::AuthScheme::None,
+            _ => xai_grok_sampler::AuthScheme::default(),
         }
     }
 
