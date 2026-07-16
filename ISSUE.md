@@ -188,3 +188,58 @@
 - **P5-S05** `providers/mod.rs:31` — `env_key` 空向量或空字符串可能误报"已配置"
 - **P5-S06** `config.rs:33-34` — `parse_provider_toml()` 通过字符串序列化/反序列化往返，效率低
 - **P5-S07** `cli.rs:507-514` — `provider`/`api_key`/`base_url` 被解析但永不消费
+
+---
+
+## 审计: 2026-07-16 (Phase 5+6 全面审计)
+
+**范围**: Phase 1-6 所有改动文件，跨 4 个子代理并行审计
+**参考**: `docs/model-adapter-architecture.md`, `docs/implementation-plan.md`, `AGENTS.md`
+
+### 严重
+
+- **C06** `views/providers_modal.rs:73-124` — `builtin_providers()` 返回硬编码静态数据，从不查询 `ProviderRegistry` 获取实时配置/凭据状态/模型计数。用户通过 `[provider.*]` TOML 配置的 API key 不显示在 UI 中
+
+- **C07** `xai-grok-pager-bin/src/main.rs:929,946` — 双向配置路径冲突：`[endpoints]` 后向兼容块 (line 946) 在 `configure_providers()` (line 929) 之后重新配置 xAI provider。若用户同时配置 `[provider.xai]` 和 `[endpoints]`，后者静默覆盖前者，违反 Arch §8 优先级（新配置 > 旧配置）
+
+- **C08** `xai-grok-shell/src/agent/config.rs:3365` — Provider 模型键使用 `"provider/model"` 格式（如 `"xai/grok-build"`），与内置 xAI 模型条目 `"grok-build"` 重复。`find_model_by_id()` 的 slug 回退可缓解，但拾取器显示两个重复条目 `grok-build` 和 `xai/grok-build`
+
+### 中等
+
+- **M22** `views/providers_modal.rs:408,420,425,438,452,465,478,483` — 8 处注释违反 AGENTS.md §3.1 "不要添加注释，代码应是自解释的"
+
+- **M23** `views/providers_modal.rs:127-130,191,249` — `ProvidersKeyOutcome` 缺少 `Unchanged` 变体；`_ => Changed` 导致未处理按键时仍触发重渲染
+
+- **M24** `views/providers_modal.rs:253` — `adjust_scroll()` 硬编码 `8` 为可见行数，应为具名常量
+
+- **M25** `views/settings_modal.rs:5661-5752` — 测试 `rows_contain_categories_and_settings_through_pr_14` 的期望行列表缺少 `"providers"` 条目（介于 `"plan_mode"` 和 `"coding_data_sharing"` 之间），测试将失败
+
+- **M26** 多文件 — 14+ 处 `NonZeroU64::new(n).unwrap()` 在生产代码中，违反 AGENTS.md §3.6。涉及文件：`xai-grok-shell/src/agent/config.rs:3918,4640,4865`，`xai-grok-provider/src/types.rs:95`，各 provider 实现等
+
+- **M27** `xai-grok-shell/src/auth/provider_adapter.rs:20` — `pub fn new` 缺少文档注释，违反 AGENTS.md §3.3
+
+- **M28** `xai-grok-shell/src/agent/auth_method.rs:280` — `.expect()` 在生产代码 `push_interactive_login()` 中，违反 AGENTS.md §3.6
+
+- **M29** `xai-grok-provider/src/registry.rs:37,45,54,61,68,76,102` — 7 处 `RwLock` 上的 `.expect("lock poisoned")` 在生产代码中，AGENTS.md §3.6 禁止 (`?` 或 `.context()`)
+
+- **M30** `views/providers_modal.rs:23-27` — `ProvidersModalState` 全部 4 个字段为 `pub`，AGENTS.md §3.3 要求默认私有。仅 `window` 需在 `modals.rs` 访问
+
+- **M31** `xai-grok-provider/src/types.rs:111` + `auth.rs:3` — 重复 `pub type HeaderMap` 定义，导出时造成命名冲突
+
+### 建议
+
+- **S12** 多文件 — `ProviderModelDef`、`ProviderConfig`、`ProviderTomlEntry`、`ModelDefaults`、`ModelLimits`、`GenerationOptions`、`HttpOptions`、`Usage`、`RouteInput` 等 struct 的 `Option` 字段缺少 `#[serde(default, skip_serializing_if = "Option::is_none")]`
+
+- **S13** 多文件 — `ProviderModelDef`、`ProviderDefaults`、`RouteInput`、`Route`、`Endpoint`、`ProtocolBody`、`ProtocolStream`、`Protocol`、`ProviderConfig`、`ProviderTomlEntry`、`ProviderError`、`ConfiguredProvider` 等 12 个 pub 类型缺少 `#[non_exhaustive]`
+
+- **S14** 多文件 — `ProviderModelDef`、`ProviderDefaults`、`ConfiguredProvider`、`Provider` trait、`ProviderRegistry`、`Endpoint`、`EndpointPart`、`Framing` trait、`SseFraming`、`AuthFn` trait、`NoopAuth`、`Credential`、`ProtocolStream`、`Protocol`、`ProviderResult` 等 20+ pub 项缺少 `///` 文档注释
+
+- **S15** `views/providers_modal.rs:253` — 同 M24，建议添加 `const VISIBLE_ROWS: usize = 8`
+
+- **S16** `views/settings_modal.rs:4544,4555,4915` — 字符串 `"providers"` 在三处硬编码拦截点重复，提取为 `const PROVIDERS_SETTING_KEY: &str` 可避免偏移
+
+- **S17** `xai-grok-shell/src/agent/config.rs:3423` — `api_base_url: None` 硬编码；若未来 provider 需要区分 API-key 与 session 认证端点，需从 `ProviderDefaults` 传递 `api_base_url`
+
+- **S18** `xai-grok-provider/src/providers/mod.rs:47-248` — `#[cfg(test)] mod tests` 嵌入在 `detect_env_vars()` 函数体内，不易读。应移至模块级别
+
+- **S19** `xai-grok-provider/src/providers/anthropic.rs:83`, `opencode.rs:62`, `ollama.rs:61` — 生产代码中的注释违反 AGENTS.md §3.1
