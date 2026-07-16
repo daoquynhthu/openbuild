@@ -100,3 +100,30 @@
 - **P2-S01** `request_task.rs:109` — span label 仍引用 `api_backend()` 而非 `protocol_id()` -Fixed
 - **P2-S02** `protocols/mod.rs` — 协议 ID 常量类型为 `&str` 而非 `ProtocolId`
 - **P2-S03** `stream/` — 目录未被删除（计划在 Phase 7 清理，当前状态不一致）
+
+---
+
+## Phase 3 审计: 2026-07-16
+
+**范围**: `xai-grok-provider/src/auth.rs`, `xai-grok-sampler/src/`, `xai-grok-shell/src/auth/provider_adapter.rs`
+**参考**: `docs/model-adapter-architecture.md` §3.9, `docs/implementation-plan.md` Phase 3
+
+### 中等
+
+- **P3-M01** `xai-grok-sampler/src/sampling_log.rs:18-27` — span 字段名 `api_backend` 与实际传入值 `protocol_id()` 语义不符 -Fixed
+- **P3-M02** `xai-grok-sampler/src/client.rs:547-549` — `api_backend()` 公开方法仍保留，应废弃
+- **P3-M03** `xai-grok-sampler/src/client.rs:2202` — 测试使用 `api_backend()` 而非 `protocol_id()` -Fixed
+- **P3-M04** `xai-grok-sampler/Cargo.toml:10` — `xai-grok-provider` 依赖已声明但未在任何 `.rs` 中使用
+- **P3-M05** `xai-grok-sampler/src/actor/request_task.rs:109` — `request_span()` 参数名 `api_backend` 语义错误，与 M01 同根因 -Fixed
+
+### 建议
+
+- **P3-S01** `auth.rs` — `AuthFn` 签名与 Arch §3.9 存在细微偏差（错误类型为 `String` 而非 `HeaderMap`）
+- **P3-S02** `auth.rs:121` — `Credential::or_else()` 在胜出分支上重复调用 `resolve()`
+- **P3-S03** `auth.rs:8` — `AuthInput.request` 字段无实际用途，仅架构占位
+- **P3-S04** `auth.rs:3` — `type HeaderMap` 与 `reqwest::HeaderMap` 命名冲突风险
+- **P3-S05** `auth.rs:15` — `AuthFn` trait 的 `'static` 约束限制短生命周期闭包
+- **P3-S06** `xai-grok-shell/src/auth/credential_provider.rs` — `ShellAuthCredentialProvider` 未实现 `AuthFn`，计划描述与实现有偏差
+- **P3-S07** `auth.rs:19-27` — `or_else`/`and_then` 置于 `impl dyn AuthFn` 而非 trait 中
+- **P3-S08** `auth.rs:56,67,90` — `BearerAuth`/`HeaderAuth`/`FailAuth` 为私有类型
+- **P3-S09** `auth.rs:112` — `Credential::config()` 接受 `&str` 后 `.to_owned()`，可改 `impl Into<String>`

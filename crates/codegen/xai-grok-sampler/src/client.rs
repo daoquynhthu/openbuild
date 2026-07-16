@@ -2199,7 +2199,7 @@ mod tests {
     #[test]
     fn new_with_minimal_config_succeeds() {
         let client = SamplingClient::new(minimal_config()).expect("client should construct");
-        assert_eq!(client.api_backend(), ApiBackend::ChatCompletions);
+        assert_eq!(client.protocol_id(), "chat_completions");
     }
 
     #[test]

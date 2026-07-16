@@ -15,7 +15,7 @@ pub struct AuthInfo {
 pub fn request_span(
     request_id: &RequestId,
     model: &str,
-    api_backend: &str,
+    protocol_id: &str,
     base_url: &str,
     auth: &AuthInfo,
 ) -> tracing::Span {
@@ -24,7 +24,7 @@ pub fn request_span(
         "sampling_request",
         request_id = %request_id,
         model = model,
-        api_backend = api_backend,
+        protocol_id = protocol_id,
         base_url = base_url,
         auth_type = auth.auth_type,
         auth_prefix = auth.auth_prefix.as_deref().unwrap_or(""),
