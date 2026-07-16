@@ -36,10 +36,10 @@
 | 5.2 | CLI `--provider` / `--api-key` / `--base-url` | ✅ 完成 |
 | 5.3 | `--model provider/model` 格式 | ✅ 完成 |
 | 5.4 | startup Provider 初始化 + 6 层配置合并 + env 检测 | ✅ 完成 |
-| 5.5 | `resolve_model_list()` 重写 (Provider 层) | ❌ 未开始 |
-| 5.6 | TUI Providers 模态框 (完整) | ⚠️ Stub 仅变体/action/命令就绪，渲染/交互未实现 |
+| 5.5 | `resolve_model_list()` 重写 (Provider 层) | ✅ 完成 |
+| 5.6 | TUI Providers 模态框 (完整) | ✅ 列表+详情+Settings 入口 |
 | 5.7 | `/providers` 斜杠命令 | ✅ 完成 |
-| 5.8 | 模型选择器 provider/ 前缀 | ⚠️ `parse_model_ref()` 支持 CLI，`Ctrl+M` 显示未扩展 |
+| 5.8 | 模型选择器 provider/ 前缀 | ✅ CLI + Ctrl+M 均显示 `provider/model` |
 | 5.9 | `[endpoints]` 向后兼容 → xAI Provider | ✅ 完成 |
 | 5.10 | 环境变量自动检测 | ✅ 完成 |
 
@@ -88,9 +88,23 @@
 - `[endpoints]` → xAI 兼容路径也存储配置
 - `provider_known_models()` 读取存储的配置以填充 `ModelEntry.api_key` 和合并 `env_key` 列表
 
-### 待完成
-- 5.6: Providers 模态框完整交互 (TUI)
-- 5.8: 模型选择器 provider/model 显示 (TUI)
+### Phase 5.6a-5.6c 完成内容 (TUI)
+- `providers_modal.rs` 全面重写: `ModalWindowState` chrome、状态指示器、↑↓/Home/End 导航
+- 键盘/鼠标 dispatch: `modals.rs` 3 处分支 (draw/kbd/mouse)
+- 详情面板: API Key 隐蔽输入、Base URL 编辑、Ctrl+R 切换可见性、Tab 切换字段
+- Settings 集成: `defs.rs` 添加 "providers" Group 条目，Enter/Space/鼠标单击分发 `Action::OpenProviders`
+
+### Phase 5.8 完成内容
+- `build_model_items()`: 当模型 ID 含 `/` 时显示 `provider/model` 格式
+- `match_text` 同时包含完整 key 和人名，支持双向搜索
+- 涉及文件: `slash/commands/model.rs`
+
+### 门禁检查 (受 protoc 限制的范围内)
+- `cargo check -p xai-grok-provider` ✅
+- `cargo test -p xai-grok-provider` — 66/66 ✅
+- `cargo clippy -p xai-grok-provider` — 零警告
+- `cargo check -p xai-grok-pager` ✅ (tools-api protoc 问题仅影响该 crate 本身)
+- 所有代码在 `feat/provider-adapter` 分支提交
 
 ---
 
