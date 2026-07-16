@@ -151,13 +151,29 @@ types:
 ## 审计: <日期>
 
 ### 严重
-- 描述 | 文件:行号 | 建议修复
+- **C01** `文件:行号` — 描述
 
 ### 中等
-- ...
+- **M01** `文件:行号` — 描述
 
 ### 建议
-- ...
+- **S01** `文件:行号` — 描述
+```
+
+编号按分类独立递增（C01、C02…、M01、M02…、S01、S02…）。
+
+每个条目的行号必须精确到单行或范围（如 `types.rs:39` 或 `registry.rs:29,33,55`）。
+
+### 5.2 修复与关闭流程
+
+1. 修复某个条目后，在其末尾追加 `-Fixed` 标签（如 `— 描述 -Fixed`）
+2. 所有 `-Fixed` 条目需经过用户再审确认
+3. 再审通过后，将 `-Fixed` 改为 `-Closed`（如 `— 描述 -Closed`）
+
+```markdown
+# 示例
+- **M01** `types.rs:39` — `ProviderDefaults.api_backend` 类型为 `String`，Arch §3.2 要求 `ApiBackend` 枚举 -Fixed
+- **M02** `types.rs:40` — `ProviderDefaults.auth_scheme` 类型为 `String`，Arch §3.2 要求 `AuthScheme` 枚举 -Closed
 ```
 
 审计完成后 `git add ISSUE.md && git commit -m "audit: <日期>"`。
