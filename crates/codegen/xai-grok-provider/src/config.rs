@@ -112,6 +112,38 @@ base_url = "https://api.openai.com/v1"
     }
 
     #[test]
+    fn provider_config_merge_self_overrides_none() {
+        let base = ProviderConfig {
+            id: Some("p".into()),
+            api_key: None,
+            base_url: Some("https://default.url".into()),
+            ..Default::default()
+        };
+        let merged = base.merge(ProviderConfig::default());
+        assert_eq!(merged.id.as_deref(), Some("p"));
+        assert_eq!(merged.base_url.as_deref(), Some("https://default.url"));
+        assert!(merged.api_key.is_none());
+    }
+
+    #[test]
+    fn provider_config_merge_other_overrides() {
+        let base = ProviderConfig {
+            id: Some("p".into()),
+            api_key: Some("base-key".into()),
+            base_url: Some("https://base.url".into()),
+            ..Default::default()
+        };
+        let other = ProviderConfig {
+            id: Some("p".into()),
+            api_key: Some("other-key".into()),
+            ..Default::default()
+        };
+        let merged = base.merge(other);
+        assert_eq!(merged.api_key.as_deref(), Some("other-key"));
+        assert_eq!(merged.base_url.as_deref(), Some("https://base.url"));
+    }
+
+    #[test]
     fn parse_provider_toml_multiple() {
         let toml: toml::Value = toml::from_str(
             r#"

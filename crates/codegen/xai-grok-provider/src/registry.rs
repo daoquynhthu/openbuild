@@ -319,4 +319,57 @@ mod tests {
             "openai-compatible"
         );
     }
+
+    #[test]
+    fn store_config_and_get_config() {
+        let registry = ProviderRegistry::new();
+        registry.register(dummy_provider());
+        let pid = ProviderId::new("dummy");
+        let cfg = ProviderConfig {
+            id: Some("dummy".into()),
+            api_key: Some("sk-test".into()),
+            base_url: Some("https://dummy.test/v1".into()),
+            ..Default::default()
+        };
+        registry.store_config(&pid, cfg.clone());
+        let retrieved = registry.get_config(&pid);
+        assert!(retrieved.is_some());
+        let r = retrieved.unwrap();
+        assert_eq!(r.api_key.as_deref(), Some("sk-test"));
+        assert_eq!(r.base_url.as_deref(), Some("https://dummy.test/v1"));
+    }
+
+    #[test]
+    fn get_config_unknown_returns_none() {
+        let registry = ProviderRegistry::new();
+        let pid = ProviderId::new("unknown");
+        assert!(registry.get_config(&pid).is_none());
+    }
+
+    #[test]
+    fn store_config_overwrites() {
+        let registry = ProviderRegistry::new();
+        registry.register(dummy_provider());
+        let pid = ProviderId::new("dummy");
+        registry.store_config(
+            &pid,
+            ProviderConfig {
+                id: Some("dummy".into()),
+                api_key: Some("first".into()),
+                ..Default::default()
+            },
+        );
+        registry.store_config(
+            &pid,
+            ProviderConfig {
+                id: Some("dummy".into()),
+                api_key: Some("second".into()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            registry.get_config(&pid).unwrap().api_key.as_deref(),
+            Some("second")
+        );
+    }
 }
