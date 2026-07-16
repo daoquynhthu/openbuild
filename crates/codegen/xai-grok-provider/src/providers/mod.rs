@@ -211,7 +211,7 @@ mod tests {
             "#,
         )
         .unwrap();
-        configure_providers(&reg, &toml, None);
+        configure_providers(&reg, &toml, None, None);
         let pid = ProviderId::new("test-provider");
         let stored = reg.get_config(&pid);
         assert!(stored.is_some());
@@ -233,7 +233,7 @@ mod tests {
             api_key: Some("cli-key".into()),
             ..Default::default()
         };
-        configure_providers(&reg, &toml, Some(cli));
+        configure_providers(&reg, &toml, None, Some(cli));
         let pid = ProviderId::new("test-provider");
         let stored = reg.get_config(&pid);
         assert_eq!(stored.unwrap().api_key.as_deref(), Some("cli-key"));
@@ -284,22 +284,42 @@ pub fn build_provider_config(
 }
 
 /// Configure all providers in the registry with merged config from all sources.
+/// Priority (low→high): env → TOML → compat (old [endpoints]) → CLI.
 /// Stores resolved routes back into the registry for later model resolution.
+/// The `compat` parameter provides backward-compatible overrides (e.g., from old
+/// `[endpoints]` config) that apply between TOML and CLI layers.
 pub fn configure_providers(
     registry: &ProviderRegistry,
     toml: &toml::Value,
+    compat: Option<ProviderConfig>,
     cli_override: Option<ProviderConfig>,
 ) {
     let toml_configs = crate::config::parse_provider_toml(toml);
     let env_configs = detect_env_vars(registry);
 
     for pid in registry.all_ids() {
-        let merged = build_provider_config(
+        // Layer 1: env vars
+        // Layer 2: TOML [provider.*]
+        let mut merged = build_provider_config(
             &pid.0,
             &toml_configs,
             &env_configs,
-            cli_override.as_ref(),
+            None,
         );
+
+        // Layer 3: backward-compat overrides (old [endpoints] → xAI mapping)
+        if let Some(ref compat_cfg) = compat
+            && compat_cfg.id.as_deref() == Some(&pid.0)
+        {
+            merged = merged.merge(compat_cfg.clone());
+        }
+
+        // Layer 4: CLI overrides (--api-key, --base-url) — highest priority
+        if let Some(ref cli) = cli_override
+            && cli.id.as_deref() == Some(&pid.0)
+        {
+            merged = merged.merge(cli.clone());
+        }
 
         registry.store_config(&pid, merged.clone());
         if let Some(cp) = registry.configure(&pid, merged) {

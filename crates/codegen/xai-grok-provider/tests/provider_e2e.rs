@@ -101,7 +101,7 @@ fn configure_stores_api_key() {
         "#,
     )
     .unwrap();
-    xai_grok_provider::providers::configure_providers(&reg, &toml, None);
+    xai_grok_provider::providers::configure_providers(&reg, &toml, None, None);
 
     let pid = ProviderId::new("openai");
     let stored = reg.get_config(&pid).expect("openai config");

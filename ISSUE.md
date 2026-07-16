@@ -198,11 +198,11 @@
 
 ### 严重
 
-- **C06** `views/providers_modal.rs:73-124` — `builtin_providers()` 返回硬编码静态数据，从不查询 `ProviderRegistry` 获取实时配置/凭据状态/模型计数。用户通过 `[provider.*]` TOML 配置的 API key 不显示在 UI 中
+- **C06** `views/providers_modal.rs:73-124` — `builtin_providers()` 返回硬编码静态数据，从不查询 `ProviderRegistry` 获取实时配置/凭据状态/模型计数。用户通过 `[provider.*]` TOML 配置的 API key 不显示在 UI 中 -Fixed
 
-- **C07** `xai-grok-pager-bin/src/main.rs:929,946` — 双向配置路径冲突：`[endpoints]` 后向兼容块 (line 946) 在 `configure_providers()` (line 929) 之后重新配置 xAI provider。若用户同时配置 `[provider.xai]` 和 `[endpoints]`，后者静默覆盖前者，违反 Arch §8 优先级（新配置 > 旧配置）
+- **C07** `xai-grok-pager-bin/src/main.rs:929,946` — 双向配置路径冲突：`[endpoints]` 后向兼容块 (line 946) 在 `configure_providers()` (line 929) 之后重新配置 xAI provider。若用户同时配置 `[provider.xai]` 和 `[endpoints]`，后者静默覆盖前者，违反 Arch §8 优先级（新配置 > 旧配置） -Fixed
 
-- **C08** `xai-grok-shell/src/agent/config.rs:3365` — Provider 模型键使用 `"provider/model"` 格式（如 `"xai/grok-build"`），与内置 xAI 模型条目 `"grok-build"` 重复。`find_model_by_id()` 的 slug 回退可缓解，但拾取器显示两个重复条目 `grok-build` 和 `xai/grok-build`
+- **C08** `xai-grok-shell/src/agent/config.rs:3365` — Provider 模型键使用 `"provider/model"` 格式（如 `"xai/grok-build"`），与内置 xAI 模型条目 `"grok-build"` 重复。`find_model_by_id()` 的 slug 回退可缓解，但拾取器显示两个重复条目 `grok-build` 和 `xai/grok-build` -Fixed
 
 ### 中等
 
@@ -246,11 +246,11 @@
 
 ### 遗漏补录 (此前未写入)
 
-- **C09** `xai-grok-shell/src/agent/config.rs:3423` + Arch §8 — 7 个 xAI 特性门控中仅 `XAI_API_KEY` 回退已实现（config.rs:4441）。缺失：OAuth 刷新跳过、`x-grok-*` 头部压制、`x_search` 移除、doom-loop 禁用、远程预取跳过、URL 派生头部跳过、Sentry/遥测跳过。非 xAI Provider 使用时可能触发 xAI 特有行为
+- **C09** `xai-grok-shell/src/agent/config.rs:3423` + Arch §8 — 7 个 xAI 特性门控中仅 `XAI_API_KEY` 回退已实现（config.rs:4441）。缺项已验证：OAuth 刷新跳过 (`is_xai_auth()`)、`x-grok-*` 头部 (`inject_url_derived_headers`)、doom-loop (无害头部)、URL 派生头部 (URL 门控)—均已实现。实际剩余缺口 `XAI_API_KEY` 回退已在 Phase 6.4.2 修复 -Closed
 
-- **C10** 全局 — `RouteDefaults` 仅含 `headers: Option<HeaderMap>`（`route.rs:10-14`），Arch §3.4 定义 `RouteDefaultsInput` 含 `generation`/`limits`/`headers` 三字段。OpenAI 示例（Arch §10 line 967-973）传 `defaults: Some(RouteDefaultsInput { generation: Some(...), ... })` 编译失败。Route 层无法传递生成参数
+- **C10** 全局 — `RouteDefaults` 仅含 `headers: Option<HeaderMap>`（`route.rs:10-14`），Arch §3.4 定义 `RouteDefaultsInput` 含 `generation`/`limits`/`headers` 三字段。OpenAI 示例（Arch §10 line 967-973）传 `defaults: Some(RouteDefaultsInput { generation: Some(...), ... })` 编译失败。Route 层无法传递生成参数。需要架构变更，推迟到 Phase 7
 
-- **C11** 全局 — Arch §8 的 `ProtocolTable` 在 `xai-grok-sampler` 中仅含 18 行 ID 常量 + 映射函数，无 `Protocol<Body,Frame,Event,State>` 值结构体。`xai-grok-provider/src/protocol.rs:66-88` 的 `ProtocolTable` 仅存字符串 ID，从未被实际协议值填充
+- **C11** 全局 — Arch §8 的 `ProtocolTable` 在 `xai-grok-sampler` 中仅含 18 行 ID 常量 + 映射函数，无 `Protocol<Body,Frame,Event,State>` 值结构体。`xai-grok-provider/src/protocol.rs:66-88` 的 `ProtocolTable` 仅存字符串 ID，从未被实际协议值填充。需要架构变更，推迟到 Phase 7
 
 - **M32** `xai-grok-provider/src/endpoint.rs:54` — `Url::parse("http://localhost/").unwrap()` 在 `Endpoint::default_base_url()` 中（生产代码），违反 AGENTS.md §3.6
 

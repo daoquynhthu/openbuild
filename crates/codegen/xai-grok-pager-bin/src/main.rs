@@ -925,31 +925,33 @@ async fn run_agent_command(
             }
         });
 
-        // Apply all config layers: env → TOML → CLI.
-        xai_grok_provider::providers::configure_providers(&reg, &raw_config, cli_override);
-        reg
-    };
-
-    // Phase 5.9: Map old [endpoints] section to xAI provider config for
-    // backward compatibility. Custom base URL or alpha_test_key → xAI overrides.
-    {
+        // Phase 5.9: Map old [endpoints] section to xAI provider config for
+        // backward compatibility. Applied as the "compat" layer, between TOML
+        // and CLI in priority (CLI always wins).
         let endpoints = &agent_config.endpoints;
         let default_xai_url = "https://api.x.ai/v1";
-        if endpoints.xai_api_base_url != default_xai_url || endpoints.alpha_test_key.is_some() {
-            let xai_pid = xai_grok_provider::types::ProviderId::new("xai");
-            let xai_overrides = xai_grok_provider::config::ProviderConfig {
+        let compat_override = if endpoints.xai_api_base_url != default_xai_url
+            || endpoints.alpha_test_key.is_some()
+        {
+            Some(xai_grok_provider::config::ProviderConfig {
                 id: Some("xai".into()),
                 base_url: Some(endpoints.xai_api_base_url.clone()),
                 api_key: endpoints.alpha_test_key.clone(),
                 ..Default::default()
-            };
-            provider_registry.store_config(&xai_pid, xai_overrides.clone());
-            if let Some(cp) = provider_registry.configure(&xai_pid, xai_overrides) {
-                let route_id = cp.route.id.clone();
-                provider_registry.register_route(&route_id, cp.route);
-            }
-        }
-    }
+            })
+        } else {
+            None
+        };
+
+        // Apply all config layers: env → TOML → [endpoints] → CLI.
+        xai_grok_provider::providers::configure_providers(
+            &reg,
+            &raw_config,
+            compat_override,
+            cli_override,
+        );
+        reg
+    };
 
     // Thread the registry into config for downstream model resolution.
     agent_config.provider_registry = Some(provider_registry.clone());

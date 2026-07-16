@@ -3170,17 +3170,24 @@ pub fn resolve_model_list(
         resolved = prefetched;
     }
     // LAYER 2b: Provider-known models from registry (between prefetched and [model.*]).
+    // Skip entries whose bare model name duplicates an existing built-in key
+    // (e.g. "xai/grok-build" duplicates built-in "grok-build").
     if let Some(registry) = &cfg.provider_registry {
         let provider_entries = provider_known_models(registry);
         if !provider_entries.is_empty() {
             let before = resolved.len();
             for (key, entry) in provider_entries {
-                resolved.entry(key).or_insert(entry);
+                let model_part = key.split('/').nth(1).unwrap_or(&key);
+                if !resolved.contains_key(model_part) {
+                    resolved.entry(key).or_insert(entry);
+                }
             }
-            tracing::debug!(
-                added = resolved.len() - before,
-                "added provider-known models"
-            );
+            if resolved.len() > before {
+                tracing::debug!(
+                    added = resolved.len() - before,
+                    "added provider-known models"
+                );
+            }
         }
     }
 

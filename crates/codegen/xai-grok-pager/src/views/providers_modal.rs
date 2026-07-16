@@ -71,38 +71,58 @@ impl ProvidersModalState {
 }
 
 fn builtin_providers() -> Vec<ProviderEntry> {
+    fn check_env(keys: &[&str]) -> (bool, String) {
+        for key in keys {
+            if let Ok(val) = std::env::var(key)
+                && !val.trim().is_empty()
+            {
+                return (true, String::new());
+            }
+        }
+        (false, String::new())
+    }
+
+    let (xai_ok, _) = check_env(&["XAI_API_KEY"]);
+    let (openai_ok, _) = check_env(&["OPENAI_API_KEY"]);
+    let (anthropic_ok, _) = check_env(&["ANTHROPIC_API_KEY"]);
+    let (opencode_ok, _) = check_env(&["OPENCODE_API_KEY"]);
+
     vec![
         ProviderEntry {
             id: "xai".into(),
             name: "xAI".into(),
-            status: "Connected",
-            status_color: Color::Green,
+            status: if xai_ok { "Connected" } else { "Not configured" },
+            status_color: if xai_ok { Color::Green } else { Color::Red },
             endpoint: "api.x.ai".into(),
-            configured: true,
+            configured: xai_ok,
         },
         ProviderEntry {
             id: "openai".into(),
             name: "OpenAI".into(),
-            status: "Not configured",
-            status_color: Color::Red,
+            status: if openai_ok { "Connected" } else { "Not configured" },
+            status_color: if openai_ok { Color::Green } else { Color::Red },
             endpoint: "api.openai.com".into(),
-            configured: false,
+            configured: openai_ok,
         },
         ProviderEntry {
             id: "anthropic".into(),
             name: "Anthropic".into(),
-            status: "Not configured",
-            status_color: Color::Red,
+            status: if anthropic_ok { "Connected" } else { "Not configured" },
+            status_color: if anthropic_ok { Color::Green } else { Color::Red },
             endpoint: "api.anthropic.com".into(),
-            configured: false,
+            configured: anthropic_ok,
         },
         ProviderEntry {
             id: "opencode".into(),
             name: "OpenCode Zen".into(),
-            status: "Free tier",
-            status_color: Color::Gray,
+            status: if opencode_ok {
+                "Connected"
+            } else {
+                "Free tier"
+            },
+            status_color: if opencode_ok { Color::Green } else { Color::Gray },
             endpoint: "opencode.ai".into(),
-            configured: false,
+            configured: opencode_ok,
         },
         ProviderEntry {
             id: "ollama".into(),
