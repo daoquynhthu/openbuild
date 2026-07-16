@@ -127,3 +127,33 @@
 - **P3-S07** `auth.rs:19-27` — `or_else`/`and_then` 置于 `impl dyn AuthFn` 而非 trait 中
 - **P3-S08** `auth.rs:56,67,90` — `BearerAuth`/`HeaderAuth`/`FailAuth` 为私有类型
 - **P3-S09** `auth.rs:112` — `Credential::config()` 接受 `&str` 后 `.to_owned()`，可改 `impl Into<String>`
+
+---
+
+## Phase 4 审计: 2026-07-16
+
+**范围**: `xai-grok-provider/src/providers/` — 6 个内置 Provider 实现
+**参考**: `docs/model-adapter-architecture.md` §5, `docs/implementation-plan.md` Phase 4
+
+### 严重
+
+- **P4-C01** `xai.rs:64-66` — xAI auth 链缺少 `SessionToken(OAuth)` 回退。`grok login` 建立的 OAuth 会话令牌无法通过新 provider 系统解析，破坏向后兼容
+- **P4-C02** `xai.rs:32` — xAI `known_models` 为空 (Arch §5.1 要求 `grok-build`)
+- **P4-C03** `anthropic.rs:33` — Anthropic `known_models` 为空 (Arch §5.3 要求 `claude-sonnet-4-20250514`, `claude-haiku-3-5-20241022`)
+
+### 中等
+
+- **P4-M01** `xai.rs:31` — xAI provider 缺少 `x-grok-*` 头部注入 (Arch §5.1 + 实施计划 4.2)
+- **P4-M02** `openai.rs:86-98` — OpenAI 缺少双协议支持 (Arch §5.2 + 实施计划 4.3 要求 Chat + Responses 双 Route)
+- **P4-M03** `opencode.rs:63-65` — OpenCode 免费层公共回退缺失 (Arch §5.4 要求 `PublicKey("public")` 回退)
+- **P4-M04** `anthropic.rs:15,70` — `anthropic-version` 头部在 `ProviderDefaults.extra_headers` 和 `RouteDefaults.headers` 中重复
+
+### 建议
+
+- **P4-S01** 全局 provider — `pub` 结构体缺少 `///` 文档注释 (AGENTS.md §3.3)
+- **P4-S02** 全局 provider — `defaults()` 函数可见性不一致 (`pub`/`pub(crate)`/私有混合)
+- **P4-S03** `anthropic.rs:13` — `use indexmap::IndexMap` 局部导入而非模块顶部导入
+- **P4-S04** `openai_compatible.rs:13` — `#[allow(dead_code)]` 在 `profile_base_url()` 上
+- **P4-S05** 全局 provider — `configure()` 中 `model` 闭包可简化为 `route.model(id)`
+- **P4-S06** 全局 provider — 常量 `NonZeroU64::new(x).unwrap()` 应使用 `.expect()`
+- **P4-S07** `xai.rs:69` — 路由 ID `"xai-responses"` 硬编码，未来扩展不便
