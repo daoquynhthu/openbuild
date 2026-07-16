@@ -157,10 +157,15 @@ fn build_model_items(models: &ModelState) -> Vec<ArgItem> {
         let is_current = current_id == Some(id);
         let supports = supports_reasoning_effort(info);
 
-        // Show model with provider prefix if available (provider/model).
-        // The display_name is the model ID itself, which may contain
-        // a "/" separator (e.g. "openai/gpt-4o") or be a bare name.
-        let model_label = info.name.as_str();
+        // Show the model ID (which may be "provider/model" for provider
+        // models) alongside the human-readable name as a suffix when
+        // the two differ.
+        let has_provider_prefix = id.0.contains('/');
+        let model_label = if has_provider_prefix {
+            id.0.to_string()
+        } else {
+            info.name.to_string()
+        };
 
         let display = if is_current {
             format!("{model_label} (current)")
@@ -177,9 +182,17 @@ fn build_model_items(models: &ModelState) -> Vec<ArgItem> {
             model_label.to_string()
         };
 
+        // match_text includes both the full key and the name so
+        // users can search by "gpt-4o" or by "openai/gpt-4o".
+        let match_text = if has_provider_prefix {
+            format!("{} {}", model_label, info.name)
+        } else {
+            model_label.to_string()
+        };
+
         items.push(ArgItem {
             display: display.clone(),
-            match_text: model_label.to_string(),
+            match_text,
             insert_text,
             description: info.description.clone().unwrap_or_default(),
         });
