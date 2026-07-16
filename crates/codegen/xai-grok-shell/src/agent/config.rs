@@ -4762,8 +4762,10 @@ pub fn sampling_config_for_model(
         max_completion_tokens,
         temperature,
         top_p,
+        protocol_id: Some(
+            xai_grok_sampler::protocols::api_backend_to_protocol_id(&api_backend).to_owned(),
+        ),
         api_backend,
-        protocol_id: None,
         auth_scheme: credentials.auth_scheme,
         extra_headers,
         context_window: info.context_window.get(),

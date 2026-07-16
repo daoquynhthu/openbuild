@@ -314,8 +314,10 @@ impl SessionActor {
             max_completion_tokens: cfg.max_completion_tokens,
             temperature: cfg.temperature,
             top_p: cfg.top_p,
+            protocol_id: Some(
+                xai_grok_sampler::protocols::api_backend_to_protocol_id(&cfg.api_backend).to_owned(),
+            ),
             api_backend: cfg.api_backend,
-            protocol_id: None,
             auth_scheme,
             extra_headers,
             context_window: cfg.context_window.get(),

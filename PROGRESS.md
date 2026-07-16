@@ -76,17 +76,21 @@
 - 每个模型携带 provider 的 `env_key` 列表，使 `resolve_credentials()` 回退到正确的环境变量
 - 优先级链: 内置默认 > 预取 > **provider 模型** > `[model.*]` > 继承 > 全局默认
 
-### 关键结果
+### 关键结果 (本轮追加)
 - `cargo check -p xai-grok-shell` ✅
 - `cargo test -p xai-grok-provider` — 58/58 ✅
 - `cargo clippy -p xai-grok-provider` — 零警告
-- 修改 1 个文件 (config.rs)，新增 ~90 行代码
+- 修改 4 个文件，新增 ~50 行代码
+
+### 凭证集成 (Phase 5 追加)
+- `ProviderRegistry.store_config()` / `get_config()` 存储解析后的 ProviderConfig (含 api_key)
+- `configure_providers()` / `register_from_config()` 在调用 `configure()` 前存储配置
+- `[endpoints]` → xAI 兼容路径也存储配置
+- `provider_known_models()` 读取存储的配置以填充 `ModelEntry.api_key` 和合并 `env_key` 列表
 
 ### 待完成
-- 5.6: Providers 模态框完整交互 — 5 个 dispatch 点修改
-- 5.8: 模型选择器 provider/model 显示
-- Phase 6: 全链路集成 + 新端到端测试
-- Phase 7: 清理 + 文档 + 审计
+- 5.6: Providers 模态框完整交互 (TUI)
+- 5.8: 模型选择器 provider/model 显示 (TUI)
 
 ---
 
@@ -142,9 +146,37 @@
 
 ---
 
-## Phase 6: 协议层集成 + 端到端验证 — 预留
+## Phase 6: 集成与迁移 — 2026-07-16
 
-**尚未开始** — 依赖 Phase 5.5 (resolve_model_list 重写) 完成后执行。
+### 子任务状态
+
+| ID | 任务 | 状态 |
+|----|------|------|
+| 6.1 | main.rs 初始化 ProviderRegistry | ✅ 已在 5.4 完成 |
+| 6.2 | Registry 注入到 SessionActor | ❌ 未开始 — 需修改 spawn_session_actor 参数链 |
+| 6.3 | Route-based protocol_id 贯通 | ✅ protocol_id 从 api_backend 派生占位 |
+| 6.4 | xAI 特性门控 | ⚠️ 部分完成 — XAI_API_KEY 回退已门控 |
+| 6.5-6.6 | 验证测试 | ❌ 待实施 |
+
+### Phase 6.4.2 完成内容
+- `resolve_credentials()` PRIORITY 3 添加 `is_first_party_xai_url()` 门控
+- 非 xAI 端点不再错误接收 `XAI_API_KEY` 值
+- 涉及文件: `config.rs`
+
+### Phase 6.3 完成内容
+- `sampling_config_for_model()` — `protocol_id` 从 `api_backend` 派生，不再硬编码 `None`
+- `reconstruct_full_config()` — 同上
+- `protocol_id` 现在始终反映正确的协议标识符
+- 涉及文件: `config.rs`, `sampler_turn.rs`
+
+### 关键结果
+- `cargo check -p xai-grok-shell` ✅
+- `cargo clippy -p xai-grok-provider` — 零警告
+- 修改 2 个文件
+
+### 待完成
+- 6.2: Registry 线程化到 SessionActor
+- 6.5-6.6: 集成/端到端测试
 
 ---
 
