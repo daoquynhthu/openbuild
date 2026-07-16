@@ -592,7 +592,18 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             vec![]
         }
         Action::OpenProviders => {
-            // TODO: implement providers modal
+            use crate::views::modal::ActiveModal;
+            use crate::views::providers_modal::ProvidersModalState;
+            let ActiveView::Agent(id) = app.active_view else {
+                return vec![];
+            };
+            let Some(agent) = app.agents.get_mut(&id) else {
+                return vec![];
+            };
+            let modal = ActiveModal::Providers {
+                state: Box::new(ProvidersModalState::new()),
+            };
+            agent.active_modal = Some(modal);
             vec![]
         }
         Action::OpenExtensionsModal { tab, trigger } => {

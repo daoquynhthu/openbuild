@@ -20,6 +20,7 @@ pub mod list_pane;
 pub mod mcps_modal;
 pub mod memory_modal;
 pub mod modal;
+pub mod providers_modal;
 pub mod modal_window;
 pub mod new_worktree_dialog;
 pub mod overlay;

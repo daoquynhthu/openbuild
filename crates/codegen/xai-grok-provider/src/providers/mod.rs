@@ -21,8 +21,7 @@ pub fn register_all(registry: &ProviderRegistry) {
 
 /// Parse `[provider.*]` TOML sections and log configuration details.
 /// The actual configuration is applied lazily when `registry.configure()` is called
-/// during model resolution. Built-in provider defaults are merged with user overrides
-/// at that point.
+/// during model resolution.
 pub fn register_from_config(registry: &ProviderRegistry, toml: &toml::Value) {
     let configs = crate::config::parse_provider_toml(toml);
     for (id, provider_config) in &configs {
@@ -33,6 +32,11 @@ pub fn register_from_config(registry: &ProviderRegistry, toml: &toml::Value) {
                 has_api_key = provider_config.api_key.is_some()
                     || provider_config.env_key.as_ref().is_some_and(|k| !k.is_empty()),
                 "configured provider from [provider.*]",
+            );
+        } else {
+            tracing::warn!(
+                provider = %id,
+                "unknown provider in [provider.*] config — skipping",
             );
         }
     }
