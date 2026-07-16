@@ -4435,7 +4435,14 @@ pub fn resolve_credentials(model: &ModelEntry, session_key: Option<&str>) -> Res
             .api_base_url
             .clone()
             .unwrap_or_else(|| info.base_url.clone());
-        (Some(key), url, xai_chat_state::AuthType::ApiKey)
+        // Only send XAI_API_KEY to first-party xAI endpoints.
+        // Non-xAI providers (OpenAI, Anthropic, etc.) must have their
+        // own key via model.api_key, model.env_key, or --api-key.
+        if crate::util::is_first_party_xai_url(&url) {
+            (Some(key), url, xai_chat_state::AuthType::ApiKey)
+        } else {
+            (None, url, xai_chat_state::AuthType::ApiKey)
+        }
     } else {
         if let Some(ref env_keys) = model.env_key
             && !env_keys.is_empty()
