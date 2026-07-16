@@ -97,6 +97,7 @@ pub fn configure_providers(
             cli_override.as_ref(),
         );
 
+        registry.store_config(&pid, merged.clone());
         if let Some(cp) = registry.configure(&pid, merged) {
             let route_id = cp.route.id.clone();
             registry.register_route(&route_id, cp.route);
@@ -117,6 +118,7 @@ pub fn register_from_config(registry: &ProviderRegistry, toml: &toml::Value) {
                     || provider_config.env_key.as_ref().is_some_and(|k| !k.is_empty()),
                 "configured provider from [provider.*]",
             );
+            registry.store_config(&provider_id, provider_config.clone());
             if let Some(cp) = registry.configure(&provider_id, provider_config.clone()) {
                 let route_id = cp.route.id.clone();
                 registry.register_route(&route_id, cp.route);

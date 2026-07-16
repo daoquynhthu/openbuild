@@ -3357,6 +3357,10 @@ fn provider_known_models(
         if known.is_empty() {
             continue;
         }
+        // Retrieve the merged config (TOML + CLI + env) stored during
+        // startup, so api_key from [provider.*] or --api-key flows through.
+        let resolved_config = registry.get_config(&pid);
+
         for model_def in known {
             let key = format!("{}/{}", pid.0, model_def.model);
             let provider_api_backend = model_def.api_backend.clone().unwrap_or_else(|| defaults.api_backend.clone());
@@ -3395,11 +3399,26 @@ fn provider_known_models(
                     stream_tool_calls: None,
                     laziness_detector: LazinessDetectorPerModelConfig::default(),
                 },
-                api_key: None,
-                env_key: if defaults.env_key.is_empty() {
-                    None
-                } else {
-                    Some(EnvKeys::new(defaults.env_key.clone()))
+                api_key: resolved_config
+                    .as_ref()
+                    .and_then(|c| c.api_key.clone())
+                    .filter(|k| !k.is_empty()),
+                env_key: {
+                    let mut env_names: Vec<String> = defaults.env_key.clone();
+                    if let Some(ref cfg) = resolved_config {
+                        if let Some(ref ek) = cfg.env_key {
+                            for name in ek.iter() {
+                                if !env_names.contains(name) {
+                                    env_names.push(name.clone());
+                                }
+                            }
+                        }
+                    }
+                    if env_names.is_empty() {
+                        None
+                    } else {
+                        Some(EnvKeys::new(env_names))
+                    }
                 },
                 api_base_url: None,
             };

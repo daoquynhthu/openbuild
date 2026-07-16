@@ -11,6 +11,7 @@ use crate::types::ProviderId;
 pub struct ProviderRegistry {
     providers: RwLock<HashMap<ProviderId, SharedProvider>>,
     routes: RwLock<HashMap<String, Arc<Route>>>,
+    configs: RwLock<HashMap<ProviderId, ProviderConfig>>,
 }
 
 impl Default for ProviderRegistry {
@@ -24,7 +25,26 @@ impl ProviderRegistry {
         Self {
             providers: RwLock::new(HashMap::new()),
             routes: RwLock::new(HashMap::new()),
+            configs: RwLock::new(HashMap::new()),
         }
+    }
+
+    /// Store the resolved configuration for a provider so it can be
+    /// queried later (e.g. when building ModelEntry items).
+    pub fn store_config(&self, id: &ProviderId, config: ProviderConfig) {
+        self.configs
+            .write()
+            .expect("ProviderRegistry lock poisoned")
+            .insert(id.clone(), config);
+    }
+
+    /// Retrieve the last-stored configuration for a provider, if any.
+    pub fn get_config(&self, id: &ProviderId) -> Option<ProviderConfig> {
+        self.configs
+            .read()
+            .expect("ProviderRegistry lock poisoned")
+            .get(id)
+            .cloned()
     }
 
     pub fn register(&self, provider: SharedProvider) {
