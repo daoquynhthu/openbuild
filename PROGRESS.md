@@ -247,3 +247,31 @@
 - `cargo clippy -p xai-grok-provider -- -D warnings` — 零警告
 - `cargo test -p xai-grok-provider` — 37/37 通过
 - 新增 ~1,200 行 Rust 代码
+
+---
+
+## Workspace 清洁：tracing const-eval ICE 修复 — 2026-07-16
+
+### 问题
+`tracing` crate（0.1.40+）的 `__tracing_stringify` macro 使用 `FieldName<{ FieldName::len(name) }>` —— const 泛型+内联 const 表达式。Rust 1.92.0 的 `min_generic_const_args` 将此模式误降为 `TupleCall`，导致所有 `tracing::info!()` / `debug!()` / `span!()` 调用引发 `E0080`/ICE。`xai-grok-shell` crate 798 处调用全部受影响。
+
+方案：vendor tracing 0.1.44 到 `crates/vendor/tracing/`，将 `__tracing_stringify` 替换为纯 `stringify!()`，避免 const-generic `FieldName`。
+
+### 完成内容
+- 从 crates.io 下载 tracing 0.1.44 源码，置于 `crates/vendor/tracing/`
+- 修复 `macros.rs:3247` — `__tracing_stringify` 改为 `stringify!($($k).+)`
+- 清理 `Cargo.toml` 移除 `[[test]]` / `[[bench]]` 等不可用条目
+- `Cargo.toml` 恢复 `tracing = "0.1"`；新增 `[patch.crates-io]` 段指向 vendored path
+- `Cargo.lock` 更新
+
+### 副作用
+`r#type` 作为字段名时不再自动去除 `r#` 前缀（代码库中无此用法，行为等价）。
+
+### 关键结果
+- `cargo check --workspace` — 零 error ✅
+- `cargo clippy --workspace` — 零 warning ✅
+- `cargo test -p xai-grok-provider` — 66/66 ✅
+- 新增 47 个文件（vendor tracing 源码），修改 2 个文件
+
+### 移除条件
+Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复为 crates.io 依赖。
