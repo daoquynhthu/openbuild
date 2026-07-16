@@ -1984,22 +1984,28 @@ impl SamplingClient {
     ) -> Result<ConversationResponse> {
         let request_id = crate::types::RequestId::random();
         let idle_timeout = std::time::Duration::from_secs(300);
-        let result = match self.api_backend() {
-            ApiBackend::ChatCompletions => {
+        let result = match self.protocol_id() {
+            crate::protocols::id::CHAT_COMPLETIONS => {
                 let (raw, meta) = self.conversation_stream(request).await?;
                 let events =
                     crate::stream::stream_chat_completions(raw, meta, request_id, idle_timeout);
                 crate::stream::collect_response(events).await
             }
-            ApiBackend::Responses => {
+            crate::protocols::id::RESPONSES => {
                 let (raw, meta, doom_loop) = self.conversation_stream_responses(request).await?;
                 let events =
                     crate::stream::stream_responses(raw, meta, request_id, idle_timeout, doom_loop);
                 crate::stream::collect_response(events).await
             }
-            ApiBackend::Messages => {
+            crate::protocols::id::MESSAGES => {
                 let (raw, meta) = self.conversation_stream_messages(request).await?;
                 let events = crate::stream::stream_messages(raw, meta, request_id, idle_timeout);
+                crate::stream::collect_response(events).await
+            }
+            _ => {
+                let (raw, meta) = self.conversation_stream(request).await?;
+                let events =
+                    crate::stream::stream_chat_completions(raw, meta, request_id, idle_timeout);
                 crate::stream::collect_response(events).await
             }
         };
@@ -2033,6 +2039,7 @@ mod tests {
             temperature: None,
             top_p: None,
             api_backend: ApiBackend::ChatCompletions,
+            protocol_id: "chat_completions".into(),
             auth_scheme: AuthScheme::Bearer,
             extra_headers: IndexMap::new(),
             context_window: 8192,

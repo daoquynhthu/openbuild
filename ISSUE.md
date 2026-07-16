@@ -74,3 +74,29 @@
 - **C04** `route.rs:105-112` — `RoutePatch` 缺少 `auth` 和 `headers` 字段 -Closed
 - **C05** `Cargo.toml` — 缺少 `thiserror` 依赖；所有错误类型均用裸 `String` 而非 `thiserror` 派生 -Closed
 - **S11** `types.rs:121-126` — 新增 `HeaderMap` 类型别名避免与 `reqwest` 冲突 -Closed
+
+---
+
+## Phase 2 审计: 2026-07-16
+
+**范围**: `crates/codegen/xai-grok-sampler/src/` — protocol dispatch 重构
+**参考**: `docs/model-adapter-architecture.md` §6.3, `docs/implementation-plan.md` Phase 2
+
+### 严重
+
+- **P2-C01** `client.rs:2027-2056`, `actor/state.rs:82-112` — 测试辅助函数 (`minimal_config`, `cfg`) 未添加 `protocol_id` 字段，导致所有测试编译失败 -Fixed
+- **P2-C02** `request_task.rs:429-473` — dispatch key 改为 `protocol_id` 但实际仍调用旧 `stream_*()` 函数，未使用 `Protocol::stream.step()`。此条目为设计阶段差异 — 完整的 Protocol trait dispatch 需在 Phase 4 之后才能实现
+- **P2-C03** `(缺失文件)` — `protocol.rs` 文件不存在。Arch §13 文件映射要求此文件包含 `ProtocolTable` 注册逻辑
+
+### 中等
+
+- **P2-M01** `client.rs:1980-2018` — `conversation_collect()` 仍使用 `match api_backend()`，与 `request_task.rs` 的 `protocol_id` dispatch 不一致 -Fixed
+- **P2-M02** `Cargo.toml:10` — `xai-grok-provider` 依赖已声明但未在任何 `.rs` 文件中被 `use`，当前无实际用途
+- **P2-M03** `config.rs:60, client.rs:316` — `protocol_id` 字段类型为 `String` 而非 `ProtocolId`（当前 `ProtocolId` 是类型别名，功能上等价）
+- **P2-M04** `protocols/` — 目录不完整，仅有 `mod.rs`，缺少 `chat_completions.rs`/`responses.rs`/`messages.rs` 协议值文件
+
+### 建议
+
+- **P2-S01** `request_task.rs:109` — span label 仍引用 `api_backend()` 而非 `protocol_id()`
+- **P2-S02** `protocols/mod.rs` — 协议 ID 常量类型为 `&str` 而非 `ProtocolId`
+- **P2-S03** `stream/` — 目录未被删除（计划在 Phase 7 清理，当前状态不一致）
