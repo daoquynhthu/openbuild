@@ -110,11 +110,11 @@
 
 ### 中等
 
-- **P3-M01** `xai-grok-sampler/src/sampling_log.rs:18-27` — span 字段名 `api_backend` 与实际传入值 `protocol_id()` 语义不符 -Fixed
-- **P3-M02** `xai-grok-sampler/src/client.rs:547-549` — `api_backend()` 公开方法仍保留，已加 `#[deprecated]` -Fixed
-- **P3-M03** `xai-grok-sampler/src/client.rs:2202` — 测试使用 `api_backend()` 而非 `protocol_id()` -Fixed
-- **P3-M04** `xai-grok-sampler/Cargo.toml:10` — `xai-grok-provider` 依赖已声明但未在任何 `.rs` 中使用 -Fixed
-- **P3-M05** `xai-grok-sampler/src/actor/request_task.rs:109` — `request_span()` 参数名 `api_backend` 语义错误，与 M01 同根因 -Fixed
+- **P3-M01** `xai-grok-sampler/src/sampling_log.rs:18-27` — span 字段名 `api_backend` 与实际传入值 `protocol_id()` 语义不符 -Closed
+- **P3-M02** `xai-grok-sampler/src/client.rs:547-549` — `api_backend()` 公开方法仍保留，已加 `#[deprecated]` -Closed
+- **P3-M03** `xai-grok-sampler/src/client.rs:2202` — 测试使用 `api_backend()` 而非 `protocol_id()` -Closed
+- **P3-M04** `xai-grok-sampler/Cargo.toml:10` — `xai-grok-provider` 依赖已声明但未在任何 `.rs` 中使用 -Closed
+- **P3-M05** `xai-grok-sampler/src/actor/request_task.rs:109` — `request_span()` 参数名 `api_backend` 语义错误，与 M01 同根因 -Closed
 
 ### 建议
 
