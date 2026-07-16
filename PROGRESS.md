@@ -26,33 +26,67 @@
 
 ---
 
-## Phase 5-7: 配置集成 + 清理收尾 — 2026-07-16
+## Phase 5: TUI 集成 + Provider 启动初始化 — 2026-07-16 (补完)
 
-### Phase 5 完成内容
-- CLI 标志: `--provider` / `--api-key` / `--base-url` 到 `PagerArgs` + `AgentArgs`
-- `[provider.*]` TOML 配置解析 (`config.rs:parse_provider_toml()`)
-- `ProviderRegistry` 启动初始化 (`main.rs:904`)
-- `/providers` 斜杠命令 + `Action::OpenProviders` dispatch
-- `views/providers_modal.rs` — Provider 管理模态框 (stub)
-- `register_from_config()` — 从 TOML 配置 Provider
+### 子任务状态
 
-### Phase 6 完成内容
-- `protocol_id` → `SamplerConfig` 全链路贯通
-- xAI OAuth 通过 `Credential::session()` 回退
-- `detect_from_url()` URL 模式匹配全部 6 个 Provider
-- 环境变量自动检测 (XAI_API_KEY, OPENAI_API_KEY 等)
+| ID | 任务 | 状态 |
+|----|------|------|
+| 5.1 | `[provider.*]` TOML 解析 | ✅ 完成 |
+| 5.2 | CLI `--provider` / `--api-key` / `--base-url` | ✅ 完成 |
+| 5.3 | `--model provider/model` 格式 | ✅ 完成 |
+| 5.4 | startup Provider 初始化 + 6 层配置合并 + env 检测 | ✅ 完成 |
+| 5.5 | `resolve_model_list()` 重写 (Provider 层) | ❌ 未开始 |
+| 5.6 | TUI Providers 模态框 (完整) | ⚠️ Stub 仅变体/action/命令就绪，渲染/交互未实现 |
+| 5.7 | `/providers` 斜杠命令 | ✅ 完成 |
+| 5.8 | 模型选择器 provider/ 前缀 | ⚠️ `parse_model_ref()` 支持 CLI，`Ctrl+M` 显示未扩展 |
+| 5.9 | `[endpoints]` 向后兼容 → xAI Provider | ✅ 完成 |
+| 5.10 | 环境变量自动检测 | ✅ 完成 |
 
-### Phase 7 完成内容
-- 移除 `main.rs` 顶层的 `#![allow(unused_imports, unreachable_code, ...)]`
-- `cargo audit` 尝试运行 (Windows 环境安装失败)
-- 最终编译验证: `cargo check -p xai-grok-pager-bin` ✅
+### Phase 5.4 完成内容 (本次新增)
+- `ProviderConfig::merge()` — 分层配置合并方法
+- `detect_env_vars()` — 按 provider 的 `env_key` 列表检测环境变量
+- `build_provider_config()` — 三源合并 (env → TOML → CLI)
+- `configure_providers()` — 对所有注册 provider 应用合并配置并存储 route
+- `register_from_config()` — 改为实际调用 `registry.configure()` (原来仅日志)
+- `main.rs` — registry 不再 `_` 丢弃，线程化到 `AgentConfig.provider_registry`
+- `Config.provider_registry` — 新增 `Option<Arc<ProviderRegistry>>` 字段
 
-### 最终关键结果
-- `cargo test -p xai-grok-provider` — 55/55 ✅
-- `cargo test -p xai-grok-sampler` — 154/154 ✅
-- `cargo clippy -p xai-grok-provider -- -D warnings` ✅
-- `cargo clippy -p xai-grok-sampler -- -D warnings` ✅
-- 分支 34 次 commit，总计约 3,500+ 行新增代码
+### Phase 5.9 完成内容
+- 读取 `agent_config.endpoints.xai_api_base_url` / `alpha_test_key`
+- 转换为 xAI provider 的 `ProviderConfig` 并配置到 registry
+- 保留旧配置语义：自定义 base_url 或 key 自动映射
+
+### Phase 5.10 完成内容
+- `detect_env_vars()` 遍历各 provider 的 `env_key` 列表
+- 支持：`XAI_API_KEY` → xAI, `OPENAI_API_KEY` → OpenAI, `ANTHROPIC_API_KEY` → Anthropic 等
+- 优先级：env < `[provider.*]` < CLI `--api-key`
+
+### 关键结果
+- `cargo check -p xai-grok-pager-bin` ✅
+- `cargo clippy -p xai-grok-provider` — 零警告
+- `cargo test -p xai-grok-provider` — 58/58 ✅
+- 修改 4 个文件，新增 ~170 行代码
+
+### Phase 5.5 完成内容 (本次新增)
+- `provider_known_models()` — 将 `ProviderDefaults` + `ProviderModelDef` 转换为 `ModelEntry`
+- `resolve_model_list()` 新增 Layer 2b — 在预取模型之后、`[model.*]` 重写之前注入
+- 转换函数 `to_api_backend()` / `to_auth_scheme()` 处理跨 crate 类型映射
+- 注入的模型使用 `provider/model` 键名，避免与内置 xAI 模型冲突
+- 每个模型携带 provider 的 `env_key` 列表，使 `resolve_credentials()` 回退到正确的环境变量
+- 优先级链: 内置默认 > 预取 > **provider 模型** > `[model.*]` > 继承 > 全局默认
+
+### 关键结果
+- `cargo check -p xai-grok-shell` ✅
+- `cargo test -p xai-grok-provider` — 58/58 ✅
+- `cargo clippy -p xai-grok-provider` — 零警告
+- 修改 1 个文件 (config.rs)，新增 ~90 行代码
+
+### 待完成
+- 5.6: Providers 模态框完整交互 — 5 个 dispatch 点修改
+- 5.8: 模型选择器 provider/model 显示
+- Phase 6: 全链路集成 + 新端到端测试
+- Phase 7: 清理 + 文档 + 审计
 
 ---
 
@@ -105,6 +139,20 @@
 - `cargo clippy -p xai-grok-sampler -- -D warnings` — 零警告
 - 修改 5 个文件，新增 `protocols/` 模块
 - 向后兼容：`SamplingClient::api_backend()` 保留，`protocol_id` 在未设置时自动从 `api_backend` 派生
+
+---
+
+## Phase 6: 协议层集成 + 端到端验证 — 预留
+
+**尚未开始** — 依赖 Phase 5.5 (resolve_model_list 重写) 完成后执行。
+
+---
+
+## Phase 7: 清理收尾 — 2026-07-16
+
+### 完成内容
+- 移除 `main.rs` 顶层的 `#![allow(unused_imports, unreachable_code, ...)]`
+- `cargo audit` 尝试运行 (Windows 环境安装失败)
 
 ---
 

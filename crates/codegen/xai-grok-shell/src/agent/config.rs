@@ -3169,6 +3169,21 @@ pub fn resolve_model_list(
         }
         resolved = prefetched;
     }
+    // LAYER 2b: Provider-known models from registry (between prefetched and [model.*]).
+    if let Some(registry) = &cfg.provider_registry {
+        let provider_entries = provider_known_models(registry);
+        if !provider_entries.is_empty() {
+            let before = resolved.len();
+            for (key, entry) in provider_entries {
+                resolved.entry(key).or_insert(entry);
+            }
+            tracing::debug!(
+                added = resolved.len() - before,
+                "added provider-known models"
+            );
+        }
+    }
+
     for (key, model_override) in &cfg.config_models {
         let had_base = resolved.contains_key(key);
         let base = resolved.shift_remove(key);
@@ -3305,6 +3320,95 @@ pub fn default_model_entries(endpoints: &EndpointsConfig) -> IndexMap<String, Mo
         .map(|(key, entry)| (key, ModelEntry::from_config_entry(&entry)))
         .collect()
 }
+/// Convert provider-known models from the registry into ModelEntry map entries.
+/// Each entry uses `"provider/model"` as the key and carries the provider's
+/// default base_url, api_backend, auth_scheme, and env_key list so credential
+/// resolution can find the right env var (e.g. OPENAI_API_KEY).
+fn provider_known_models(
+    registry: &std::sync::Arc<xai_grok_provider::registry::ProviderRegistry>,
+) -> IndexMap<String, ModelEntry> {
+    fn to_api_backend(b: xai_grok_provider::types::ApiBackend) -> crate::sampling::ApiBackend {
+        match b {
+            xai_grok_provider::types::ApiBackend::ChatCompletions => {
+                crate::sampling::ApiBackend::ChatCompletions
+            }
+            xai_grok_provider::types::ApiBackend::Responses => {
+                crate::sampling::ApiBackend::Responses
+            }
+            xai_grok_provider::types::ApiBackend::Messages => {
+                crate::sampling::ApiBackend::Messages
+            }
+        }
+    }
+    fn to_auth_scheme(s: xai_grok_provider::types::AuthScheme) -> xai_grok_sampler::AuthScheme {
+        match s {
+            xai_grok_provider::types::AuthScheme::Bearer => xai_grok_sampler::AuthScheme::Bearer,
+            xai_grok_provider::types::AuthScheme::XApiKey => xai_grok_sampler::AuthScheme::XApiKey,
+        }
+    }
+
+    let mut entries = IndexMap::new();
+    for pid in registry.all_ids() {
+        let Some(provider) = registry.get(&pid) else {
+            continue;
+        };
+        let defaults = provider.defaults();
+        let known = provider.known_models();
+        if known.is_empty() {
+            continue;
+        }
+        for model_def in known {
+            let key = format!("{}/{}", pid.0, model_def.model);
+            let provider_api_backend = model_def.api_backend.clone().unwrap_or_else(|| defaults.api_backend.clone());
+            let entry = ModelEntry {
+                info: ModelInfo {
+                    id: Some(key.clone()),
+                    model: model_def.model.clone(),
+                    base_url: defaults.base_url.clone(),
+                    name: Some(model_def.name.clone()),
+                    description: model_def.description.clone(),
+                    context_window: model_def.context_window,
+                    api_backend: to_api_backend(provider_api_backend),
+                    auth_scheme: to_auth_scheme(defaults.auth_scheme.clone()),
+                    extra_headers: defaults.extra_headers.clone(),
+                    temperature: defaults.temperature,
+                    top_p: defaults.top_p,
+                    max_completion_tokens: defaults.max_completion_tokens,
+                    supports_backend_search: defaults.supports_backend_search,
+                    supports_reasoning_effort: model_def
+                        .supports_reasoning_effort
+                        .unwrap_or(defaults.supports_reasoning_effort),
+                    user_selectable: !model_def.hidden,
+                    hidden: model_def.hidden,
+                    supported_in_api: true,
+                    auto_compact_threshold_percent: None,
+                    system_prompt_label: None,
+                    use_concise: false,
+                    agent_type: default_agent_type(),
+                    inference_idle_timeout_secs: None,
+                    max_retries: None,
+                    reasoning_effort: None,
+                    reasoning_efforts: vec![],
+                    compactions_remaining: None,
+                    compaction_at_tokens: None,
+                    show_model_fingerprint: false,
+                    stream_tool_calls: None,
+                    laziness_detector: LazinessDetectorPerModelConfig::default(),
+                },
+                api_key: None,
+                env_key: if defaults.env_key.is_empty() {
+                    None
+                } else {
+                    Some(EnvKeys::new(defaults.env_key.clone()))
+                },
+                api_base_url: None,
+            };
+            entries.insert(key, entry);
+        }
+    }
+    entries
+}
+
 /// Resolve a model against the available model map.
 /// Checks the map key (id) first, then falls back to a slug scan.
 pub fn find_model_by_id<'a>(
