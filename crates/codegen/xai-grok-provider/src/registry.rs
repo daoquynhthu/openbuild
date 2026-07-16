@@ -196,9 +196,6 @@ mod tests {
             }
         }
 
-        fn known_models(&self) -> &[crate::types::ProviderModelDef] {
-            &[]
-        }
     }
 
     fn dummy_provider() -> SharedProvider {

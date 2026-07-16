@@ -41,11 +41,6 @@ fn openai_provider_full_pipeline() {
         xai_grok_provider::types::ApiBackend::ChatCompletions
     );
 
-    // Known models
-    let models = provider.known_models();
-    assert!(!models.is_empty());
-    assert!(models.iter().any(|m| m.id == "gpt-4o"));
-
     // Build SamplerConfig and verify protocol_id
     let sampler = xai_grok_sampler::SamplerConfig {
         api_key: Some("sk-e2e-test-key".into()),
@@ -66,9 +61,11 @@ fn openai_provider_full_pipeline() {
     assert_eq!(client.protocol_id(), "chat_completions");
 }
 
-/// Verify all built-in providers are registered with known models.
+/// Verify all built-in providers have model list endpoint or format configured.
 #[test]
-fn all_providers_have_known_models() {
+fn all_providers_have_model_list_config() {
+    use xai_grok_provider::types::ModelListFormat;
+
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
 
@@ -77,13 +74,33 @@ fn all_providers_have_known_models() {
 
     for pid in &ids {
         let provider = reg.get(pid).expect("provider");
-        let models = provider.known_models();
-        assert!(
-            models.len() <= 10,
-            "{} should have at most 10 known models, got {}",
-            provider.name(),
-            models.len()
-        );
+        let defaults = provider.defaults();
+        // Every provider must have a model_list_format set.
+        // The model_list_endpoint is optional — for dynamic base_url
+        // providers (openai-compatible) it's None and derived at runtime.
+        match pid.0.as_str() {
+            "ollama" => {
+                assert_eq!(defaults.model_list_format, ModelListFormat::OllamaTags);
+                assert!(defaults.model_list_endpoint.is_some());
+            }
+            "openai-compatible" => {
+                assert_eq!(defaults.model_list_format, ModelListFormat::OpenAiCompatible);
+                assert!(defaults.model_list_endpoint.is_none());
+            }
+            _ => {
+                assert_eq!(defaults.model_list_format, ModelListFormat::OpenAiCompatible);
+                assert!(
+                    defaults.model_list_endpoint.is_none(),
+                    "{} should derive endpoint from base_url",
+                    provider.name()
+                );
+                assert!(
+                    !defaults.base_url.is_empty(),
+                    "{} must have a base_url",
+                    provider.name()
+                );
+            }
+        }
     }
 }
 

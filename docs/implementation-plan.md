@@ -474,10 +474,62 @@ xai-grok-shell/src/agent/
 
 ---
 
+## Phase 8: 多 Provider 模型动态获取
+
+### 目标
+
+将所有 provider 的 hardcoded `known_models` 替换为统一的动态 API 获取管道。每个 provider 在启动时从其模型列表端点获取最新模型，注入模型解析管线。
+
+### 架构变更
+
+- 删除 `ProviderDefaults.known_models` 字段和 `ProviderModelDef` 结构体
+- 删除 `Provider::known_models()` trait 方法
+- 新增 `ProviderDefaults.model_list_endpoint: Option<String>`（None → 从 base_url 自动推导）
+- 新增 `ProviderDefaults.model_list_format: ModelListFormat`（`OpenAiCompatible | OllamaTags`）
+- 新增 `fetch_provider_models_blocking()` 函数，在 `configure_providers()` 之后调用
+- 从 `resolve_model_list()` 中删除 Layer 2b 硬编码注入
+
+### 任务
+
+| ID | 任务 | 产出 | 参考 |
+|----|------|------|------|
+| 8.1 | 删除 `known_models` 和 `ProviderModelDef` | 从 `types.rs` 删除字段 + 结构体 | Arch §3.2 |
+| 8.2 | 删除 `Provider::known_models()` trait 方法 | 从 `provider.rs` 删除 | Arch §3.3 |
+| 8.3 | 清理 6 个 provider 文件 | 删除 `known_models` 构造 + trait impl | xai.rs, openai.rs, anthropic.rs, opencode.rs, ollama.rs, openai_compatible.rs |
+| 8.4 | 新增 `model_list_endpoint` + `model_list_format` 到 `ProviderDefaults` | 更新 `types.rs` | Arch §3.2 |
+| 8.5 | 配置 6 个 provider 的模型列表端点 | 更新各 provider 的 `defaults()` | Arch §6.4 |
+| 8.6 | 实现 `fetch_provider_models_blocking()` | 在 `xai-grok-shell/src/agent/models.rs` 中 | Arch §6.4 |
+| 8.7 | 实现 Ollama `/api/tags` 响应解析器 | 从 `{"models":[{"name":"..."}]}` → `ModelEntryConfig` | Arch §6.4 |
+| 8.8 | 从 `resolve_model_list()` 中删除 Layer 2b | 删除 `provider_known_models()` 函数和调用 | config.rs |
+| 8.9 | 集成 prefetch 缓存 | 每个 provider 独立缓存键 `"{pid}|{url}"`，TTL 300s | models.rs |
+| 8.10 | 清理测试 | 删除/更新 `all_providers_have_known_models` 等 | provider_e2e.rs, types.rs |
+
+### 各 Provider 模型列表端点
+
+| Provider | endpoint_url | format | auth |
+|----------|-------------|--------|------|
+| xAI | `None` → `{base_url}/models` | OpenAiCompatible | Bearer |
+| OpenAI | `None` → `{base_url}/models` | OpenAiCompatible | Bearer |
+| Anthropic | `None` → `{base_url}/models` | OpenAiCompatible | x-api-key |
+| OpenCode | `None` → `{base_url}/models` | OpenAiCompatible | Bearer or none |
+| Ollama | `"http://localhost:11434/api/tags"` | OllamaTags | None |
+| OpenAiCompatible | `None` → `{base_url}/models` | OpenAiCompatible | Bearer |
+
+### 门禁
+
+- `cargo check --workspace` 零错误
+- `cargo clippy --workspace` 零警告
+- `cargo test -p xai-grok-provider` 66/66 ✅（更新测试后）
+- `cargo test -p xai-grok-shell` 所有前置测试通过
+- `cargo doc --no-deps` 零 warning
+- 删除 `ProviderModelDef` 后不留下任何悬空引用
+
+---
+
 ## 依赖图
 
 ```
-Phase 0 ──→ Phase 1 ──→ Phase 2 ──→ Phase 5 ──→ Phase 6 ──→ Phase 7
+Phase 0 ──→ Phase 1 ──→ Phase 2 ──→ Phase 5 ──→ Phase 6 ──→ Phase 7 ──→ Phase 8
                 │            │                           ↑
                 │            └── Phase 3 ────────────────┘
                 │                         ↑
@@ -488,6 +540,7 @@ Phase 0 ──→ Phase 1 ──→ Phase 2 ──→ Phase 5 ──→ Phase 6 
 - Phase 5 需要 Phase 2 + 3 + 4
 - Phase 6 需要 Phase 5
 - Phase 7 需要 Phase 6
+- Phase 8 需要 Phase 1 + 7（依赖 ProviderDefaults 类型和完整的 provider 注册流程）
 
 ---
 
@@ -503,6 +556,7 @@ Phase 0 ──→ Phase 1 ──→ Phase 2 ──→ Phase 5 ──→ Phase 6 
 | 性能无倒退 | 对比 `resolve_model_to_sampling_config` 基准 | Phase 7 |
 | 零安全漏洞 | `cargo audit` | Phase 7 |
 | 文档完整 | `cargo doc --no-deps 2>&1 | grep "warning" | wc -l` | Phase 7 |
+| 无硬编码模型列表 | `grep -r "known_models.*ProviderModelDef"` 返回空 | Phase 8 |
 
 ---
 
@@ -517,7 +571,8 @@ main
         ├── Phase 4 → commit
         ├── Phase 5 → commit
         ├── Phase 6 → commit
-        └── Phase 7 → commit
+        ├── Phase 7 → commit
+        └── Phase 8 → commit
 ```
 
 每个 Phase 完成后创建一个标记的 commit。commit message 格式：

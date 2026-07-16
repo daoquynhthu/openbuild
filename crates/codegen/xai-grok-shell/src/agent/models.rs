@@ -1,7 +1,11 @@
 //! Model fetching, resolution, and management.
 
+use std::collections::HashMap;
+use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::LazyLock;
+use std::time::Instant;
 
 use parking_lot::RwLock;
 
@@ -1393,6 +1397,276 @@ fn build_prefetched_map(
         map.insert(key, entry);
     }
     map
+}
+
+fn to_api_backend(b: xai_grok_provider::types::ApiBackend) -> crate::sampling::ApiBackend {
+    match b {
+        xai_grok_provider::types::ApiBackend::ChatCompletions => {
+            crate::sampling::ApiBackend::ChatCompletions
+        }
+        xai_grok_provider::types::ApiBackend::Responses => crate::sampling::ApiBackend::Responses,
+        xai_grok_provider::types::ApiBackend::Messages => crate::sampling::ApiBackend::Messages,
+    }
+}
+
+fn to_auth_scheme(s: xai_grok_provider::types::AuthScheme) -> xai_grok_sampler::AuthScheme {
+    match s {
+        xai_grok_provider::types::AuthScheme::Bearer => xai_grok_sampler::AuthScheme::Bearer,
+        xai_grok_provider::types::AuthScheme::XApiKey => xai_grok_sampler::AuthScheme::XApiKey,
+        xai_grok_provider::types::AuthScheme::None => xai_grok_sampler::AuthScheme::None,
+        _ => xai_grok_sampler::AuthScheme::default(),
+    }
+}
+
+fn resolve_provider_auth(
+    defaults: &xai_grok_provider::types::ProviderDefaults,
+    resolved_config: &Option<xai_grok_provider::config::ProviderConfig>,
+) -> Option<(String, String)> {
+    let candidates: Vec<(String, String)> = {
+        let mut c = Vec::new();
+        if let Some(cfg) = resolved_config {
+            if let Some(key) = &cfg.api_key {
+                if !key.is_empty() {
+                    c.push(("config".into(), key.clone()));
+                }
+            }
+        }
+        for env_name in &defaults.env_key {
+            if let Ok(key) = std::env::var(env_name) {
+                if !key.is_empty() {
+                    c.push((env_name.clone(), key));
+                    break;
+                }
+            }
+        }
+        c
+    };
+
+    let key_value = candidates.into_iter().next()?;
+
+    match defaults.auth_scheme {
+        xai_grok_provider::types::AuthScheme::Bearer => {
+            Some(("Authorization".into(), format!("Bearer {}", key_value.1)))
+        }
+        xai_grok_provider::types::AuthScheme::XApiKey => {
+            Some(("x-api-key".into(), key_value.1))
+        }
+        xai_grok_provider::types::AuthScheme::None => None,
+        _ => None,
+    }
+}
+
+fn parse_openai_compatible_provider_models(
+    response: reqwest::blocking::Response,
+    base_url: &str,
+) -> Vec<config::ModelEntryConfig> {
+    let json: serde_json::Value = match response.json() {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to parse provider model list JSON");
+            return vec![];
+        }
+    };
+
+    let data = match json.get("data").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => {
+            tracing::warn!("provider model list missing 'data' array");
+            return vec![];
+        }
+    };
+
+    let mut models = Vec::with_capacity(data.len());
+    for (idx, value) in data.iter().enumerate() {
+        match crate::remote::client::parse_remote_model_value(value, base_url) {
+            Some(model) => models.push(model),
+            None => {
+                tracing::warn!(index = idx, "skipping unparseable model entry");
+            }
+        }
+    }
+    models
+}
+
+fn parse_ollama_tags_models(
+    response: reqwest::blocking::Response,
+    defaults: &xai_grok_provider::types::ProviderDefaults,
+) -> Vec<config::ModelEntryConfig> {
+    let json: serde_json::Value = match response.json() {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to parse Ollama tags JSON");
+            return vec![];
+        }
+    };
+
+    let models = match json.get("models").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => {
+            tracing::warn!("Ollama response missing 'models' array");
+            return vec![];
+        }
+    };
+
+    let provider_api_backend = to_api_backend(defaults.api_backend.clone());
+
+    let mut entries = Vec::with_capacity(models.len());
+    for model_value in models {
+        let obj = match model_value.as_object() {
+            Some(o) => o,
+            None => continue,
+        };
+        let name = match obj.get("name").and_then(|v| v.as_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+
+        entries.push(config::ModelEntryConfig {
+            id: None,
+            model: name.to_owned(),
+            base_url: defaults.base_url.clone(),
+            name: Some(name.to_owned()),
+            description: None,
+            max_completion_tokens: defaults.max_completion_tokens,
+            temperature: defaults.temperature,
+            top_p: defaults.top_p,
+            api_key: None,
+            env_key: None,
+            api_backend: provider_api_backend.clone(),
+            auth_scheme: Some(to_auth_scheme(defaults.auth_scheme.clone())),
+            reasoning_effort: None,
+            supports_reasoning_effort: defaults.supports_reasoning_effort,
+            reasoning_efforts: vec![],
+            extra_headers: defaults.extra_headers.clone(),
+            context_window: defaults.context_window,
+            auto_compact_threshold_percent: None,
+            system_prompt_label: None,
+            api_base_url: None,
+            use_concise: false,
+            agent_type: crate::agent::config::default_agent_type(),
+            inference_idle_timeout_secs: None,
+            max_retries: None,
+            hidden: false,
+            supported_in_api: true,
+            supports_backend_search: defaults.supports_backend_search,
+            compactions_remaining: None,
+            compaction_at_tokens: None,
+            show_model_fingerprint: false,
+            stream_tool_calls: None,
+            laziness_detector: Default::default(),
+        });
+    }
+    entries
+}
+
+const PROVIDER_MODEL_CACHE_TTL_SECS: u64 = 300;
+
+struct ProviderModelCacheEntry {
+    models: IndexMap<String, ModelEntry>,
+    fetched_at: Instant,
+}
+
+static PROVIDER_MODEL_CACHE: LazyLock<RwLock<HashMap<String, ProviderModelCacheEntry>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub fn fetch_provider_models_blocking(
+    registry: &Arc<xai_grok_provider::registry::ProviderRegistry>,
+) -> IndexMap<String, ModelEntry> {
+    let client = crate::http::shared_blocking_client();
+    let mut all_models: IndexMap<String, ModelEntry> = IndexMap::new();
+
+    for pid in registry.all_ids() {
+        let Some(provider) = registry.get(&pid) else {
+            continue;
+        };
+        let defaults = provider.defaults();
+        let resolved_config = registry.get_config(&pid);
+
+        let model_list_url = defaults
+            .model_list_endpoint
+            .clone()
+            .unwrap_or_else(|| format!("{}/models", defaults.base_url.trim_end_matches('/')));
+
+        let cache_key = format!("{}|{}", pid.0, model_list_url);
+
+        let mut request = client.get(&model_list_url);
+
+        if defaults.auth_scheme != xai_grok_provider::types::AuthScheme::None {
+            if let Some((header_name, header_value)) =
+                resolve_provider_auth(defaults, &resolved_config)
+            {
+                request = request.header(&header_name, header_value);
+            } else {
+                tracing::warn!(
+                    provider = %pid.0,
+                    url = %model_list_url,
+                    "no credentials for model list fetch, skipping"
+                );
+                continue;
+            }
+        }
+
+        match request.send() {
+            Ok(resp) if resp.status().is_success() => {
+                let model_configs = match defaults.model_list_format {
+                    xai_grok_provider::types::ModelListFormat::OpenAiCompatible => {
+                        parse_openai_compatible_provider_models(resp, &defaults.base_url)
+                    }
+                    xai_grok_provider::types::ModelListFormat::OllamaTags => {
+                        parse_ollama_tags_models(resp, defaults)
+                    }
+                };
+
+                let mut provider_models = IndexMap::new();
+                for mc in model_configs {
+                    let key = format!("{}/{}", pid.0, mc.model);
+                    let entry = ModelEntry::from_config_entry(&mc);
+                    provider_models.insert(key, entry);
+                }
+
+                let mut cache = PROVIDER_MODEL_CACHE.write();
+                cache.insert(
+                    cache_key.clone(),
+                    ProviderModelCacheEntry {
+                        models: provider_models.clone(),
+                        fetched_at: Instant::now(),
+                    },
+                );
+
+                all_models.extend(provider_models);
+            }
+            Ok(resp) => {
+                tracing::warn!(
+                    provider = %pid.0,
+                    status = resp.status().as_u16(),
+                    "non-success from model list endpoint"
+                );
+                if let Some(cached) = PROVIDER_MODEL_CACHE.read().get(&cache_key) {
+                    tracing::info!(
+                        provider = %pid.0,
+                        "using stale cached provider models as fallback"
+                    );
+                    all_models.extend(cached.models.clone());
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    provider = %pid.0,
+                    error = %e,
+                    "failed to fetch provider model list"
+                );
+                if let Some(cached) = PROVIDER_MODEL_CACHE.read().get(&cache_key) {
+                    tracing::info!(
+                        provider = %pid.0,
+                        "using stale cached provider models as fallback"
+                    );
+                    all_models.extend(cached.models.clone());
+                }
+            }
+        }
+    }
+
+    all_models
 }
 
 /// Fetch remote models. Checks disk cache first; persists after fetch.

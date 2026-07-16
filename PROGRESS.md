@@ -309,3 +309,53 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 - `cargo clippy -p xai-grok-provider -p xai-grok-tools -p xai-grok-workspace -- -D warnings` — 零警告 ✅
 - `cargo test -p xai-grok-provider` — 66/66 ✅
 - 修改 5 个文件（ollama.rs, fs.rs, handle.rs, model-adapter-architecture.md, ISSUE.md），新增 PROGRESS.md 条目
+
+---
+
+## Phase 8: 多 Provider 模型动态获取 — 2026-07-17
+
+### 完成内容
+
+- **8.1** 从 `types.rs` 删除 `ProviderModelDef` 结构体和 `known_models` 字段
+- **8.2** 从 `Provider` trait 删除 `known_models()` 方法
+- **8.3** 清理 8 个文件中所有 `known_models` 引用（6 provider + registry.rs + provers/mod.rs 测试）
+- **8.4** 新增 `ModelListFormat` 枚举（`OpenAiCompatible | OllamaTags`）、`model_list_endpoint` 和 `model_list_format` 字段到 `ProviderDefaults`
+- **8.5** 配置 6 个 provider 的模型列表端点（Ollama → `http://localhost:11434/api/tags` + `OllamaTags`，其余 → `None` + `OpenAiCompatible`)
+- **8.6** 实现 `fetch_provider_models_blocking()` 在 `xai-grok-shell/src/agent/models.rs`
+- **8.7** 实现 `parse_ollama_tags_models()` Ollama `/api/tags` 响应解析器
+- **8.8** 从 `resolve_model_list()` 删除 Layer 2b（`provider_known_models()` 函数 + 调用）
+- **8.9** 集成内存 prefetch 缓存（每 provider 独立缓存键 `"{pid}|{url}"`，TTL 300s，失败时回退过期缓存）
+- **8.10** 更新测试（删除 `all_providers_have_known_models` → 替换为 `all_providers_have_model_list_config`；删除 `openai_provider_full_pipeline` 中的 `known_models` 断言）
+- 更新 `docs/model-adapter-architecture.md` 对齐 §3.2/§3.3/§5.x/§6.1/§6.4/§9/§10/§13
+- 添加 `docs/implementation-plan.md` Phase 8 完整定义
+
+### 修改文件
+
+| 文件 | 变更 |
+|------|------|
+| `crates/codegen/xai-grok-provider/src/types.rs` | 删除 `ProviderModelDef` + `known_models`；新增 `ModelListFormat`、`model_list_endpoint`、`model_list_format` |
+| `crates/codegen/xai-grok-provider/src/provider.rs` | 删除 `known_models()` trait 方法 |
+| `crates/codegen/xai-grok-provider/src/providers/xai.rs` | 删除 `known_models` 字段 + trait impl |
+| `crates/codegen/xai-grok-provider/src/providers/openai.rs` | 同上 |
+| `crates/codegen/xai-grok-provider/src/providers/anthropic.rs` | 同上 |
+| `crates/codegen/xai-grok-provider/src/providers/opencode.rs` | 同上 |
+| `crates/codegen/xai-grok-provider/src/providers/ollama.rs` | 同上 + 设置 OllamaTags 格式 |
+| `crates/codegen/xai-grok-provider/src/providers/openai_compatible.rs` | 删除 `known_models` 字段 + trait impl |
+| `crates/codegen/xai-grok-provider/src/providers/mod.rs` | 删除测试中 `known_models` |
+| `crates/codegen/xai-grok-provider/src/registry.rs` | 同上 |
+| `crates/codegen/xai-grok-provider/tests/provider_e2e.rs` | 更新测试 |
+| `crates/codegen/xai-grok-shell/src/agent/config.rs` | 删除 Layer 2b + `provider_known_models()` |
+| `crates/codegen/xai-grok-shell/src/agent/models.rs` | 新增 `fetch_provider_models_blocking()` 及相关辅助函数 + 缓存 |
+| `docs/model-adapter-architecture.md` | 全文档对齐 |
+| `docs/implementation-plan.md` | 新增 Phase 8 |
+
+### 关键结果
+- `cargo check --workspace` — 通过 ✅
+- `cargo clippy --workspace -- -D warnings` — 零警告 ✅
+- `cargo test -p xai-grok-provider` — 65/65 ✅（62 unit + 3 integration）
+- 无 `known_models` 或 `ProviderModelDef` 残留引用
+- 删除 `ProviderModelDef` 和 `known_models` 后编译完全通过
+
+### 阻塞项
+- Phase 8 的启动集成（调用 `fetch_provider_models_blocking` 并合并到模型解析管线）需要在 shell 启动流程中接入。当前函数已实现，待 caller 接入
+- 预存 `PROGRESS.md` 中 `known_models` 引用为历史记录保留，不影响当前状态

@@ -52,19 +52,6 @@ pub enum AuthScheme {
     None,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[non_exhaustive]
-pub struct ProviderModelDef {
-    pub id: String,
-    pub model: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub context_window: NonZeroU64,
-    pub hidden: bool,
-    pub api_backend: Option<ApiBackend>,
-    pub supports_reasoning_effort: Option<bool>,
-}
-
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct ProviderDefaults {
@@ -74,6 +61,8 @@ pub struct ProviderDefaults {
     pub api_backend: ApiBackend,
     pub auth_scheme: AuthScheme,
     pub env_key: Vec<String>,
+    pub model_list_endpoint: Option<String>,
+    pub model_list_format: ModelListFormat,
     pub context_window: NonZeroU64,
     pub max_completion_tokens: Option<u32>,
     pub temperature: Option<f32>,
@@ -84,7 +73,6 @@ pub struct ProviderDefaults {
     pub supports_tool_calling: bool,
     pub supports_structured_output: bool,
     pub extra_headers: IndexMap<String, String>,
-    pub known_models: Vec<ProviderModelDef>,
 }
 
 impl Default for ProviderDefaults {
@@ -96,6 +84,8 @@ impl Default for ProviderDefaults {
             api_backend: ApiBackend::ChatCompletions,
             auth_scheme: AuthScheme::Bearer,
             env_key: Vec::new(),
+            model_list_endpoint: None,
+            model_list_format: ModelListFormat::OpenAiCompatible,
             context_window: NonZeroU64::new(128_000).expect("128_000 is non-zero"),
             max_completion_tokens: None,
             temperature: None,
@@ -106,9 +96,17 @@ impl Default for ProviderDefaults {
             supports_tool_calling: true,
             supports_structured_output: false,
             extra_headers: IndexMap::new(),
-            known_models: Vec::new(),
         }
     }
+}
+
+/// Format of the model list endpoint response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ModelListFormat {
+    #[default]
+    OpenAiCompatible,
+    /// Ollama /api/tags format: {"models": [{"name": "...", ...}]}
+    OllamaTags,
 }
 
 /// Shared header map type used across the provider crate.
@@ -148,8 +146,6 @@ pub fn parse_model_ref(s: &str) -> (Option<ProviderId>, String) {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU64;
-
     use super::*;
 
     #[test]
@@ -205,26 +201,8 @@ mod tests {
         assert_eq!(d.id.0, "unknown");
         assert_eq!(d.context_window.get(), 128_000);
         assert!(d.supports_streaming);
-        assert!(d.known_models.is_empty());
         assert_eq!(d.api_backend, ApiBackend::ChatCompletions);
         assert_eq!(d.auth_scheme, AuthScheme::Bearer);
-    }
-
-    #[test]
-    fn provider_model_def_serde() {
-        let def = ProviderModelDef {
-            id: "gpt-4o".into(),
-            model: "gpt-4o-2024-11-20".into(),
-            name: "GPT-4o".into(),
-            description: Some("Flagship model".into()),
-            context_window: NonZeroU64::new(128_000).expect("128_000 is non-zero"),
-            hidden: false,
-            api_backend: None,
-            supports_reasoning_effort: None,
-        };
-        let json = serde_json::to_string(&def).unwrap();
-        let back: ProviderModelDef = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.id, "gpt-4o");
     }
 
     #[test]

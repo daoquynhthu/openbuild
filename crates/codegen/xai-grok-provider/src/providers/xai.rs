@@ -10,7 +10,7 @@ use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
 use crate::types::{
-    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId,
 };
 
 pub(crate) fn xai_defaults() -> ProviderDefaults {
@@ -31,16 +31,8 @@ pub(crate) fn xai_defaults() -> ProviderDefaults {
         supports_tool_calling: true,
         supports_structured_output: true,
         extra_headers: IndexMap::new(),
-        known_models: vec![ProviderModelDef {
-            id: "grok-build".into(),
-            model: "grok-build".into(),
-            name: "Grok Build".into(),
-            description: Some("Best for advanced coding tasks".into()),
-            context_window: NonZeroU64::new(500_000).unwrap(),
-            hidden: false,
-            api_backend: None,
-            supports_reasoning_effort: None,
-        }],
+        model_list_endpoint: None,
+        model_list_format: crate::types::ModelListFormat::OpenAiCompatible,
     }
 }
 
@@ -115,7 +107,4 @@ impl Provider for XaiProvider {
         }
     }
 
-    fn known_models(&self) -> &[ProviderModelDef] {
-        &self.defaults.known_models
-    }
 }

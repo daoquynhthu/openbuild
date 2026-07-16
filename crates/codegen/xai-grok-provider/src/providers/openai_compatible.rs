@@ -8,7 +8,7 @@ use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
 use crate::types::{
-    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId,
 };
 
 /// Known OpenAI-compatible profile configurations.
@@ -45,7 +45,8 @@ fn compatible_defaults() -> ProviderDefaults {
         supports_tool_calling: true,
         supports_structured_output: false,
         extra_headers: Default::default(),
-        known_models: vec![],
+        model_list_endpoint: None,
+        model_list_format: crate::types::ModelListFormat::OpenAiCompatible,
     }
 }
 
@@ -115,7 +116,4 @@ impl Provider for OpenAiCompatibleProvider {
         }
     }
 
-    fn known_models(&self) -> &[ProviderModelDef] {
-        &self.defaults.known_models
-    }
 }

@@ -8,7 +8,7 @@ use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
 use crate::types::{
-    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId,
 };
 
 fn anthropic_defaults() -> ProviderDefaults {
@@ -29,28 +29,8 @@ fn anthropic_defaults() -> ProviderDefaults {
         supports_tool_calling: true,
         supports_structured_output: false,
         extra_headers: Default::default(),
-        known_models: vec![
-            ProviderModelDef {
-                id: "claude-sonnet-4-20250514".into(),
-                model: "claude-sonnet-4-20250514".into(),
-                name: "Claude Sonnet 4".into(),
-                description: Some("Anthropic's balanced intelligence model".into()),
-                context_window: NonZeroU64::new(200_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: None,
-            },
-            ProviderModelDef {
-                id: "claude-haiku-3-5-20241022".into(),
-                model: "claude-haiku-3-5-20241022".into(),
-                name: "Claude Haiku 3.5".into(),
-                description: Some("Anthropic's fastest, most affordable model".into()),
-                context_window: NonZeroU64::new(200_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: None,
-            },
-        ],
+        model_list_endpoint: None,
+        model_list_format: crate::types::ModelListFormat::OpenAiCompatible,
     }
 }
 
@@ -122,7 +102,4 @@ impl Provider for AnthropicProvider {
         }
     }
 
-    fn known_models(&self) -> &[ProviderModelDef] {
-        &self.defaults.known_models
-    }
 }

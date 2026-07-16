@@ -137,6 +137,15 @@ impl ProviderId {
 ### 3.2 ProviderDefaults
 
 ```rust
+/// Format of the model list endpoint response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModelListFormat {
+    /// Standard OpenAI-compatible /v1/models: {"data": [{...}]}
+    OpenAiCompatible,
+    /// Ollama /api/tags format: {"models": [{"name": "...", ...}]}
+    OllamaTags,
+}
+
 /// Immutable set of defaults baked into each provider definition.
 /// Users override individual fields via [model.*] or [provider.*] config.
 #[derive(Debug, Clone)]
@@ -151,8 +160,12 @@ pub struct ProviderDefaults {
     pub api_backend: ApiBackend,  // ChatCompletions | Responses | Messages
 
     // Auth
-    pub auth_scheme: AuthScheme,  // Bearer | XApiKey
+    pub auth_scheme: AuthScheme,  // Bearer | XApiKey | None
     pub env_key: Vec<String>,     // env vars to try, in order
+
+    // Model list endpoint
+    pub model_list_endpoint: Option<String>,   // None → auto-derived from base_url
+    pub model_list_format: ModelListFormat,    // response format
 
     // Generation defaults
     pub context_window: NonZeroU64,
@@ -169,21 +182,6 @@ pub struct ProviderDefaults {
 
     // Default headers
     pub extra_headers: IndexMap<String, String>,
-
-    // Known models shipped with this provider
-    pub known_models: Vec<ProviderModelDef>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ProviderModelDef {
-    pub id: String,            // display/slug, e.g. "gpt-4o"
-    pub model: String,         // wire model name, e.g. "gpt-4o-2024-11-20"
-    pub name: String,          // human-readable, e.g. "GPT-4o"
-    pub description: Option<String>,
-    pub context_window: NonZeroU64,
-    pub api_backend: Option<ApiBackend>,  // override provider default
-    pub hidden: bool,          // hidden from picker by default
-    pub supports_reasoning_effort: Option<bool>,
 }
 ```
 
@@ -204,8 +202,6 @@ pub trait Provider: Send + Sync + Debug {
     /// Override defaults with user config → a configured provider
     /// that can create Models.
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider;
-
-    fn known_models(&self) -> &[ProviderModelDef];
 }
 
 /// User-supplied overrides for a provider.
@@ -599,7 +595,7 @@ impl ProviderRegistry {
 | Extra Headers | `x-grok-*` headers via `XaiExtraHeaders` |
 | Raw Tools | `x_search` |
 | Doom Loop | Enabled |
-| Known Models | `grok-build` |
+| Known Models | Fetched dynamically from `https://api.x.ai/v1/models` |
 
 The xAI provider is the **default** when no other provider is configured. It preserves the
 existing OAuth device-code flow, `grok login`, session token refresh, and all `x-grok-*`
@@ -617,7 +613,7 @@ headers for backward compatibility.
 | Context Window | 128,000 |
 | Extra Headers | None |
 | Raw Tools | None |
-| Known Models | `gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini` |
+| Known Models | Fetched dynamically from `https://api.openai.com/v1/models` |
 
 ### 5.3 Anthropic Provider
 
@@ -629,7 +625,7 @@ headers for backward compatibility.
 | Auth Scheme | `XApiKey` (via `x-api-key` header) |
 | Auth Chain | `InlineKey → EnvVar("ANTHROPIC_API_KEY")` |
 | Extra Headers | `anthropic-version: 2023-06-01` |
-| Known Models | `claude-sonnet-4-20250514`, `claude-haiku-3-5-20241022` |
+| Known Models | Fetched dynamically from `https://api.anthropic.com/v1/models`<br>Auth: `x-api-key` header via `ANTHROPIC_API_KEY` |
 
 ### 5.4 OpenCode Zen Provider
 
@@ -645,6 +641,8 @@ headers for backward compatibility.
 
 **Free-model fallback**: when no API key is available, the chain resolves to `"public"`
 and paid models (those with cost > 0) are filtered out of the model list automatically.
+The model list fetch is also made without auth when no key is configured; the server
+returns only free models for unauthenticated requests.
 
 ### 5.5 Ollama Provider
 
@@ -656,7 +654,7 @@ and paid models (those with cost > 0) are filtered out of the model list automat
 | Auth Scheme | `None` |
 | Auth Chain | `None` |
 | Extra Headers | None |
-| Known Models | `llama3.1`, `codellama`, `deepseek-coder` (example IDs; actual list from `/api/tags`) |
+| Known Models | Fetched dynamically from `http://localhost:11434/api/tags`<br>Format: `ModelListFormat::OllamaTags` |
 
 ### 5.6 OpenAI-Compatible Provider
 
@@ -669,17 +667,19 @@ and paid models (those with cost > 0) are filtered out of the model list automat
 | Auth Chain | `InlineKey → EnvVar("XAI_API_KEY")` (generic fallback) |
 | Extra Headers | None |
 
+| Known Models | Fetched dynamically from `{base_url}/models` (depends on user-specified or profile base_url) |
+
 Catch-all provider for any OpenAI Chat Completions-compatible API
 (Groq, DeepSeek, Together AI, Fireworks, etc.). Known profiles map
 friendly names to base URLs:
 
-| Profile | Base URL |
-|---------|----------|
-| `groq` | `https://api.groq.com/openai/v1` |
-| `deepseek` | `https://api.deepseek.com/v1` |
-| `togetherai` | `https://api.together.xyz/v1` |
-| `fireworks` | `https://api.fireworks.ai/inference/v1` |
-| `openrouter` | `https://openrouter.ai/api/v1` |
+| Profile | Base URL | Model List URL |
+|---------|----------|----------------|
+| `groq` | `https://api.groq.com/openai/v1` | `https://api.groq.com/openai/v1/models` |
+| `deepseek` | `https://api.deepseek.com/v1` | `https://api.deepseek.com/v1/models` |
+| `togetherai` | `https://api.together.xyz/v1` | `https://api.together.xyz/v1/models` |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` | `https://api.fireworks.ai/inference/v1/models` |
+| `openrouter` | `https://openrouter.ai/api/v1` | `https://openrouter.ai/api/v1/models` |
 
 ---
 
@@ -688,22 +688,43 @@ friendly names to base URLs:
 ### 6.1 Model Resolution Pipeline
 
 The existing `resolve_model_list()` function in `xai-grok-shell/src/agent/config.rs`
-is extended with a Provider-aware layer:
+is extended with a dynamic model-fetch layer:
 
 ```
-Before:
-  [model.*] config > prefetched models > default_models.json
-
 After:
-  [model.*] config > prefetched models > [provider.*] config > built-in providers > default_models.json (fallback)
+  [model.*] config > unified prefetch > default_models.json (fallback)
+
+Unified prefetch priority:
+  xAI /v1/models > provider API models > disk cache > empty
 ```
 
-The provider layer:
-1. Reads `[provider.*]` sections from config.toml
-2. For each configured provider, calls `registry.configure(provider_id, config)`
-3. The `ConfiguredProvider` holds a `Route` with `endpoint` + `auth` merged from config
-4. Provider model IDs are injected into the model catalog as `Model` values
-5. Each `Model` carries its `Route` reference for later `SamplerConfig` construction
+The pipeline runs as follows:
+
+1. At startup, after `configure_providers()` merges all config sources
+   (env → TOML → CLI), `fetch_provider_models_blocking()` iterates every
+   registered provider and fetches its model list via its API:
+
+   ```
+   for each provider in ProviderRegistry:
+       model_list_url = derive_url(provider.defaults.model_list_endpoint, base_url)
+       headers = derive_auth(provider.defaults.auth_scheme, resolved_config.api_key)
+       response = http_get(model_list_url, headers)
+       models = parse_response(provider.defaults.model_list_format, response)
+       inject_into_catalog(provider.id, models)
+   ```
+
+2. Models are keyed as `"{provider_id}/{model_id}"` (e.g. `"openai/gpt-4o"`,
+   `"ollama/llama3.1:8b"`) to avoid collisions across providers.
+
+3. Failures are logged and skipped:
+   - Ollama not running → model list stays empty; warning shown
+   - Missing API key for OpenAI/Anthropic → models not fetched; user must
+     configure `[provider.*]` or rely on `[model.*]` overrides
+   - Network errors → cached data is used if available
+
+4. The fetched model catalog is merged into the model resolution pipeline
+   as Layer 2, between the xAI server prefetch (Layer 1) and user
+   `[model.*]` overrides (Layer 3).
 
 ### 6.2 SamplerConfig construction
 
@@ -760,6 +781,81 @@ The `SamplingClient` gains a `protocol: ProtocolId` field and the
 `Protocol::stream.step` method is used for uniform dispatch. The three
 `stream/*.rs` modules are refactored into `Protocol` values (stateless data,
 not trait objects — they carry schema + function pointers).
+
+### 6.4 Multi-Provider Model Fetch
+
+Each provider defines its model listing endpoint via `ProviderDefaults`:
+
+```
+model_list_endpoint: Option<String>   // None → {base_url}/models
+model_list_format:  ModelListFormat   // OpenAiCompatible | OllamaTags
+```
+
+#### Endpoint derivation
+
+| Provider | Base URL | Model List URL | Format | Auth |
+|----------|----------|---------------|--------|------|
+| xAI | `https://api.x.ai/v1` | `{base_url}/models` | OpenAiCompatible | Bearer |
+| OpenAI | `https://api.openai.com/v1` | `{base_url}/models` | OpenAiCompatible | Bearer |
+| Anthropic | `https://api.anthropic.com/v1` | `{base_url}/models` | OpenAiCompatible | x-api-key |
+| OpenCode | `https://opencode.ai/zen/v1` | `{base_url}/models` | OpenAiCompatible | Bearer or none |
+| Ollama | `http://localhost:11434/v1` | `http://localhost:11434/api/tags` | OllamaTags | None |
+| OpenAiCompatible | user-specified | `{base_url}/models` | OpenAiCompatible | Bearer |
+
+#### Response parsing
+
+**OpenAiCompatible format** (`ModelListFormat::OpenAiCompatible`):
+```json
+{"data": [{"id": "gpt-4o", "model": "gpt-4o-2024-11-20", ...}]}
+```
+Parsed by the existing `parse_remote_model_value()` in `xai-grok-shell/src/remote/client.rs`.
+Each entry is keyed as `"{provider_id}/{model_id}"` (e.g. `"openai/gpt-4o"`) to
+prevent key collisions across providers.
+
+**Ollama format** (`ModelListFormat::OllamaTags`):
+```json
+{"models": [{"name": "llama3.1:8b", "modified_at": "...", "size": 123}]}
+```
+A specialized parser maps `name` → `model`, derives `context_window` from the
+provider's `ProviderDefaults.context_window`, and populates the remaining
+`ModelEntryConfig` fields with provider defaults.
+
+#### Startup integration
+
+```
+configure_providers()   // merges env → TOML → CLI → [endpoints]
+       │
+       ▼
+fetch_provider_models_blocking(registry)
+       │  for each provider:
+       │    derive URL + auth
+       │    HTTP GET → parse → build_prefetched_map()
+       │    on failure: log warning, continue
+       │
+       ▼
+merge into model catalog   // Layer 2 in resolve_model_list()
+```
+
+The function `fetch_provider_models_blocking()` lives in
+`xai-grok-shell/src/agent/models.rs` alongside the existing
+`prefetch_models_blocking()`. It reuses the existing `reqwest::blocking::Client`,
+`parse_remote_model_value()`, and `build_prefetched_map()` from the main prefetch
+pipeline.
+
+#### Caching
+
+Results are cached per provider using `ModelsCacheManager` with a TTL of 300 s.
+The cache key is `"{provider_id}|{model_list_url}"` so changing a provider's base
+URL or endpoint invalidates the cache. If the fetch fails and a cached entry
+exists (even stale), it is used as a fallback to keep the catalog populated.
+
+#### Failure handling
+
+- **Ollama not running**: connection refused → log warning, skip, empty list
+- **Missing API key**: 401/403 → log warning, skip
+- **Timeout**: 30 s per-provider timeout → log warning, skip
+- **All providers fail**: model catalog falls back to `[model.*]` config entries
+  and built-in defaults only
 
 ---
 
@@ -834,7 +930,7 @@ grok
 | `[endpoints]` config | Preserved for xAI endpoint overrides. |
 | `[model.*]` config | Highest priority, unchanged semantics. |
 | `default_models.json` | Still loaded as fallback when no provider matches. |
-| `grok-4*` model references | Resolved via xAI provider's known models. |
+| `grok-4*` model references | Resolved via xAI provider's model list. |
 | `[models].default = "grok-build"` | Still works; resolves via xAI provider. |
 | ACP protocol (pager ↔ shell) | Unchanged. Pager continues to receive model list via ACP. |
 
@@ -880,18 +976,23 @@ Startup
   │          + endpoint (base_url from config or baked-in)
   │          + auth   (inline → env → none, composed via .or_else())
   │          + framing (SseFraming for all HTTP providers)
-  │        known_models injected into model catalog as Model values
   │
-  ├── 4. Detect from CLI flags
+  ├── 4. Fetch provider model lists
+  │      for each registered provider:
+  │        derive model_list_url + auth from ProviderDefaults + ProviderConfig
+  │        HTTP GET → parse → key as "{provider_id}/{model_id}"
+  │        on failure: log warning, skip provider
+  │
+  ├── 5. Detect from CLI flags
   │      if --provider: use that provider
   │      if --api-key + --base-url: auto-detect provider from URL
   │      if only --api-key: use default provider (xAI)
   │
-  ├── 5. Build final model catalog
-  │      merge: user [model.*] > prefetched > provider model defaults
-  │      each entry is a Model { id, provider, route, defaults }
+  ├── 6. Build final model catalog
+  │      merge: user [model.*] > unified prefetch (xAI + provider API)
+  │      each entry is a ModelEntry { id, provider, base_url, ... }
   │
-  └── 6. Start session
+  └── 7. Start session
          selected Model → route.auth.apply() → resolve credentials
          → build SamplerConfig { base_url, protocol_id, extra_headers }
          → SamplingClient executes Protocol.step for each frame
@@ -914,27 +1015,6 @@ pub const PATH: &str = "/chat/completions";
 /// OpenAI-compatible providers (DeepSeek, Groq, Together, etc.).
 pub const PROTOCOL_ID: ProtocolId = ProtocolId::CHAT_COMPLETIONS;
 
-pub fn known_models() -> Vec<ProviderModelDef> {
-    vec![
-        ProviderModelDef {
-            id: "gpt-4o".into(),
-            model: "gpt-4o-2024-11-20".into(),
-            name: "GPT-4o".into(),
-            description: Some("High-intelligence flagship model".into()),
-            context_window: NonZeroU64::new(128_000).unwrap(),
-            api_backend: None,
-            hidden: false,
-        },
-        ProviderModelDef {
-            id: "gpt-4o-mini".into(),
-            model: "gpt-4o-mini".into(),
-            name: "GPT-4o Mini".into(),
-            context_window: NonZeroU64::new(128_000).unwrap(),
-            ..Default::default()
-        },
-    ]
-}
-
 pub struct OpenAIProvider;
 
 impl Provider for OpenAIProvider {
@@ -955,12 +1035,13 @@ impl Provider for OpenAIProvider {
             supports_reasoning_effort: true,
             supports_streaming: true,
             supports_tool_calling: true,
+            model_list_endpoint: None,
+            model_list_format: ModelListFormat::OpenAiCompatible,
             ..Default::default()
         }
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        // Build auth chain: inline key → env var → none
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("OPENAI_API_KEY"))
             .bearer();
@@ -1000,9 +1081,6 @@ impl Provider for OpenAIProvider {
         }
     }
 
-    fn known_models(&self) -> &[ProviderModelDef] {
-        &known_models()
-    }
 }
 ```
 
@@ -1091,7 +1169,7 @@ Target design (not implemented):
 | API Key | Hidden string | Reveal/hide toggle, masked input `●●●●` |
 | Base URL | String | URL input, defaults to provider's baked-in URL |
 | Status | Display | Connected / Not configured / Needs auth |
-| Models | Display | Known models from `ProviderDefaults.known_models` |
+| Models | Display | Fetched dynamically from provider's model list API |
 
 API Key input should follow the existing `ModalInput` pattern used by the
 Extensions modal for MCP server configuration (inline form with Tab/BackTab
@@ -1214,7 +1292,7 @@ crates/codegen/xai-grok-provider/          [NEW]
 ├── Cargo.toml
 ├── src/
 │   ├── lib.rs                             # Re-exports
-│   ├── types.rs                           # ProviderId, ProviderDefaults, ProviderModelDef
+│   ├── types.rs                           # ProviderId, ProviderDefaults, ModelListFormat, ApiBackend, AuthScheme
 │   ├── provider.rs                        # Provider trait, ConfiguredProvider
 │   ├── registry.rs                        # ProviderRegistry
 │   ├── route.rs                           # Route, RouteInput, RoutePatch

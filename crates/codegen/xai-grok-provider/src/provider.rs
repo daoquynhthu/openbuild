@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::config::ProviderConfig;
 use crate::model::Model;
 use crate::route::Route;
-use crate::types::{ProviderDefaults, ProviderId, ProviderModelDef};
+use crate::types::{ProviderDefaults, ProviderId};
 
 pub struct ConfiguredProvider {
     pub id: ProviderId,
@@ -29,7 +29,6 @@ pub trait Provider: Send + Sync + core::fmt::Debug + 'static {
     fn name(&self) -> &str;
     fn defaults(&self) -> &ProviderDefaults;
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider;
-    fn known_models(&self) -> &[ProviderModelDef];
 }
 
 /// Thread-safe reference to a [`Provider`] trait object.

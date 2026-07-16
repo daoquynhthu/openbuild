@@ -8,7 +8,7 @@ use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
 use crate::types::{
-    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef,
+    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId,
 };
 
 pub fn openai_defaults() -> ProviderDefaults {
@@ -29,68 +29,8 @@ pub fn openai_defaults() -> ProviderDefaults {
         supports_tool_calling: true,
         supports_structured_output: true,
         extra_headers: Default::default(),
-        known_models: vec![
-            ProviderModelDef {
-                id: "gpt-4o".into(),
-                model: "gpt-4o-2024-11-20".into(),
-                name: "GPT-4o".into(),
-                description: Some("OpenAI's high-intelligence flagship model".into()),
-                context_window: NonZeroU64::new(128_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: None,
-            },
-            ProviderModelDef {
-                id: "gpt-4o-mini".into(),
-                model: "gpt-4o-mini".into(),
-                name: "GPT-4o Mini".into(),
-                description: Some("Fast, affordable small model".into()),
-                context_window: NonZeroU64::new(128_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: None,
-            },
-            ProviderModelDef {
-                id: "o1".into(),
-                model: "o1-2024-12-17".into(),
-                name: "o1".into(),
-                description: Some("Reasoning model for complex tasks".into()),
-                context_window: NonZeroU64::new(200_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: Some(true),
-            },
-            ProviderModelDef {
-                id: "o3-mini".into(),
-                model: "o3-mini-2025-01-31".into(),
-                name: "o3-mini".into(),
-                description: Some("Fast reasoning model".into()),
-                context_window: NonZeroU64::new(200_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: Some(true),
-            },
-            ProviderModelDef {
-                id: "gpt-4.1".into(),
-                model: "gpt-4.1-2025-04-14".into(),
-                name: "GPT-4.1".into(),
-                description: Some("Latest full-size GPT-4 model".into()),
-                context_window: NonZeroU64::new(1_000_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: None,
-            },
-            ProviderModelDef {
-                id: "gpt-4.1-mini".into(),
-                model: "gpt-4.1-mini-2025-04-14".into(),
-                name: "GPT-4.1 Mini".into(),
-                description: Some("Compact GPT-4.1 model".into()),
-                context_window: NonZeroU64::new(1_000_000).unwrap(),
-                hidden: false,
-                api_backend: None,
-                supports_reasoning_effort: None,
-            },
-        ],
+        model_list_endpoint: None,
+        model_list_format: crate::types::ModelListFormat::OpenAiCompatible,
     }
 }
 
@@ -157,7 +97,4 @@ impl Provider for OpenAIProvider {
         }
     }
 
-    fn known_models(&self) -> &[ProviderModelDef] {
-        &self.defaults.known_models
-    }
 }

@@ -125,9 +125,6 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
                     },
                 }
             }
-            fn known_models(&self) -> &[crate::types::ProviderModelDef] {
-                &[]
-            }
         }
 
         #[test]
