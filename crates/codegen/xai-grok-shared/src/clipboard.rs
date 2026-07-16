@@ -1170,8 +1170,6 @@ mod platform {
 #[cfg(not(target_os = "macos"))]
 mod platform {
     use super::ImageData;
-    use std::process::{Command, Stdio};
-
     /// No subprocess-free pasteboard probe exists off-macOS.
     pub(super) fn clipboard_image_snapshot() -> (Option<u64>, bool) {
         (None, false)
@@ -1931,6 +1929,7 @@ mod platform {
     // -- Public API ----------------------------------------------------------
 
     pub fn get_text() -> anyhow::Result<Option<String>> {
+        #[allow(unused_assignments)]
         let mut arboard_error = None;
         match arboard_get_text() {
             Ok(Some(text)) => return Ok(Some(text)),
@@ -2044,6 +2043,7 @@ mod platform {
     }
 
     pub fn get_image() -> anyhow::Result<Option<ImageData>> {
+        #[allow(unused_assignments)]
         let mut arboard_error = None;
         match arboard_get_image() {
             Ok(Some(image)) => return Ok(Some(image)),

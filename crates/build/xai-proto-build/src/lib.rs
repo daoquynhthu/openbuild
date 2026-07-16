@@ -118,8 +118,11 @@ impl XaiProtoBuilder {
                 .context("failed to create temp file for protoc dependency output")?;
             let dev_null_out = tempfile::NamedTempFile::new()
                 .context("failed to create temp file for protoc descriptor output")?;
-            let dev_null_path = dev_null_out.path().to_str()
-                .context("dev_null_out path is not valid UTF-8")?.to_owned();
+            let dev_null_path = dev_null_out
+                .path()
+                .to_str()
+                .context("dev_null_out path is not valid UTF-8")?
+                .to_owned();
             let mut command = Command::new(protoc.unwrap_or(Path::new("protoc")));
             command
                 .arg(format!("--dependency_out={}", dep_out.path().display()))

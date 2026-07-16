@@ -2,22 +2,69 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub enum LLMEvent {
-    StepStart { index: u32 },
-    TextStart { id: String },
-    TextDelta { id: String, text: String },
-    TextEnd { id: String },
-    ReasoningStart { id: String },
-    ReasoningDelta { id: String, text: String },
-    ReasoningEnd { id: String },
-    ToolInputStart { id: String, name: String },
-    ToolInputDelta { id: String, text: String },
-    ToolInputEnd { id: String, name: String },
-    ToolCall { id: String, name: String, input: serde_json::Value },
-    ToolResult { id: String, name: String, result: serde_json::Value },
-    ToolError { id: String, name: String, message: String },
-    StepFinish { index: u32, reason: FinishReason, usage: Option<Usage> },
-    Finish { reason: FinishReason, usage: Option<Usage> },
-    Error { message: String, kind: ErrorKind },
+    StepStart {
+        index: u32,
+    },
+    TextStart {
+        id: String,
+    },
+    TextDelta {
+        id: String,
+        text: String,
+    },
+    TextEnd {
+        id: String,
+    },
+    ReasoningStart {
+        id: String,
+    },
+    ReasoningDelta {
+        id: String,
+        text: String,
+    },
+    ReasoningEnd {
+        id: String,
+    },
+    ToolInputStart {
+        id: String,
+        name: String,
+    },
+    ToolInputDelta {
+        id: String,
+        text: String,
+    },
+    ToolInputEnd {
+        id: String,
+        name: String,
+    },
+    ToolCall {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    ToolResult {
+        id: String,
+        name: String,
+        result: serde_json::Value,
+    },
+    ToolError {
+        id: String,
+        name: String,
+        message: String,
+    },
+    StepFinish {
+        index: u32,
+        reason: FinishReason,
+        usage: Option<Usage>,
+    },
+    Finish {
+        reason: FinishReason,
+        usage: Option<Usage>,
+    },
+    Error {
+        message: String,
+        kind: ErrorKind,
+    },
 }
 
 #[derive(Debug, Clone)]

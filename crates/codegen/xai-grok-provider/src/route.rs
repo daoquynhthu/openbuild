@@ -49,9 +49,7 @@ impl Route {
             provider: input.provider,
             protocol: input.protocol,
             endpoint: input.endpoint,
-            defaults: input.defaults.unwrap_or(RouteDefaults {
-                headers: None,
-            }),
+            defaults: input.defaults.unwrap_or(RouteDefaults { headers: None }),
         }
     }
 
@@ -62,10 +60,7 @@ impl Route {
     pub fn model(&self, _id: &str) -> Model {
         Model::make(
             String::new(),
-            self.provider
-                .clone()
-                .map(|p| p.0)
-                .unwrap_or_default(),
+            self.provider.clone().map(|p| p.0).unwrap_or_default(),
             Arc::new(self.clone()),
             None,
         )

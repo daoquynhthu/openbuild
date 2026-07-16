@@ -49,11 +49,7 @@ where
     }
 }
 
-impl<Body> EndpointPart<Body>
-where
-    Body: Clone,
-{
-}
+impl<Body> EndpointPart<Body> where Body: Clone {}
 
 impl<Body> Clone for EndpointPart<Body>
 where
@@ -73,9 +69,6 @@ impl<Body> Endpoint<Body> {
     }
 }
 
-pub fn merge_endpoints<Body>(
-    _base: &Endpoint<Body>,
-    _patch: &Endpoint<Body>,
-) -> Endpoint<Body> {
+pub fn merge_endpoints<Body>(_base: &Endpoint<Body>, _patch: &Endpoint<Body>) -> Endpoint<Body> {
     unimplemented!()
 }

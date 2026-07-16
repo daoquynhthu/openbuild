@@ -1698,7 +1698,7 @@ pub async fn run_leader_server(
             buf_client.0, error = % e,
             "Failed to flush buffered live notification after load (channel closed)");
             break; } count += 1; } if count > 0 || deduped > 0 { trace!(client_id =
-            buf_client.0, count, deduped,
+            buf_client.0, count, d = deduped,
             "Flushed buffered live notifications after load (replay-overlap dropped)"); }
             } if let Some(cached) = interaction_requests.get(buf_sid.as_str()) && let
             Some(target) = clients.get(& buf_client) { let count = cached.len(); for req
