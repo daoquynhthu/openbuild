@@ -425,6 +425,15 @@ main
 
 各 Phase 内部的子任务允许多次 commit，但需保证每个 commit 后 `cargo check --workspace` 通过。
 
+### Phase 收尾流程
+
+每个 Phase 完成后，必须执行以下收尾序列：
+
+1. **门禁检查**：`cargo check --workspace` + `cargo clippy --workspace` + `cargo test --workspace`
+2. **更新 PROGRESS.md**：追加 Phase 摘要（完成内容、关键结果、阻塞项）
+3. **提交**：`git add PROGRESS.md && git commit -m "progress: phase N <名称>"`
+4. **提交 Phase**：若还有未提交的代码变更，一并进行
+
 ---
 
 ## 风险与缓解
