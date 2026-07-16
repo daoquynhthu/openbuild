@@ -174,9 +174,18 @@
 - `cargo clippy -p xai-grok-provider` — 零警告
 - 修改 2 个文件
 
+### Phase 6.5 完成内容
+- `build_provider_config()` 合并优先级测试 (env < TOML < CLI)
+- `configure_providers()` 存储配置 + CLI 覆盖测试
+- `registry.store_config()/get_config()` 存取 + 覆盖测试
+- `ProviderConfig::merge()` 优先级测试
+- 5 个新测试，provider crate 总计 63 项
+- `cargo test -p xai-grok-provider` — 63/63 ✅
+- `cargo clippy -p xai-grok-provider` — 零警告
+
 ### 待完成
-- 6.2: Registry 线程化到 SessionActor
-- 6.5-6.6: 集成/端到端测试
+- 6.6: 端到端 Mock HTTP 测试 — 需要 `mockito`/`wiremock` 集成，涉及 SamplerConfig 全链路验证
+- 6.2: Registry → SessionActor — 非阻塞，运行时不需要
 
 ---
 
