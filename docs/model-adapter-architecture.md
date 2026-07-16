@@ -1020,12 +1020,104 @@ route.with({
 
 ## 11. Boundary Conditions
 
-### 11.1 What if no provider matches?
+## 7. TUI Provider Configuration
 
-If `--provider` is set to an unknown ID, startup fails with a clear error listing
-available providers. Unknown model IDs in `[model.*]` config fall back to a
-generic `ModelEntry` with the user-specified `base_url` (if any) or the default
-xAI endpoint.
+### 7.1 Overview
+
+The TUI provides an interactive Provider management interface accessible via:
+- `/providers` slash command → Provider list modal
+- `F2` → Settings → Models → Provider sub-section
+- `Ctrl+M` → Model picker (shows `provider/model`, auto-configures on first use)
+
+### 7.2 Providers Modal
+
+A standalone modal (similar to Extensions modal) that shows all registered
+providers with their connection status:
+
+```
+┌─ Providers ────────────────────────────────────────────[✗]─┐
+│                                                              │
+│   Provider           Status       Models     Endpoint        │
+│  ─────────────────────────────────────────────────────────── │
+│   ● xAI              ✅ 已连接      1         api.x.ai       │
+│   ○ OpenAI           ❌ 未配置      0         —               │
+│   ○ Anthropic        ⚡ 需认证      2         api.anthropic   │
+│   ○ OpenCode Zen     🔓 免费模式    —         opencode.ai     │
+│   ○ Ollama           🟢 本地        —         localhost:11434 │
+│                                                              │
+│   [a Add] [Enter Configure] [x Remove] [t Test]              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 7.3 Provider Detail Panel
+
+Selected provider opens a configuration panel with form fields:
+
+| Field | Type | Behavior |
+|-------|------|----------|
+| API Key | Hidden string | Reveal/hide toggle, masked input `●●●●` |
+| Base URL | String | URL input, defaults to provider's baked-in URL |
+| Status | Display | Connected / Not configured / Needs auth |
+| Models | Display | Known models from `ProviderDefaults.known_models` |
+
+### 7.4 Model Picker Enhancement
+
+The existing `Ctrl+M` model picker and `/model` slash command are extended:
+
+```
+Before:  grok-build              gpt-4o              claude-sonnet
+After:   xai/grok-build          openai/gpt-4o       anthropic/claude-sonnet
+```
+
+When a model from an unconfigured provider is selected:
+1. Picker shows the model as `dimmed` with `(needs key)` indicator
+2. On selection → transitions to Provider configuration panel for that provider
+3. After API key is entered → refreshes model list → selects the model
+
+### 7.5 Slash Command: `/providers`
+
+```
+/providers           → Opens Provider list modal
+/providers <name>    → Opens configuration panel for that provider
+```
+
+Implements `SlashCommand` trait with `suggest_args()` returning all registered
+Provider IDs for tab completion.
+
+### 7.6 Settings Integration
+
+In the existing Settings modal (F2), under the `Models` category:
+
+```
+Models
+  ├── Default model         (DynamicEnum, existing)
+  ├── Fork secondary model  (DynamicEnum, existing)
+  └── Providers ›           (Group → opens provider list)
+```
+
+### 7.7 Status Indicators
+
+| Status | Badge | Color | Condition |
+|--------|-------|-------|-----------|
+| Connected | `✅` | `accent_success` | API key resolved, last test passed |
+| Not configured | `❌` | `accent_error` | No API key available |
+| Needs auth | `⚡` | `warning` | Session token expired |
+| Free tier | `🔓` | `gray` | Public key fallback (OpenCode) |
+| Local | `🟢` | `running` | Auto-detected (Ollama) |
+
+### 7.8 Interaction Flows
+
+```
+First-time user:  Welcome → /providers → Select Provider → Enter API Key → Verify → Chat
+Switch provider:  Ctrl+M → select model → (if unconfigured: enter key) → Switch
+CLI headless:     grok -p "hello" --provider openai --api-key sk-...
+```
+
+---
+
+## 11. Boundary Conditions
+
+### 11.1 What if no provider matches?
 
 ### 11.2 What if both [provider.*] and [model.*] configure the same model?
 

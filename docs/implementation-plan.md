@@ -249,20 +249,111 @@ xai-grok-provider/src/providers/
 
 ### 目标
 
-实现 `[provider.*]` TOML 配置解析、`--provider`/`--api-key`/`--base-url` CLI 标志、自动检测逻辑，以及 Route-based 模型解析。
+实现 `[provider.*]` TOML 配置解析、`--provider`/`--api-key`/`--base-url` CLI 标志、自动检测逻辑、Route-based 模型解析，以及 **TUI Provider 配置界面**。
+
+### CLI 标志
+
+| 标志 | 类型 | 作用域 | 说明 |
+|------|------|--------|------|
+| `--provider` | `Option<String>` | global | 指定 Provider ID（如 `"openai"`, `"anthropic"`） |
+| `--api-key` | `Option<String>` | global | API 密钥 |
+| `--base-url` | `Option<String>` | global | 端点 URL 覆盖 |
+| `--model` | `Option<String>` | global | 扩展为 `provider/model` 格式（向后兼容裸名） |
+
+### TUI Provider 管理界面
+
+**入口**: `/providers` 斜杠命令 + Settings → Models 分类中的 "Providers" 子项
+
+**模态框设计**（参照 Extensions Modal / MCP Tabs 风格）：
+
+```
+┌─ Providers ────────────────────────────────────────────[✗]─┐
+│                                                              │
+│  Provider           Status       Models     Configured       │
+│ ─────────────────────────────────────────────────────────── │
+│  ● xAI              ✅ 已连接      1         api.x.ai        │
+│  ○ OpenAI           ❌ 未配置      0         —               │
+│  ○ Anthropic        ⚡ 需认证      2         claude-...      │
+│  ○ OpenCode Zen     🔓 免费模式    —         opencode.ai     │
+│  ○ Ollama           🟢 本地        —         localhost:11434 │
+│                                                              │
+│  [a 添加] [r 刷新] [e 编辑] [x 移除] [T 测试连接]            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Provider 详情/配置面板**（选中 Provider 后 Enter 进入）：
+
+```
+┌─ Configure: OpenAI ────────────────────────────────────[✗]─┐
+│                                                              │
+│  API Key:     ●●●●●●●●●●●●●●●●●●●●                          │
+│  Base URL:    https://api.openai.com/v1                      │
+│  Models:      [2 available]                                  │
+│                 ● gpt-4o         128K   chat_completions      │
+│                 ○ gpt-4o-mini    128K   chat_completions      │
+│                                                              │
+│  [S 保存] [T 测试连接] [D 重置默认]                            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**交互流程**:
+
+| 场景 | 操作路径 |
+|------|----------|
+| 首次配置 | `/providers` → 选中未配置 Provider → Enter → 填写 API Key → 保存 |
+| 切换模型 | `Ctrl+M` → 列表显示 `provider/model` → 选中后若未配置自动弹出 API 输入 |
+| 查看状态 | `/providers` → 列表显示所有 Provider 状态 |
+| 快速连接 | `/connect openai` → 直接进入 API Key 输入 |
+| 移除 Provider | `/providers` → 选中 → `x` 确认移除 |
+| 无头模式 | `grok -p "hello" --provider openai --api-key sk-...` |
+
+**组件实现**（参照现有 modal 模式）：
+
+| 组件 | 文件 | 参照 |
+|------|------|------|
+| `ActiveModal::Providers` | `views/modal.rs` | 新增变体，参照 `Settings` 模式 |
+| `ProvidersModalState` | `views/providers_modal.rs` | 新增，参照 `ExtensionsModalState` 结构 |
+| `render_providers_modal()` | `views/providers_modal.rs` | 使用 `ModalWindowState` + `render_modal_window()` |
+| `render_provider_detail()` | 同上 | API key 编辑、模型列表展示 |
+| `/providers` 命令 | `slash/commands/providers.rs` | 参照 `/mcps` 命令注册模式 |
+| `Action::OpenProviders` | `app/actions.rs` | 参照 `Action::OpenExtensionsModal` |
+| 模型选择器增强 | `app/agent_view/input.rs` | `Ctrl+M` 列表添加 `provider/` 前缀 |
+
+**视觉风格**（对齐现有 UI）:
+
+| 元素 | 样式 |
+|------|------|
+| 模态框框架 | `ModalWindowState` + `ModalSizing::medium()` |
+| Provider 行 | `PickerEntry::Row` + `PickerRow` |
+| 状态标签 | 彩色 badge：`✅` `accent_success`、`❌` `accent_error`、`⚡` `warning`、`🔓` `gray` |
+| 搜索过滤 | `/` 键进入 `render_search_bar()` |
+| 快捷键页脚 | `Vec<Shortcut>` → `modal_window::render_modal_window()` |
+| API Key 输入 | 隐蔽输入 `●●●●`，参照 `ModalInput` 模式 |
+| 测试连接 | 异步请求 → 结果反馈（成功/失败 toast） |
 
 ### 文件变更
 
 ```
+xai-grok-provider/src/
+├── config.rs                  [MODIFY] — 完善 ProviderConfig 反序列化
+
 xai-grok-shell/src/
 ├── agent/config.rs            [MAJOR] — Route-based 模型解析
-└── cli_models.rs              [MODIFY] — 新增 CLI 标志
+├── agent/cli_models.rs        [MODIFY] — 新增 CLI 标志
 
 xai-grok-pager-bin/src/
-└── main.rs                    [MODIFY] — --provider/--api-key/--base-url 参数
+├── main.rs                    [MODIFY] — --provider/--api-key/--base-url 参数
 
-xai-grok-provider/src/
-└── config.rs                  [MODIFY] — 完善 ProviderConfig 反序列化
+xai-grok-pager/src/
+├── app/cli.rs                 [MODIFY] — PagerArgs 新增字段
+├── app/actions.rs             [MODIFY] — 新增 OpenProviders 等 Action
+├── app/dispatch/router.rs     [MODIFY] — Action 分派
+├── app/modals.rs              [MODIFY] — ActiveModal 新增 Providers 变体
+├── app/agent_view/input.rs    [MODIFY] — Ctrl+M 列表添加 provider 前缀
+├── slash/commands/mod.rs      [MODIFY] — 注册 /providers 命令
+├── slash/commands/providers.rs[NEW]   — /providers 命令实现
+├── settings/defs.rs           [MODIFY] — 新增 Provider 相关设置项
+└── views/providers_modal.rs   [NEW]   — Provider 管理模态框
 ```
 
 ### 子任务
@@ -270,15 +361,15 @@ xai-grok-provider/src/
 | ID | 任务 | 关键细节 | 参考 |
 |----|------|----------|------|
 | 5.1 | 实现 `[provider.*]` TOML 段落解析 | 合并到 `ProviderConfig` | Arch §7.1 |
-| 5.2 | 新增 CLI `--provider` 参数 | `PagerArgs` 中新增字段 | Arch §6.4 |
-| 5.3 | 新增 CLI `--api-key` 参数 | 全局参数，所有 subcommand 可见 | — |
-| 5.4 | 新增 CLI `--base-url` 参数 | 可选覆盖 | — |
-| 5.5 | 实现 startup 流程中的 Provider 初始化 | `ProviderRegistry` + `[provider.*]` 配置合并 | Arch §9 |
-| 5.6 | 重写 `resolve_model_list()` 以包含 Provider 层 | `[model.*]` > `[provider.*]` > 内嵌 Provider 默认值 | Arch §6.1 |
-| 5.7 | 重写 `resolve_model_to_sampling_config()` → Route 驱动 | 从 `Model.route` 获取 protocol/auth/endpoint | Arch §6.2 |
-| 5.8 | 实现 `auto_detect_provider()` | CLI 标志 → URL 模式匹配 → Provider 选择 | — |
+| 5.2 | 新增 CLI `--provider` / `--api-key` / `--base-url` | `PagerArgs` 中新增 `global = true` 字段 | — |
+| 5.3 | `--model` 格式扩展 | 支持 `provider/model`，向后兼容裸名 | — |
+| 5.4 | 实现 startup 流程中的 Provider 初始化 | `ProviderRegistry` + 6 层配置合并 + env 自动检测 | Arch §9 |
+| 5.5 | 重写 `resolve_model_list()` 以包含 Provider 层 | `[model.*]` > `[provider.*]` > 内嵌 Provider 默认值 | Arch §6.1 |
+| 5.6 | 创建 TUI Providers 模态框 | `views/providers_modal.rs` + `ActiveModal::Providers` | Extensions Modal |
+| 5.7 | 实现 `/providers` 斜杠命令 | `slash/commands/providers.rs` | `/mcps` 模式 |
+| 5.8 | 模型选择器增强 | `Ctrl+M` 列表显示 `provider/model`，未配置时自动弹出配置 | — |
 | 5.9 | 保留 `[endpoints]` 向后兼容 | 旧配置映射到 `XaiProvider` | Arch §8 |
-| 5.10 | 保留 `XAI_API_KEY` / `OPENAI_API_KEY` 等环境变量 | 映射到对应 Provider 的认证链 | — |
+| 5.10 | 保留环境变量自动检测 | `XAI_API_KEY` → xAI, `OPENAI_API_KEY` → OpenAI 等 | — |
 
 ### 测试要求
 
@@ -291,12 +382,15 @@ xai-grok-provider/src/
 | 向后兼容：旧 `[model.*]` 配置 | 100% | 优先级不变 |
 | 向后兼容：环境变量 | 100% | set/unset 每项 |
 | auto_detect 正确率 | 100% | 已知 URL 模式全覆盖 |
+| Providers 模态框渲染 | 90% | 快照测试 |
+| `/providers` 命令参数补全 | 100% | Provider ID 列表 |
 
 ### 门禁
 
 - 所有现有 `config.rs` 测试通过（回归）
 - 旧配置（`[endpoints]` + `[model.*]`）产生与改造前完全相同的 `SamplerConfig`
 - 新增 CLI 参数不破坏现有 CLI 行为
+- Providers 模态框不干扰现有 TUI 快捷键
 
 ---
 
