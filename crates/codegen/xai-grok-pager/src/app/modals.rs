@@ -388,6 +388,37 @@ impl AgentView {
             }
         }
 
+        // Providers: route through ModalWindow chrome, then delegate.
+        if let ActiveModal::Providers { state: prov_state } = modal {
+            let chrome_cfg = mw::ModalWindowConfig {
+                title: "",
+                tabs: None,
+                shortcuts: &[],
+                sizing: mw::ModalSizing::default(),
+                fold_info: None,
+            };
+            let outcome = mw::handle_modal_key(&mut prov_state.window, key, &chrome_cfg);
+            match outcome {
+                ModalWindowOutcome::CloseRequested => {
+                    self.active_modal = None;
+                    return InputOutcome::Changed;
+                }
+                ModalWindowOutcome::Unhandled => {
+                    use crate::views::providers_modal::ProvidersKeyOutcome;
+                    return match crate::views::providers_modal::handle_providers_key(
+                        prov_state, key,
+                    ) {
+                        ProvidersKeyOutcome::Close => {
+                            self.active_modal = None;
+                            InputOutcome::Changed
+                        }
+                        ProvidersKeyOutcome::Changed => InputOutcome::Changed,
+                    };
+                }
+                _ => return InputOutcome::Changed,
+            }
+        }
+
         // Settings: route through ModalWindow chrome, then delegate.
         if let ActiveModal::Settings { state } = modal {
             // Sub-mode short-circuit: FilterFocused, PickingEnum, PickingGroup,
@@ -1484,6 +1515,25 @@ impl AgentView {
             }
         }
 
+        // Providers: route through ModalWindow chrome, then delegate.
+        if let Some(ActiveModal::Providers { state: prov_state }) = &mut self.active_modal {
+            let outcome = mw::handle_modal_mouse(
+                &mut prov_state.window,
+                mouse.kind,
+                mouse.column,
+                mouse.row,
+            );
+            match outcome {
+                ModalWindowOutcome::CloseRequested => {
+                    self.active_modal = None;
+                    return InputOutcome::Changed;
+                }
+                ModalWindowOutcome::Handled => return InputOutcome::Changed,
+                ModalWindowOutcome::Unhandled => return InputOutcome::Changed,
+                _ => return InputOutcome::Changed,
+            }
+        }
+
         // Settings: route through ModalWindow chrome, then delegate.
         if let Some(ActiveModal::Settings { state }) = &mut self.active_modal {
             let outcome =
@@ -2236,6 +2286,14 @@ impl AgentView {
                 }
             } else if let modal::ActiveModal::MemoryBrowser { state: mem_state } = active_modal {
                 crate::views::memory_modal::render_memory_modal(buf, area, mem_state, compact);
+            } else if let modal::ActiveModal::Providers { state: prov_state } = active_modal {
+                crate::views::providers_modal::render_providers_modal(
+                    buf,
+                    area,
+                    prov_state,
+                    compact,
+                    &theme,
+                );
             } else if let modal::ActiveModal::Settings {
                 state: settings_state,
             } = active_modal
