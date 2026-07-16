@@ -9,6 +9,8 @@ pub struct EndpointInput<Body> {
     pub body: Body,
 }
 
+/// A path segment in an API endpoint URL.
+/// Either a static string or a dynamic function that takes request input.
 #[derive(Clone)]
 #[non_exhaustive]
 pub enum EndpointPart<Body> {

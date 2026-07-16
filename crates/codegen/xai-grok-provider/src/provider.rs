@@ -21,6 +21,9 @@ impl core::fmt::Debug for ConfiguredProvider {
     }
 }
 
+/// A provider of LLM inference capabilities. Implementations represent
+/// specific model providers (OpenAI, Anthropic, xAI, etc.) and are
+/// registered with a [`ProviderRegistry`] for model resolution.
 pub trait Provider: Send + Sync + core::fmt::Debug + 'static {
     fn id(&self) -> &ProviderId;
     fn name(&self) -> &str;
@@ -29,4 +32,5 @@ pub trait Provider: Send + Sync + core::fmt::Debug + 'static {
     fn known_models(&self) -> &[ProviderModelDef];
 }
 
+/// Thread-safe reference to a [`Provider`] trait object.
 pub type SharedProvider = Arc<dyn Provider>;
