@@ -157,3 +157,34 @@
 - **P4-S05** 全局 provider — `configure()` 中 `model` 闭包可简化为 `route.model(id)`
 - **P4-S06** 全局 provider — 常量 `NonZeroU64::new(x).unwrap()` 应使用 `.expect()`
 - **P4-S07** `xai.rs:69` — 路由 ID `"xai-responses"` 硬编码，未来扩展不便
+
+---
+
+## Phase 5 审计: 2026-07-16
+
+**范围**: `xai-grok-pager/src/cli.rs`, `slash/commands/providers.rs`, `views/providers_modal.rs`, `xai-grok-provider/src/config.rs`, `providers/mod.rs`, `xai-grok-pager-bin/src/main.rs`, `app/actions.rs`, `dispatch/router.rs`
+**参考**: `docs/implementation-plan.md` Phase 5, `docs/model-adapter-architecture.md` §7
+
+### 严重
+
+- **P5-C01** `views/providers_modal.rs` — `ActiveModal::Providers` 变体未注册到 `ActiveModal` 枚举，模态框无法打开
+- **P5-C02** `main.rs:904-910` — `ProviderRegistry` 仅在 `run_agent_command()` 中初始化，交互式 TUI 路径 (`async_main`) 未创建
+
+### 中等
+
+- **P5-M01** `dispatch/router.rs:594-597` — `Action::OpenProviders` 是 `TODO` 存根，`/providers` 静默无反应
+- **P5-M02** `views/providers_modal.rs` — 模态框未接入输入处理和分派系统（无键盘处理、无 `update_modal_state`）
+- **P5-M03** `views/providers_modal.rs:52-58` — Provider 列表硬编码，未使用 `ProviderRegistry` 实时数据
+- **P5-M04** `providers/mod.rs:30-38` — `register_from_config()` 对未知 Provider ID 静默忽略，无警告
+- **P5-M05** `main.rs:1-7` — 顶层 `#![allow(unused_imports, ...)]` 屏蔽了所有合法诊断
+- **P5-M06** `client.rs:547-549` — `#[deprecated]` 的 `api_backend()` 在内部仍被调用
+
+### 建议
+
+- **P5-S01** `providers_modal.rs:48-49` — `let _ = registry/footer;` 标记未完成的实现
+- **P5-S02** `providers_modal.rs:32-34` — 快捷键列表仅含 `Esc`，缺少 `Add/Configure/Remove/Test`
+- **P5-S03** `commands/providers.rs:43-76` — `suggest_args()` 硬编码 Provider ID 而非查询 `AppCtx`
+- **P5-S04** `commands/providers.rs:43` — `_query` 参数未用于过滤补全列表
+- **P5-S05** `providers/mod.rs:31` — `env_key` 空向量或空字符串可能误报"已配置"
+- **P5-S06** `config.rs:33-34` — `parse_provider_toml()` 通过字符串序列化/反序列化往返，效率低
+- **P5-S07** `cli.rs:507-514` — `provider`/`api_key`/`base_url` 被解析但永不消费
