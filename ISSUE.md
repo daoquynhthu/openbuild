@@ -264,7 +264,7 @@
 
 - **M37** `xai-grok-provider/src/route.rs:79-91` — `Route::with()` 的 `RoutePatch` 中 `auth` 字段在 patching 时被静默丢弃（`Self { ...self, ...patch }` 不含 `auth`）
 
-- **M38** PROGRESS.md — Phase 6 的子任务 6.2（❌ 未启动）、6.4（⚠️ 仅部分）、6.5（❌ 未启动）、6.6（❌ 未启动）在 PROGRESS.md 中状态与实际不一致
+- **M38** PROGRESS.md — Phase 6 的子任务状态已同步 -Fixed
 
 - **S20** `xai-grok-provider/src/providers/openai_compatible.rs:13` — 同 M33，`profile_base_url` 死代码
 
