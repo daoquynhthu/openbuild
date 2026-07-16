@@ -243,3 +243,33 @@
 - **S18** `xai-grok-provider/src/providers/mod.rs:47-248` — `#[cfg(test)] mod tests` 嵌入在 `detect_env_vars()` 函数体内，不易读。应移至模块级别
 
 - **S19** `xai-grok-provider/src/providers/anthropic.rs:83`, `opencode.rs:62`, `ollama.rs:61` — 生产代码中的注释违反 AGENTS.md §3.1
+
+### 遗漏补录 (此前未写入)
+
+- **C09** `xai-grok-shell/src/agent/config.rs:3423` + Arch §8 — 7 个 xAI 特性门控中仅 `XAI_API_KEY` 回退已实现（config.rs:4441）。缺失：OAuth 刷新跳过、`x-grok-*` 头部压制、`x_search` 移除、doom-loop 禁用、远程预取跳过、URL 派生头部跳过、Sentry/遥测跳过。非 xAI Provider 使用时可能触发 xAI 特有行为
+
+- **C10** 全局 — `RouteDefaults` 仅含 `headers: Option<HeaderMap>`（`route.rs:10-14`），Arch §3.4 定义 `RouteDefaultsInput` 含 `generation`/`limits`/`headers` 三字段。OpenAI 示例（Arch §10 line 967-973）传 `defaults: Some(RouteDefaultsInput { generation: Some(...), ... })` 编译失败。Route 层无法传递生成参数
+
+- **C11** 全局 — Arch §8 的 `ProtocolTable` 在 `xai-grok-sampler` 中仅含 18 行 ID 常量 + 映射函数，无 `Protocol<Body,Frame,Event,State>` 值结构体。`xai-grok-provider/src/protocol.rs:66-88` 的 `ProtocolTable` 仅存字符串 ID，从未被实际协议值填充
+
+- **M32** `xai-grok-provider/src/endpoint.rs:54` — `Url::parse("http://localhost/").unwrap()` 在 `Endpoint::default_base_url()` 中（生产代码），违反 AGENTS.md §3.6
+
+- **M33** `xai-grok-provider/src/providers/openai_compatible.rs:13` — `#[allow(dead_code)]` 在 `pub fn profile_base_url()` 上，函数声明为 `pub` 但无调用者，应移除或降为 `pub(crate)`
+
+- **M34** 全局 — Arch §5.2 要求 OpenAI 支持 ChatCompletions + Responses 双 Route，当前实现仅单 Route。Arch §5.4 要求 OpenCode 动态获取模型列表（`https://opencode.ai/zen/v1/models`），当前 `known_models` 为空
+
+- **M35** `xai-grok-provider/src/providers/mod.rs:34` — `detect_env_vars()` 每次迭代克隆 `Vec<String>`，应改为引用 `&[String]`
+
+- **M36** `xai-grok-provider/src/auth.rs:7-13` — `AuthInput` 的 `request: String`，Arch §3.9 要求 `request: &LLMRequest`。认证系统无法检查结构化请求（model/messages），阻碍上下文感知的凭据解析
+
+- **M37** `xai-grok-provider/src/route.rs:79-91` — `Route::with()` 的 `RoutePatch` 中 `auth` 字段在 patching 时被静默丢弃（`Self { ...self, ...patch }` 不含 `auth`）
+
+- **M38** PROGRESS.md — Phase 6 的子任务 6.2（❌ 未启动）、6.4（⚠️ 仅部分）、6.5（❌ 未启动）、6.6（❌ 未启动）在 PROGRESS.md 中状态与实际不一致
+
+- **S20** `xai-grok-provider/src/providers/openai_compatible.rs:13` — 同 M33，`profile_base_url` 死代码
+
+- **S21** `xai-grok-provider/src/providers/mod.rs:48` — `#[allow(dead_code)]` 在 `mod tests` 上掩盖了真正的死代码问题
+
+- **S22** `xai-grok-provider/src/providers/xai.rs:79-80` — `x-grok-client-identifier` 注入 `RouteDefaults.headers`，但 Arch 指定 `ProviderDefaults.extra_headers`。若任何代码读取 `extra_headers` 期望找到 x-grok 头部，则不会找到
+
+- **S23** `xai-grok-shell/src/agent/config.rs:3330,3343` — 内部函数 `to_api_backend`/`to_auth_scheme` 缺少文档注释
