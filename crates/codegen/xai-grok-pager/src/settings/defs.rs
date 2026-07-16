@@ -1156,6 +1156,24 @@ pub fn default_settings() -> Vec<SettingMeta> {
             restart_required: false,
             hidden_in_minimal: false,
         },
+        // Providers group: opens the Providers modal for managing AI provider
+        // connections (API keys, base URLs). Rendered as a clickable row with
+        // a chevron indicator; does not expand to child settings.
+        SettingMeta {
+            key: "providers",
+            category: SettingCategory::Agent,
+            owner: SettingOwner::Pager,
+            label: "Providers",
+            description: "Manage AI provider connections such as API keys and base URLs.",
+            keywords: &[
+                "providers", "ai", "models", "api", "keys", "connections", "openai", "anthropic",
+            ],
+            kind: SettingKind::Group {
+                children: &[],
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
         // SHELL-owned startup-time settings (restart_required: true).
         // The running pager doesn't re-read these mid-session.
         SettingMeta {

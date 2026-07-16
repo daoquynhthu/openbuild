@@ -4541,6 +4541,9 @@ fn handle_browse(state: &mut SettingsModalState, key: &KeyEvent) -> SettingsKeyO
             SettingsKeyOutcome::Unchanged
         }
         KeyCode::Char(' ') => {
+            if state.focused_setting().map(|(k, _)| k) == Some("providers") {
+                return SettingsKeyOutcome::Action(Action::OpenProviders);
+            }
             if let Some(action) = state.toggle_focused_bool() {
                 SettingsKeyOutcome::Action(action)
             } else {
@@ -4548,6 +4551,10 @@ fn handle_browse(state: &mut SettingsModalState, key: &KeyEvent) -> SettingsKeyO
             }
         }
         KeyCode::Enter => {
+            // Providers action row: open the providers modal directly.
+            if state.focused_setting().map(|(k, _)| k) == Some("providers") {
+                return SettingsKeyOutcome::Action(Action::OpenProviders);
+            }
             // Group row → open its sub-sheet of child toggles.
             if state.try_enter_picking_group() {
                 return SettingsKeyOutcome::Changed;
@@ -4904,6 +4911,10 @@ pub fn handle_settings_mouse(
             }
 
             if on_value || was_selected_already {
+                // Providers action row: open the providers modal.
+                if state.focused_setting().map(|(k, _)| k) == Some("providers") {
+                    return SettingsKeyOutcome::Action(Action::OpenProviders);
+                }
                 if state.try_enter_picking_group() {
                     return SettingsKeyOutcome::Changed;
                 }
