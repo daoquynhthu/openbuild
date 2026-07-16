@@ -97,6 +97,6 @@
 
 ### 建议
 
-- **P2-S01** `request_task.rs:109` — span label 仍引用 `api_backend()` 而非 `protocol_id()`
+- **P2-S01** `request_task.rs:109` — span label 仍引用 `api_backend()` 而非 `protocol_id()` -Fixed
 - **P2-S02** `protocols/mod.rs` — 协议 ID 常量类型为 `&str` 而非 `ProtocolId`
 - **P2-S03** `stream/` — 目录未被删除（计划在 Phase 7 清理，当前状态不一致）

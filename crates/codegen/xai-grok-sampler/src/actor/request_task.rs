@@ -106,7 +106,7 @@ pub(crate) async fn run_request_task(
     let sampling_span = crate::sampling_log::request_span(
         &request_id,
         &config.model,
-        &format!("{:?}", client.api_backend()),
+        client.protocol_id(),
         &config.base_url,
         &client.auth_info(),
     );
