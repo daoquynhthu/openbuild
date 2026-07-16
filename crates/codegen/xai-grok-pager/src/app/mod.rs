@@ -164,8 +164,8 @@ pub(crate) fn voice_mode_enabled() -> bool {
 ///
 /// Precedence: `env` override (`GROK_VOICE_MODE`) > `remote` (`voice_mode_enabled`)
 /// > default **on**. Remote `Some(false)` is a kill switch; `None` means GA
-/// default (on). Free-tier SuperGrok upsell for `/voice` / Ctrl+Space is a
-/// separate gate (`is_voice_tier_restricted`).
+/// > default (on). Free-tier SuperGrok upsell for `/voice` / Ctrl+Space is a
+/// > separate gate (`is_voice_tier_restricted`).
 pub(crate) fn resolve_voice_mode_enabled(env: Option<bool>, remote: Option<bool>) -> bool {
     env.or(remote).unwrap_or(true)
 }
@@ -908,13 +908,12 @@ pub(crate) mod win_native_selection {
             let Ok(saved) = u32::try_from(saved) else {
                 return;
             };
-            if let Some((handle, current)) = stdin_console_mode() {
-                if current != saved {
+            if let Some((handle, current)) = stdin_console_mode()
+                && current != saved {
                     unsafe {
                         let _ = SetConsoleMode(handle, saved);
                     }
                 }
-            }
         }
     }
     #[cfg(test)]

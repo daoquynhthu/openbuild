@@ -1,3 +1,4 @@
+#![allow(clippy::possible_missing_else)]
 //! WebSocket relay connection management.
 //!
 //! This module provides a shared `RelayConnection` that handles the WebSocket

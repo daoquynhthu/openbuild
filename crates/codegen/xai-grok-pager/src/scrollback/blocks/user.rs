@@ -136,7 +136,8 @@ impl UserPromptBlock {
         let token_end = first_line
             .find(char::is_whitespace)
             .unwrap_or(first_line.len());
-        let skill_token_ranges = if token_end > 0 {
+        #[allow(clippy::single_range_in_vec_init)]
+        let skill_token_ranges: Vec<Range<usize>> = if token_end > 0 {
             vec![0..token_end]
         } else {
             Vec::new()

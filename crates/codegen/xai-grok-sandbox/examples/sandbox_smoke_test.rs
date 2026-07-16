@@ -14,10 +14,21 @@
 //! cargo run -p xai-grok-sandbox --example sandbox_smoke_test -- read-only
 //! ```
 
+#[cfg(unix)]
 use std::path::Path;
+#[cfg(unix)]
 use xai_grok_sandbox::{ProfileName, SandboxManager};
 
+
+#[cfg(not(unix))]
 fn main() {
+    eprintln!("sandbox_smoke_test is Unix-only");
+    std::process::exit(0);
+}
+
+#[cfg(unix)]
+fn main() {
+    // Parse profile from args (default: workspace).
     // Parse profile from args (default: workspace).
     let profile_name = std::env::args()
         .nth(1)
@@ -124,13 +135,14 @@ fn main() {
     println!("\n✅ Smoke test complete");
 }
 
+#[cfg(unix)]
 fn test_read(label: &str, path: &Path) {
     if path.is_file() {
         match std::fs::read(path) {
             Ok(_) => println!("  ✅ {label}: OK (read)"),
             Err(e)
-                if e.raw_os_error() == Some(libc::EACCES)
-                    || e.raw_os_error() == Some(libc::EPERM) =>
+                if e.raw_os_error() == Some(13)
+                    || e.raw_os_error() == Some(1) =>
             {
                 println!("  🔒 {label}: BLOCKED ({e})");
             }
@@ -144,7 +156,7 @@ fn test_read(label: &str, path: &Path) {
             println!("  ✅ {label}: OK ({count} entries)");
         }
         Err(e) => {
-            if e.raw_os_error() == Some(libc::EACCES) || e.raw_os_error() == Some(libc::EPERM) {
+            if e.raw_os_error() == Some(13) || e.raw_os_error() == Some(1) {
                 println!("  🔒 {label}: BLOCKED ({e})");
             } else {
                 println!("  ❌ {label}: ERROR ({e})");
@@ -153,13 +165,14 @@ fn test_read(label: &str, path: &Path) {
     }
 }
 
+#[cfg(unix)]
 fn test_write(label: &str, path: &Path) {
     match std::fs::write(path, b"sandbox-test") {
         Ok(()) => {
             println!("  ✅ {label}: OK (written)");
         }
         Err(e) => {
-            if e.raw_os_error() == Some(libc::EACCES) || e.raw_os_error() == Some(libc::EPERM) {
+            if e.raw_os_error() == Some(13) || e.raw_os_error() == Some(1) {
                 println!("  🔒 {label}: BLOCKED ({e})");
             } else {
                 println!("  ❌ {label}: ERROR ({e})");

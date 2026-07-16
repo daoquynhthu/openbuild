@@ -115,10 +115,10 @@ impl EnvKeys {
         mut getenv: impl FnMut(&str) -> Option<String>,
     ) -> Option<String> {
         for name in self.names() {
-            if let Some(value) = getenv(name) {
-                if !value.trim().is_empty() {
-                    return Some(value);
-                }
+            if let Some(value) = getenv(name)
+                && !value.trim().is_empty()
+            {
+                return Some(value);
             }
         }
         None
@@ -3405,12 +3405,12 @@ fn provider_known_models(
                     .filter(|k| !k.is_empty()),
                 env_key: {
                     let mut env_names: Vec<String> = defaults.env_key.clone();
-                    if let Some(ref cfg) = resolved_config {
-                        if let Some(ref ek) = cfg.env_key {
-                            for name in ek.iter() {
-                                if !env_names.contains(name) {
-                                    env_names.push(name.clone());
-                                }
+                    if let Some(ref cfg) = resolved_config
+                        && let Some(ref ek) = cfg.env_key
+                    {
+                        for name in ek.iter() {
+                            if !env_names.contains(name) {
+                                env_names.push(name.clone());
                             }
                         }
                     }

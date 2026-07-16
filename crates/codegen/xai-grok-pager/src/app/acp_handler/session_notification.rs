@@ -546,8 +546,8 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
                     )),
                 };
                 agent.scrollback.push_block(block);
-            } else if let Some(eid) = entry_id {
-                if let Some(entry) = agent.scrollback.get_by_id_mut(eid) {
+            } else if let Some(eid) = entry_id
+                && let Some(entry) = agent.scrollback.get_by_id_mut(eid) {
                     if let RenderBlock::Subagent(ref mut sb) = entry.block {
                         match status.as_str() {
                             "completed" => {
@@ -570,7 +570,6 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
                     }
                     entry.invalidate_cache();
                 }
-            }
             let mut was_running = false;
             if let Some(info) = agent.subagent_sessions.get_mut(&child_session_id) {
                 was_running = info.is_running();

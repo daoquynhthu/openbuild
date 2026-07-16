@@ -412,12 +412,10 @@ impl AgentView {
                         }
                         if let Some(id) = self.queue.send_now_click(mouse.column, mouse.row)
                             && self.session.state.is_turn_running()
-                        {
-                            if let InputOutcome::Action(action) = self.force_interject_queue_row(id)
+                            && let InputOutcome::Action(action) = self.force_interject_queue_row(id)
                             {
                                 return InputOutcome::Action(action);
                             }
-                        }
                         self.set_active_pane(AgentPane::Queue, false);
                         self.queue.handle_mouse(
                             mouse.kind,

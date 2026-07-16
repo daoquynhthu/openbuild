@@ -343,6 +343,7 @@ fn live_tail_renderer<'a>(
 /// Starts at the shared [`super::commit::scan_frontier`] stop point so it renders
 /// exactly the entries [`tail_height`] measured (the viewport was sized to that —
 /// any disagreement makes the prompt jump on commit).
+#[allow(clippy::too_many_arguments)]
 fn draw_tail(
     buf: &mut Buffer,
     area: Rect,

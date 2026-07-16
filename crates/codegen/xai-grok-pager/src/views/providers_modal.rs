@@ -40,6 +40,12 @@ pub struct ProvidersModalState {
     pub mode: ProvidersView,
 }
 
+impl Default for ProvidersModalState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProvidersModalState {
     pub fn new() -> Self {
         Self {
@@ -141,8 +147,6 @@ pub fn handle_providers_key(
     state: &mut ProvidersModalState,
     key: &crossterm::event::KeyEvent,
 ) -> ProvidersKeyOutcome {
-    use crossterm::event::KeyCode;
-
     match &state.mode {
         ProvidersView::List => handle_list_key(state, key),
         ProvidersView::Detail { .. } => handle_detail_key(state, key),
@@ -456,6 +460,7 @@ fn render_detail(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_field(
     buf: &mut Buffer,
     x: u16,

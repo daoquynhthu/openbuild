@@ -831,6 +831,7 @@ impl EditToolCallBlock {
     }
 
     /// Header line: path painted for `surface` (Collapsed / Expanded / Fullscreen).
+    #[allow(clippy::too_many_arguments)]
     fn header_line(
         &self,
         theme: &Theme,

@@ -596,11 +596,10 @@ impl AgentView {
                     modifiers: crossterm::event::KeyModifiers::NONE,
                 };
                 let _ = self.prompt.handle_mouse(&event);
-            } else if let Some((scroll_top, scroll_bottom)) = self.question_scroll_region {
-                if row >= scroll_top && row < scroll_bottom {
+            } else if let Some((scroll_top, scroll_bottom)) = self.question_scroll_region
+                && row >= scroll_top && row < scroll_bottom {
                     self.apply_question_scroll(lines);
                 }
-            }
             return;
         }
         let target = self
