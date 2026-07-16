@@ -36,6 +36,24 @@
 - **3.5** 修改 `SamplerConfig.protocol_id` 从 `String` 改为 `Option<String>` — 消除所有向后兼容问题
 - 修复 `SamplerConfig` 构造器遗漏 `protocol_id` 字段的 5+ 处
 
+---
+
+## Phase 4: Provider 实现层 — 2026-07-16
+
+### 完成内容
+- **4.1** `providers/mod.rs:register_all()` — 注册全部 6 个内置 Provider
+- **4.2** `XaiProvider` — Responses 协议, Bearer auth, XAI_API_KEY env, 500K context
+- **4.3** `OpenAIProvider` — ChatCompletions, OPENAI_API_KEY, 2 个内置模型 (gpt-4o, gpt-4o-mini)
+- **4.4** `AnthropicProvider` — Messages 协议, x-api-key auth, anthropic-version header
+- **4.5** `OpenCodeProvider` — Zen 网关, ChatCompletions, OPENCODE_API_KEY
+- **4.6** `OllamaProvider` — 无认证, localhost:11434
+- **4.7** `OpenAiCompatibleProvider` — catch-all, OpenAI-compatible profiles
+
+### 关键结果
+- `cargo test -p xai-grok-provider` — 52/52
+- `cargo clippy -p xai-grok-provider -- -D warnings` — 零警告
+- 6 个新文件，~600 行代码
+
 ### 关键结果
 - `cargo test -p xai-grok-provider` — 52/52 ✅
 - `cargo test -p xai-grok-sampler` — 154/154 ✅
