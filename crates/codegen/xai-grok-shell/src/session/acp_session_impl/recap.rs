@@ -216,7 +216,7 @@ impl SessionActor {
         // provider's prefix KV cache stays warm. Mirrors compaction's
         // `summary_strips_reasoning`.
         let strip_reasoning =
-            sampling_client.api_backend() == crate::sampling::ApiBackend::Messages;
+            sampling_client.protocol_id() == xai_grok_sampler::protocols::id::MESSAGES;
 
         // Budget off the recap model's context window (today the session model).
         // One read serves both the window and the model.
@@ -522,14 +522,14 @@ impl SessionActor {
         let request_id = xai_grok_sampler::RequestId::random();
         let idle_timeout = std::time::Duration::from_secs(5);
 
-        let result = match sampling_client.api_backend() {
-            crate::sampling::ApiBackend::ChatCompletions => {
+        let result = match sampling_client.protocol_id() {
+            xai_grok_sampler::protocols::id::CHAT_COMPLETIONS => {
                 let (raw, meta) = sampling_client.conversation_stream(request).await.ok()?;
                 let events =
                     xai_grok_sampler::stream_chat_completions(raw, meta, request_id, idle_timeout);
                 xai_grok_sampler::collect_response(events).await
             }
-            crate::sampling::ApiBackend::Responses => {
+            xai_grok_sampler::protocols::id::RESPONSES => {
                 let (raw, meta, doom_loop) = sampling_client
                     .conversation_stream_responses(request)
                     .await
@@ -543,12 +543,18 @@ impl SessionActor {
                 );
                 xai_grok_sampler::collect_response(events).await
             }
-            crate::sampling::ApiBackend::Messages => {
+            xai_grok_sampler::protocols::id::MESSAGES => {
                 let (raw, meta) = sampling_client
                     .conversation_stream_messages(request)
                     .await
                     .ok()?;
                 let events = xai_grok_sampler::stream_messages(raw, meta, request_id, idle_timeout);
+                xai_grok_sampler::collect_response(events).await
+            }
+            _ => {
+                let (raw, meta) = sampling_client.conversation_stream(request).await.ok()?;
+                let events =
+                    xai_grok_sampler::stream_chat_completions(raw, meta, request_id, idle_timeout);
                 xai_grok_sampler::collect_response(events).await
             }
         };

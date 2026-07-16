@@ -716,8 +716,8 @@ impl SessionActor {
         let request_id = xai_grok_sampler::RequestId::random();
         let idle_timeout = std::time::Duration::from_secs(15);
 
-        let result = match sampling_client.api_backend() {
-            crate::sampling::ApiBackend::ChatCompletions => {
+        let result = match sampling_client.protocol_id() {
+            xai_grok_sampler::protocols::id::CHAT_COMPLETIONS => {
                 let (raw, meta) = sampling_client
                     .conversation_stream(request)
                     .await
@@ -726,7 +726,7 @@ impl SessionActor {
                     xai_grok_sampler::stream_chat_completions(raw, meta, request_id, idle_timeout);
                 xai_grok_sampler::collect_response(events).await
             }
-            crate::sampling::ApiBackend::Responses => {
+            xai_grok_sampler::protocols::id::RESPONSES => {
                 let (raw, meta, doom_loop) = sampling_client
                     .conversation_stream_responses(request)
                     .await
@@ -740,12 +740,21 @@ impl SessionActor {
                 );
                 xai_grok_sampler::collect_response(events).await
             }
-            crate::sampling::ApiBackend::Messages => {
+            xai_grok_sampler::protocols::id::MESSAGES => {
                 let (raw, meta) = sampling_client
                     .conversation_stream_messages(request)
                     .await
                     .map_err(|e| format!("rewrite stream failed: {e}"))?;
                 let events = xai_grok_sampler::stream_messages(raw, meta, request_id, idle_timeout);
+                xai_grok_sampler::collect_response(events).await
+            }
+            _ => {
+                let (raw, meta) = sampling_client
+                    .conversation_stream(request)
+                    .await
+                    .map_err(|e| format!("rewrite stream failed: {e}"))?;
+                let events =
+                    xai_grok_sampler::stream_chat_completions(raw, meta, request_id, idle_timeout);
                 xai_grok_sampler::collect_response(events).await
             }
         };
