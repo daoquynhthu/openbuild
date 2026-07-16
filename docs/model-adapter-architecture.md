@@ -1,0 +1,1123 @@
+# Model Adapter Layer — Architecture Specification
+
+## 1. Overview
+
+Grok Build currently supports three API backends (`ChatCompletions`, `Responses`, `Messages`)
+but is tightly coupled to xAI's proprietary authentication, headers, and endpoint defaults.
+This document defines the target architecture for a **provider-agnostic model adapter layer**
+that treats xAI as one provider among many while preserving full backward compatibility.
+
+### Design goals
+
+- **Provider as a first-class concept**: each provider (xAI, OpenAI, Anthropic, OpenCode Zen,
+  Ollama, etc.) is a self-contained unit carrying its own protocol, auth, defaults, and
+  known model list.
+- **Layered isolation**: protocol logic (wire format), transport (HTTP/SSE), authentication,
+  and provider metadata are each owned by separate layers with单向 dependencies.
+- **Immutable composition**: providers, routes, and protocols are assembled via composition
+  (not inheritance) and combined into immutable configurations.
+- **Backward compatible**: existing xAI OAuth flows, config.toml sections, env vars, and
+  CLI flags continue to work unchanged.
+- **Zero-config discovery**: when the user provides only `--api-key` and `--base-url`, the
+  system auto-detects the provider from the URL and loads appropriate defaults.
+
+---
+
+## 2. Layer Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Provider Facades                                                   │
+│  xai.rs | openai.rs | anthropic.rs | opencode.rs | ollama.rs | ...  │
+│                                                                      │
+│  Each facade is a thin function that calls                           │
+│  `route.with({ endpoint, auth, defaults })` and returns              │
+│  `{ id, model: (modelID) => Model, configure }`.                    │
+│  Bundles one or more Protocol implementations via Route.            │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Route — 4-axis immutable composition                               │
+│                                                                      │
+│  Route =  Protocol  +  Endpoint  +  Auth  +  Framing                │
+│           ↑              ↑            ↑          ↑                   │
+│       wire format    base URL +    credential   byte→frame          │
+│                      path + query  resolution   decoding            │
+│                                                                      │
+│  route.with(patch) → new Route  (immutable patching)                │
+│  route.model(input) → Model    (bind model ID to route)             │
+│                                                                      │
+│  RouteRegistry — map<protocol_id, Route>                             │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Protocol Layer (xai-grok-sampler)                                   │
+│                                                                      │
+│  Protocol<Body, Frame, Event, State> {                               │
+│    id: ProtocolID                                                     │
+│    body:  { schema: Codec<Body>, from(LLMRequest) → Body }           │
+│    stream: { event: Codec<Event>,                                     │
+│              initial(request) → State,                               │
+│              step(state, event) → [State, LLMEvent[]],               │
+│              terminal?(event) → bool,                                │
+│              onHalt?(state) → LLMEvent[] }                           │
+│  }                                                                   │
+│                                                                      │
+│  Pure wire format — no URL, no auth, no headers.                     │
+│  Reusable across providers: OpenAIChat.protocol shared by            │
+│  20+ OpenAI-compatible providers.                                    │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Auth Layer — functional composition                                 │
+│                                                                      │
+│  Auth is a function: apply(AuthInput) → Effect<Headers>              │
+│                                                                      │
+│  Composition:                                                        │
+│    Auth.optional(apiKey)              // try inline key               │
+│      .orElse(Auth.config("ENV_VAR"))  // fallback to env             │
+│      .bearer()                        // render as Bearer header     │
+│    // OR:                                                             │
+│    Auth.optional(apiKey).orElse(...).header("x-api-key")             │
+│                                                                      │
+│  Auth chain is: credential resolution → header rendering             │
+│  Rendered per-request via `auth.apply(input) → Headers`             │
+└───────────────────────────┬──────────────────────────────────────────┘
+                            │
+                            ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Transport + Framing Layer                                           │
+│                                                                      │
+│  Transport: prepare(body) → Prepared, frames(Prepared) → Stream<Frame>│
+│  Framing:   Stream<Uint8Array> → Stream<Frame>                       │
+│    • sse — Server-Sent Events (decode UTF-8, emit JSON data strings) │
+│    • (future) aws-event-stream — binary frames with CRC              │
+│                                                                      │
+│  reqwest HTTP client (protocol-agnostic).                            │
+│  Headers assembled from: Provider defaults > Route defaults > Auth   │
+│  > HTTP options (request-level overlay with denylist).              │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer ownership
+
+| Layer | Crate | Responsibility |
+|-------|-------|----------------|
+| Provider Facades | `xai-grok-provider` | Pre-built provider definitions |
+| Provider Trait | `xai-grok-provider` | Interface + registry |
+| Protocol | `xai-grok-sampler` (refactored) | Wire format ↔ LLMEvent |
+| Auth | `xai-grok-shell/src/auth/` (refactored) | Credential chain resolution |
+| Transport | `xai-grok-sampler/src/client.rs` | HTTP + SSE (unchanged) |
+
+---
+
+## 3. Core Types
+
+### 3.1 ProviderId
+
+```rust
+/// Type-safe provider identifier.
+/// Newtype over String for future extensibility (e.g. custom providers).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ProviderId(pub String);
+
+impl ProviderId {
+    pub const XAI: &'static str = "xai";
+    pub const OPENAI: &'static str = "openai";
+    pub const ANTHROPIC: &'static str = "anthropic";
+    pub const OPENCODE: &'static str = "opencode";
+    pub const OLLAMA: &'static str = "ollama";
+    pub const OPENAI_COMPATIBLE: &'static str = "openai-compatible";
+}
+```
+
+### 3.2 ProviderDefaults
+
+```rust
+/// Immutable set of defaults baked into each provider definition.
+/// Users override individual fields via [model.*] or [provider.*] config.
+#[derive(Debug, Clone)]
+pub struct ProviderDefaults {
+    pub id: ProviderId,
+    pub name: String,
+
+    // Endpoint
+    pub base_url: String,
+
+    // Protocol
+    pub api_backend: ApiBackend,  // ChatCompletions | Responses | Messages
+
+    // Auth
+    pub auth_scheme: AuthScheme,  // Bearer | XApiKey
+    pub env_key: Vec<String>,     // env vars to try, in order
+
+    // Generation defaults
+    pub context_window: NonZeroU64,
+    pub max_completion_tokens: Option<u32>,
+    pub temperature: Option<f32>,
+    pub top_p: Option<f32>,
+
+    // Capabilities
+    pub supports_backend_search: bool,
+    pub supports_reasoning_effort: bool,
+    pub supports_streaming: bool,
+    pub supports_tool_calling: bool,
+    pub supports_structured_output: bool,
+
+    // Default headers
+    pub extra_headers: IndexMap<String, String>,
+
+    // Known models shipped with this provider
+    pub known_models: Vec<ProviderModelDef>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProviderModelDef {
+    pub id: String,            // display/slug, e.g. "gpt-4o"
+    pub model: String,         // wire model name, e.g. "gpt-4o-2024-11-20"
+    pub name: String,          // human-readable, e.g. "GPT-4o"
+    pub description: Option<String>,
+    pub context_window: NonZeroU64,
+    pub api_backend: Option<ApiBackend>,  // override provider default
+    pub hidden: bool,          // hidden from picker by default
+    pub supports_reasoning_effort: Option<bool>,
+}
+```
+
+### 3.3 Provider Facade — Function, Not Trait
+
+Unlike OpenCode (TypeScript), Rust's type system requires a trait for
+dynamic dispatch. The `Provider` trait is `Arc`-clonable and stateless —
+`configure()` returns a `ConfiguredProvider` that holds a concrete `Route`.
+
+```rust
+/// Stateless provider definition. Singleton registered in ProviderRegistry.
+/// configure() merges user overrides into baked-in defaults → ConfiguredProvider.
+pub trait Provider: Send + Sync + Debug {
+    fn id(&self) -> &ProviderId;
+    fn name(&self) -> &str;
+    fn defaults(&self) -> &ProviderDefaults;
+
+    /// Override defaults with user config → a configured provider
+    /// that can create Models.
+    fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider;
+
+    fn known_models(&self) -> &[ProviderModelDef];
+}
+
+/// User-supplied overrides for a provider.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ProviderConfig {
+    pub api_key: Option<String>,
+    pub env_key: Option<Vec<String>>,
+    pub base_url: Option<String>,
+    pub extra_headers: Option<IndexMap<String, String>>,
+}
+
+/// Result of provider.configure(): holds the composed Route and credential
+/// chain, ready to create Model values.
+pub struct ConfiguredProvider {
+    pub id: ProviderId,
+    pub route: Route,
+    pub model: fn(model_id: &str, route: &Route) -> Model,
+    pub configure: fn(ProviderConfig) -> ConfiguredProvider,
+}
+```
+
+### 3.4 Route — The Central Composition
+
+A `Route` composes the four orthogonal deployment axes. It is an **immutable value**:
+`route.with(patch)` returns a new `Route`.
+
+```rust
+pub struct Route {
+    pub id: String,
+    pub provider: Option<ProviderId>,
+    pub protocol: ProtocolId,
+    pub endpoint: Endpoint,
+    pub auth: Box<dyn AuthFn>,
+    pub framing: Box<dyn Framing<String>>,
+    pub defaults: RouteDefaults,
+    pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
+
+    // Builder methods
+    pub fn with(self, patch: RoutePatch) -> Route { ... }
+    pub fn model(&self, input: ModelInput) -> Model { ... }
+}
+
+pub struct RoutePatch {
+    pub auth: Option<Box<dyn AuthFn>>,
+    pub endpoint: Option<EndpointPatch>,
+    pub defaults: Option<RouteDefaultsInput>,
+    pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
+    pub provider: Option<ProviderId>,
+}
+
+impl Route {
+    /// Build a Route from its four orthogonal pieces.
+    pub fn make(input: RouteInput) -> Self { ... }
+}
+
+pub struct RouteInput {
+    pub id: String,
+    pub provider: Option<ProviderId>,
+    pub protocol: ProtocolId,
+    pub endpoint: Endpoint,
+    pub auth: Option<Box<dyn AuthFn>>,
+    pub framing: Box<dyn Framing<String>>,
+    pub defaults: Option<RouteDefaultsInput>,
+}
+```
+
+Hooks into the request/response pipeline (modelled after OpenCode's 5-stage hooks):
+
+```rust
+pub enum HookStage {
+    Request,   // Transform the LLMRequest before body construction
+    Body,      // Transform the provider-native body before serialization
+    Transport, // Transform the HTTP request before sending
+    Event,     // Transform a normalized LLMEvent
+    Error,     // Classify or enrich errors
+}
+```
+
+### 3.5 Model — Executable Process-local Value
+
+```rust
+/// A model ready to run. Contains identity, capabilities, route reference,
+/// and reusable request-behavior defaults.
+pub struct Model {
+    pub id: ModelId,
+    pub provider: ProviderId,
+    pub route: Arc<Route>,
+    pub defaults: Option<ModelDefaults>,
+}
+
+pub struct ModelDefaults {
+    pub limits: Option<ModelLimits>,       // context_window, max_output
+    pub generation: Option<GenerationOptions>,  // temperature, top_p, etc.
+    pub provider_options: Option<HashMap<String, Value>>,
+    pub http: Option<HttpOptions>,          // headers, body, query overlays
+}
+
+pub struct HttpOptions {
+    pub headers: Option<HashMap<String, String>>,
+    pub body: Option<Value>,        // JSON overlay (deny-listed for protocol fields)
+    pub query: Option<HashMap<String, String>>,
+}
+```
+
+### 3.4 ProviderConfig
+
+```rust
+/// User-supplied overrides for a provider, from config.toml [provider.*]
+/// and/or CLI flags --provider/--api-key/--base-url.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ProviderConfig {
+    pub id: Option<String>,
+    pub api_key: Option<String>,
+    pub env_key: Option<Vec<String>>,
+    pub base_url: Option<String>,
+    pub extra_headers: Option<IndexMap<String, String>>,
+}
+```
+
+### 3.5 Protocol
+
+```rust
+/// Semantic API contract of one model server family.
+/// Pure wire-format logic — no URL, no auth, no headers.
+/// Reusable across providers: OpenAIChat.protocol shared by 20+ providers.
+pub struct Protocol<Body, Frame, Event, State> {
+    pub id: ProtocolId,
+    pub body: ProtocolBody<Body>,
+    pub stream: ProtocolStream<Frame, Event, State>,
+}
+
+pub struct ProtocolBody<Body> {
+    /// Schema for the validated provider-native body sent as JSON.
+    pub schema: Schema<Body>,
+    /// Build provider-native body from the common request.
+    pub from: fn(LLMRequest) -> Result<Body>,
+}
+
+pub struct ProtocolStream<Frame, Event, State> {
+    /// Schema for one decoded streaming event (from a transport frame).
+    pub event: Schema<Event>,
+    /// Initial parser state. Called once per response with the resolved request.
+    pub initial: fn(LLMRequest) -> State,
+    /// Translate one event into emitted LLMEvents plus the next state.
+    pub step: fn(&mut State, Event) -> Result<Vec<LLMEvent>>,
+    /// Optional request-completion signal for transports that don't end naturally.
+    pub terminal: Option<fn(&Event) -> bool>,
+    /// Optional flush emitted when the framed stream ends.
+    pub on_halt: Option<fn(&State) -> Vec<LLMEvent>>,
+}
+```
+
+Factory helper equivalent to OpenCode's `Protocol.make({...})`:
+
+```rust
+impl<B, F, E, S> Protocol<B, F, E, S> {
+    pub fn new(
+        id: impl Into<ProtocolId>,
+        body: ProtocolBody<B>,
+        stream: ProtocolStream<F, E, S>,
+    ) -> Self { ... }
+}
+```
+
+### 3.6 LLMEvent — Normalized Provider Event Union
+
+All provider-native events map to this union. Contains exactly one `Finish` per
+response. Content-type events follow a `Start → Delta* → End` pattern.
+
+```rust
+#[derive(Debug, Clone)]
+pub enum LLMEvent {
+    StepStart { index: u32 },
+
+    TextStart { id: String },
+    TextDelta { id: String, text: String },
+    TextEnd { id: String },
+
+    ReasoningStart { id: String },
+    ReasoningDelta { id: String, text: String },
+    ReasoningEnd { id: String },
+
+    ToolInputStart { id: String, name: String },
+    ToolInputDelta { id: String, text: String },
+    ToolInputEnd { id: String, name: String },
+
+    /// A completed tool call (all deltas accumulated).
+    ToolCall { id: String, name: String, input: Value },
+
+    ToolResult { id: String, name: String, result: ToolResultValue },
+    ToolError { id: String, name: String, message: String },
+
+    StepFinish { index: u32, reason: FinishReason, usage: Option<Usage> },
+    Finish { reason: FinishReason, usage: Option<Usage> },
+
+    Error { message: String, kind: ErrorKind },
+}
+
+/// Inclusive totals with non-overlapping breakdown.
+/// Every breakdown field is independently meaningful — consumers never subtract.
+/// Invariant: nonCachedInputTokens + cacheReadInputTokens + cacheWriteInputTokens = inputTokens
+///            reasoningTokens ≤ outputTokens
+#[derive(Debug, Clone)]
+pub struct Usage {
+    // Inclusive totals (match OpenAI/Anthropic convention)
+    pub input_tokens: Option<u32>,
+    pub output_tokens: Option<u32>,
+    pub total_tokens: Option<u32>,
+
+    // Non-overlapping breakdown
+    pub non_cached_input_tokens: Option<u32>,
+    pub cache_read_input_tokens: Option<u32>,
+    pub cache_write_input_tokens: Option<u32>,
+    pub reasoning_tokens: Option<u32>,
+
+    /// Raw provider usage data for fields we don't normalize.
+    pub provider_metadata: Option<HashMap<String, Value>>,
+}
+```
+
+### 3.7 Endpoint
+
+```rust
+/// Declarative URL construction for one route.
+/// baseURL + path (string or function) + query params.
+pub struct Endpoint<Body> {
+    pub base_url: Option<String>,
+    pub path: EndpointPart<Body>,
+    pub query: Option<HashMap<String, String>>,
+}
+
+/// Path can be a static string or a function of the request body
+/// (for routes whose URL embeds model id, region, etc.).
+pub enum EndpointPart<Body> {
+    Static(String),
+    Dynamic(fn(&EndpointInput<Body>) -> String),
+}
+
+pub struct EndpointInput<Body> {
+    pub request: LLMRequest,
+    pub body: Body,
+}
+
+impl<Body> Endpoint<Body> {
+    pub fn render(&self, input: &EndpointInput<Body>) -> Url { ... }
+}
+
+/// Merge base endpoint with an override patch (used by route.with()).
+pub fn merge_endpoints<Body>(
+    base: &Endpoint<Body>,
+    patch: &EndpointPatch<Body>,
+) -> Endpoint<Body> { ... }
+```
+
+### 3.8 Framing
+
+```rust
+/// Byte-stream decoder: raw HTTP body → protocol frames.
+/// The frame type is opaque; the Protocol's `event` schema decodes it.
+pub trait Framing<Frame>: Send + Sync {
+    fn id(&self) -> &str;
+    fn frame(&self, bytes: ByteStream) -> Stream<Frame>;
+}
+
+/// Server-Sent Events framing. Used by every JSON-streaming HTTP provider.
+/// UTF-8 decode → SSE channel decoder → filter empty/[DONE] → emit data strings.
+pub struct SseFraming;
+impl Framing<String> for SseFraming { ... }
+```
+
+### 3.9 Auth — Functional Composition
+
+```rust
+/// Auth is a function: apply(AuthInput) → Headers.
+/// Supports chaining: .orElse() for fallback, .andThen() for layering.
+pub trait AuthFn: Send + Sync {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap>;
+    fn or_else(self, that: Box<dyn AuthFn>) -> Box<dyn AuthFn>;
+    fn and_then(self, that: Box<dyn AuthFn>) -> Box<dyn AuthFn>;
+}
+
+/// Credential source: an Effect that resolves to a secret string.
+pub enum Credential {
+    Inline(Option<String>),
+    Config(String),  // environment variable name
+    Session,         // existing OAuth session
+    None,
+}
+
+// Builder helpers:
+impl Credential {
+    pub fn optional(key: Option<String>, source: &str) -> Self { ... }
+    pub fn config(name: &str) -> Self { ... }
+
+    /// Render credential as Bearer token → Auth
+    pub fn bearer(self) -> Box<dyn AuthFn> { ... }
+
+    /// Render credential as arbitrary header → Auth
+    pub fn header(self, name: &str) -> Box<dyn AuthFn> { ... }
+}
+
+/// Chain multiple auth sources. First success wins.
+/// Usage: `Credential::optional(api_key).or_else(Credential::config("OPENAI_API_KEY")).bearer()`
+///        `Credential::optional(api_key).or_else(Credential::config("ANTHROPIC_API_KEY")).header("x-api-key")`
+```
+
+---
+
+## 4. ProviderRegistry
+
+```rust
+/// Global registry of all built-in and user-configured providers.
+/// Populated at startup from:
+///   1. Hardcoded built-in providers (xai-grok-provider/src/providers/*.rs)
+///   2. User [provider.*] config.toml sections
+///   3. Auto-detection from --provider / --api-key / --base-url CLI flags
+#[derive(Debug)]
+pub struct ProviderRegistry {
+    providers: RwLock<HashMap<ProviderId, Arc<dyn Provider>>>,
+    routes: RwLock<HashMap<String, Arc<Route>>>,
+}
+
+impl ProviderRegistry {
+    pub fn new() -> Self;
+
+    /// Register a built-in provider.
+    pub fn register(&self, provider: Arc<dyn Provider>);
+
+    /// Resolve a provider by ID. Returns None for unknown IDs.
+    pub fn get(&self, id: &ProviderId) -> Option<Arc<dyn Provider>>;
+
+    /// Configure a provider with user overrides, returning a ready-to-use
+    /// ConfiguredProvider that holds the composed Route + model factory.
+    pub fn configure(
+        &self,
+        id: &ProviderId,
+        overrides: ProviderConfig,
+    ) -> Option<ConfiguredProvider>;
+
+    /// Auto-detect provider from base URL patterns:
+    ///   api.x.ai         → xai
+    ///   api.openai.com   → openai
+    ///   api.anthropic.com → anthropic
+    ///   opencode.ai      → opencode
+    ///   localhost        → ollama
+    ///   *                → openai-compatible
+    pub fn detect_from_url(&self, base_url: &str) -> ProviderId;
+
+    /// Create a Model from a provider + model ID.
+    /// Shortcut for: registry.configure(provider_id, config)?.model(model_id)
+    pub fn model(
+        &self,
+        provider_id: &ProviderId,
+        model_id: &str,
+        overrides: ProviderConfig,
+    ) -> Option<Model>;
+
+    /// All registered provider IDs.
+    pub fn all_ids(&self) -> Vec<ProviderId>;
+}
+```
+
+---
+
+## 5. Pre-built Provider Definitions
+
+### 5.1 xAI Provider
+
+| Property | Value |
+|----------|-------|
+| ProviderId | `"xai"` |
+| Base URL | `https://api.x.ai/v1` |
+| API Backend | `Responses` |
+| Auth Scheme | `Bearer` |
+| Auth Chain | `InlineKey → EnvVar("XAI_API_KEY") → SessionToken(OAuth)` |
+| Context Window | 500,000 |
+| Extra Headers | `x-grok-*` headers via `XaiExtraHeaders` |
+| Raw Tools | `x_search` |
+| Doom Loop | Enabled |
+| Known Models | `grok-build` |
+
+The xAI provider is the **default** when no other provider is configured. It preserves the
+existing OAuth device-code flow, `grok login`, session token refresh, and all `x-grok-*`
+headers for backward compatibility.
+
+### 5.2 OpenAI Provider
+
+| Property | Value |
+|----------|-------|
+| ProviderId | `"openai"` |
+| Base URL | `https://api.openai.com/v1` |
+| API Backend | `ChatCompletions` (also supports `Responses`) |
+| Auth Scheme | `Bearer` |
+| Auth Chain | `InlineKey → EnvVar("OPENAI_API_KEY")` |
+| Context Window | 128,000 |
+| Extra Headers | None |
+| Raw Tools | None |
+| Known Models | `gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini` |
+
+### 5.3 Anthropic Provider
+
+| Property | Value |
+|----------|-------|
+| ProviderId | `"anthropic"` |
+| Base URL | `https://api.anthropic.com/v1` |
+| API Backend | `Messages` |
+| Auth Scheme | `XApiKey` (via `x-api-key` header) |
+| Auth Chain | `InlineKey → EnvVar("ANTHROPIC_API_KEY")` |
+| Extra Headers | `anthropic-version: 2023-06-01` |
+| Known Models | `claude-sonnet-4-20250514`, `claude-haiku-3-5-20241022` |
+
+### 5.4 OpenCode Zen Provider
+
+| Property | Value |
+|----------|-------|
+| ProviderId | `"opencode"` |
+| Base URL | `https://opencode.ai/zen/v1` |
+| API Backend | `ChatCompletions` |
+| Auth Scheme | `Bearer` |
+| Auth Chain | `PublicKey("public") → EnvVar("OPENCODE_API_KEY")` |
+| Extra Headers | None |
+| Known Models | Dynamically fetched from `https://opencode.ai/zen/v1/models` |
+
+**Free-model fallback**: when no API key is available, the chain resolves to `"public"`
+and paid models (those with cost > 0) are filtered out of the model list automatically.
+
+### 5.5 Ollama Provider
+
+| Property | Value |
+|----------|-------|
+| ProviderId | `"ollama"` |
+| Base URL | `http://localhost:11434/v1` |
+| API Backend | `ChatCompletions` |
+| Auth Scheme | `None` |
+| Auth Chain | `None` |
+| Extra Headers | None |
+| Known Models | `llama3.1`, `codellama`, `deepseek-coder` (example IDs; actual list from `/api/tags`) |
+
+### 5.6 OpenAI-Compatible Provider
+
+| Property | Value |
+|----------|-------|
+| ProviderId | `"openai-compatible"` |
+| Base URL | User-specified |
+| API Backend | `ChatCompletions` |
+| Auth Scheme | `Bearer` |
+| Auth Chain | `InlineKey → EnvVar("XAI_API_KEY")` (generic fallback) |
+| Extra Headers | None |
+
+Catch-all provider for any OpenAI Chat Completions-compatible API
+(Groq, DeepSeek, Together AI, Fireworks, etc.). Known profiles map
+friendly names to base URLs:
+
+| Profile | Base URL |
+|---------|----------|
+| `groq` | `https://api.groq.com/openai/v1` |
+| `deepseek` | `https://api.deepseek.com/v1` |
+| `togetherai` | `https://api.together.xyz/v1` |
+| `fireworks` | `https://api.fireworks.ai/inference/v1` |
+| `openrouter` | `https://openrouter.ai/api/v1` |
+
+---
+
+## 6. Integration Points with Existing Code
+
+### 6.1 Model Resolution Pipeline
+
+The existing `resolve_model_list()` function in `xai-grok-shell/src/agent/config.rs`
+is extended with a Provider-aware layer:
+
+```
+Before:
+  [model.*] config > prefetched models > default_models.json
+
+After:
+  [model.*] config > prefetched models > [provider.*] config > built-in providers > default_models.json (fallback)
+```
+
+The provider layer:
+1. Reads `[provider.*]` sections from config.toml
+2. For each configured provider, calls `registry.configure(provider_id, config)`
+3. The `ConfiguredProvider` holds a `Route` with `endpoint` + `auth` merged from config
+4. Provider model IDs are injected into the model catalog as `Model` values
+5. Each `Model` carries its `Route` reference for later `SamplerConfig` construction
+
+### 6.2 SamplerConfig construction
+
+`resolve_model_to_sampling_config()` builds `SamplerConfig` from the `Model`'s Route:
+
+```rust
+pub fn resolve_model_to_sampling_config(
+    model: &Model,
+    session_key: Option<&str>,
+) -> SamplerConfig {
+    let route = &model.route;
+    let endpoint = &route.endpoint;
+
+    // Resolve credentials via the route's auth function
+    let headers = route.auth.apply(&AuthInput {
+        request: &request,
+        method: "POST",
+        url: endpoint.render(...).to_string(),
+        body: body_text,
+        headers: default_headers(),
+    });
+
+    SamplerConfig {
+        base_url: endpoint.base_url.clone(),
+        protocol: Some(Arc::new(route.protocol.into_protocol())),
+        extra_headers: headers,
+        // ...existing fields...
+    }
+}
+```
+
+### 6.3 Stream dispatch
+
+The existing triple-match in `request_task.rs` is replaced by trait dispatch:
+
+```rust
+// Before:
+match client.api_backend() {
+    ApiBackend::ChatCompletions => stream_chat_completions(...),
+    ApiBackend::Responses => stream_responses(...),
+    ApiBackend::Messages => stream_messages(...),
+}
+
+// After:
+let protocol = client.protocol();  // &dyn Protocol
+for frame in stream {
+    let event = protocol.stream.event.decode(frame)?;
+    let llm_events = protocol.stream.step(&mut state, event)?;
+    for ev in llm_events { ... }
+}
+```
+
+The `SamplingClient` gains a `protocol: ProtocolId` field and the
+`Protocol::stream.step` method is used for uniform dispatch. The three
+`stream/*.rs` modules are refactored into `Protocol` values (stateless data,
+not trait objects — they carry schema + function pointers).
+
+---
+
+## 7. Configuration
+
+### 7.1 New config.toml sections
+
+```toml
+# ── Provider configuration ────────────────────────────────────────
+# Each [provider.<id>] overrides that provider's baked-in defaults.
+
+[provider.openai]
+api_key = "sk-..."
+# base_url = "https://api.openai.com/v1"     # optional override
+# env_key = ["OPENAI_API_KEY"]                # optional override
+# extra_headers = { "Custom-Header" = "value" }
+
+[provider.opencode]
+# no api_key → free models only, apiKey="public"
+# with api_key → all models available
+# env_key = ["OPENCODE_API_KEY"]
+
+[provider.ollama]
+base_url = "http://localhost:11434/v1"        # override default
+
+# ── Provider-based model shortcuts ────────────────────────────────
+# The [provider.*] sections automatically inject [model.*] entries.
+# You can still override individual models explicitly:
+
+[model.gpt-4o]
+model = "gpt-4o"
+api_key = "sk-custom-key"                    # override provider key
+
+[model.deepseek-v4-flash-free]
+model = "deepseek-v4-flash-free"
+base_url = "https://opencode.ai/zen/v1"      # from opencode provider
+api_key = "public"                           # free-tier marker
+
+# ── Legacy xAI config (unchanged) ──────────────────────────────────
+# [endpoints]
+# cli_chat_proxy_base_url = "..."
+# xai_api_base_url = "..."
+```
+
+### 7.2 Auto-detection from CLI
+
+```bash
+# Explicit provider selection
+grok --provider openai --api-key sk-...
+
+# Auto-detect from base URL + API key
+grok --api-key sk-... --base-url https://api.openai.com/v1
+# → detects "openai", loads defaults
+
+# Minimal: just the API key
+grok --api-key sk-...
+# → checks base_url from env or defaults to xAI
+
+# Zero config (no credentials)
+grok
+# → checks session token → xAI OAuth → fallback to default (xAI)
+```
+
+---
+
+## 8. Backward Compatibility
+
+| Existing feature | Compatibility strategy |
+|---|---|
+| `grok login` (xAI OAuth) | Preserved. `XaiProvider` includes full OAuth flow. |
+| `XAI_API_KEY` env var | Retroactively detected by `OpenAICompatibleProvider` as generic fallback. |
+| `[endpoints]` config | Preserved for xAI endpoint overrides. |
+| `[model.*]` config | Highest priority, unchanged semantics. |
+| `default_models.json` | Still loaded as fallback when no provider matches. |
+| `grok-4*` model references | Resolved via xAI provider's known models. |
+| `[models].default = "grok-build"` | Still works; resolves via xAI provider. |
+| ACP protocol (pager ↔ shell) | Unchanged. Pager continues to receive model list via ACP. |
+
+### Feature gating
+
+When no xAI-specific features are needed, the following are automatically disabled:
+
+| Feature | Condition | Behavior |
+|---------|-----------|----------|
+| OAuth token refresh | Provider is not xAI | Skipped |
+| `x-grok-*` headers | Provider is not xAI | Not injected |
+| `x_search` raw tools | Provider is not xAI | Removed from body |
+| Doom-loop recovery | Provider is not xAI | Disabled |
+| `inject_url_derived_headers()` | URL is not cli-chat-proxy | No-op |
+| Remote model prefetch | Provider is not xAI | Skipped (unless explicitly configured) |
+| Sentry/telemetry | Provider is not xAI | Can be disabled via config |
+
+---
+
+## 9. Provider Registration Flow
+
+```
+Startup
+  │
+  ├── 1. Load config.toml
+  │      ├── parse [model.*] sections
+  │      ├── parse [provider.*] sections
+  │      └── parse [endpoints] (legacy)
+  │
+  ├── 2. Initialize ProviderRegistry
+  │      ├── register built-in Provider: xai
+  │      ├── register built-in Provider: openai
+  │      ├── register built-in Provider: anthropic
+  │      ├── register built-in Provider: opencode
+  │      ├── register built-in Provider: ollama
+  │      └── register built-in Provider: openai-compatible
+  │
+  ├── 3. Merge user [provider.*] configs
+  │      for each configured provider:
+  │        provider.configure(config_overrides) → ConfiguredProvider
+  │        ConfiguredProvider.route is composed from:
+  │          protocol (reused, shared)
+  │          + endpoint (base_url from config or baked-in)
+  │          + auth   (inline → env → none, composed via .or_else())
+  │          + framing (SseFraming for all HTTP providers)
+  │        known_models injected into model catalog as Model values
+  │
+  ├── 4. Detect from CLI flags
+  │      if --provider: use that provider
+  │      if --api-key + --base-url: auto-detect provider from URL
+  │      if only --api-key: use default provider (xAI)
+  │
+  ├── 5. Build final model catalog
+  │      merge: user [model.*] > prefetched > provider model defaults
+  │      each entry is a Model { id, provider, route, defaults }
+  │
+  └── 6. Start session
+         selected Model → route.auth.apply() → resolve credentials
+         → build SamplerConfig { base_url, protocol_id, extra_headers }
+         → SamplingClient executes Protocol.step for each frame
+```
+
+---
+
+## 10. Example Provider Implementation
+
+```rust
+// crates/codegen/xai-grok-provider/src/providers/openai.rs
+
+use super::*;
+
+pub const PROVIDER_ID: ProviderId = ProviderId(ProviderId::OPENAI);
+pub const BASE_URL: &str = "https://api.openai.com/v1";
+pub const PATH: &str = "/chat/completions";
+
+/// Protocol reference — the same ChatCompletionsProtocol is shared by all
+/// OpenAI-compatible providers (DeepSeek, Groq, Together, etc.).
+pub const PROTOCOL_ID: ProtocolId = ProtocolId::CHAT_COMPLETIONS;
+
+pub fn known_models() -> Vec<ProviderModelDef> {
+    vec![
+        ProviderModelDef {
+            id: "gpt-4o".into(),
+            model: "gpt-4o-2024-11-20".into(),
+            name: "GPT-4o".into(),
+            description: Some("High-intelligence flagship model".into()),
+            context_window: NonZeroU64::new(128_000).unwrap(),
+            api_backend: None,
+            hidden: false,
+        },
+        ProviderModelDef {
+            id: "gpt-4o-mini".into(),
+            model: "gpt-4o-mini".into(),
+            name: "GPT-4o Mini".into(),
+            context_window: NonZeroU64::new(128_000).unwrap(),
+            ..Default::default()
+        },
+    ]
+}
+
+pub struct OpenAIProvider;
+
+impl Provider for OpenAIProvider {
+    fn id(&self) -> &ProviderId { &PROVIDER_ID }
+    fn name(&self) -> &str { "OpenAI" }
+
+    fn defaults(&self) -> &ProviderDefaults {
+        &ProviderDefaults {
+            id: PROVIDER_ID.clone(),
+            name: "OpenAI".into(),
+            base_url: BASE_URL.into(),
+            api_backend: ApiBackend::ChatCompletions,
+            auth_scheme: AuthScheme::Bearer,
+            context_window: NonZeroU64::new(128_000).unwrap(),
+            temperature: Some(0.7),
+            top_p: Some(0.95),
+            max_completion_tokens: Some(8192),
+            supports_reasoning_effort: true,
+            supports_streaming: true,
+            supports_tool_calling: true,
+            ..Default::default()
+        }
+    }
+
+    fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
+        // Build auth chain: inline key → env var → none
+        let auth = Credential::optional(overrides.api_key, "api_key")
+            .or_else(Credential::config("OPENAI_API_KEY"))
+            .bearer();
+
+        // Compose the Route: protocol + endpoint + auth + framing
+        let route = Route::make(RouteInput {
+            id: "openai-chat",
+            provider: Some(PROVIDER_ID.clone()),
+            protocol: PROTOCOL_ID,
+            endpoint: Endpoint {
+                base_url: overrides.base_url.or(Some(BASE_URL.into())),
+                path: EndpointPart::Static(PATH.into()),
+                query: None,
+            },
+            auth: Some(auth),
+            framing: Box::new(SseFraming),
+            defaults: Some(RouteDefaultsInput {
+                generation: Some(GenerationOptions {
+                    temperature: Some(0.7),
+                    max_tokens: Some(8192),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+        });
+
+        ConfiguredProvider {
+            id: PROVIDER_ID.clone(),
+            route,
+            model: |model_id, route| Model::make(ModelInput {
+                id: model_id.into(),
+                provider: PROVIDER_ID.clone(),
+                route: route.clone(),
+                defaults: None,
+            }),
+            configure: |c| self.configure(c),
+        }
+    }
+
+    fn known_models(&self) -> &[ProviderModelDef] {
+        &known_models()
+    }
+}
+```
+
+### Anthropic Provider — Auth Chaining Pattern
+
+Anthropic uses `x-api-key` header instead of Bearer, demonstrating the
+composable auth pattern:
+
+```rust
+fn anthropic_auth(api_key: Option<String>) -> Box<dyn AuthFn> {
+    Credential::optional(api_key, "api_key")
+        .or_else(Credential::config("ANTHROPIC_API_KEY"))
+        .header("x-api-key")   // ← render as header, not Bearer
+}
+```
+
+The Anthropic route has one extra default header:
+
+```rust
+route.with({
+    auth: anthropic_auth(overrides.api_key),
+    endpoint: { base_url: "https://api.anthropic.com/v1" },
+    defaults: {
+        headers: { "anthropic-version": "2023-06-01" },
+    },
+})
+
+---
+
+## 11. Boundary Conditions
+
+### 11.1 What if no provider matches?
+
+If `--provider` is set to an unknown ID, startup fails with a clear error listing
+available providers. Unknown model IDs in `[model.*]` config fall back to a
+generic `ModelEntry` with the user-specified `base_url` (if any) or the default
+xAI endpoint.
+
+### 11.2 What if both [provider.*] and [model.*] configure the same model?
+
+`[model.*]` always wins — it is the highest-priority layer. Provider defaults only
+fill in fields not explicitly set by the user.
+
+### 11.3 What about streaming vs non-streaming?
+
+All providers support streaming. The `Protocol.stream.step()` function handles both
+modes. Non-streaming requests use `collect_response()` which drains the stream and
+assembles the final `ConversationResponse`.
+
+### 11.4 Provider-specific capabilities
+
+The `ProviderDefaults` struct carries capability flags (`supports_tool_calling`,
+`supports_structured_output`, etc.) that the session actor checks before
+enabling features. When a capability is unsupported, the system degrades gracefully
+(e.g. structured output falls back to tool-based generation).
+
+### 11.5 New providers from config
+
+Users can define entirely new providers without code changes by using the
+`openai-compatible` provider type, which accepts arbitrary `base_url`, `api_key`,
+and model definitions in config.toml.
+
+---
+
+## 12. Key Design Decisions from OpenCode
+
+The architecture above is informed by studying OpenCode's model adapter layer at
+`packages/llm/src/`. The following patterns proved most impactful:
+
+| Pattern | OpenCode Idiom | Grok Build Equivalent |
+|---------|---------------|---------------------- |
+| **Protocol reuse** | One `OpenAIChat.protocol` shared by 20+ providers | `ProtocolId::ChatCompletions` reused by OpenAI, DeepSeek, Groq, Together, etc. |
+| **Values over registries** | `Route.make({...})` returns a value, registers nothing globally | `Route::make(...)` returns a `Route` struct; `ProviderRegistry` is explicit |
+| **Auth chaining** | `Auth.optional(key).orElse(Auth.config("ENV")).bearer()` | `Credential::optional(k).or_else(Credential::config("E")).bearer()` |
+| **Immutable patching** | `route.with({ auth, endpoint, ... })` returns new route | `Route::with(self, patch) -> Route` |
+| **4-axis composition** | `Route = Protocol + Endpoint + Auth + Framing` | Same 4-axis composition |
+| **Request-level HTTP overlay** | `http.body`/`http.headers`/`http.query` with protocol-field denylist | `HttpOptions` with denylist for protocol-owned fields |
+| **M:N protocol-to-provider** | One protocol → many providers; one provider → many protocols | `OpenAIProvider` exposes both `ChatCompletions` and `Responses` routes |
+| **Provider facade** | `configure({apiKey})` returns `{ id, model, configure }` | `Provider::configure()` returns `ConfiguredProvider` |
+
+## 13. File Map
+
+```
+crates/codegen/xai-grok-provider/          [NEW]
+├── Cargo.toml
+├── src/
+│   ├── lib.rs                             # Re-exports
+│   ├── types.rs                           # ProviderId, ProviderDefaults, ProviderModelDef
+│   ├── provider.rs                        # Provider trait, ConfiguredProvider
+│   ├── registry.rs                        # ProviderRegistry
+│   ├── route.rs                           # Route, RouteInput, RoutePatch
+│   ├── endpoint.rs                        # Endpoint, EndpointPart, EndpointInput
+│   ├── framing.rs                         # Framing trait, SseFraming
+│   ├── auth.rs                            # Credential, AuthFn, chaining helpers
+│   ├── model.rs                           # Model, ModelDefaults, ModelLimits
+│   ├── events.rs                          # LLMEvent, Usage, FinishReason
+│   ├── protocol.rs                        # Protocol, ProtocolBody, ProtocolStream
+│   ├── config.rs                          # ProviderConfig deserialization
+│   └── providers/
+│       ├── mod.rs                         # register_all()
+│       ├── xai.rs                         # XaiProvider (OAuth, x-grok-* headers)
+│       ├── openai.rs                      # OpenAIProvider (Chat + Responses)
+│       ├── anthropic.rs                   # AnthropicProvider (Messages, x-api-key)
+│       ├── opencode.rs                    # OpenCodeProvider (Zen gateway)
+│       ├── ollama.rs                      # OllamaProvider (local, no auth)
+│       └── openai_compatible.rs           # Generic provider + profiles
+
+crates/codegen/xai-grok-sampler/           [MODIFIED]
+├── src/
+│   ├── protocol.rs                        # NEW: Protocol value definitions
+│   ├── client.rs                          # MODIFIED: uses Protocol from Route
+│   ├── config.rs                          # MODIFIED: SamplerConfig gains protocol_id
+│   ├── protocols/                         # [NEW] Protocol values (stateless data)
+│   │   ├── mod.rs
+│   │   ├── chat_completions.rs            # REFACTORED from stream/*
+│   │   ├── responses.rs                   # REFACTORED from stream/*
+│   │   └── messages.rs                    # REFACTORED from stream/*
+│   └── actor/
+│       └── request_task.rs                # MODIFIED: Protocol.step dispatch
+
+crates/codegen/xai-grok-shell/src/         [MODIFIED]
+├── agent/
+│   └── config.rs                          # MODIFIED: Route-based model resolution
+├── auth/
+│   ├── manager.rs                         # MODIFIED: wrapped by XaiProvider
+│   └── credential_provider.rs             # MODIFIED: adapts to AuthFn
+└── session/
+    └── acp_session_impl/
+        └── sampler_turn.rs                # MODIFIED: uses Route from Model
+
+crates/codegen/xai-grok-models/
+└── default_models.json                    # MODIFIED: embeds provider sections
