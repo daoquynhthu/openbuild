@@ -9,6 +9,8 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use tokio::task::spawn_blocking;
+
 pub(crate) const FS_SYSCALL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Async symlink-resolved path or the input path on failure/timeout.
@@ -17,16 +19,25 @@ pub(crate) const FS_SYSCALL_TIMEOUT: Duration = Duration::from_secs(30);
 /// `dunce::simplified` so Windows callers never see verbatim `\\?\` paths.
 #[tracing::instrument(name = "fs.canonicalize", skip_all, fields(result))]
 pub async fn canonicalize_with_timeout(path: PathBuf) -> PathBuf {
-    // dunce-simplified below — blessed wrapper
-    #[allow(clippy::disallowed_methods)]
-    match tokio::time::timeout(FS_SYSCALL_TIMEOUT, tokio::fs::canonicalize(&path)).await {
-        Ok(Ok(canonical)) => {
+    let path2 = path.clone();
+    match tokio::time::timeout(
+        FS_SYSCALL_TIMEOUT,
+        spawn_blocking(move || dunce::canonicalize(&path2)),
+    )
+    .await
+    {
+        Ok(Ok(Ok(canonical))) => {
             tracing::Span::current().record("result", "ok");
             dunce::simplified(&canonical).to_path_buf()
         }
-        Ok(Err(e)) => {
+        Ok(Ok(Err(e))) => {
             tracing::Span::current().record("result", "error");
             tracing::debug!(error = %e, "canonicalize failed, using original path");
+            path
+        }
+        Ok(Err(_join_err)) => {
+            tracing::Span::current().record("result", "panic");
+            tracing::error!("canonicalize task panicked, using original path");
             path
         }
         Err(_elapsed) => {
@@ -51,10 +62,10 @@ pub async fn canonicalize_with_timeout(path: PathBuf) -> PathBuf {
 /// `\\?\` paths. Deliberately no timeout: a synthetic TimedOut error would
 /// change the `ErrorKind`-matching semantics at call sites.
 pub(crate) async fn try_canonicalize(path: &Path) -> std::io::Result<PathBuf> {
-    // dunce-simplified below — blessed wrapper
-    #[allow(clippy::disallowed_methods)]
-    tokio::fs::canonicalize(path)
+    let owned = path.to_owned();
+    spawn_blocking(move || dunce::canonicalize(&owned))
         .await
+        .unwrap_or_else(|_| Err(std::io::Error::other("canonicalize task panicked")))
         .map(|p| dunce::simplified(&p).to_path_buf())
 }
 

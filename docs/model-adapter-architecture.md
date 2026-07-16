@@ -526,6 +526,7 @@ impl Credential {
 pub struct ProviderRegistry {
     providers: RwLock<HashMap<ProviderId, Arc<dyn Provider>>>,
     routes: RwLock<HashMap<String, Arc<Route>>>,
+    configs: RwLock<HashMap<ProviderId, ProviderConfig>>,
 }
 
 impl ProviderRegistry {
@@ -544,6 +545,19 @@ impl ProviderRegistry {
         id: &ProviderId,
         overrides: ProviderConfig,
     ) -> Option<ConfiguredProvider>;
+
+    /// Persist a ProviderConfig so it can be queried later (e.g. when
+    /// building ModelEntry items from provider-known models).
+    pub fn store_config(&self, id: &ProviderId, config: ProviderConfig);
+
+    /// Retrieve the last-stored configuration for a provider, if any.
+    pub fn get_config(&self, id: &ProviderId) -> Option<ProviderConfig>;
+
+    /// Register a resolved Route under a string key (typically its id).
+    pub fn register_route(&self, id: impl Into<String>, route: Route);
+
+    /// Look up a previously-registered Route by key.
+    pub fn get_route(&self, id: &str) -> Option<Arc<Route>>;
 
     /// Auto-detect provider from base URL patterns:
     ///   api.x.ai         → xai

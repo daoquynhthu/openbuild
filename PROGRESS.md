@@ -291,3 +291,21 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 - `cargo clippy -p xai-grok-provider -p xai-grok-sampler` — 零警告 ✅
 - `cargo fmt --all --check` — 通过 ✅
 - 修改 14 个文件（route.rs, auth.rs, framing.rs, 6 个 provider, types.rs x2, client.rs, provider_adapter.rs, ISSUE.md, PROGRESS.md）
+
+---
+
+## Round 2 Fix Batch: C13/C16/C18 — 2026-07-17
+
+### 完成内容
+- **C13** (Critical): `docs/model-adapter-architecture.md` §4 补充 `ProviderRegistry` 的 `configs` 字段和 `store_config()`/`get_config()`/`register_route()`/`get_route()` 四个方法
+- **C16** (Critical): Ollama provider `known_models` 从空扩展到 3 个示例模型（`llama3.1`, `codellama`, `deepseek-coder`）
+- **C18** (Critical): 4 处 `tokio::fs::canonicalize` 替换为 `spawn_blocking + dunce::canonicalize`（`xai-grok-tools/src/util/fs.rs` 2 处 + `xai-grok-workspace/src/handle.rs` 2 处）
+- **C17** (Critical): 标记为 `-Deferred` — 需与 M45/C19/C21 认证栈统一方案时一并处理
+- 更新 `ISSUE.md` 标记 C13/C16/C18 为 `-Fixed`，C17 为 `-Deferred`
+- 更新 `docs/model-adapter-architecture.md` 补充 ProviderRegistry 文档
+
+### 关键结果
+- `cargo check -p xai-grok-provider -p xai-grok-tools -p xai-grok-workspace` — 通过 ✅
+- `cargo clippy -p xai-grok-provider -p xai-grok-tools -p xai-grok-workspace -- -D warnings` — 零警告 ✅
+- `cargo test -p xai-grok-provider` — 66/66 ✅
+- 修改 5 个文件（ollama.rs, fs.rs, handle.rs, model-adapter-architecture.md, ISSUE.md），新增 PROGRESS.md 条目

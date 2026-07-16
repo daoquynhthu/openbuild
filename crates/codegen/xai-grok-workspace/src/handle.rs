@@ -1645,10 +1645,15 @@ impl WorkspaceHandle {
     }
     /// Canonicalize a confinement root directory.
     async fn canonicalize_root_dir(root: &std::path::Path) -> WorkspaceResult<PathBuf> {
-        #[allow(clippy::disallowed_methods)]
-        let canonical = tokio::fs::canonicalize(root).await.map_err(|e| {
-            WorkspaceError::HubError(format!("failed to canonicalize workspace root: {e}"))
-        })?;
+        let root = root.to_owned();
+        let canonical = tokio::task::spawn_blocking(move || dunce::canonicalize(&root))
+            .await
+            .map_err(|join_err| {
+                WorkspaceError::HubError(format!("canonicalize task panicked: {join_err}"))
+            })?
+            .map_err(|e| {
+                WorkspaceError::HubError(format!("failed to canonicalize workspace root: {e}"))
+            })?;
         Ok(dunce::simplified(&canonical).to_path_buf())
     }
     /// Resolve a caller-provided path safely. Accepts a path relative to the
@@ -1710,9 +1715,9 @@ impl WorkspaceHandle {
         let mut symlink_hops = 0usize;
         let mut check_path = normalized.clone();
         loop {
-            #[allow(clippy::disallowed_methods)]
-            match tokio::fs::canonicalize(&check_path).await {
-                Ok(canonical) => {
+            let cp = check_path.clone();
+            match tokio::task::spawn_blocking(move || dunce::canonicalize(&cp)).await {
+                Ok(Ok(canonical)) => {
                     let canonical = dunce::simplified(&canonical).to_path_buf();
                     if !canonical.starts_with(canonical_root) {
                         return Err(WorkspaceError::HubError(format!(
@@ -1721,7 +1726,7 @@ impl WorkspaceHandle {
                     }
                     break;
                 }
-                Err(e)
+                Ok(Err(e))
                     if e.kind() == std::io::ErrorKind::NotFound
                         || e.kind() == std::io::ErrorKind::NotADirectory =>
                 {
@@ -1761,9 +1766,14 @@ impl WorkspaceHandle {
                         }
                     }
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     return Err(WorkspaceError::HubError(format!(
                         "failed to verify path containment: {e}"
+                    )));
+                }
+                Err(join_err) => {
+                    return Err(WorkspaceError::HubError(format!(
+                        "canonicalize task panicked: {join_err}"
                     )));
                 }
             }

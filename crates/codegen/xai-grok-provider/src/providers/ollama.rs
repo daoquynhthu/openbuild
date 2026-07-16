@@ -28,7 +28,38 @@ fn ollama_defaults() -> ProviderDefaults {
         supports_tool_calling: true,
         supports_structured_output: false,
         extra_headers: Default::default(),
-        known_models: vec![],
+        known_models: vec![
+            ProviderModelDef {
+                id: "llama3.1".into(),
+                model: "llama3.1".into(),
+                name: "Llama 3.1".into(),
+                description: Some("Meta's Llama 3.1 8B, 70B, and 405B".into()),
+                context_window: NonZeroU64::new(128_000).expect("128_000 is non-zero"),
+                hidden: false,
+                api_backend: None,
+                supports_reasoning_effort: None,
+            },
+            ProviderModelDef {
+                id: "codellama".into(),
+                model: "codellama".into(),
+                name: "Code Llama".into(),
+                description: Some("Meta's Code Llama 34B specialized for code".into()),
+                context_window: NonZeroU64::new(16_000).expect("16_000 is non-zero"),
+                hidden: false,
+                api_backend: None,
+                supports_reasoning_effort: None,
+            },
+            ProviderModelDef {
+                id: "deepseek-coder".into(),
+                model: "deepseek-coder".into(),
+                name: "DeepSeek Coder".into(),
+                description: Some("DeepSeek Coder 33B for code generation".into()),
+                context_window: NonZeroU64::new(16_000).expect("16_000 is non-zero"),
+                hidden: false,
+                api_backend: None,
+                supports_reasoning_effort: None,
+            },
+        ],
     }
 }
 

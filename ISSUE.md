@@ -310,17 +310,17 @@
 
 - **C12** `xai-grok-provider/src/route.rs:48-49` — `Route` 使用 `Arc<dyn AuthFn>` 和 `Arc<dyn Framing>` 而非 Arch §3.4 要求的 `Box<dyn ...>`. `Arc` 表示共享所有权 (可在 `Route::with` 的 `Clone` 中重用), 但 Arch 签约为 `Box` 表示所有权转移。实际行为兼容, 但接口契约偏离 -Fixed
 
-- **C13** `xai-grok-provider/src/registry.rs:13-16` — `ProviderRegistry` 包含 Arch §4 未指定的 `configs: RwLock<HashMap<ProviderId, ProviderConfig>>` 字段及 `store_config()`/`get_config()`/`register_route()`/`get_route()` 四个额外方法。功能上必要, 但公开 API 面与文档差异
+- **C13** `xai-grok-provider/src/registry.rs:13-16` — `ProviderRegistry` 包含 Arch §4 未指定的 `configs: RwLock<HashMap<ProviderId, ProviderConfig>>` 字段及 `store_config()`/`get_config()`/`register_route()`/`get_route()` 四个额外方法。功能上必要, 但公开 API 面与文档差异 -Fixed
 
 - **C14** `xai-grok-provider/src/providers/openai.rs:32-53` — 仅定义 2 个已知模型 (`gpt-4o`, `gpt-4o-mini`), Arch §5.2 要求 6 个 (`gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini`)。缺少 4 个模型 -Fixed
 
 - **C15** `xai-grok-provider/src/providers/ollama.rs:19` — `auth_scheme: AuthScheme::Bearer`. Arch §5.5 要求 `None`。Ollama 不需要认证, 声明 Bearer scheme 会导致上游代码添加空的 `Authorization: Bearer` 头 -Fixed
 
-- **C16** `xai-grok-provider/src/providers/ollama.rs:31` — `known_models: vec![]`. Arch §5.5 至少列出 3 个示例模型 (`llama3.1`, `codellama`, `deepseek-coder`)
+- **C16** `xai-grok-provider/src/providers/ollama.rs:31` — `known_models: vec![]`. Arch §5.5 至少列出 3 个示例模型 (`llama3.1`, `codellama`, `deepseek-coder`) -Fixed
 
-- **C17** `xai-grok-provider/src/auth.rs:5-11` — `AuthInput` 所有字段为 owned `String` (request, method, url, body), Arch §3.9 要求引用类型 (`&LLMRequest`, `&str`)。认证系统无法检查结构化请求, 阻碍上下文感知凭据解析 (同 M36)
+- **C17** `xai-grok-provider/src/auth.rs:5-11` — `AuthInput` 所有字段为 owned `String` (request, method, url, body), Arch §3.9 要求引用类型 (`&LLMRequest`, `&str`)。认证系统无法检查结构化请求, 阻碍上下文感知凭据解析 (同 M36) -Deferred (see audit C17 report: route.auth.apply() never called in production; to be bundled with M45/C19/C21 auth stack unification)
 
-- **C18** `crates/codegen/xai-grok-workspace/src/handle.rs:1649,1714` + `crates/codegen/xai-grok-tools/src/util/fs.rs:22,56` — 使用 `tokio::fs::canonicalize`, 违反 AGENTS.md §3.6 禁止模式。需替换为 `spawn_blocking + dunce::canonicalize`
+- **C18** `crates/codegen/xai-grok-workspace/src/handle.rs:1649,1714` + `crates/codegen/xai-grok-tools/src/util/fs.rs:22,56` — 使用 `tokio::fs::canonicalize`, 违反 AGENTS.md §3.6 禁止模式。需替换为 `spawn_blocking + dunce::canonicalize` -Fixed
 
 - **C19** 跨 crate — `ApiBackend` 枚举在 `xai-grok-provider/src/types.rs:37-42` 和 `xai-grok-sampling-types/src/types.rs:1013-1021` 重复定义。`AuthScheme` 枚举在 `xai-grok-provider/src/types.rs:47-51` 和 `xai-grok-sampler/src/config.rs:20-24` 重复定义。添加变体须同步更新两处, 编译器无帮助。shell 靠 `to_api_backend()`/`to_auth_scheme()` 手工桥接 (config.rs:3337-3353)
 
