@@ -31,8 +31,7 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
         let Some(provider) = registry.get(&pid) else {
             continue;
         };
-        let env_keys = provider.defaults().env_key.clone();
-        for env_key in &env_keys {
+        for env_key in &provider.defaults().env_key {
             if let Ok(val) = std::env::var(env_key) {
                 result.entry(pid.0.clone()).or_insert_with(|| ProviderConfig {
                     id: Some(pid.0.clone()),

@@ -34,11 +34,13 @@ pub enum ProvidersView {
 /// State for the Providers modal.
 pub struct ProvidersModalState {
     pub window: mw::ModalWindowState,
-    pub selected: usize,
-    pub scroll_offset: usize,
-    pub providers: Vec<ProviderEntry>,
-    pub mode: ProvidersView,
+    selected: usize,
+    scroll_offset: usize,
+    providers: Vec<ProviderEntry>,
+    mode: ProvidersView,
 }
+
+const VISIBLE_ROWS: usize = 8;
 
 impl Default for ProvidersModalState {
     fn default() -> Self {
@@ -147,6 +149,7 @@ fn builtin_providers() -> Vec<ProviderEntry> {
 pub enum ProvidersKeyOutcome {
     Close,
     Changed,
+    Unchanged,
 }
 
 fn open_detail(state: &mut ProvidersModalState) {
@@ -208,7 +211,7 @@ fn handle_list_key(
             state.selected = state.providers.len().saturating_sub(1);
             ProvidersKeyOutcome::Changed
         }
-        _ => ProvidersKeyOutcome::Changed,
+        _ => ProvidersKeyOutcome::Unchanged,
     }
 }
 
@@ -266,16 +269,15 @@ fn handle_detail_key(
             state.mode = ProvidersView::List;
             ProvidersKeyOutcome::Changed
         }
-        _ => ProvidersKeyOutcome::Changed,
+        _ => ProvidersKeyOutcome::Unchanged,
     }
 }
 
 fn adjust_scroll(state: &mut ProvidersModalState) {
-    let visible = 8usize;
     if state.selected < state.scroll_offset {
         state.scroll_offset = state.selected;
-    } else if state.selected >= state.scroll_offset + visible {
-        state.scroll_offset = state.selected + 1 - visible;
+    } else if state.selected >= state.scroll_offset + VISIBLE_ROWS {
+        state.scroll_offset = state.selected + 1 - VISIBLE_ROWS;
     }
 }
 
@@ -423,9 +425,7 @@ fn render_detail(
         return;
     };
 
-    let mut y = content.content.y;
-
-    // API Key field
+    let mut render_y = content.content.y;
     let field_label = "API Key:";
     let display_val = if show_api_key {
         api_key_str.clone()
@@ -434,15 +434,13 @@ fn render_detail(
     } else {
         "\u{25cf}".repeat(api_key_str.len().min(20))
     };
-    render_field(buf, content.inner_x, y, content.inner_width, field_label, &display_val, focused_field == 0, theme);
-    y += 1;
+    render_field(buf, content.inner_x, render_y, content.inner_width, field_label, &display_val, focused_field == 0, theme);
+    render_y += 1;
 
-    // Base URL field
     let field_label = "Base URL:";
-    render_field(buf, content.inner_x, y, content.inner_width, field_label, &base_url_str, focused_field == 1, theme);
-    y += 1;
+    render_field(buf, content.inner_x, render_y, content.inner_width, field_label, &base_url_str, focused_field == 1, theme);
+    render_y += 1;
 
-    // Status field (read-only)
     let field_label = "Status:";
     let status_style = Style::default().fg(provider.status_color);
     let status_line = Line::from(vec![
@@ -452,10 +450,9 @@ fn render_detail(
         ),
         ratatui::text::Span::styled(provider.status, status_style),
     ]);
-    status_line.render(Rect::new(content.inner_x, y, content.inner_width, 1), buf);
-    y += 1;
+    status_line.render(Rect::new(content.inner_x, render_y, content.inner_width, 1), buf);
+    render_y += 1;
 
-    // Endpoint field (read-only)
     let endpoint_line = Line::from(vec![
         ratatui::text::Span::styled(
             "  Endpoint:  ",
@@ -466,16 +463,15 @@ fn render_detail(
             Style::default().fg(theme.gray_bright),
         ),
     ]);
-    endpoint_line.render(Rect::new(content.inner_x, y, content.inner_width, 1), buf);
-    y += 1;
+    endpoint_line.render(Rect::new(content.inner_x, render_y, content.inner_width, 1), buf);
+    render_y += 1;
 
-    // Hint text
     let hint = Line::styled(
         "Tab to switch fields  \u{2022}  Ctrl+R to toggle API key visibility  \u{2022}  Enter to save",
         Style::default().fg(theme.gray_dim),
     );
     hint.render(
-        Rect::new(content.inner_x, y + 1, content.inner_width, 1),
+        Rect::new(content.inner_x, render_y + 1, content.inner_width, 1),
         buf,
     );
 }

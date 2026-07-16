@@ -17,6 +17,7 @@ impl std::fmt::Debug for AuthManagerAsAuthFn {
 }
 
 impl AuthManagerAsAuthFn {
+    /// Wrap an [`AuthManager`] as an [`AuthFn`] for use in the provider route chain.
     pub fn new(auth_manager: Arc<AuthManager>) -> Self {
         Self { auth_manager }
     }

@@ -51,7 +51,7 @@ impl<Body> Endpoint<Body> {
             EndpointPart::Dynamic(f) => f(input),
         };
         let mut url = Url::parse(&format!("{base}{path}")).unwrap_or_else(|_| {
-            Url::parse("http://localhost/").unwrap()
+            Url::parse("http://localhost/").expect("http://localhost/ is a valid URL")
         });
         if let Some(query) = &self.query {
             for (k, v) in query {

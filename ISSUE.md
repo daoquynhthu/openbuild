@@ -206,25 +206,25 @@
 
 ### 中等
 
-- **M22** `views/providers_modal.rs:408,420,425,438,452,465,478,483` — 8 处注释违反 AGENTS.md §3.1 "不要添加注释，代码应是自解释的"
+- **M22** `views/providers_modal.rs:408,420,425,438,452,465,478,483` — 8 处注释违反 AGENTS.md §3.1 "不要添加注释，代码应是自解释的" -Fixed
 
-- **M23** `views/providers_modal.rs:127-130,191,249` — `ProvidersKeyOutcome` 缺少 `Unchanged` 变体；`_ => Changed` 导致未处理按键时仍触发重渲染
+- **M23** `views/providers_modal.rs:127-130,191,249` — `ProvidersKeyOutcome` 缺少 `Unchanged` 变体；`_ => Changed` 导致未处理按键时仍触发重渲染 -Fixed
 
-- **M24** `views/providers_modal.rs:253` — `adjust_scroll()` 硬编码 `8` 为可见行数，应为具名常量
+- **M24** `views/providers_modal.rs:253` — `adjust_scroll()` 硬编码 `8` 为可见行数，应为具名常量 -Fixed
 
 - **M25** `views/settings_modal.rs:5661-5752` — 测试 `rows_contain_categories_and_settings_through_pr_14` 的期望行列表缺少 `"providers"` 条目（介于 `"plan_mode"` 和 `"coding_data_sharing"` 之间），测试将失败
 
 - **M26** 多文件 — 14+ 处 `NonZeroU64::new(n).unwrap()` 在生产代码中，违反 AGENTS.md §3.6。涉及文件：`xai-grok-shell/src/agent/config.rs:3918,4640,4865`，`xai-grok-provider/src/types.rs:95`，各 provider 实现等
 
-- **M27** `xai-grok-shell/src/auth/provider_adapter.rs:20` — `pub fn new` 缺少文档注释，违反 AGENTS.md §3.3
+- **M27** `xai-grok-shell/src/auth/provider_adapter.rs:20` — `pub fn new` 缺少文档注释，违反 AGENTS.md §3.3 -Fixed
 
 - **M28** `xai-grok-shell/src/agent/auth_method.rs:280` — `.expect()` 在生产代码 `push_interactive_login()` 中，违反 AGENTS.md §3.6
 
 - **M29** `xai-grok-provider/src/registry.rs:37,45,54,61,68,76,102` — 7 处 `RwLock` 上的 `.expect("lock poisoned")` 在生产代码中，AGENTS.md §3.6 禁止 (`?` 或 `.context()`)
 
-- **M30** `views/providers_modal.rs:23-27` — `ProvidersModalState` 全部 4 个字段为 `pub`，AGENTS.md §3.3 要求默认私有。仅 `window` 需在 `modals.rs` 访问
+- **M30** `views/providers_modal.rs:23-27` — `ProvidersModalState` 全部 4 个字段为 `pub`，AGENTS.md §3.3 要求默认私有。仅 `window` 需在 `modals.rs` 访问 -Fixed
 
-- **M31** `xai-grok-provider/src/types.rs:111` + `auth.rs:3` — 重复 `pub type HeaderMap` 定义，导出时造成命名冲突
+- **M31** `xai-grok-provider/src/types.rs:111` + `auth.rs:3` — 重复 `pub type HeaderMap` 定义，导出时造成命名冲突 -Fixed
 
 ### 建议
 
@@ -252,13 +252,13 @@
 
 - **C11** 全局 — Arch §8 的 `ProtocolTable` 在 `xai-grok-sampler` 中仅含 18 行 ID 常量 + 映射函数，无 `Protocol<Body,Frame,Event,State>` 值结构体。`xai-grok-provider/src/protocol.rs:66-88` 的 `ProtocolTable` 仅存字符串 ID，从未被实际协议值填充。需要架构变更，推迟到 Phase 7
 
-- **M32** `xai-grok-provider/src/endpoint.rs:54` — `Url::parse("http://localhost/").unwrap()` 在 `Endpoint::default_base_url()` 中（生产代码），违反 AGENTS.md §3.6
+- **M32** `xai-grok-provider/src/endpoint.rs:54` — `Url::parse("http://localhost/").unwrap()` 在 `Endpoint::default_base_url()` 中（生产代码），违反 AGENTS.md §3.6 -Fixed
 
-- **M33** `xai-grok-provider/src/providers/openai_compatible.rs:13` — `#[allow(dead_code)]` 在 `pub fn profile_base_url()` 上，函数声明为 `pub` 但无调用者，应移除或降为 `pub(crate)`
+- **M33** `xai-grok-provider/src/providers/openai_compatible.rs:13` — `#[allow(dead_code)]` 在 `pub fn profile_base_url()` 上，函数声明为 `pub` 但无调用者，应移除或降为 `pub(crate)` -Fixed
 
 - **M34** 全局 — Arch §5.2 要求 OpenAI 支持 ChatCompletions + Responses 双 Route，当前实现仅单 Route。Arch §5.4 要求 OpenCode 动态获取模型列表（`https://opencode.ai/zen/v1/models`），当前 `known_models` 为空
 
-- **M35** `xai-grok-provider/src/providers/mod.rs:34` — `detect_env_vars()` 每次迭代克隆 `Vec<String>`，应改为引用 `&[String]`
+- **M35** `xai-grok-provider/src/providers/mod.rs:34` — `detect_env_vars()` 每次迭代克隆 `Vec<String>`，应改为引用 `&[String]` -Fixed
 
 - **M36** `xai-grok-provider/src/auth.rs:7-13` — `AuthInput` 的 `request: String`，Arch §3.9 要求 `request: &LLMRequest`。认证系统无法检查结构化请求（model/messages），阻碍上下文感知的凭据解析
 

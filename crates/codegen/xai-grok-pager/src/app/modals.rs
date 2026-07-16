@@ -413,6 +413,7 @@ impl AgentView {
                             InputOutcome::Changed
                         }
                         ProvidersKeyOutcome::Changed => InputOutcome::Changed,
+                        ProvidersKeyOutcome::Unchanged => InputOutcome::Unchanged,
                     };
                 }
                 _ => return InputOutcome::Changed,

@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-pub type HeaderMap = HashMap<String, String>;
+pub use crate::types::HeaderMap;
 
 /// Input to an AuthFn::apply call.
 #[non_exhaustive]
