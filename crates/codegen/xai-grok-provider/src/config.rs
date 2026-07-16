@@ -1,6 +1,8 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
+/// Merged configuration for a single provider.
+/// Priority order (low→high): env var → TOML config → CLI override.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct ProviderConfig {
     pub id: Option<String>,
@@ -8,6 +10,26 @@ pub struct ProviderConfig {
     pub env_key: Option<Vec<String>>,
     pub base_url: Option<String>,
     pub extra_headers: Option<IndexMap<String, String>>,
+}
+
+impl ProviderConfig {
+    /// Merge `other` on top of `self`. Non-None fields in `other` override.
+    pub fn merge(self, other: ProviderConfig) -> ProviderConfig {
+        ProviderConfig {
+            id: other.id.or(self.id),
+            api_key: other.api_key.or(self.api_key),
+            env_key: other.env_key.or(self.env_key),
+            base_url: other.base_url.or(self.base_url),
+            extra_headers: match (self.extra_headers, other.extra_headers) {
+                (Some(mut base), Some(other)) => {
+                    base.extend(other);
+                    Some(base)
+                }
+                (None, other) => other,
+                (base, None) => base,
+            },
+        }
+    }
 }
 
 /// A single `[provider.<id>]` entry from config.toml.

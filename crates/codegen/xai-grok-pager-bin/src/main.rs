@@ -895,13 +895,63 @@ async fn run_agent_command(
     let mut agent_config = AgentConfig::new_from_toml_cfg(&raw_config)
         .map_err(|e| anyhow::anyhow!("Failed to create agent config: {}", e))?;
 
-    // Initialize ProviderRegistry with built-in providers and user config.
-    let _provider_registry = {
-        let reg = xai_grok_provider::registry::ProviderRegistry::new();
+    // Initialize ProviderRegistry with built-in providers, user config,
+    // environment variables, and CLI overrides.
+    let provider_registry = {
+        let reg = std::sync::Arc::new(
+            xai_grok_provider::registry::ProviderRegistry::new(),
+        );
         xai_grok_provider::providers::register_all(&reg);
-        xai_grok_provider::providers::register_from_config(&reg, &raw_config);
+
+        // Determine which provider the CLI overrides target.
+        let cli_provider_name: Option<String> = agent_args
+            .provider
+            .clone()
+            .or_else(|| {
+                agent_args.model.as_ref().and_then(|m| {
+                    xai_grok_provider::types::parse_model_ref(m)
+                        .0
+                        .map(|p| p.0)
+                })
+            });
+
+        // Build CLI override ProviderConfig when a target provider is known.
+        let cli_override = cli_provider_name.clone().map(|provider_name| {
+            xai_grok_provider::config::ProviderConfig {
+                id: Some(provider_name),
+                api_key: agent_args.api_key.clone(),
+                base_url: agent_args.base_url.clone(),
+                ..Default::default()
+            }
+        });
+
+        // Apply all config layers: env → TOML → CLI.
+        xai_grok_provider::providers::configure_providers(&reg, &raw_config, cli_override);
         reg
     };
+
+    // Phase 5.9: Map old [endpoints] section to xAI provider config for
+    // backward compatibility. Custom base URL or alpha_test_key → xAI overrides.
+    {
+        let endpoints = &agent_config.endpoints;
+        let default_xai_url = "https://api.x.ai/v1";
+        if endpoints.xai_api_base_url != default_xai_url || endpoints.alpha_test_key.is_some() {
+            let xai_overrides = xai_grok_provider::config::ProviderConfig {
+                id: Some("xai".into()),
+                base_url: Some(endpoints.xai_api_base_url.clone()),
+                api_key: endpoints.alpha_test_key.clone(),
+                ..Default::default()
+            };
+            let xai_pid = xai_grok_provider::types::ProviderId::new("xai");
+            if let Some(cp) = provider_registry.configure(&xai_pid, xai_overrides) {
+                let route_id = cp.route.id.clone();
+                provider_registry.register_route(&route_id, cp.route);
+            }
+        }
+    }
+
+    // Thread the registry into config for downstream model resolution.
+    agent_config.provider_registry = Some(provider_registry.clone());
 
     // Parse --model for provider/model format (e.g. "openai/gpt-4o").
     // Backward compatible: bare model names (e.g. "grok-build") pass through unchanged.

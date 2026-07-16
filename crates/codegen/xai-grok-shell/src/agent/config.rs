@@ -1393,6 +1393,10 @@ pub struct Config {
     /// CLI override for provider ID (from --provider or inferred from --model).
     #[serde(skip)]
     pub provider_override: Option<String>,
+    /// Resolved provider registry with all built-in and user-configured providers.
+    /// Set during startup in main.rs, threaded through to model resolution.
+    #[serde(skip)]
+    pub provider_registry: Option<std::sync::Arc<xai_grok_provider::registry::ProviderRegistry>>,
     /// CLI override for API key (from --api-key).
     #[serde(skip)]
     pub api_key_override: Option<String>,
@@ -1756,6 +1760,7 @@ impl Default for Config {
             storage_mode: StorageMode::resolve(None, None),
             default_model_override: None,
             provider_override: None,
+            provider_registry: None,
             api_key_override: None,
             base_url_override: None,
             reasoning_effort_override: None,
