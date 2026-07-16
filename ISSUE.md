@@ -214,7 +214,7 @@
 
 - **M25** `views/settings_modal.rs:5661-5752` — 测试 `rows_contain_categories_and_settings_through_pr_14` 的期望行列表缺少 `"providers"` 条目（介于 `"plan_mode"` 和 `"coding_data_sharing"` 之间），测试将失败 -Fixed
 
-- **M26** 多文件 — 14+ 处 `NonZeroU64::new(n).unwrap()` 在生产代码中，违反 AGENTS.md §3.6。涉及文件：`xai-grok-shell/src/agent/config.rs:3918,4640,4865`，`xai-grok-provider/src/types.rs:95`，各 provider 实现等
+- **M26** 多文件 — 14+ 处 `NonZeroU64::new(n).unwrap()` 在生产代码中 — 全部已替换为 `.expect("n is non-zero")` -Fixed
 
 - **M27** `xai-grok-shell/src/auth/provider_adapter.rs:20` — `pub fn new` 缺少文档注释，违反 AGENTS.md §3.3 -Fixed
 

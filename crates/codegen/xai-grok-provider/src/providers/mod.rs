@@ -61,7 +61,7 @@ mod tests {
             api_backend: crate::types::ApiBackend::ChatCompletions,
             auth_scheme: crate::types::AuthScheme::Bearer,
             env_key: vec!["TEST_API_KEY".into()],
-            context_window: std::num::NonZeroU64::new(128_000).unwrap(),
+            context_window: std::num::NonZeroU64::new(128_000).expect("128_000 is non-zero"),
             ..Default::default()
         };
         let provider = std::sync::Arc::new(TestProvider { pid, defaults }) as crate::provider::SharedProvider;
