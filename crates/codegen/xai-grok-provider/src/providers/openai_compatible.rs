@@ -10,7 +10,8 @@ use crate::route::{Route, RouteInput};
 use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId, ProviderModelDef};
 
 /// Known OpenAI-compatible profile configurations.
-pub fn profile_base_url(profile: &str) -> Option<&'static str> {
+#[allow(dead_code)]
+pub(crate) fn profile_base_url(profile: &str) -> Option<&'static str> {
     match profile {
         "groq" => Some("https://api.groq.com/openai/v1"),
         "deepseek" => Some("https://api.deepseek.com/v1"),

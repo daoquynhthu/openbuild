@@ -5729,6 +5729,8 @@ mod tests {
                 "toolset.ask_user_question.timeout_enabled",
                 // PAGER-owned plan_mode (Agent category).
                 "plan_mode",
+                // PAGER-owned providers group (Agent category, opens modal).
+                "providers",
                 // SHELL-owned coding_data_sharing (Privacy category).
                 "coding_data_sharing",
                 // SHELL-owned default_model (Models category).
