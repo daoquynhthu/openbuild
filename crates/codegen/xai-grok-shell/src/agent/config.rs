@@ -1390,6 +1390,15 @@ pub struct Config {
     /// CLI override for the default model ID.
     #[serde(skip)]
     pub default_model_override: Option<String>,
+    /// CLI override for provider ID (from --provider or inferred from --model).
+    #[serde(skip)]
+    pub provider_override: Option<String>,
+    /// CLI override for API key (from --api-key).
+    #[serde(skip)]
+    pub api_key_override: Option<String>,
+    /// CLI override for base URL (from --base-url).
+    #[serde(skip)]
+    pub base_url_override: Option<String>,
     /// CLI override for reasoning effort.
     #[serde(skip)]
     pub reasoning_effort_override: Option<ReasoningEffort>,
@@ -1746,6 +1755,9 @@ impl Default for Config {
             diagnostics: DiagnosticsConfig::default(),
             storage_mode: StorageMode::resolve(None, None),
             default_model_override: None,
+            provider_override: None,
+            api_key_override: None,
+            base_url_override: None,
             reasoning_effort_override: None,
             web_search_model_override: None,
             session_summary_model_override: None,

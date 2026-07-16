@@ -129,6 +129,19 @@ pub enum ToolResultValue {
     Error(String),
 }
 
+/// Parse a `--model` value that may be in `provider/model` format.
+/// Returns `(Some(provider), model)` when a `/` separator is present,
+/// or `(None, model)` for bare model names (backward compatible).
+pub fn parse_model_ref(s: &str) -> (Option<ProviderId>, String) {
+    if let Some(slash_pos) = s.find('/') {
+        let provider = &s[..slash_pos];
+        let model = &s[slash_pos + 1..];
+        (Some(ProviderId::new(provider)), model.to_string())
+    } else {
+        (None, s.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::num::NonZeroU64;
@@ -208,5 +221,26 @@ mod tests {
         let json = serde_json::to_string(&def).unwrap();
         let back: ProviderModelDef = serde_json::from_str(&json).unwrap();
         assert_eq!(back.id, "gpt-4o");
+    }
+
+    #[test]
+    fn parse_model_ref_with_provider() {
+        let (provider, model) = parse_model_ref("openai/gpt-4o");
+        assert_eq!(provider.unwrap().0, "openai");
+        assert_eq!(model, "gpt-4o");
+    }
+
+    #[test]
+    fn parse_model_ref_bare() {
+        let (provider, model) = parse_model_ref("grok-build");
+        assert!(provider.is_none());
+        assert_eq!(model, "grok-build");
+    }
+
+    #[test]
+    fn parse_model_ref_multiple_slashes() {
+        let (provider, model) = parse_model_ref("anthropic/claude-sonnet-4-5");
+        assert_eq!(provider.unwrap().0, "anthropic");
+        assert_eq!(model, "claude-sonnet-4-5");
     }
 }

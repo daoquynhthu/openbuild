@@ -903,7 +903,25 @@ async fn run_agent_command(
         reg
     };
 
-    agent_config.default_model_override = agent_args.model.clone();
+    // Parse --model for provider/model format (e.g. "openai/gpt-4o").
+    // Backward compatible: bare model names (e.g. "grok-build") pass through unchanged.
+    if let Some(model_val) = &agent_args.model {
+        let (provider_from_model, _) = xai_grok_provider::types::parse_model_ref(model_val);
+        agent_config.default_model_override = Some(model_val.clone());
+        if let Some(pid) = provider_from_model {
+            agent_config.provider_override = Some(pid.0.clone());
+        }
+    }
+    // Apply explicit --provider / --api-key / --base-url to config.
+    if let Some(provider) = &agent_args.provider {
+        agent_config.provider_override = Some(provider.clone());
+    }
+    if let Some(api_key) = &agent_args.api_key {
+        agent_config.api_key_override = Some(api_key.clone());
+    }
+    if let Some(base_url) = &agent_args.base_url {
+        agent_config.base_url_override = Some(base_url.clone());
+    }
     agent_config.reasoning_effort_override = agent_args
         .reasoning_effort
         .as_deref()
