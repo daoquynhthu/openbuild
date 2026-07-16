@@ -231,9 +231,18 @@ pub struct AgentArgs {
         default_value = "false"
     )]
     pub reauthenticate: bool,
-    /// Model ID to use
+    /// Model ID to use (provider/model format, e.g. "openai/gpt-4o")
     #[arg(short = 'm', long = "model", value_name = "MODEL")]
     pub model: Option<String>,
+    /// Provider ID (e.g. "openai", "anthropic", "xai")
+    #[arg(long = "provider", value_name = "PROVIDER")]
+    pub provider: Option<String>,
+    /// API key for the provider
+    #[arg(long = "api-key", value_name = "KEY")]
+    pub api_key: Option<String>,
+    /// Base URL override for the provider
+    #[arg(long = "base-url", value_name = "URL")]
+    pub base_url: Option<String>,
     /// Reasoning effort for reasoning models
     #[clap(
         long = "reasoning-effort",
@@ -491,9 +500,18 @@ pub struct PagerArgs {
     /// Example: --json-schema '{"type":"object","properties":{"name":{"type":"string"}}}'
     #[clap(long = "json-schema", value_name = "SCHEMA")]
     pub json_schema: Option<String>,
-    /// Model ID to use.
+    /// Model ID to use (provider/model format, e.g. "openai/gpt-4o").
     #[clap(short = 'm', long = "model", value_name = "MODEL")]
     pub model: Option<String>,
+    /// Provider ID (e.g. "openai", "anthropic", "xai").
+    #[arg(long = "provider", value_name = "PROVIDER", global = true)]
+    pub provider: Option<String>,
+    /// API key for the provider.
+    #[arg(long = "api-key", value_name = "KEY", global = true)]
+    pub api_key: Option<String>,
+    /// Base URL override for the provider.
+    #[arg(long = "base-url", value_name = "URL", global = true)]
+    pub base_url: Option<String>,
     /// Reasoning effort for reasoning models
     #[clap(
         long = "reasoning-effort",

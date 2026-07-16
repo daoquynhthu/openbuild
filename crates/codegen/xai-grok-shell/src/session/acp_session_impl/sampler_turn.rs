@@ -315,6 +315,7 @@ impl SessionActor {
             temperature: cfg.temperature,
             top_p: cfg.top_p,
             api_backend: cfg.api_backend,
+            protocol_id: None,
             auth_scheme,
             extra_headers,
             context_window: cfg.context_window.get(),
