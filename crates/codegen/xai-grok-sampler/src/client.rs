@@ -313,6 +313,7 @@ struct ClientDefaults {
     temperature: Option<f32>,
     top_p: Option<f32>,
     api_backend: ApiBackend,
+    protocol_id: String,
     auth_scheme: AuthScheme,
     stream_tool_calls: bool,
     doom_loop_recovery: Option<xai_grok_sampling_types::DoomLoopRecoveryPolicy>,
@@ -525,6 +526,7 @@ impl SamplingClient {
             temperature: config.temperature,
             top_p: config.top_p,
             api_backend: config.api_backend,
+            protocol_id: config.protocol_id,
             auth_scheme: config.auth_scheme,
             stream_tool_calls: config.stream_tool_calls,
             doom_loop_recovery: config.doom_loop_recovery,
@@ -544,6 +546,15 @@ impl SamplingClient {
     /// The configured API backend for this client.
     pub fn api_backend(&self) -> ApiBackend {
         self.defaults.api_backend.clone()
+    }
+
+    pub fn protocol_id(&self) -> &str {
+        if self.defaults.protocol_id.is_empty() {
+            // Fallback to api_backend-derived protocol for backward compatibility.
+            crate::protocols::api_backend_to_protocol_id(&self.defaults.api_backend)
+        } else {
+            &self.defaults.protocol_id
+        }
     }
 
     /// POST with default headers. Overrides auth from resolver if wired.

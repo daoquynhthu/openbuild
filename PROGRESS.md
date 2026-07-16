@@ -26,6 +26,23 @@
 
 ---
 
+## Phase 2: 协议层提取 — 2026-07-16
+
+### 完成内容
+- **2.0** 添加 `xai-grok-provider` 依赖到 `xai-grok-sampler`
+- **2.1** 创建 `protocols/mod.rs` — 协议 ID 常量 + `api_backend_to_protocol_id()` 映射
+- **2.5** 添加 `protocol_id: String` 到 `SamplerConfig`，默认从 `api_backend` 派生
+- **2.6** 添加 `protocol_id()` 方法到 `SamplingClient`（含向后兼容回退）
+- **2.7** 重写 `request_task.rs` dispatch — 从 `match api_backend` 改为 `match protocol_id`，添加未知协议回退
+
+### 关键结果
+- `cargo check -p xai-grok-sampler` — 通过
+- `cargo clippy -p xai-grok-sampler -- -D warnings` — 零警告
+- 修改 5 个文件，新增 `protocols/` 模块
+- 向后兼容：`SamplingClient::api_backend()` 保留，`protocol_id` 在未设置时自动从 `api_backend` 派生
+
+---
+
 ## Phase 1: 核心类型层 — 2026-07-16
 
 ### 完成内容

@@ -19,13 +19,14 @@ use xai_grok_sampling_types::{
     error::Result as SamplingResult,
 };
 
-use crate::client::{ApiBackend, SamplingClient};
+use crate::client::SamplingClient;
 use crate::config::{RetryPolicy, SamplerConfig};
 use crate::events::{SamplingErrorInfo, SamplingErrorKind, SamplingEvent};
 use crate::metrics::InferenceLatencyStats;
 use crate::retry::{
     self as retry_mod, RetryDecision, classify_error, clone_error, resolve_max_retries,
 };
+use crate::protocols;
 use crate::stream::{stream_chat_completions, stream_messages, stream_responses};
 use crate::types::RequestId;
 
@@ -425,8 +426,8 @@ async fn run_one_attempt(
     cancel_token: &CancellationToken,
     doom_check: Option<xai_grok_sampling_types::DoomLoopRecoveryPolicy>,
 ) -> AttemptOutcome {
-    match client.api_backend() {
-        ApiBackend::ChatCompletions => {
+    match client.protocol_id() {
+        protocols::id::CHAT_COMPLETIONS => {
             let (raw, metadata) = match client.conversation_stream(request).await {
                 Ok(pair) => pair,
                 Err(e) => return AttemptOutcome::InitFailed { error: e },
@@ -435,7 +436,7 @@ async fn run_one_attempt(
             let l2 = stream_chat_completions(teed, metadata, request_id.clone(), idle_timeout);
             drive_l2(l2, request_id, event_tx, cancel_token, captured, None).await
         }
-        ApiBackend::Responses => {
+        protocols::id::RESPONSES => {
             let (raw, metadata, doom_loop) =
                 match client.conversation_stream_responses(request).await {
                     Ok(parts) => parts,
@@ -450,13 +451,23 @@ async fn run_one_attempt(
             let l2 = stream_responses(teed, metadata, request_id.clone(), idle_timeout, doom_loop);
             drive_l2(l2, request_id, event_tx, cancel_token, captured, doom_check).await
         }
-        ApiBackend::Messages => {
+        protocols::id::MESSAGES => {
             let (raw, metadata) = match client.conversation_stream_messages(request).await {
                 Ok(pair) => pair,
                 Err(e) => return AttemptOutcome::InitFailed { error: e },
             };
             let (teed, captured) = tee_errors(raw);
             let l2 = stream_messages(teed, metadata, request_id.clone(), idle_timeout);
+            drive_l2(l2, request_id, event_tx, cancel_token, captured, None).await
+        }
+        other => {
+            tracing::warn!(protocol = %other, "unknown protocol, falling back to chat_completions");
+            let (raw, metadata) = match client.conversation_stream(request).await {
+                Ok(pair) => pair,
+                Err(e) => return AttemptOutcome::InitFailed { error: e },
+            };
+            let (teed, captured) = tee_errors(raw);
+            let l2 = stream_chat_completions(teed, metadata, request_id.clone(), idle_timeout);
             drive_l2(l2, request_id, event_tx, cancel_token, captured, None).await
         }
     }
