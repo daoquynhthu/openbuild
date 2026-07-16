@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 pub type HeaderMap = HashMap<String, String>;
 
+/// Input to an AuthFn::apply call.
+#[non_exhaustive]
 pub struct AuthInput {
     pub request: String,
     pub body: String,
@@ -94,6 +96,7 @@ impl AuthFn for FailAuth {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Credential {
     Inline(Option<String>),
     Config(String),

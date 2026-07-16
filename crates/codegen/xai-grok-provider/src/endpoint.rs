@@ -3,12 +3,14 @@ use url::Url;
 
 use crate::types::LLMRequest;
 
+#[non_exhaustive]
 pub struct EndpointInput<Body> {
     pub request: LLMRequest,
     pub body: Body,
 }
 
 #[derive(Clone)]
+#[non_exhaustive]
 pub enum EndpointPart<Body> {
     Static(String),
     Dynamic(fn(&EndpointInput<Body>) -> String),
@@ -33,6 +35,7 @@ pub struct Endpoint<Body> {
 /// Partial endpoint overrides for route patching.
 /// All fields are optional — absent fields inherit from the base endpoint.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct EndpointPatch<Body> {
     pub base_url: Option<String>,
     pub path: Option<EndpointPart<Body>>,

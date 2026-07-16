@@ -7,6 +7,7 @@ use crate::model::Model;
 use crate::types::{ModelId, ProviderId};
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct RouteDefaults {
     pub headers: Option<std::collections::HashMap<String, String>>,
 }
@@ -97,6 +98,7 @@ impl Route {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct RoutePatch {
     pub provider: Option<ProviderId>,
     pub endpoint: Option<EndpointPatch<()>>,

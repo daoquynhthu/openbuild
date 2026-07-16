@@ -40,9 +40,9 @@
 
 ### 建议
 
-- **S01** 全局 — 15 个类型缺少 `#[non_exhaustive]`
-- **S02** 全局 — 所有 `pub` 项缺少 `///` 文档注释
-- **S03** 全局 — 多类型缺少 serde 派生
+- **S01** 全局 — 15 个类型缺少 `#[non_exhaustive]` -Fixed
+- **S02** 全局 — 所有 `pub` 项缺少 `///` 文档注释 -Fixed
+- **S03** 全局 — 多类型缺少 serde 派生 -Fixed
 - **S04** `endpoint.rs:34-42` — `Endpoint::render()` 静默回退到 `http://localhost/`
 - **S05** `framing.rs:28` — `String::from_utf8_lossy` 静默替换无效 UTF-8 字节
 - **S06** `events.rs:52-61` — `Usage` 的非重叠分解 invariants 未记录或验证

@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+/// Normalized event from a provider stream.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum LLMEvent {
     StepStart { index: u32 },
     TextStart { id: String },
@@ -15,19 +18,15 @@ pub enum LLMEvent {
     ToolCall { id: String, name: String, input: serde_json::Value },
     ToolResult { id: String, name: String, result: serde_json::Value },
     ToolError { id: String, name: String, message: String },
-    StepFinish {
-        index: u32,
-        reason: FinishReason,
-        usage: Option<Usage>,
-    },
-    Finish {
-        reason: FinishReason,
-        usage: Option<Usage>,
-    },
+    StepFinish { index: u32, reason: FinishReason, usage: Option<Usage> },
+    Finish { reason: FinishReason, usage: Option<Usage> },
     Error { message: String, kind: ErrorKind },
 }
 
-#[derive(Debug, Clone)]
+/// Why a stream finished.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum FinishReason {
     Stop,
     Length,
@@ -38,7 +37,10 @@ pub enum FinishReason {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
+/// What kind of error occurred.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ErrorKind {
     Authentication,
     RateLimit,
@@ -48,7 +50,17 @@ pub enum ErrorKind {
     Other(String),
 }
 
-#[derive(Debug, Clone)]
+/// Normalized token usage with non-overlapping breakdown.
+///
+/// Inclusive totals (`input_tokens`, `output_tokens`) match OpenAI/Anthropic
+/// convention. Breakdown fields are independently meaningful — consumers
+/// never need to subtract.
+///
+/// **Invariant** (enforced at protocol mapper level):
+/// - `non_cached_input_tokens + cache_read_input_tokens + cache_write_input_tokens = input_tokens`
+/// - `reasoning_tokens ≤ output_tokens`
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub struct Usage {
     pub input_tokens: Option<u32>,
     pub output_tokens: Option<u32>,

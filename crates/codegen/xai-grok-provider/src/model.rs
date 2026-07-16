@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::route::Route;
 use crate::types::{ModelId, ProviderId};
 
+/// An executable model value bound to a route.
 #[derive(Debug, Clone)]
 pub struct Model {
     pub id: ModelId,
@@ -12,7 +13,9 @@ pub struct Model {
     pub defaults: Option<ModelDefaults>,
 }
 
-#[derive(Debug, Clone)]
+/// Reusable request-behavior defaults attached to a Model.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub struct ModelDefaults {
     pub limits: Option<ModelLimits>,
     pub generation: Option<GenerationOptions>,
@@ -20,13 +23,18 @@ pub struct ModelDefaults {
     pub http: Option<HttpOptions>,
 }
 
-#[derive(Debug, Clone)]
+/// Context and output token limits for a model.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub struct ModelLimits {
     pub context: Option<u64>,
     pub output: Option<u32>,
 }
 
-#[derive(Debug, Clone)]
+/// Generation parameters sent to the provider.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub struct GenerationOptions {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f32>,
@@ -38,7 +46,9 @@ pub struct GenerationOptions {
     pub stop: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone)]
+/// Raw HTTP-level overrides for a request.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub struct HttpOptions {
     pub headers: Option<HashMap<String, String>>,
     pub body: Option<serde_json::Value>,
@@ -80,9 +90,7 @@ mod tests {
             },
             auth: None,
             framing: Box::new(SseFraming),
-            defaults: Some(RouteDefaults {
-                headers: None,
-            }),
+            defaults: Some(RouteDefaults { headers: None }),
         })
     }
 
