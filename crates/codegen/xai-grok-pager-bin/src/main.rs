@@ -900,6 +900,15 @@ async fn run_agent_command(
         .map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
     let mut agent_config = AgentConfig::new_from_toml_cfg(&raw_config)
         .map_err(|e| anyhow::anyhow!("Failed to create agent config: {}", e))?;
+
+    // Initialize ProviderRegistry with built-in providers and user config.
+    let _provider_registry = {
+        let reg = xai_grok_provider::registry::ProviderRegistry::new();
+        xai_grok_provider::providers::register_all(&reg);
+        xai_grok_provider::providers::register_from_config(&reg, &raw_config);
+        reg
+    };
+
     agent_config.default_model_override = agent_args.model.clone();
     agent_config.reasoning_effort_override = agent_args
         .reasoning_effort
