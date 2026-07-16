@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use url::Url;
 
-#[derive(Debug, Clone)]
+use crate::types::LLMRequest;
+
 pub struct EndpointInput<Body> {
-    pub request: (),
+    pub request: LLMRequest,
     pub body: Body,
 }
 
@@ -29,6 +30,15 @@ pub struct Endpoint<Body> {
     pub query: Option<HashMap<String, String>>,
 }
 
+/// Partial endpoint overrides for route patching.
+/// All fields are optional — absent fields inherit from the base endpoint.
+#[derive(Debug, Clone)]
+pub struct EndpointPatch<Body> {
+    pub base_url: Option<String>,
+    pub path: Option<EndpointPart<Body>>,
+    pub query: Option<HashMap<String, String>>,
+}
+
 impl<Body> Endpoint<Body> {
     pub fn render(&self, input: &EndpointInput<Body>) -> Url {
         let base = self.base_url.as_deref().unwrap_or("http://localhost");
@@ -51,14 +61,14 @@ impl<Body> Endpoint<Body> {
 
 pub fn merge_endpoints<Body>(
     base: &Endpoint<Body>,
-    patch: &Endpoint<Body>,
+    patch: &EndpointPatch<Body>,
 ) -> Endpoint<Body>
 where
     EndpointPart<Body>: Clone,
 {
     Endpoint {
         base_url: patch.base_url.clone().or_else(|| base.base_url.clone()),
-        path: patch.path.clone(),
+        path: patch.path.clone().unwrap_or_else(|| base.path.clone()),
         query: match (&base.query, &patch.query) {
             (Some(bq), Some(pq)) => {
                 let mut merged = bq.clone();
@@ -84,7 +94,7 @@ mod tests {
             query: None,
         };
         let input = EndpointInput {
-            request: (),
+            request: LLMRequest { model: "gpt-4o".into(), messages: vec![], max_tokens: None, temperature: None },
             body: (),
         };
         let url = ep.render(&input);
@@ -99,7 +109,7 @@ mod tests {
             query: Some(HashMap::from([("limit".into(), "10".into())])),
         };
         let input = EndpointInput {
-            request: (),
+            request: LLMRequest { model: "gpt-4o".into(), messages: vec![], max_tokens: None, temperature: None },
             body: (),
         };
         let url = ep.render(&input);
@@ -114,7 +124,7 @@ mod tests {
             query: None,
         };
         let input = EndpointInput {
-            request: (),
+            request: LLMRequest { model: "test".into(), messages: vec![], max_tokens: None, temperature: None },
             body: (),
         };
         let url = ep.render(&input);
@@ -128,9 +138,9 @@ mod tests {
             path: EndpointPart::Static("/path".into()),
             query: None,
         };
-        let patch = Endpoint::<()> {
+        let patch = EndpointPatch {
             base_url: Some("https://override.com".into()),
-            path: EndpointPart::Static("/path".into()),
+            path: None,
             query: None,
         };
         let merged = merge_endpoints(&base, &patch);
@@ -144,13 +154,12 @@ mod tests {
             path: EndpointPart::Static("/path".into()),
             query: None,
         };
-        let patch = Endpoint::<()> {
+        let patch = EndpointPatch {
             base_url: None,
-            path: EndpointPart::Static("/other".into()),
+            path: None,
             query: None,
         };
         let merged = merge_endpoints(&base, &patch);
         assert_eq!(merged.base_url.unwrap(), "https://default.com");
-        // path still comes from patch (Clone constraint)
     }
 }

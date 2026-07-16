@@ -2,20 +2,25 @@ use std::collections::HashMap;
 
 pub type HeaderMap = HashMap<String, String>;
 
-#[derive(Debug)]
 pub struct AuthInput {
+    pub request: String,
+    pub body: String,
     pub method: String,
     pub url: String,
     pub headers: HeaderMap,
 }
 
-pub trait AuthFn: Send + Sync + core::fmt::Debug {
+pub trait AuthFn: Send + Sync + core::fmt::Debug + 'static {
     fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String>;
 }
 
 impl dyn AuthFn {
     pub fn or_else(self: Box<Self>, that: Box<dyn AuthFn>) -> Box<dyn AuthFn> {
         Box::new(ChainAuth(self, that))
+    }
+
+    pub fn and_then(self: Box<Self>, that: Box<dyn AuthFn>) -> Box<dyn AuthFn> {
+        Box::new(ThenAuth(self, that))
     }
 }
 
@@ -25,6 +30,23 @@ struct ChainAuth(Box<dyn AuthFn>, Box<dyn AuthFn>);
 impl AuthFn for ChainAuth {
     fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
         self.0.apply(input).or_else(|_| self.1.apply(input))
+    }
+}
+
+#[derive(Debug)]
+struct ThenAuth(Box<dyn AuthFn>, Box<dyn AuthFn>);
+
+impl AuthFn for ThenAuth {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
+        let headers = self.0.apply(input)?;
+        let chained_input = AuthInput {
+            headers,
+            request: input.request.clone(),
+            body: input.body.clone(),
+            method: input.method.clone(),
+            url: input.url.clone(),
+        };
+        self.1.apply(&chained_input)
     }
 }
 
@@ -54,7 +76,7 @@ impl AuthFn for HeaderAuth {
 }
 
 #[derive(Debug)]
-struct NoopAuth;
+pub struct NoopAuth;
 
 impl AuthFn for NoopAuth {
     fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
@@ -63,9 +85,19 @@ impl AuthFn for NoopAuth {
 }
 
 #[derive(Debug)]
+struct FailAuth(String);
+
+impl AuthFn for FailAuth {
+    fn apply(&self, _input: &AuthInput) -> Result<HeaderMap, String> {
+        Err(self.0.clone())
+    }
+}
+
+#[derive(Debug)]
 pub enum Credential {
     Inline(Option<String>),
     Config(String),
+    Session,
     None,
 }
 
@@ -76,6 +108,10 @@ impl Credential {
 
     pub fn config(name: &str) -> Self {
         Credential::Config(name.to_owned())
+    }
+
+    pub fn session() -> Self {
+        Credential::Session
     }
 
     pub fn bearer(self) -> Box<dyn AuthFn> {
@@ -103,17 +139,9 @@ impl Credential {
         match self {
             Credential::Inline(Some(key)) if !key.is_empty() => Some(key.clone()),
             Credential::Config(name) => std::env::var(name).ok().filter(|v| !v.is_empty()),
+            Credential::Session => std::env::var("XAI_SESSION_TOKEN").ok(),
             _ => None,
         }
-    }
-}
-
-#[derive(Debug)]
-struct FailAuth(String);
-
-impl AuthFn for FailAuth {
-    fn apply(&self, _input: &AuthInput) -> Result<HeaderMap, String> {
-        Err(self.0.clone())
     }
 }
 
@@ -121,15 +149,20 @@ impl AuthFn for FailAuth {
 mod tests {
     use super::*;
 
-    #[test]
-    fn bearer_auth_sets_header() {
-        let auth = Credential::optional(Some("sk-test".into()), "api_key").bearer();
-        let input = AuthInput {
+    fn test_input() -> AuthInput {
+        AuthInput {
+            request: String::new(),
+            body: String::new(),
             method: "POST".into(),
             url: "http://localhost".into(),
             headers: HeaderMap::new(),
-        };
-        let headers = auth.apply(&input).unwrap();
+        }
+    }
+
+    #[test]
+    fn bearer_auth_sets_header() {
+        let auth = Credential::optional(Some("sk-test".into()), "api_key").bearer();
+        let headers = auth.apply(&test_input()).unwrap();
         assert_eq!(headers.get("Authorization").unwrap(), "Bearer sk-test");
     }
 
@@ -137,12 +170,7 @@ mod tests {
     fn header_auth_sets_custom_header() {
         let auth = Credential::optional(Some("ant-key".into()), "api_key")
             .header("x-api-key");
-        let input = AuthInput {
-            method: "POST".into(),
-            url: "http://localhost".into(),
-            headers: HeaderMap::new(),
-        };
-        let headers = auth.apply(&input).unwrap();
+        let headers = auth.apply(&test_input()).unwrap();
         assert_eq!(headers.get("x-api-key").unwrap(), "ant-key");
     }
 
@@ -150,56 +178,45 @@ mod tests {
     fn chain_auth_falls_through() {
         let auth = Credential::optional(None, "first")
             .bearer()
-            .or_else(
-                Credential::optional(Some("fallback".into()), "second").bearer(),
-            );
-        let input = AuthInput {
-            method: "POST".into(),
-            url: "http://localhost".into(),
-            headers: HeaderMap::new(),
-        };
-        let headers = auth.apply(&input).unwrap();
+            .or_else(Credential::optional(Some("fallback".into()), "second").bearer());
+        let headers = auth.apply(&test_input()).unwrap();
         assert_eq!(headers.get("Authorization").unwrap(), "Bearer fallback");
     }
 
     #[test]
     fn noop_auth_preserves_headers() {
         let auth = Credential::None.bearer();
-        let input = AuthInput {
-            method: "GET".into(),
-            url: "http://localhost".into(),
-            headers: HeaderMap::new(),
-        };
-        let headers = auth.apply(&input).unwrap();
+        let headers = auth.apply(&test_input()).unwrap();
         assert!(headers.is_empty());
     }
 
     #[test]
-    fn optional_none_falls_through_chain() {
-        let auth = Credential::optional(None, "first")
-            .bearer()
-            .or_else(Credential::optional(Some("fallback".into()), "second").bearer());
-        let input = AuthInput {
-            method: "POST".into(),
-            url: "http://localhost".into(),
-            headers: HeaderMap::new(),
-        };
-        let headers = auth.apply(&input).unwrap();
-        assert_eq!(headers.get("Authorization").unwrap(), "Bearer fallback");
+    fn session_credential_resolves_env() {
+        // SAFETY: test-only env mutation, single-threaded test.
+        unsafe { std::env::set_var("XAI_SESSION_TOKEN", "sess-abc"); }
+        let auth = Credential::session().bearer();
+        let headers = auth.apply(&test_input()).unwrap();
+        assert_eq!(headers.get("Authorization").unwrap(), "Bearer sess-abc");
+        // SAFETY: test-only env cleanup.
+        unsafe { std::env::remove_var("XAI_SESSION_TOKEN"); }
     }
 
     #[test]
     fn empty_inline_key_falls_through() {
-        // Inline("") should be treated as None
         let auth = Credential::optional(Some(String::new()), "empty")
             .bearer()
             .or_else(Credential::None.bearer());
-        let input = AuthInput {
-            method: "POST".into(),
-            url: "http://localhost".into(),
-            headers: HeaderMap::new(),
-        };
-        let headers = auth.apply(&input).unwrap();
+        let headers = auth.apply(&test_input()).unwrap();
         assert!(headers.is_empty());
+    }
+
+    #[test]
+    fn and_then_chains_auth_steps() {
+        let step1 = Credential::optional(Some("key1".into()), "s1").bearer();
+        let step2 = Credential::optional(Some("key2".into()), "s2").header("x-custom");
+        let auth = step1.and_then(step2);
+        let headers = auth.apply(&test_input()).unwrap();
+        assert_eq!(headers.get("Authorization").unwrap(), "Bearer key1");
+        assert_eq!(headers.get("x-custom").unwrap(), "key2");
     }
 }

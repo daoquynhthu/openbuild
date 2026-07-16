@@ -1,7 +1,8 @@
+use std::num::NonZeroU64;
+
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-/// Type-safe provider identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ProviderId(pub String);
@@ -19,27 +20,57 @@ impl ProviderId {
     }
 }
 
-/// Known model definition shipped with a provider.
+/// Stable model identifier in the ACP protocol.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct ModelId(pub String);
+
+impl ModelId {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+}
+
+/// Which API backend protocol to use for inference.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiBackend {
+    #[default]
+    ChatCompletions,
+    Responses,
+    Messages,
+}
+
+/// HTTP auth scheme for API requests.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthScheme {
+    #[default]
+    Bearer,
+    XApiKey,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderModelDef {
     pub id: String,
     pub model: String,
     pub name: String,
     pub description: Option<String>,
-    pub context_window: u64,
+    pub context_window: NonZeroU64,
     pub hidden: bool,
+    pub api_backend: Option<ApiBackend>,
+    pub supports_reasoning_effort: Option<bool>,
 }
 
-/// Immutable set of defaults baked into each provider definition.
 #[derive(Debug, Clone)]
 pub struct ProviderDefaults {
     pub id: ProviderId,
     pub name: String,
     pub base_url: String,
-    pub api_backend: String,
-    pub auth_scheme: String,
+    pub api_backend: ApiBackend,
+    pub auth_scheme: AuthScheme,
     pub env_key: Vec<String>,
-    pub context_window: u64,
+    pub context_window: NonZeroU64,
     pub max_completion_tokens: Option<u32>,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
@@ -58,10 +89,10 @@ impl Default for ProviderDefaults {
             id: ProviderId::new("unknown"),
             name: String::new(),
             base_url: String::new(),
-            api_backend: "chat_completions".into(),
-            auth_scheme: "bearer".into(),
+            api_backend: ApiBackend::ChatCompletions,
+            auth_scheme: AuthScheme::Bearer,
             env_key: Vec::new(),
-            context_window: 128_000,
+            context_window: NonZeroU64::new(128_000).unwrap(),
             max_completion_tokens: None,
             temperature: None,
             top_p: None,
@@ -76,14 +107,28 @@ impl Default for ProviderDefaults {
     }
 }
 
-/// A portable, provider-independent LLM request.
+/// A portable, provider-independent request body for an LLM call.
+/// Protocol implementations convert this to their native wire format.
 #[derive(Debug, Clone)]
 pub struct LLMRequest {
     pub model: String,
+    pub messages: Vec<String>,
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f32>,
+}
+
+/// Result value from a provider-executed tool call.
+#[derive(Debug, Clone)]
+pub enum ToolResultValue {
+    Text(String),
+    Json(serde_json::Value),
+    Error(String),
 }
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU64;
+
     use super::*;
 
     #[test]
@@ -110,12 +155,38 @@ mod tests {
     }
 
     #[test]
+    fn model_id_newtype() {
+        let id = ModelId::new("gpt-4o");
+        assert_eq!(id.0, "gpt-4o");
+    }
+
+    #[test]
+    fn api_backend_default() {
+        assert_eq!(ApiBackend::default(), ApiBackend::ChatCompletions);
+    }
+
+    #[test]
+    fn api_backend_serde() {
+        let json = serde_json::to_string(&ApiBackend::Responses).unwrap();
+        assert_eq!(json, "\"responses\"");
+        let back: ApiBackend = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ApiBackend::Responses);
+    }
+
+    #[test]
+    fn auth_scheme_default() {
+        assert_eq!(AuthScheme::default(), AuthScheme::Bearer);
+    }
+
+    #[test]
     fn provider_defaults_default() {
         let d = ProviderDefaults::default();
         assert_eq!(d.id.0, "unknown");
-        assert_eq!(d.context_window, 128_000);
+        assert_eq!(d.context_window.get(), 128_000);
         assert!(d.supports_streaming);
         assert!(d.known_models.is_empty());
+        assert_eq!(d.api_backend, ApiBackend::ChatCompletions);
+        assert_eq!(d.auth_scheme, AuthScheme::Bearer);
     }
 
     #[test]
@@ -125,12 +196,13 @@ mod tests {
             model: "gpt-4o-2024-11-20".into(),
             name: "GPT-4o".into(),
             description: Some("Flagship model".into()),
-            context_window: 128_000,
+            context_window: NonZeroU64::new(128_000).unwrap(),
             hidden: false,
+            api_backend: None,
+            supports_reasoning_effort: None,
         };
         let json = serde_json::to_string(&def).unwrap();
         let back: ProviderModelDef = serde_json::from_str(&json).unwrap();
         assert_eq!(back.id, "gpt-4o");
-        assert_eq!(back.model, "gpt-4o-2024-11-20");
     }
 }

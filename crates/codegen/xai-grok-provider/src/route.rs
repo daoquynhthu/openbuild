@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use crate::auth::AuthFn;
-use crate::endpoint::Endpoint;
+use crate::auth::{AuthFn, NoopAuth};
+use crate::endpoint::{Endpoint, EndpointPatch};
 use crate::framing::Framing;
 use crate::model::Model;
-use crate::types::ProviderId;
+use crate::types::{ModelId, ProviderId};
 
 #[derive(Debug, Clone)]
 pub struct RouteDefaults {
@@ -33,13 +33,27 @@ impl core::fmt::Debug for RouteInput {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Route {
     pub id: String,
     pub provider: Option<ProviderId>,
     pub protocol: String,
     pub endpoint: Endpoint<()>,
+    pub auth: Arc<dyn AuthFn>,
+    pub framing: Arc<dyn Framing<String>>,
     pub defaults: RouteDefaults,
+}
+
+impl core::fmt::Debug for Route {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Route")
+            .field("id", &self.id)
+            .field("provider", &self.provider)
+            .field("protocol", &self.protocol)
+            .field("endpoint", &self.endpoint)
+            .field("framing", &self.framing.id())
+            .finish()
+    }
 }
 
 impl Route {
@@ -49,6 +63,8 @@ impl Route {
             provider: input.provider,
             protocol: input.protocol,
             endpoint: input.endpoint,
+            auth: input.auth.map(Arc::<dyn AuthFn>::from).unwrap_or_else(|| Arc::new(NoopAuth)),
+            framing: Arc::<dyn Framing<String>>::from(input.framing),
             defaults: input.defaults.unwrap_or(RouteDefaults {
                 headers: None,
             }),
@@ -56,41 +72,44 @@ impl Route {
     }
 
     pub fn with(&self, patch: RoutePatch) -> Self {
-        let mut route = self.clone();
-        if let Some(provider) = patch.provider {
-            route.provider = Some(provider);
+        Self {
+            endpoint: patch.endpoint.as_ref().map_or_else(
+                || self.endpoint.clone(),
+                |ep| crate::endpoint::merge_endpoints(&self.endpoint, ep),
+            ),
+            provider: patch.provider.or_else(|| self.provider.clone()),
+            defaults: patch.defaults.unwrap_or_else(|| self.defaults.clone()),
+            ..self.clone()
         }
-        if let Some(endpoint) = patch.endpoint {
-            route.endpoint = crate::endpoint::merge_endpoints(&self.endpoint, &endpoint);
-        }
-        route
     }
 
     pub fn model(&self, id: &str) -> Model {
         Model::make(
-            id.to_owned(),
+            ModelId::new(id),
             self.provider
                 .as_ref()
-                .map(|p| p.0.clone())
-                .unwrap_or_default(),
+                .cloned()
+                .unwrap_or_else(|| ProviderId::new("unknown")),
             Arc::new(self.clone()),
             None,
         )
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RoutePatch {
     pub provider: Option<ProviderId>,
-    pub endpoint: Option<Endpoint<()>>,
+    pub endpoint: Option<EndpointPatch<()>>,
+    pub defaults: Option<RouteDefaults>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::auth::Credential;
-    use crate::endpoint::EndpointPart;
+    use crate::endpoint::{EndpointPatch, EndpointPart};
     use crate::framing::SseFraming;
+    use crate::types::ProviderId;
 
     fn test_route() -> Route {
         Route::make(RouteInput {
@@ -119,15 +138,22 @@ mod tests {
     }
 
     #[test]
+    fn route_make_preserves_auth_and_framing() {
+        let route = test_route();
+        assert_eq!(route.framing.id(), "sse");
+    }
+
+    #[test]
     fn route_with_updates_endpoint() {
         let route = test_route();
         let patched = route.with(RoutePatch {
             provider: None,
-            endpoint: Some(Endpoint {
+            endpoint: Some(EndpointPatch {
                 base_url: Some("https://override.com/v1".into()),
-                path: EndpointPart::Static("/chat/completions".into()),
+                path: None,
                 query: None,
             }),
+            defaults: None,
         });
         assert_eq!(
             patched.endpoint.base_url.unwrap(),
@@ -139,8 +165,8 @@ mod tests {
     fn route_model_creates_model() {
         let route = test_route();
         let model = route.model("gpt-4o");
-        assert_eq!(model.id, "gpt-4o");
-        assert_eq!(model.provider, "openai");
+        assert_eq!(model.id.0, "gpt-4o");
+        assert_eq!(model.provider.0, "openai");
     }
 
     #[test]

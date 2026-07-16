@@ -1,14 +1,16 @@
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use crate::config::ProviderConfig;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, SharedProvider};
+use crate::route::Route;
 use crate::types::ProviderId;
 
 #[derive(Debug)]
 pub struct ProviderRegistry {
     providers: RwLock<HashMap<ProviderId, SharedProvider>>,
+    routes: RwLock<HashMap<String, Arc<Route>>>,
 }
 
 impl Default for ProviderRegistry {
@@ -21,16 +23,39 @@ impl ProviderRegistry {
     pub fn new() -> Self {
         Self {
             providers: RwLock::new(HashMap::new()),
+            routes: RwLock::new(HashMap::new()),
         }
     }
 
     pub fn register(&self, provider: SharedProvider) {
         let id = provider.id().clone();
-        self.providers.write().unwrap().insert(id, provider);
+        self.providers
+            .write()
+            .expect("ProviderRegistry lock poisoned")
+            .insert(id, provider);
+    }
+
+    pub fn register_route(&self, id: impl Into<String>, route: Route) {
+        self.routes
+            .write()
+            .expect("ProviderRegistry lock poisoned")
+            .insert(id.into(), Arc::new(route));
+    }
+
+    pub fn get_route(&self, id: &str) -> Option<Arc<Route>> {
+        self.routes
+            .read()
+            .expect("ProviderRegistry lock poisoned")
+            .get(id)
+            .cloned()
     }
 
     pub fn get(&self, id: &ProviderId) -> Option<SharedProvider> {
-        self.providers.read().unwrap().get(id).cloned()
+        self.providers
+            .read()
+            .expect("ProviderRegistry lock poisoned")
+            .get(id)
+            .cloned()
     }
 
     pub fn configure(
@@ -52,11 +77,36 @@ impl ProviderRegistry {
     }
 
     pub fn all_ids(&self) -> Vec<ProviderId> {
-        self.providers.read().unwrap().keys().cloned().collect()
+        self.providers
+            .read()
+            .expect("ProviderRegistry lock poisoned")
+            .keys()
+            .cloned()
+            .collect()
     }
 
-    pub fn detect_from_url(&self, _base_url: &str) -> ProviderId {
-        ProviderId::new("openai-compatible")
+    pub fn detect_from_url(&self, base_url: &str) -> ProviderId {
+        let host = base_url
+            .trim_start_matches("https://")
+            .trim_start_matches("http://")
+            .split('/')
+            .next()
+            .unwrap_or("");
+
+        match host {
+            h if h == "api.x.ai" || h == "api.grok.com" || h.ends_with(".grok.com") => {
+                ProviderId::new(ProviderId::XAI)
+            }
+            "api.openai.com" => ProviderId::new(ProviderId::OPENAI),
+            "api.anthropic.com" => ProviderId::new(ProviderId::ANTHROPIC),
+            h if h == "opencode.ai" || h == "console.opencode.ai" => {
+                ProviderId::new(ProviderId::OPENCODE)
+            }
+            h if h == "localhost" || h.starts_with("localhost:") || h == "127.0.0.1" => {
+                ProviderId::new(ProviderId::OLLAMA)
+            }
+            _ => ProviderId::new(ProviderId::OPENAI_COMPATIBLE),
+        }
     }
 }
 
@@ -66,13 +116,9 @@ mod tests {
     use crate::config::ProviderConfig;
     use crate::endpoint::{Endpoint, EndpointPart};
     use crate::framing::SseFraming;
-    use crate::provider::ConfiguredProvider;
-    use crate::route::{Route, RouteInput};
-    use crate::types::ProviderDefaults;
-
-    fn dummy_provider() -> SharedProvider {
-        std::sync::Arc::new(DummyProvider::new())
-    }
+    use crate::provider::{ConfiguredProvider, Provider};
+    use crate::route::{Route, RouteDefaults, RouteInput};
+    use crate::types::{ModelId, ProviderDefaults};
 
     #[derive(Debug)]
     struct DummyProvider {
@@ -89,7 +135,7 @@ mod tests {
         }
     }
 
-    impl crate::provider::Provider for DummyProvider {
+    impl Provider for DummyProvider {
         fn id(&self) -> &ProviderId {
             &self.id
         }
@@ -114,20 +160,31 @@ mod tests {
                 },
                 auth: None,
                 framing: Box::new(SseFraming),
-                defaults: None,
+                defaults: Some(RouteDefaults { headers: None }),
             });
+            let id = ProviderId::new("dummy");
             ConfiguredProvider {
-                id: ProviderId::new("dummy"),
+                id: id.clone(),
                 route,
-                model: |id, route| {
-                    Model::make(id, "dummy", std::sync::Arc::new(route.clone()), None)
+                model: |id, rt| {
+                    Model::make(
+                        ModelId::new(id),
+                        ProviderId::new("dummy"),
+                        Arc::new(rt.clone()),
+                        None,
+                    )
                 },
+                configure: move |c| DummyProvider::new().configure(c),
             }
         }
 
         fn known_models(&self) -> &[crate::types::ProviderModelDef] {
             &[]
         }
+    }
+
+    fn dummy_provider() -> SharedProvider {
+        Arc::new(DummyProvider::new())
     }
 
     #[test]
@@ -143,6 +200,27 @@ mod tests {
         let registry = ProviderRegistry::new();
         let p = registry.get(&ProviderId::new("unknown"));
         assert!(p.is_none());
+    }
+
+    #[test]
+    fn registry_register_route_and_get() {
+        let registry = ProviderRegistry::new();
+        let route = Route::make(RouteInput {
+            id: "test-route".into(),
+            provider: None,
+            protocol: "chat".into(),
+            endpoint: Endpoint {
+                base_url: None,
+                path: EndpointPart::Static("/test".into()),
+                query: None,
+            },
+            auth: None,
+            framing: Box::new(SseFraming),
+            defaults: None,
+        });
+        registry.register_route("my-route", route);
+        let r = registry.get_route("my-route");
+        assert!(r.is_some());
     }
 
     #[test]
@@ -164,7 +242,7 @@ mod tests {
             ProviderConfig::default(),
         );
         assert!(model.is_some());
-        assert_eq!(model.unwrap().id, "dummy-model");
+        assert_eq!(model.unwrap().id.0, "dummy-model");
     }
 
     #[test]
@@ -173,5 +251,54 @@ mod tests {
         registry.register(dummy_provider());
         let ids = registry.all_ids();
         assert_eq!(ids.len(), 1);
+    }
+
+    #[test]
+    fn detect_from_url_xai() {
+        let registry = ProviderRegistry::new();
+        assert_eq!(
+            registry.detect_from_url("https://api.x.ai/v1").0,
+            "xai"
+        );
+        assert_eq!(
+            registry.detect_from_url("https://api.grok.com/v1").0,
+            "xai"
+        );
+    }
+
+    #[test]
+    fn detect_from_url_openai() {
+        let registry = ProviderRegistry::new();
+        assert_eq!(
+            registry.detect_from_url("https://api.openai.com/v1").0,
+            "openai"
+        );
+    }
+
+    #[test]
+    fn detect_from_url_anthropic() {
+        let registry = ProviderRegistry::new();
+        assert_eq!(
+            registry.detect_from_url("https://api.anthropic.com/v1").0,
+            "anthropic"
+        );
+    }
+
+    #[test]
+    fn detect_from_url_ollama() {
+        let registry = ProviderRegistry::new();
+        assert_eq!(
+            registry.detect_from_url("http://localhost:11434/v1").0,
+            "ollama"
+        );
+    }
+
+    #[test]
+    fn detect_from_url_fallback() {
+        let registry = ProviderRegistry::new();
+        assert_eq!(
+            registry.detect_from_url("https://api.groq.com/v1").0,
+            "openai-compatible"
+        );
     }
 }

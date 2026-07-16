@@ -6,11 +6,32 @@ use crate::types::LLMRequest;
 
 pub type ProtocolId = String;
 
+/// Schema for validating and decoding provider-native types.
+pub struct Schema<T> {
+    pub validate: fn(&T) -> Result<(), String>,
+}
+
+impl<T> core::fmt::Debug for Schema<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Schema<{}>", std::any::type_name::<T>())
+    }
+}
+
+impl<T> Clone for Schema<T> {
+    fn clone(&self) -> Self {
+        Self {
+            validate: self.validate,
+        }
+    }
+}
+
 pub struct ProtocolBody<Body> {
+    pub schema: Schema<Body>,
     pub from: fn(LLMRequest) -> Result<Body, String>,
 }
 
 pub struct ProtocolStream<Frame, Event, State> {
+    pub event: Schema<Event>,
     pub initial: fn(LLMRequest) -> State,
     pub step: fn(&mut State, Event) -> Result<Vec<LLMEvent>, String>,
     pub terminal: Option<fn(&Event) -> bool>,
@@ -72,9 +93,11 @@ mod tests {
     #[test]
     fn protocol_new_sets_id() {
         let body = ProtocolBody::<()> {
+            schema: Schema { validate: |_| Ok(()) },
             from: |_| Ok(()),
         };
         let stream = ProtocolStream::<(), (), ()> {
+            event: Schema { validate: |_| Ok(()) },
             initial: |_| (),
             step: |_, _| Ok(vec![]),
             terminal: None,
@@ -93,5 +116,18 @@ mod tests {
         assert!(table.contains("chat"));
         table.register("responses");
         assert_eq!(table.all_ids().len(), 2);
+    }
+
+    #[test]
+    fn schema_validate_passes() {
+        let s = Schema::<()> { validate: |_| Ok(()) };
+        assert!((s.validate)(&()).is_ok());
+    }
+
+    #[test]
+    fn schema_validate_fails() {
+        let s = Schema::<String> { validate: |v| if v.is_empty() { Err("empty".into()) } else { Ok(()) } };
+        assert!((s.validate)(&String::new()).is_err());
+        assert!((s.validate)(&"ok".to_owned()).is_ok());
     }
 }

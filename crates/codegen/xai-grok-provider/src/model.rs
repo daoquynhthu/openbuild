@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::route::Route;
+use crate::types::{ModelId, ProviderId};
 
 #[derive(Debug, Clone)]
 pub struct Model {
-    pub id: String,
-    pub provider: String,
+    pub id: ModelId,
+    pub provider: ProviderId,
     pub route: Arc<Route>,
     pub defaults: Option<ModelDefaults>,
 }
@@ -46,8 +47,8 @@ pub struct HttpOptions {
 
 impl Model {
     pub fn make(
-        id: impl Into<String>,
-        provider: impl Into<String>,
+        id: impl Into<ModelId>,
+        provider: impl Into<ProviderId>,
         route: Arc<Route>,
         defaults: Option<ModelDefaults>,
     ) -> Self {
@@ -64,6 +65,7 @@ impl Model {
 mod tests {
     use super::*;
     use crate::endpoint::{Endpoint, EndpointPart};
+    use crate::framing::SseFraming;
     use crate::route::{Route, RouteDefaults, RouteInput};
 
     fn dummy_route() -> Route {
@@ -77,7 +79,7 @@ mod tests {
                 query: None,
             },
             auth: None,
-            framing: Box::new(crate::framing::SseFraming),
+            framing: Box::new(SseFraming),
             defaults: Some(RouteDefaults {
                 headers: None,
             }),
@@ -87,9 +89,9 @@ mod tests {
     #[test]
     fn model_make_sets_fields() {
         let route = Arc::new(dummy_route());
-        let model = Model::make("gpt-4o", "openai", route.clone(), None);
-        assert_eq!(model.id, "gpt-4o");
-        assert_eq!(model.provider, "openai");
+        let model = Model::make(ModelId::new("gpt-4o"), ProviderId::new("openai"), route, None);
+        assert_eq!(model.id.0, "gpt-4o");
+        assert_eq!(model.provider.0, "openai");
         assert!(model.defaults.is_none());
     }
 
@@ -114,8 +116,8 @@ mod tests {
             provider_options: None,
             http: None,
         };
-        let model = Model::make("gpt-4o", "openai", route, Some(defaults));
-        assert_eq!(model.id, "gpt-4o");
+        let model = Model::make(ModelId::new("gpt-4o"), ProviderId::new("openai"), route, Some(defaults));
+        assert_eq!(model.id.0, "gpt-4o");
         assert!(model.defaults.is_some());
     }
 }

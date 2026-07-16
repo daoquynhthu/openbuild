@@ -8,11 +8,8 @@ description = "Provider abstractions and registry for Grok Build model adapter l
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
-http = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
-tokio-stream = { workspace = true }
 indexmap = { workspace = true }
 url = { workspace = true }
 
