@@ -505,8 +505,36 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 ### Scope review
 - No unrelated files changed
 - No dependency added
-- No source code modified
 
+---
+
+## Provider Adapter V1 — Phase 4: Route-to-Sampler Execution Authority — 2026-07-17
+
+### Base and result
+- Start commit: `1bb390f`
+- End commit: `d1d93f6`
+- Tasks completed: `P4-01` through `P4-06`
+
+### Files changed
+- `xai-grok-sampler/src/config.rs` — `endpoint_path`/`endpoint_query` fields (P4-01)
+- `xai-grok-sampler/src/protocols/mod.rs` — `resolve_protocol_id()`, tests (P4-02)
+- `xai-grok-sampler/src/client.rs` — protocol validation, no `_` fallback, `endpoint()` uses route path (P4-02/03)
+- `xai-grok-shell/src/agent/provider_resolution.rs` — route compiler (P4-04)
+- `xai-grok-provider/src/endpoint.rs` — `path_for_default()` (P4-04)
+- `xai-grok-shell/src/agent/config.rs` — legacy header doc (P4-05)
+
+### Regression issues
+- `C-02`: Route is authority — `endpoint()` uses route path/query
+- `C-11`: No `_ => chat_completions` fallback — unknown protocol returns error
+
+### Verification
+- `cargo test -p xai-grok-sampler --all-targets` — 174 passed, 0 failed
+- `cargo test -p xai-grok-provider --all-targets` — 109 passed, 0 failed
+- `cargo clippy -p xai-grok-sampler --all-targets -- -D warnings` — pass
+- `cargo check -p xai-grok-shell --lib` — clean
+
+### Scope review
+- No unrelated files changed, no dependency added
 ---
 
 ## Provider Adapter V1 — Phase 2: Provider Core and Transactional Registry — 2026-07-17
