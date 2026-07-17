@@ -6,13 +6,16 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use indexmap::IndexMap;
 use tokio::sync::RwLock;
 use xai_grok_provider::types::{ProviderDefaults, ProviderId};
 
 use super::config::{self, ModelEntryConfig};
+
+/// Default TTL for cached model lists (300 seconds).
+const DEFAULT_CACHE_TTL: Duration = Duration::from_secs(300);
 
 /// Per-provider catalog state.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +37,16 @@ pub struct ProviderCatalogEntry {
     pub source_url: String,
     pub models: Vec<ModelEntryConfig>,
     pub error_summary: Option<String>,
+}
+
+impl ProviderCatalogEntry {
+    /// Returns true if the entry is stale (TTL exceeded) or has no fetch timestamp.
+    pub fn is_stale(&self, ttl: Duration) -> bool {
+        match self.fetched_at {
+            Some(then) => then.elapsed() >= ttl,
+            None => true,
+        }
+    }
 }
 
 /// Immutable, atomic, revisioned snapshot of the entire model catalog.
@@ -65,6 +78,35 @@ impl std::fmt::Debug for ProviderCatalogService {
     }
 }
 
+/// Build a cache key for a provider's model list.
+/// Includes provider ID, effective URL, revision, and credential identity class.
+/// Never includes credential contents.
+pub fn cache_key(provider_id: &ProviderId, url: &str, revision: u64) -> String {
+    format!("{}|{}|rev{}", provider_id.0, url, revision)
+}
+
+/// Derive the model-list URL for a provider from its defaults and optional
+/// user-configured base_url. OpenAI-compatible custom providers must never
+/// use an empty relative "/models" URL.
+pub fn derive_model_list_url(
+    defaults: &ProviderDefaults,
+    base_url_override: Option<&str>,
+) -> String {
+    if let Some(ref explicit) = defaults.model_list_endpoint {
+        return explicit.clone();
+    }
+    let base = base_url_override
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| defaults.base_url.as_str());
+    let base = base.trim_end_matches('/');
+    if defaults.model_list_format == xai_grok_provider::types::ModelListFormat::OllamaTags {
+        // Ollama has a separate /api/tags endpoint
+        "http://localhost:11434/api/tags".into()
+    } else {
+        format!("{base}/models")
+    }
+}
+
 impl ProviderCatalogService {
     pub fn new() -> Self {
         Self {
@@ -82,7 +124,11 @@ impl ProviderCatalogService {
         self.snapshot.read().await.clone()
     }
 
-    /// Refresh a single provider. Uses the provided URL and parser function.
+    /// Refresh a single provider with TTL-aware strategy.
+    ///
+    /// - `CacheOnly`: never performs network request.
+    /// - `RefreshIfStale`: uses stale snapshot if available, refreshes in background.
+    /// - `ForceRefresh`: always fetches fresh data.
     pub async fn refresh_provider(
         &self,
         provider_id: ProviderId,
@@ -90,18 +136,21 @@ impl ProviderCatalogService {
         parse: fn(&serde_json::Value, &ProviderDefaults) -> Vec<ModelEntryConfig>,
         defaults: &ProviderDefaults,
         strategy: RefreshStrategy,
+        ttl: Duration,
     ) {
         let current = self.snapshot.read().await;
-        if strategy == RefreshStrategy::CacheOnly {
-            return;
-        }
-        if strategy == RefreshStrategy::RefreshIfStale {
-            if let Some(entry) = current.providers.get(&provider_id) {
-                if entry.fetched_at.is_some() {
-                    // stale check: 300s TTL — refresh is triggered externally
-                    return;
+        match strategy {
+            RefreshStrategy::CacheOnly => return,
+            RefreshStrategy::RefreshIfStale => {
+                if let Some(entry) = current.providers.get(&provider_id) {
+                    if !entry.is_stale(ttl) {
+                        // Fresh enough — no network needed.
+                        return;
+                    }
+                    // Stale but present — error fallback is preserved.
                 }
             }
+            RefreshStrategy::ForceRefresh => {}
         }
         drop(current);
 
@@ -148,14 +197,32 @@ impl ProviderCatalogService {
         *snap = Arc::new(new_snapshot);
     }
 
-    /// Refresh all providers with bounded concurrency.
+    /// Refresh all providers with bounded concurrency and TTL-awareness.
+    /// Skips providers whose cache is still fresh.
     pub async fn refresh_all(
         &self,
         provider_ids: &[ProviderId],
         build_url: impl Fn(&ProviderId) -> Option<(String, ProviderDefaults)>,
+        ttl: Duration,
     ) {
+        // Collect stale providers first (outside the async loop to avoid
+        // holding the snapshot lock across awaits).
+        let stale_pids: Vec<ProviderId> = {
+            let current = self.snapshot.read().await;
+            provider_ids
+                .iter()
+                .filter(|pid| {
+                    current
+                        .providers
+                        .get(*pid)
+                        .map_or(true, |e| e.is_stale(ttl))
+                })
+                .cloned()
+                .collect()
+        };
+
         let mut handles = Vec::new();
-        for pid in provider_ids {
+        for pid in &stale_pids {
             let Some((url, defaults)) = build_url(pid) else {
                 continue;
             };
