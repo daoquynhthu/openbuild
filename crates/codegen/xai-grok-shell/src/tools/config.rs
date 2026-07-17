@@ -202,6 +202,7 @@ pub(crate) fn web_search_sampling_config(base: SamplerConfig) -> SamplerConfig {
 
 impl ShellToolsetConfig {
     /// Optionally layers sampling credentials onto the web search config.
+    /// Classification: LEGACY FALLBACK PATH (web search default base)
     pub fn new(base: Option<Self>, sampling_config: Option<SamplerConfig>) -> Self {
         let default_base = SamplerConfig {
             api_key: None,

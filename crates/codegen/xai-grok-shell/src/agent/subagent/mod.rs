@@ -909,6 +909,8 @@ async fn read_parent_sampling_config(
             let auth_scheme = crate::agent::config::try_resolve_model_credentials(&cfg.model, None)
                 .map(|r| r.auth_scheme)
                 .unwrap_or_default();
+            // Classification: SUBAGENT INHERITANCE PATH
+            // Inherits parent's protocol_id, route endpoint, headers, and auth.
             let inherited = xai_grok_sampler::SamplerConfig {
                 api_key: creds.api_key,
                 base_url: cfg.base_url,
