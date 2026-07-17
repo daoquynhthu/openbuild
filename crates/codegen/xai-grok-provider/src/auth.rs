@@ -6,7 +6,8 @@ pub type AuthHeaderMap = HeaderMap;
 
 use crate::error::ProviderError;
 
-/// Input to an AuthFn::apply call.
+/// Input to an [`AuthFn::apply`] call. Carries request metadata and
+/// existing headers that the auth function may augment.
 #[non_exhaustive]
 pub struct AuthInput {
     pub body: String,
@@ -69,6 +70,7 @@ impl AuthFn for ThenAuth {
     }
 }
 
+/// Auth function that sets an `Authorization: Bearer <token>` header.
 #[derive(Debug)]
 pub struct BearerAuth(pub String);
 
@@ -84,6 +86,7 @@ impl AuthFn for BearerAuth {
     }
 }
 
+/// Auth function that sets an arbitrary HTTP header.
 #[derive(Debug)]
 pub struct HeaderAuth {
     pub name: String,
@@ -105,6 +108,7 @@ impl AuthFn for HeaderAuth {
     }
 }
 
+/// Auth function that passes through existing headers unchanged.
 #[derive(Debug)]
 pub struct NoopAuth;
 
@@ -118,6 +122,7 @@ impl AuthFn for NoopAuth {
     }
 }
 
+/// Auth function that always returns an error.
 #[derive(Debug)]
 pub struct FailAuth(pub String);
 

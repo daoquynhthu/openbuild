@@ -30,7 +30,13 @@ impl Framing<String> for SseFraming {
 
         let stream = bytes
             .map(|result| match result {
-                Ok(b) => String::from_utf8_lossy(&b).to_string(),
+                Ok(b) => {
+                    let s = String::from_utf8_lossy(&b);
+                    if matches!(s, std::borrow::Cow::Owned(_)) {
+                        tracing::warn!("invalid UTF-8 in SSE stream, replacing bytes");
+                    }
+                    s.to_string()
+                }
                 Err(e) => e,
             })
             .flat_map(|text| {

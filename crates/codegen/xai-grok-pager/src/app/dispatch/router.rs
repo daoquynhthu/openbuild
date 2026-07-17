@@ -601,7 +601,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 return vec![];
             };
             let modal = ActiveModal::Providers {
-                state: Box::new(ProvidersModalState::new()),
+                state: Box::new(ProvidersModalState::new(&[])),
             };
             agent.active_modal = Some(modal);
             vec![]

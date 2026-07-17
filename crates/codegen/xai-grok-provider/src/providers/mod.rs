@@ -117,13 +117,13 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
                             None,
                         )
                     }),
-                    configure: |c| {
+                    configure: Box::new(|c| {
                         TestProvider {
                             pid: crate::types::ProviderId::new("test-provider"),
                             defaults: crate::types::ProviderDefaults::default(),
                         }
                         .configure(c)
-                    },
+                    }),
                 }
             }
         }

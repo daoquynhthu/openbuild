@@ -99,7 +99,7 @@ impl Provider for AnthropicProvider {
                     None,
                 )
             }),
-            configure: move |c| AnthropicProvider::new().configure(c),
+            configure: Box::new(move |c| AnthropicProvider::new().configure(c)),
         }
     }
 

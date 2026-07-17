@@ -105,7 +105,7 @@ impl Provider for XaiProvider {
                     None,
                 )
             }),
-            configure: move |c| XaiProvider::new().configure(c),
+            configure: Box::new(move |c| XaiProvider::new().configure(c)),
         }
     }
 

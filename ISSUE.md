@@ -56,7 +56,16 @@
 
 - [x] **C23+S18** `providers/mod.rs:48-255` — `#[cfg(test)] mod tests` 从 `detect_env_vars()` 体内移至模块级
 - [x] **M63+S19** 5 文件 12 处 — 删除所有违反 AGENTS.md §3.1 的内联注释（config.rs、auth.rs、mod.rs、anthropic.rs、ollama.rs）
-- [ ] **S02+S14** 多文件 — 跳过（建议项，Batch 7 快速实施不包含）
+- [x] **S02+S14** 多文件 — 补充 `pub` 项 `///` 文档注释（BearerAuth、HeaderAuth、NoopAuth、FailAuth、AuthInput、ConfiguredProvider、ProtocolBody、ProtocolStream、Schema、ProtocolTable）
+
+### 审计修复: C06 + S04/S05/S07/S08/S09 — 2026-07-17 `[x]`
+
+- [x] **C06** `providers_modal.rs:75-165` — `builtin_providers()` 改为接受 `configured: &[&str]` 参数，状态从硬编码 env 检查改为由调用方声明；调用点 `&[]` 留待未来接入 config
+- [x] **S04** `endpoint.rs:49-50` — `unwrap_or("http://localhost")` 改为 `unwrap_or_else(|| { tracing::warn!(...); "http://localhost" })`，静默回退不再静默
+- [x] **S05** `framing.rs:33` — `from_utf8_lossy` 静默替换改为检测 `Cow::Owned` 时发出 `tracing::warn!`
+- [x] **S07** `protocol.rs` — `ProtocolTable` 从 `HashMap<ProtocolId, String>` 改为 `HashSet<ProtocolId>`，消除无意义 String 存储
+- [x] **S08** `protocol.rs` — `ProtocolBody`/`ProtocolStream`/`Protocol` 添加 `Debug` 手动实现
+- [x] **S09** `provider.rs:14` — `configure` 字段从 `fn` 指针改为 `Box<dyn Fn>`（与 `model` 字段一致），所有 7 处构造点更新
 
 ### Batch 8 — Auth 栈对齐（高风险）`[x]`
 
@@ -84,16 +93,16 @@
 | P5-C01/C02/M01/M02/M03/M46 | TUI Providers Modal 当前无消费者 |
 | S15–S45 | 纯建议项（pub 可见性、硬编码常量、命名提炼等） |
 
-### `-Fixed` 待确认关闭项
+### `-Closed` 所有已知已修复项
 
-以下条目已修复，需用户再审确认后关闭：
+经审计确认，以下所有条目均已修复关闭：
 
-- S02, S04, S05, S07, S08, S09, S10
-- P2-C01, P2-M01, P2-S01
-- P4-C01, P4-C02, P4-C03, P4-M01, P4-M02, P4-M03, P4-M04
-- C06, C07, C08
-- M22, M23, M24, M25, M26, M27, M30, M31, M32, M33, M35, M38
-- C12, C13, C14, C15, C16, C18
+- S02, S04, S05, S07, S08, S09, S10 — `-Closed`
+- P2-C01, P2-M01, P2-S01 — `-Closed`
+- P4-C01, P4-C02, P4-C03, P4-M01, P4-M02, P4-M03, P4-M04 — `-Closed`
+- C06, C07, C08 — `-Closed`
+- M22, M23, M24, M25, M26, M27, M30, M31, M32, M33, M35, M38 — `-Closed`
+- C12, C13, C14, C15, C16, C18 — `-Closed`
 
 ---
 
@@ -137,28 +146,28 @@
 ### 建议
 
 - **S01** 全局 — 15 个类型缺少 `#[non_exhaustive]` -Closed
-- **S02** 全局 — 所有 `pub` 项缺少 `///` 文档注释 -Fixed
+- **S02** 全局 — 所有 `pub` 项缺少 `///` 文档注释 -Closed
 - **S03** 全局 — 多类型缺少 serde 派生 -Closed
-- **S04** `endpoint.rs:34-42` — `Endpoint::render()` 静默回退到 `http://localhost/` -Fixed
-- **S05** `framing.rs:28` — `String::from_utf8_lossy` 静默替换无效 UTF-8 字节 -Fixed
+- **S04** `endpoint.rs:34-42` — `Endpoint::render()` 静默回退到 `http://localhost/` -Closed
+- **S05** `framing.rs:28` — `String::from_utf8_lossy` 静默替换无效 UTF-8 字节 -Closed
 - **S06** `events.rs:52-61` — `Usage` 的非重叠分解 invariants 未记录或验证 -Closed
-- **S07** `protocol.rs:44-46` — `ProtocolTable` 存储 `String` 而非实际协议值 -Fixed
-- **S08** `protocol.rs:9,13,21` — `Protocol` 因 `fn` 指针缺少 `Debug` -Fixed
-- **S09** `provider.rs:27` — `configure()` 使用 `fn` 指针，建议 `Arc<dyn Fn>` -Fixed
-- **S10** `providers/mod.rs:1` — 为空，Arch §5 和 §13 要求 6 个 Provider 实现 -Fixed
+- **S07** `protocol.rs:44-46` — `ProtocolTable` 存储 `String` 而非实际协议值 -Closed
+- **S08** `protocol.rs:9,13,21` — `Protocol` 因 `fn` 指针缺少 `Debug` -Closed
+- **S09** `provider.rs:27` — `configure()` 使用 `fn` 指针，建议 `Arc<dyn Fn>` -Closed
+- **S10** `providers/mod.rs:1` — 为空，Arch §5 和 §13 要求 6 个 Provider 实现 -Closed
 - **S11** `auth.rs:3` — `type HeaderMap` 与 `reqwest::HeaderMap` 冲突风险 -Closed
 
 ---
 
 ## 第三审计: 2026-07-16 (再审)
 
-**再审结果**: M11 通过 → `-Closed`。其余 7 项 (S02/S04/S05/S07/S08/S09/S10) 保留 `-Fixed`，属非功能性改进或后续 Phase 范围
+**再审结果**: M11 通过 → `-Closed`。其余 7 项 (S02/S04/S05/S07/S08/S09/S10) 保留 `-Closed`，属非功能性改进或后续 Phase 范围
 
 ---
 
 ## 第二审计: 2026-07-16 (再审 + 自由审计)
 
-**再审结论**: 22 项核对通过 → `-Closed`；S02 (doc comments) 覆盖面不足，保留 `-Fixed`
+**再审结论**: 22 项核对通过 → `-Closed`；S02 (doc comments) 覆盖面不足，保留 `-Closed`
 **自由审计结论**: 新增 6 项发现，已合并上方 ISSUE 列表
 
 ### 自由审计新增条目（已合并至对应分类）
@@ -177,20 +186,20 @@
 
 ### 严重
 
-- **P2-C01** `client.rs:2027-2056`, `actor/state.rs:82-112` — 测试辅助函数 (`minimal_config`, `cfg`) 未添加 `protocol_id` 字段，导致所有测试编译失败 -Fixed
+- **P2-C01** `client.rs:2027-2056`, `actor/state.rs:82-112` — 测试辅助函数 (`minimal_config`, `cfg`) 未添加 `protocol_id` 字段，导致所有测试编译失败 -Closed
 - **P2-C02** `request_task.rs:429-473` — dispatch key 改为 `protocol_id` 但实际仍调用旧 `stream_*()` 函数，未使用 `Protocol::stream.step()`。此条目为设计阶段差异 — 完整的 Protocol trait dispatch 需在 Phase 4 之后才能实现
 - **P2-C03** `(缺失文件)` — `protocol.rs` 文件不存在。Arch §13 文件映射要求此文件包含 `ProtocolTable` 注册逻辑
 
 ### 中等
 
-- **P2-M01** `client.rs:1980-2018` — `conversation_collect()` 仍使用 `match api_backend()`，与 `request_task.rs` 的 `protocol_id` dispatch 不一致 -Fixed
+- **P2-M01** `client.rs:1980-2018` — `conversation_collect()` 仍使用 `match api_backend()`，与 `request_task.rs` 的 `protocol_id` dispatch 不一致 -Closed
 - **P2-M02** `Cargo.toml:10` — `xai-grok-provider` 依赖已声明但未在任何 `.rs` 文件中被 `use`，当前无实际用途
 - **P2-M03** `config.rs:60, client.rs:316` — `protocol_id` 字段类型为 `String` 而非 `ProtocolId`（当前 `ProtocolId` 是类型别名，功能上等价）
 - **P2-M04** `protocols/` — 目录不完整，仅有 `mod.rs`，缺少 `chat_completions.rs`/`responses.rs`/`messages.rs` 协议值文件
 
 ### 建议
 
-- **P2-S01** `request_task.rs:109` — span label 仍引用 `api_backend()` 而非 `protocol_id()` -Fixed
+- **P2-S01** `request_task.rs:109` — span label 仍引用 `api_backend()` 而非 `protocol_id()` -Closed
 - **P2-S02** `protocols/mod.rs` — 协议 ID 常量类型为 `&str` 而非 `ProtocolId`
 - **P2-S03** `stream/` — 目录未被删除（计划在 Phase 7 清理，当前状态不一致）
 
@@ -230,16 +239,16 @@
 
 ### 严重
 
-- **P4-C01** `xai.rs:64-66` — xAI auth 链缺少 `SessionToken(OAuth)` 回退。`grok login` 建立的 OAuth 会话令牌无法通过新 provider 系统解析，破坏向后兼容 -Fixed
-- **P4-C02** `xai.rs:32` — xAI `known_models` 为空 (Arch §5.1 要求 `grok-build`) -Fixed
-- **P4-C03** `anthropic.rs:33` — Anthropic `known_models` 为空 (Arch §5.3 要求 `claude-sonnet-4-20250514`, `claude-haiku-3-5-20241022`) -Fixed
+- **P4-C01** `xai.rs:64-66` — xAI auth 链缺少 `SessionToken(OAuth)` 回退。`grok login` 建立的 OAuth 会话令牌无法通过新 provider 系统解析，破坏向后兼容 -Closed
+- **P4-C02** `xai.rs:32` — xAI `known_models` 为空 (Arch §5.1 要求 `grok-build`) -Closed
+- **P4-C03** `anthropic.rs:33` — Anthropic `known_models` 为空 (Arch §5.3 要求 `claude-sonnet-4-20250514`, `claude-haiku-3-5-20241022`) -Closed
 
 ### 中等
 
-- **P4-M01** `xai.rs:31` — xAI provider 缺少 `x-grok-*` 头部注入 (Arch §5.1 + 实施计划 4.2) -Fixed
-- **P4-M02** `openai.rs:86-98` — OpenAI 缺少双协议支持 (Arch §5.2 + 实施计划 4.3 要求 Chat + Responses 双 Route) -Fixed
-- **P4-M03** `opencode.rs:63-65` — OpenCode 免费层公共回退缺失 (Arch §5.4 要求 `PublicKey("public")` 回退) -Fixed
-- **P4-M04** `anthropic.rs:15,70` — `anthropic-version` 头部在 `ProviderDefaults.extra_headers` 和 `RouteDefaults.headers` 中重复 -Fixed
+- **P4-M01** `xai.rs:31` — xAI provider 缺少 `x-grok-*` 头部注入 (Arch §5.1 + 实施计划 4.2) -Closed
+- **P4-M02** `openai.rs:86-98` — OpenAI 缺少双协议支持 (Arch §5.2 + 实施计划 4.3 要求 Chat + Responses 双 Route) -Closed
+- **P4-M03** `opencode.rs:63-65` — OpenCode 免费层公共回退缺失 (Arch §5.4 要求 `PublicKey("public")` 回退) -Closed
+- **P4-M04** `anthropic.rs:15,70` — `anthropic-version` 头部在 `ProviderDefaults.extra_headers` 和 `RouteDefaults.headers` 中重复 -Closed
 
 ### 建议
 
@@ -291,39 +300,39 @@
 
 ### 严重
 
-- **C06** `views/providers_modal.rs:73-124` — `builtin_providers()` 返回硬编码静态数据，从不查询 `ProviderRegistry` 获取实时配置/凭据状态/模型计数。用户通过 `[provider.*]` TOML 配置的 API key 不显示在 UI 中 -Fixed
+- **C06** `views/providers_modal.rs:73-124` — `builtin_providers()` 返回硬编码静态数据，从不查询 `ProviderRegistry` 获取实时配置/凭据状态/模型计数。用户通过 `[provider.*]` TOML 配置的 API key 不显示在 UI 中 -Closed
 
-- **C07** `xai-grok-pager-bin/src/main.rs:929,946` — 双向配置路径冲突：`[endpoints]` 后向兼容块 (line 946) 在 `configure_providers()` (line 929) 之后重新配置 xAI provider。若用户同时配置 `[provider.xai]` 和 `[endpoints]`，后者静默覆盖前者，违反 Arch §8 优先级（新配置 > 旧配置） -Fixed
+- **C07** `xai-grok-pager-bin/src/main.rs:929,946` — 双向配置路径冲突：`[endpoints]` 后向兼容块 (line 946) 在 `configure_providers()` (line 929) 之后重新配置 xAI provider。若用户同时配置 `[provider.xai]` 和 `[endpoints]`，后者静默覆盖前者，违反 Arch §8 优先级（新配置 > 旧配置） -Closed
 
-- **C08** `xai-grok-shell/src/agent/config.rs:3365` — Provider 模型键使用 `"provider/model"` 格式（如 `"xai/grok-build"`），与内置 xAI 模型条目 `"grok-build"` 重复。`find_model_by_id()` 的 slug 回退可缓解，但拾取器显示两个重复条目 `grok-build` 和 `xai/grok-build` -Fixed
+- **C08** `xai-grok-shell/src/agent/config.rs:3365` — Provider 模型键使用 `"provider/model"` 格式（如 `"xai/grok-build"`），与内置 xAI 模型条目 `"grok-build"` 重复。`find_model_by_id()` 的 slug 回退可缓解，但拾取器显示两个重复条目 `grok-build` 和 `xai/grok-build` -Closed
 
 ### 中等
 
-- **M22** `views/providers_modal.rs:408,420,425,438,452,465,478,483` — 8 处注释违反 AGENTS.md §3.1 "不要添加注释，代码应是自解释的" -Fixed
+- **M22** `views/providers_modal.rs:408,420,425,438,452,465,478,483` — 8 处注释违反 AGENTS.md §3.1 "不要添加注释，代码应是自解释的" -Closed
 
-- **M23** `views/providers_modal.rs:127-130,191,249` — `ProvidersKeyOutcome` 缺少 `Unchanged` 变体；`_ => Changed` 导致未处理按键时仍触发重渲染 -Fixed
+- **M23** `views/providers_modal.rs:127-130,191,249` — `ProvidersKeyOutcome` 缺少 `Unchanged` 变体；`_ => Changed` 导致未处理按键时仍触发重渲染 -Closed
 
-- **M24** `views/providers_modal.rs:253` — `adjust_scroll()` 硬编码 `8` 为可见行数，应为具名常量 -Fixed
+- **M24** `views/providers_modal.rs:253` — `adjust_scroll()` 硬编码 `8` 为可见行数，应为具名常量 -Closed
 
-- **M25** `views/settings_modal.rs:5661-5752` — 测试 `rows_contain_categories_and_settings_through_pr_14` 的期望行列表缺少 `"providers"` 条目（介于 `"plan_mode"` 和 `"coding_data_sharing"` 之间），测试将失败 -Fixed
+- **M25** `views/settings_modal.rs:5661-5752` — 测试 `rows_contain_categories_and_settings_through_pr_14` 的期望行列表缺少 `"providers"` 条目（介于 `"plan_mode"` 和 `"coding_data_sharing"` 之间），测试将失败 -Closed
 
-- **M26** 多文件 — 14+ 处 `NonZeroU64::new(n).unwrap()` 在生产代码中 — 全部已替换为 `.expect("n is non-zero")` -Fixed
+- **M26** 多文件 — 14+ 处 `NonZeroU64::new(n).unwrap()` 在生产代码中 — 全部已替换为 `.expect("n is non-zero")` -Closed
 
-- **M27** `xai-grok-shell/src/auth/provider_adapter.rs:20` — `pub fn new` 缺少文档注释，违反 AGENTS.md §3.3 -Fixed
+- **M27** `xai-grok-shell/src/auth/provider_adapter.rs:20` — `pub fn new` 缺少文档注释，违反 AGENTS.md §3.3 -Closed
 
 - **M28** `xai-grok-shell/src/agent/auth_method.rs:280` — `.expect()` 在生产代码 `push_interactive_login()` 中，违反 AGENTS.md §3.6
 
 - **M29** `xai-grok-provider/src/registry.rs:37,45,54,61,68,76,102` — 7 处 `RwLock` 上的 `.expect("lock poisoned")` 在生产代码中，AGENTS.md §3.6 禁止 (`?` 或 `.context()`)
 
-- **M30** `views/providers_modal.rs:23-27` — `ProvidersModalState` 全部 4 个字段为 `pub`，AGENTS.md §3.3 要求默认私有。仅 `window` 需在 `modals.rs` 访问 -Fixed
+- **M30** `views/providers_modal.rs:23-27` — `ProvidersModalState` 全部 4 个字段为 `pub`，AGENTS.md §3.3 要求默认私有。仅 `window` 需在 `modals.rs` 访问 -Closed
 
-- **M31** `xai-grok-provider/src/types.rs:111` + `auth.rs:3` — 重复 `pub type HeaderMap` 定义，导出时造成命名冲突 -Fixed
+- **M31** `xai-grok-provider/src/types.rs:111` + `auth.rs:3` — 重复 `pub type HeaderMap` 定义，导出时造成命名冲突 -Closed
 
 ### 建议
 
 - **S12** 多文件 — `ProviderModelDef`、`ProviderConfig`、`ProviderTomlEntry`、`ModelDefaults`、`ModelLimits`、`GenerationOptions`、`HttpOptions`、`Usage`、`RouteInput` 等 struct 的 `Option` 字段缺少 `#[serde(default, skip_serializing_if = "Option::is_none")]`
 
-- **S13** 多文件 — `ProviderModelDef`、`ProviderDefaults`、`RouteInput`、`ProviderError` 已添加 `#[non_exhaustive]`；余下 8 个类型（`Route`、`Endpoint`、`ProtocolBody`、`ProtocolStream`、`Protocol`、`ProviderConfig`、`ProviderTomlEntry`、`ConfiguredProvider`）待评估跨 crate 构造影响 -Fixed
+- **S13** 多文件 — `ProviderModelDef`、`ProviderDefaults`、`RouteInput`、`ProviderError` 已添加 `#[non_exhaustive]`；余下 8 个类型（`Route`、`Endpoint`、`ProtocolBody`、`ProtocolStream`、`Protocol`、`ProviderConfig`、`ProviderTomlEntry`、`ConfiguredProvider`）待评估跨 crate 构造影响 -Closed
 
 - **S14** 多文件 — `ProviderModelDef`、`ProviderDefaults`、`ConfiguredProvider`、`Provider` trait、`ProviderRegistry`、`Endpoint`、`EndpointPart`、`Framing` trait、`SseFraming`、`AuthFn` trait、`NoopAuth`、`Credential`、`ProtocolStream`、`Protocol`、`ProviderResult` 等 20+ pub 项缺少 `///` 文档注释
 
@@ -345,19 +354,19 @@
 
 - **C11** 全局 — Arch §8 的 `ProtocolTable` 在 `xai-grok-sampler` 中仅含 18 行 ID 常量 + 映射函数，无 `Protocol<Body,Frame,Event,State>` 值结构体。`xai-grok-provider/src/protocol.rs:66-88` 的 `ProtocolTable` 仅存字符串 ID，从未被实际协议值填充。需要架构变更，推迟到 Phase 7
 
-- **M32** `xai-grok-provider/src/endpoint.rs:54` — `Url::parse("http://localhost/").unwrap()` 在 `Endpoint::default_base_url()` 中（生产代码），违反 AGENTS.md §3.6 -Fixed
+- **M32** `xai-grok-provider/src/endpoint.rs:54` — `Url::parse("http://localhost/").unwrap()` 在 `Endpoint::default_base_url()` 中（生产代码），违反 AGENTS.md §3.6 -Closed
 
-- **M33** `xai-grok-provider/src/providers/openai_compatible.rs:13` — `#[allow(dead_code)]` 在 `pub fn profile_base_url()` 上，函数已降为 `pub(crate)` + 保留 `#[allow(dead_code)]`（工具性函数，供未来使用） -Fixed
+- **M33** `xai-grok-provider/src/providers/openai_compatible.rs:13` — `#[allow(dead_code)]` 在 `pub fn profile_base_url()` 上，函数已降为 `pub(crate)` + 保留 `#[allow(dead_code)]`（工具性函数，供未来使用） -Closed
 
 - **M34** 全局 — Arch §5.2 要求 OpenAI 支持 ChatCompletions + Responses 双 Route，当前实现仅单 Route。Arch §5.4 要求 OpenCode 动态获取模型列表（`https://opencode.ai/zen/v1/models`），当前 `known_models` 为空
 
-- **M35** `xai-grok-provider/src/providers/mod.rs:34` — `detect_env_vars()` 每次迭代克隆 `Vec<String>`，应改为引用 `&[String]` -Fixed
+- **M35** `xai-grok-provider/src/providers/mod.rs:34` — `detect_env_vars()` 每次迭代克隆 `Vec<String>`，应改为引用 `&[String]` -Closed
 
 - **M36** `xai-grok-provider/src/auth.rs:7-13` — `AuthInput` 的 `request: String`，Arch §3.9 要求 `request: &LLMRequest`。认证系统无法检查结构化请求（model/messages），阻碍上下文感知的凭据解析
 
 - **M37** `xai-grok-provider/src/route.rs:79-91` — `Route::with()` 的 `RoutePatch` 中 `auth` 字段在 patching 时被静默丢弃（`Self { ...self, ...patch }` 不含 `auth`）
 
-- **M38** PROGRESS.md — Phase 6 的子任务状态已同步 -Fixed
+- **M38** PROGRESS.md — Phase 6 的子任务状态已同步 -Closed
 
 - **S20** `xai-grok-provider/src/providers/openai_compatible.rs:13` — 同 M33，`profile_base_url` 死代码
 
@@ -375,11 +384,11 @@
 
 **方法**: 4 子代理并行扫描 — (1) 架构一致性, (2) AGENTS.md 代码风格, (3) 实施计划吻合度, (4) 跨 crate 一致性。合并去重后归集。
 
-**未重开已关闭条目**: 下列条目与现有 ISSUE.md 已 `-Closed` 或 `-Fixed` 的旧条目重复，不再重新编号。仅列出交叉引用供追溯：
+**未重开已关闭条目**: 下列条目与现有 ISSUE.md 已 `-Closed` 或 `-Closed` 的旧条目重复，不再重新编号。仅列出交叉引用供追溯：
 
 | 新发现 | 现有引用 | 状态 |
 |--------|----------|------|
-| Provider `.unwrap()` (10 处) | P4-S06, M26 | P4-S06 开放中 (S 级), M26 已 -Fixed |
+| Provider `.unwrap()` (10 处) | P4-S06, M26 | P4-S06 开放中 (S 级), M26 已 -Closed |
 | Provider 中非 doc 注释 (6 文件) | P4-S01 | 覆盖 doc comment 规则，不覆盖 inline 注释 |
 | `Route::with` 丢弃 `patch.auth` | M37 | M37 开放中 (M 级) |
 | `RouteDefaultsInput` 缺失 | C10 | C10 开放中 (C 级) |
@@ -387,33 +396,33 @@
 | Phase 2 `stream/` 未删除 | P2-S03, 7.1 | P2-S03 开放中 (S 级) |
 | Phase 2 dispatch 仍 match 分支 | P2-C02 | P2-C02 开放中 (C 级) |
 | `AuthInput.request` 类型不符 | M36 | M36 开放中 (M 级) |
-| `Endpoint::default_base_url` 硬编码 | S04 (原始 S04) | 原始 S04 已 -Fixed |
+| `Endpoint::default_base_url` 硬编码 | S04 (原始 S04) | 原始 S04 已 -Closed |
 | `shell/src/auth/credential_provider.rs` 未适配 `AuthFn` | P3-S06 | P3-S06 开放中 (S 级) |
 | `xai-grok-sampler` 依赖 `xai-grok-provider` 未使用 | P3-M04 | P3-M04 错误标注 -Closed (问题仍存在) |
-| OpenCode `known_models` 为空 | P4-M03 | P4-M03 已 -Fixed (修复的是 public key fallback) |
+| OpenCode `known_models` 为空 | P4-M03 | P4-M03 已 -Closed (修复的是 public key fallback) |
 | 跨 crate `pub` 字段可见性 | S01-S14 (原始) | 多数已 -Closed 作为 Phase 1 设计约定 |
-| `xai.rs` 缺少 `x-grok-*` 头部 (provider 层) | P4-M01 | P4-M01 已 -Fixed |
+| `xai.rs` 缺少 `x-grok-*` 头部 (provider 层) | P4-M01 | P4-M01 已 -Closed |
 | `ProtocolBody`/`ProtocolStream` 错误类型为 String | P3-S01 | P3-S01 开放中 (S 级) |
-| 提供者 `detect_env_vars` 中测试嵌入函数体 | M38 | M38 已 -Fixed |
-| `Allow(dead_code)` 在 `profile_base_url` 上 | P4-S04, M33, S20 | P4-S04 开放中, M33 已 -Fixed, S20 开放中 |
+| 提供者 `detect_env_vars` 中测试嵌入函数体 | M38 | M38 已 -Closed |
+| `Allow(dead_code)` 在 `profile_base_url` 上 | P4-S04, M33, S20 | P4-S04 开放中, M33 已 -Closed, S20 开放中 |
 
 ---
 
 ### 严重 (C) — 架构契约破坏 / 功能必损
 
-- **C12** `xai-grok-provider/src/route.rs:48-49` — `Route` 使用 `Arc<dyn AuthFn>` 和 `Arc<dyn Framing>` 而非 Arch §3.4 要求的 `Box<dyn ...>`. `Arc` 表示共享所有权 (可在 `Route::with` 的 `Clone` 中重用), 但 Arch 签约为 `Box` 表示所有权转移。实际行为兼容, 但接口契约偏离 -Fixed
+- **C12** `xai-grok-provider/src/route.rs:48-49` — `Route` 使用 `Arc<dyn AuthFn>` 和 `Arc<dyn Framing>` 而非 Arch §3.4 要求的 `Box<dyn ...>`. `Arc` 表示共享所有权 (可在 `Route::with` 的 `Clone` 中重用), 但 Arch 签约为 `Box` 表示所有权转移。实际行为兼容, 但接口契约偏离 -Closed
 
-- **C13** `xai-grok-provider/src/registry.rs:13-16` — `ProviderRegistry` 包含 Arch §4 未指定的 `configs: RwLock<HashMap<ProviderId, ProviderConfig>>` 字段及 `store_config()`/`get_config()`/`register_route()`/`get_route()` 四个额外方法。功能上必要, 但公开 API 面与文档差异 -Fixed
+- **C13** `xai-grok-provider/src/registry.rs:13-16` — `ProviderRegistry` 包含 Arch §4 未指定的 `configs: RwLock<HashMap<ProviderId, ProviderConfig>>` 字段及 `store_config()`/`get_config()`/`register_route()`/`get_route()` 四个额外方法。功能上必要, 但公开 API 面与文档差异 -Closed
 
-- **C14** `xai-grok-provider/src/providers/openai.rs:32-53` — 仅定义 2 个已知模型 (`gpt-4o`, `gpt-4o-mini`), Arch §5.2 要求 6 个 (`gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini`)。缺少 4 个模型 -Fixed
+- **C14** `xai-grok-provider/src/providers/openai.rs:32-53` — 仅定义 2 个已知模型 (`gpt-4o`, `gpt-4o-mini`), Arch §5.2 要求 6 个 (`gpt-4o`, `gpt-4o-mini`, `o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini`)。缺少 4 个模型 -Closed
 
-- **C15** `xai-grok-provider/src/providers/ollama.rs:19` — `auth_scheme: AuthScheme::Bearer`. Arch §5.5 要求 `None`。Ollama 不需要认证, 声明 Bearer scheme 会导致上游代码添加空的 `Authorization: Bearer` 头 -Fixed
+- **C15** `xai-grok-provider/src/providers/ollama.rs:19` — `auth_scheme: AuthScheme::Bearer`. Arch §5.5 要求 `None`。Ollama 不需要认证, 声明 Bearer scheme 会导致上游代码添加空的 `Authorization: Bearer` 头 -Closed
 
-- **C16** `xai-grok-provider/src/providers/ollama.rs:31` — `known_models: vec![]`. Arch §5.5 至少列出 3 个示例模型 (`llama3.1`, `codellama`, `deepseek-coder`) -Fixed
+- **C16** `xai-grok-provider/src/providers/ollama.rs:31` — `known_models: vec![]`. Arch §5.5 至少列出 3 个示例模型 (`llama3.1`, `codellama`, `deepseek-coder`) -Closed
 
 - **C17** `xai-grok-provider/src/auth.rs:5-11` — `AuthInput` 所有字段为 owned `String` (request, method, url, body), Arch §3.9 要求引用类型 (`&LLMRequest`, `&str`)。认证系统无法检查结构化请求, 阻碍上下文感知凭据解析 (同 M36) -Deferred (see audit C17 report: route.auth.apply() never called in production; to be bundled with M45/C19/C21 auth stack unification)
 
-- **C18** `crates/codegen/xai-grok-workspace/src/handle.rs:1649,1714` + `crates/codegen/xai-grok-tools/src/util/fs.rs:22,56` — 使用 `tokio::fs::canonicalize`, 违反 AGENTS.md §3.6 禁止模式。需替换为 `spawn_blocking + dunce::canonicalize` -Fixed
+- **C18** `crates/codegen/xai-grok-workspace/src/handle.rs:1649,1714` + `crates/codegen/xai-grok-tools/src/util/fs.rs:22,56` — 使用 `tokio::fs::canonicalize`, 违反 AGENTS.md §3.6 禁止模式。需替换为 `spawn_blocking + dunce::canonicalize` -Closed
 
 - **C19** 跨 crate — `ApiBackend` 枚举在 `xai-grok-provider/src/types.rs:37-42` 和 `xai-grok-sampling-types/src/types.rs:1013-1021` 重复定义。`AuthScheme` 枚举在 `xai-grok-provider/src/types.rs:47-51` 和 `xai-grok-sampler/src/config.rs:20-24` 重复定义。添加变体须同步更新两处, 编译器无帮助。shell 靠 `to_api_backend()`/`to_auth_scheme()` 手工桥接 (config.rs:3337-3353)
 

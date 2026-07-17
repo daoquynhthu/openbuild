@@ -5,13 +5,15 @@ use crate::model::Model;
 use crate::route::Route;
 use crate::types::{ProviderDefaults, ProviderId};
 
+/// A provider fully configured with user overrides, containing the
+/// resolved [`Route`] and a [`Model`] factory.
 #[non_exhaustive]
 pub struct ConfiguredProvider {
     pub id: ProviderId,
     pub route: Route,
     #[allow(clippy::type_complexity)]
     pub model: Box<dyn Fn(&str, &Route) -> Model>,
-    pub configure: fn(ProviderConfig) -> ConfiguredProvider,
+    pub configure: Box<dyn Fn(ProviderConfig) -> ConfiguredProvider>,
 }
 
 impl core::fmt::Debug for ConfiguredProvider {

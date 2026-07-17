@@ -47,7 +47,10 @@ pub struct EndpointPatch<Body> {
 
 impl<Body> Endpoint<Body> {
     pub fn render(&self, input: &EndpointInput<Body>) -> Url {
-        let base = self.base_url.as_deref().unwrap_or("http://localhost");
+        let base = self.base_url.as_deref().unwrap_or_else(|| {
+            tracing::warn!("no base_url configured, falling back to http://localhost");
+            "http://localhost"
+        });
         let base = base.trim_end_matches('/');
         let path = match &self.path {
             EndpointPart::Static(s) => s.clone(),

@@ -89,7 +89,7 @@ impl Provider for OllamaProvider {
                     None,
                 )
             }),
-            configure: move |c| OllamaProvider::new().configure(c),
+            configure: Box::new(move |c| OllamaProvider::new().configure(c)),
         }
     }
 

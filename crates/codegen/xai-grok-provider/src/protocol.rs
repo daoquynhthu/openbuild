@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use crate::error::ProviderError;
@@ -8,6 +8,7 @@ use crate::types::LLMRequest;
 pub use xai_grok_sampling_types::ProtocolId;
 
 /// Schema for validating and decoding provider-native types.
+/// The `validate` function pointer returns `Ok(())` or a `ProviderError`.
 pub struct Schema<T> {
     pub validate: fn(&T) -> Result<(), ProviderError>,
 }
@@ -26,13 +27,22 @@ impl<T> Clone for Schema<T> {
     }
 }
 
-/// Body construction for a Protocol: schema validation + request lowering.
+/// Body construction for a [`Protocol`]: schema validation + request lowering.
 #[non_exhaustive]
 pub struct ProtocolBody<Body> {
     pub schema: Schema<Body>,
     pub from: fn(LLMRequest) -> Result<Body, ProviderError>,
 }
 
+impl<Body> core::fmt::Debug for ProtocolBody<Body> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ProtocolBody")
+            .field("schema", &self.schema)
+            .finish()
+    }
+}
+
+/// Stream processing for a [`Protocol`]: event schema + per-step dispatch.
 #[non_exhaustive]
 pub struct ProtocolStream<Frame, Event, State> {
     pub event: Schema<Event>,
@@ -43,12 +53,31 @@ pub struct ProtocolStream<Frame, Event, State> {
     _frame: PhantomData<Frame>,
 }
 
+impl<Frame, Event, State> core::fmt::Debug for ProtocolStream<Frame, Event, State> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ProtocolStream")
+            .field("event", &self.event)
+            .field("terminal", &self.terminal.is_some())
+            .finish()
+    }
+}
+
 #[non_exhaustive]
 pub struct Protocol<Body, Frame, Event, State> {
     pub id: ProtocolId,
     pub body: ProtocolBody<Body>,
     pub stream: ProtocolStream<Frame, Event, State>,
     _frame: PhantomData<Frame>,
+}
+
+impl<Body, Frame, Event, State> core::fmt::Debug for Protocol<Body, Frame, Event, State> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Protocol")
+            .field("id", &self.id)
+            .field("body", &self.body)
+            .field("stream", &self.stream)
+            .finish()
+    }
 }
 
 impl<B, F, E, S> Protocol<B, F, E, S> {
@@ -68,26 +97,27 @@ impl<B, F, E, S> Protocol<B, F, E, S> {
 
 #[derive(Debug, Default)]
 pub struct ProtocolTable {
-    protocols: HashMap<ProtocolId, String>,
+    protocols: HashSet<ProtocolId>,
 }
 
 impl ProtocolTable {
     pub fn new() -> Self {
         Self {
-            protocols: HashMap::new(),
+            protocols: HashSet::new(),
         }
     }
 
     pub fn register(&mut self, id: impl Into<ProtocolId>) {
-        self.protocols.insert(id.into(), String::new());
+        self.protocols.insert(id.into());
     }
 
     pub fn contains(&self, id: &str) -> bool {
-        self.protocols.contains_key(id)
+        let key = ProtocolId(id.to_owned());
+        self.protocols.contains(&key)
     }
 
     pub fn all_ids(&self) -> Vec<ProtocolId> {
-        self.protocols.keys().cloned().collect()
+        self.protocols.iter().cloned().collect()
     }
 }
 

@@ -113,7 +113,7 @@ impl Provider for OpenAIProvider {
                 };
                 Model::make(ModelId::new(id), ProviderId::new(ProviderId::OPENAI), r, None)
             }),
-            configure: move |c| OpenAIProvider::new().configure(c),
+            configure: Box::new(move |c| OpenAIProvider::new().configure(c)),
         }
     }
 

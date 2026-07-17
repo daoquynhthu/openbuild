@@ -44,17 +44,17 @@ const VISIBLE_ROWS: usize = 8;
 
 impl Default for ProvidersModalState {
     fn default() -> Self {
-        Self::new()
+        Self::new(&[])
     }
 }
 
 impl ProvidersModalState {
-    pub fn new() -> Self {
+    pub fn new(configured: &[&str]) -> Self {
         Self {
             window: mw::ModalWindowState::new(),
             selected: 0,
             scroll_offset: 0,
-            providers: builtin_providers(),
+            providers: builtin_providers(configured),
             mode: ProvidersView::List,
         }
     }
@@ -72,79 +72,67 @@ impl ProvidersModalState {
     }
 }
 
-fn builtin_providers() -> Vec<ProviderEntry> {
-    fn check_env(keys: &[&str]) -> (bool, String) {
-        for key in keys {
-            if let Ok(val) = std::env::var(key)
-                && !val.trim().is_empty()
-            {
-                return (true, String::new());
-            }
-        }
-        (false, String::new())
+fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
+    fn is_configured(id: &str, configured: &[&str]) -> bool {
+        configured.contains(&id)
     }
-
-    let (xai_ok, _) = check_env(&["XAI_API_KEY"]);
-    let (openai_ok, _) = check_env(&["OPENAI_API_KEY"]);
-    let (anthropic_ok, _) = check_env(&["ANTHROPIC_API_KEY"]);
-    let (opencode_ok, _) = check_env(&["OPENCODE_API_KEY"]);
 
     vec![
         ProviderEntry {
             id: "xai".into(),
             name: "xAI".into(),
-            status: if xai_ok {
+            status: if is_configured("xai", configured) {
                 "Connected"
             } else {
                 "Not configured"
             },
-            status_color: if xai_ok { Color::Green } else { Color::Red },
+            status_color: if is_configured("xai", configured) { Color::Green } else { Color::Red },
             endpoint: "api.x.ai".into(),
-            configured: xai_ok,
+            configured: is_configured("xai", configured),
         },
         ProviderEntry {
             id: "openai".into(),
             name: "OpenAI".into(),
-            status: if openai_ok {
+            status: if is_configured("openai", configured) {
                 "Connected"
             } else {
                 "Not configured"
             },
-            status_color: if openai_ok { Color::Green } else { Color::Red },
+            status_color: if is_configured("openai", configured) { Color::Green } else { Color::Red },
             endpoint: "api.openai.com".into(),
-            configured: openai_ok,
+            configured: is_configured("openai", configured),
         },
         ProviderEntry {
             id: "anthropic".into(),
             name: "Anthropic".into(),
-            status: if anthropic_ok {
+            status: if is_configured("anthropic", configured) {
                 "Connected"
             } else {
                 "Not configured"
             },
-            status_color: if anthropic_ok {
+            status_color: if is_configured("anthropic", configured) {
                 Color::Green
             } else {
                 Color::Red
             },
             endpoint: "api.anthropic.com".into(),
-            configured: anthropic_ok,
+            configured: is_configured("anthropic", configured),
         },
         ProviderEntry {
             id: "opencode".into(),
             name: "OpenCode Zen".into(),
-            status: if opencode_ok {
+            status: if is_configured("opencode", configured) {
                 "Connected"
             } else {
                 "Free tier"
             },
-            status_color: if opencode_ok {
+            status_color: if is_configured("opencode", configured) {
                 Color::Green
             } else {
                 Color::Gray
             },
             endpoint: "opencode.ai".into(),
-            configured: opencode_ok,
+            configured: is_configured("opencode", configured),
         },
         ProviderEntry {
             id: "ollama".into(),

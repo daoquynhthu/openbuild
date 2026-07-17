@@ -115,7 +115,7 @@ impl Provider for OpenAiCompatibleProvider {
                     None,
                 )
             }),
-            configure: move |c| OpenAiCompatibleProvider::new().configure(c),
+            configure: Box::new(move |c| OpenAiCompatibleProvider::new().configure(c)),
         }
     }
 

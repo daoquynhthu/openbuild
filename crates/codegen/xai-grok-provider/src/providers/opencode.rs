@@ -93,7 +93,7 @@ impl Provider for OpenCodeProvider {
                     None,
                 )
             }),
-            configure: move |c| OpenCodeProvider::new().configure(c),
+            configure: Box::new(move |c| OpenCodeProvider::new().configure(c)),
         }
     }
 

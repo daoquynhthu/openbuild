@@ -171,7 +171,7 @@ mod tests {
                         None,
                     )
                 }),
-                configure: move |c| DummyProvider::new().configure(c),
+                configure: Box::new(move |c| DummyProvider::new().configure(c)),
             }
         }
 
