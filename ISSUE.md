@@ -32,10 +32,10 @@
 - [x] **M59** `sampler/src/sampling_log.rs:10` — `AuthInfo` 加 `#[non_exhaustive]`
 - [x] **M60** `sampler/src/attribution.rs:39` — `SamplingConsumer` 加 `#[non_exhaustive]`
 
-### Batch 4 — `serde` 属性补全（低风险）
+### Batch 4 — `serde` 属性补全（低风险）`[x]`
 
-- [ ] **M54** `events.rs:113` — `Usage` Option 字段加 `#[serde(default, skip_serializing_if = "Option::is_none")]`
-- [ ] **S12** 多文件 — `ProviderModelDef`、`ProviderConfig`、`ProviderTomlEntry` 等 Option 字段加 serde 属性
+- [x] **M54** `events.rs:113` — `Usage` 全部 8 个 Option 字段加 `#[serde(default, skip_serializing_if = "Option::is_none")]`
+- [x] **S12** `config.rs:8,50` — `ProviderConfig` + `ProviderTomlEntry` 加 `#[serde(default)]`（`ProviderModelDef` 已在 Phase 8 删除）
 
 ### Batch 5 — `.expect()`/`.unwrap()` 消除（中风险，可能暴露错误路径）
 

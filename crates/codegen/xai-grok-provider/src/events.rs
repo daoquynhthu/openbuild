@@ -111,13 +111,21 @@ pub enum ErrorKind {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub struct Usage {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub non_cached_input_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_read_input_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_write_input_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_metadata: Option<HashMap<String, serde_json::Value>>,
 }
 

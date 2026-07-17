@@ -5,6 +5,7 @@ use serde::Deserialize;
 /// Priority order (low→high): env var → TOML config → CLI override.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[non_exhaustive]
+#[serde(default)]
 pub struct ProviderConfig {
     pub id: Option<String>,
     pub api_key: Option<String>,
@@ -47,6 +48,7 @@ impl ProviderConfig {
 /// This is a tagless TOML table that serde maps directly.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[non_exhaustive]
+#[serde(default)]
 pub struct ProviderTomlEntry {
     pub api_key: Option<String>,
     pub env_key: Option<Vec<String>>,
