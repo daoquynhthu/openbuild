@@ -9,7 +9,7 @@ use crate::theme::Theme;
 use crate::views::modal_window::{self as mw, Shortcut};
 
 /// Which view the Providers modal is showing.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum ProvidersView {
     List,
     Detail {
@@ -19,6 +19,28 @@ pub enum ProvidersView {
         focused_field: usize,
         show_api_key: bool,
     },
+}
+
+impl std::fmt::Debug for ProvidersView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::List => f.debug_struct("List").finish(),
+            Self::Detail {
+                provider_idx,
+                api_key: _,
+                base_url,
+                focused_field,
+                show_api_key,
+            } => f
+                .debug_struct("Detail")
+                .field("provider_idx", provider_idx)
+                .field("api_key", &"[redacted]")
+                .field("base_url", base_url)
+                .field("focused_field", focused_field)
+                .field("show_api_key", show_api_key)
+                .finish(),
+        }
+    }
 }
 
 /// State for the Providers modal.
