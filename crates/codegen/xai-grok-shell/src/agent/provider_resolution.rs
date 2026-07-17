@@ -28,6 +28,12 @@ pub enum ProviderResolutionError {
 
     #[error("protocol error: {0}")]
     Protocol(String),
+
+    #[error("ambiguous model reference: {0}")]
+    AmbiguousModel(String),
+
+    #[error("conflicting provider: --provider {provider} conflicts with --model {model}")]
+    ConflictingProvider { provider: String, model: String },
 }
 
 /// Resolve a `SamplerConfig` from a `ModelEntry`, registry snapshot, and credentials.
@@ -136,6 +142,67 @@ pub fn resolve_model_execution(
     })
 }
 
+/// Resolve a CLI model reference against the merged catalog.
+///
+/// Cases:
+/// - `--model openai/gpt-4o` → provider=openai, model=gpt-4o
+/// - `--provider openai --model gpt-4o` → equivalent
+/// - conflicting `--provider anthropic --model openai/gpt-4o` → error
+/// - bare model uniquely found in one provider → resolves
+/// - ambiguous bare model → error listing canonical choices
+/// - legacy bare xAI defaults → resolve predictably
+pub fn resolve_cli_model_reference(
+    model_ref: &str,
+    provider_override: Option<&str>,
+    merged_catalog: &IndexMap<String, ModelEntry>,
+) -> Result<(String, String), ProviderResolutionError> {
+    let (model_provider, bare_model) = xai_grok_provider::types::parse_model_ref(model_ref);
+
+    match (model_provider, provider_override) {
+        (Some(mp), Some(po)) => {
+            let mp_name = mp.0.clone();
+            if mp_name != po {
+                return Err(ProviderResolutionError::ConflictingProvider {
+                    provider: po.to_string(),
+                    model: model_ref.to_string(),
+                });
+            }
+            Ok((po.to_string(), bare_model))
+        }
+        (Some(mp), None) => Ok((mp.0.clone(), bare_model)),
+        (None, Some(po)) => Ok((po.to_string(), bare_model)),
+        (None, None) => {
+            // Bare model: check merged catalog for unique resolution
+            let canonical_key = format!("xai/{}", bare_model);
+            let mut matches: Vec<String> = Vec::new();
+
+            for key in merged_catalog.keys() {
+                if key.ends_with(&format!("/{}", bare_model)) {
+                    matches.push(key.clone());
+                }
+            }
+
+            match matches.len() {
+                0 => {
+                    // Fall back to xAI for legacy bare model compatibility
+                    Ok(("xai".to_string(), bare_model))
+                }
+                1 => {
+                    let provider = matches[0].split('/').next().unwrap_or("xai").to_string();
+                    Ok((provider, bare_model))
+                }
+                _ => {
+                    return Err(ProviderResolutionError::AmbiguousModel(format!(
+                        "bare model '{}' matches multiple providers: {}. Use provider/model syntax.",
+                        bare_model,
+                        matches.join(", ")
+                    )));
+                }
+            }
+        }
+    }
+}
+
 /// Merge models from multiple sources into a deterministic catalog.
 ///
 /// Precedence (high → low):
@@ -203,4 +270,84 @@ pub fn merge_model_catalog(
     }
 
     merged
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indexmap::IndexMap;
+
+    #[test]
+    fn cli_model_ref_provider_prefix() {
+        let catalog = IndexMap::new();
+        let result = resolve_cli_model_reference("openai/gpt-4o", None, &catalog);
+        assert!(result.is_ok());
+        let (provider, model) = result.unwrap();
+        assert_eq!(provider, "openai");
+        assert_eq!(model, "gpt-4o");
+    }
+
+    #[test]
+    fn cli_model_ref_provider_override() {
+        let catalog = IndexMap::new();
+        let result = resolve_cli_model_reference("gpt-4o", Some("anthropic"), &catalog);
+        assert!(result.is_ok());
+        let (provider, model) = result.unwrap();
+        assert_eq!(provider, "anthropic");
+        assert_eq!(model, "gpt-4o");
+    }
+
+    #[test]
+    fn cli_model_ref_conflicting_provider_error() {
+        let catalog = IndexMap::new();
+        let result = resolve_cli_model_reference("openai/gpt-4o", Some("anthropic"), &catalog);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProviderResolutionError::ConflictingProvider { .. }
+        ));
+    }
+
+    #[test]
+    fn cli_model_ref_bare_unique_resolves() {
+        let mut catalog = IndexMap::new();
+        let mut entry =
+            ModelEntry::fallback("gpt-4o", &crate::agent::config::EndpointsConfig::default());
+        entry.provider_id = Some("openai".into());
+        catalog.insert("openai/gpt-4o".into(), entry);
+        let result = resolve_cli_model_reference("gpt-4o", None, &catalog);
+        assert!(result.is_ok());
+        let (provider, model) = result.unwrap();
+        assert_eq!(provider, "openai");
+        assert_eq!(model, "gpt-4o");
+    }
+
+    #[test]
+    fn cli_model_ref_bare_ambiguous_error() {
+        let mut catalog = IndexMap::new();
+        let mut e1 =
+            ModelEntry::fallback("gpt-4o", &crate::agent::config::EndpointsConfig::default());
+        e1.provider_id = Some("openai".into());
+        catalog.insert("openai/gpt-4o".into(), e1);
+        let mut e2 =
+            ModelEntry::fallback("gpt-4o", &crate::agent::config::EndpointsConfig::default());
+        e2.provider_id = Some("xai".into());
+        catalog.insert("xai/gpt-4o".into(), e2);
+        let result = resolve_cli_model_reference("gpt-4o", None, &catalog);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProviderResolutionError::AmbiguousModel(_)
+        ));
+    }
+
+    #[test]
+    fn cli_model_ref_bare_legacy_xai_fallback() {
+        let catalog = IndexMap::new();
+        let result = resolve_cli_model_reference("grok-build", None, &catalog);
+        assert!(result.is_ok());
+        let (provider, model) = result.unwrap();
+        assert_eq!(provider, "xai");
+        assert_eq!(model, "grok-build");
+    }
 }
