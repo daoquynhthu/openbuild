@@ -399,6 +399,103 @@ pub fn parse_ollama_tags_models(
     entries
 }
 
+/// Persist the catalog to disk using atomic write.
+/// Only non-secret model metadata is persisted (model IDs, names, base URLs).
+/// Timestamps allow TTL comparison across restarts.
+pub fn save_catalog_snapshot(snapshot: &ModelCatalogSnapshot) -> Result<(), String> {
+    let cache_dir = xai_grok_config::grok_home().join("cache");
+    std::fs::create_dir_all(&cache_dir).map_err(|e| format!("failed to create cache dir: {e}"))?;
+    let path = cache_dir.join("provider_catalog.json");
+    let tmp_path = cache_dir.join("provider_catalog.json.tmp");
+
+    // Serialize only non-secret fields
+    let serializable: Vec<SerializableEntry> = snapshot
+        .providers
+        .values()
+        .map(|entry| SerializableEntry {
+            provider_id: entry.provider_id.0.clone(),
+            state: format!("{:?}", entry.state),
+            fetched_at_unix: entry.fetched_at.map(|i| i.elapsed().as_secs()),
+            source_url: entry.source_url.clone(),
+            model_ids: entry.models.iter().map(|m| m.model.clone()).collect(),
+            model_names: entry.models.iter().filter_map(|m| m.name.clone()).collect(),
+            error_summary: entry.error_summary.clone(),
+        })
+        .collect();
+
+    let json = serde_json::to_string_pretty(&serializable)
+        .map_err(|e| format!("serialization error: {e}"))?;
+
+    std::fs::write(&tmp_path, &json).map_err(|e| format!("failed to write tmp cache: {e}"))?;
+    std::fs::rename(&tmp_path, &path).map_err(|e| format!("failed to rename cache: {e}"))?;
+
+    Ok(())
+}
+
+/// Load a previously persisted catalog snapshot from disk.
+/// Corrupt or missing cache is silently ignored (returns empty snapshot).
+pub fn load_catalog_snapshot() -> ModelCatalogSnapshot {
+    let path = xai_grok_config::grok_home()
+        .join("cache")
+        .join("provider_catalog.json");
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => {
+            return ModelCatalogSnapshot {
+                catalog_revision: 0,
+                providers: IndexMap::new(),
+            };
+        }
+    };
+
+    let entries: Vec<SerializableEntry> = match serde_json::from_str(&content) {
+        Ok(e) => e,
+        Err(e) => {
+            tracing::warn!("corrupt provider catalog cache, ignoring: {e}");
+            // Replace corrupt cache so it doesn't block startup
+            let _ = std::fs::remove_file(&path);
+            return ModelCatalogSnapshot {
+                catalog_revision: 0,
+                providers: IndexMap::new(),
+            };
+        }
+    };
+
+    let mut providers = IndexMap::new();
+    for entry in entries {
+        let pid = ProviderId::new(&entry.provider_id);
+        providers.insert(
+            pid.clone(),
+            ProviderCatalogEntry {
+                provider_id: pid,
+                state: ProviderCatalogState::Stale,
+                fetched_at: entry.fetched_at_unix.map(|_| Instant::now()),
+                source_url: entry.source_url,
+                models: vec![],
+                error_summary: entry.error_summary,
+            },
+        );
+    }
+
+    ModelCatalogSnapshot {
+        catalog_revision: 0,
+        providers,
+    }
+}
+
+/// Serializable subset of a catalog entry (no secrets).
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SerializableEntry {
+    provider_id: String,
+    state: String,
+    fetched_at_unix: Option<u64>,
+    source_url: String,
+    model_ids: Vec<String>,
+    model_names: Vec<String>,
+    error_summary: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
