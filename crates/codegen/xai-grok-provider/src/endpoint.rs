@@ -89,6 +89,14 @@ pub struct EndpointPatch<Body> {
 }
 
 impl<Body> Endpoint<Body> {
+    /// Return the default path string (Static variant) or empty string for Dynamic.
+    pub fn path_for_default(&self) -> String {
+        match &self.path {
+            EndpointPart::Static(s) => s.clone(),
+            EndpointPart::Dynamic(_) => String::new(),
+        }
+    }
+
     /// Render the endpoint into a full URL.
     ///
     /// Returns `ProviderError::InvalidEndpoint` if the base URL is missing,
