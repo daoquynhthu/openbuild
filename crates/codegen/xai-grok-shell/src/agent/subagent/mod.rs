@@ -911,6 +911,14 @@ async fn read_parent_sampling_config(
                 .unwrap_or_default();
             // Classification: SUBAGENT INHERITANCE PATH
             // Inherits parent's protocol_id, route endpoint, headers, and auth.
+            // Inherit parent protocol by re-deriving from api_backend
+            // (the parent's api_backend reflects the route selection).
+            let parent_protocol: Option<xai_grok_sampling_types::ProtocolId> = Some(
+                xai_grok_sampler::protocols::api_backend_to_protocol_id(&cfg.api_backend)
+                    .to_string()
+                    .into(),
+            );
+
             let inherited = xai_grok_sampler::SamplerConfig {
                 api_key: creds.api_key,
                 base_url: cfg.base_url,
@@ -921,7 +929,7 @@ async fn read_parent_sampling_config(
                 temperature: cfg.temperature,
                 top_p: cfg.top_p,
                 api_backend: cfg.api_backend,
-                protocol_id: None,
+                protocol_id: parent_protocol,
                 auth_scheme,
                 extra_headers,
                 context_window: cfg.context_window.get(),
