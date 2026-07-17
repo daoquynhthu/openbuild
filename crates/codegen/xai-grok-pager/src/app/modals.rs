@@ -404,12 +404,25 @@ impl AgentView {
                     return InputOutcome::Changed;
                 }
                 ModalWindowOutcome::Unhandled => {
+                    use crate::views::providers_modal::persist_provider_config;
                     use crate::views::providers_modal::ProvidersKeyOutcome;
                     return match crate::views::providers_modal::handle_providers_key(
                         prov_state, key,
                     ) {
                         ProvidersKeyOutcome::Close => {
                             self.active_modal = None;
+                            InputOutcome::Changed
+                        }
+                        ProvidersKeyOutcome::Save { provider_id, api_key, base_url } => {
+                            let provider_state = &mut prov_state.provider_state;
+                            if let Err(e) = persist_provider_config(&provider_id, &api_key, &base_url) {
+                                provider_state.update_error(
+                                    &xai_grok_provider::types::ProviderId::new(&provider_id),
+                                    Some(e),
+                                );
+                            } else {
+                                provider_state.refresh();
+                            }
                             InputOutcome::Changed
                         }
                         ProvidersKeyOutcome::Changed => InputOutcome::Changed,

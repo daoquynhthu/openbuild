@@ -93,6 +93,11 @@ fn credential_status(view: &ProviderView) -> (&'static str, Color) {
 /// Outcome from handling a key press on the Providers modal.
 pub enum ProvidersKeyOutcome {
     Close,
+    Save {
+        provider_id: String,
+        api_key: String,
+        base_url: String,
+    },
     Changed,
     Unchanged,
 }
@@ -227,42 +232,55 @@ fn handle_detail_key(
         }
         KeyCode::Enter => {
             let providers = state.provider_state.ordered_views();
-            if let Some(view) = providers.get(*provider_idx) {
-                let key = api_key.clone();
-                let url = base_url.clone();
-                save_provider_config(&view.id.0, &key, &url);
-            }
+            let save_outcome = providers.get(*provider_idx).map(|view| {
+                (
+                    view.id.0.clone(),
+                    api_key.clone(),
+                    base_url.clone(),
+                )
+            });
             state.mode = ProvidersView::List;
-            ProvidersKeyOutcome::Changed
+            match save_outcome {
+                Some((provider_id, key, url)) => ProvidersKeyOutcome::Save {
+                    provider_id,
+                    api_key: key,
+                    base_url: url,
+                },
+                None => ProvidersKeyOutcome::Changed,
+            }
         }
         _ => ProvidersKeyOutcome::Unchanged,
     }
 }
 
-fn save_provider_config(id: &str, api_key: &str, base_url: &str) {
+/// Persist a provider configuration to disk.
+/// Called by the SaveProviderConfig effect handler.
+pub fn persist_provider_config(id: &str, api_key: &str, base_url: &str) -> Result<(), String> {
     let config_path = xai_grok_config::grok_home().join("config.toml");
     if let Some(parent) = config_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("cannot create config directory: {e}"))?;
     }
     let content = std::fs::read_to_string(&config_path).unwrap_or_default();
-    let mut doc: toml_edit::DocumentMut = content.parse().unwrap_or_default();
+    let mut doc: toml_edit::DocumentMut = content.parse().map_err(|e| format!("invalid config: {e}"))?;
     let provider = doc
         .entry("provider")
         .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
         .as_table_mut()
-        .expect("[provider] must be a table");
+        .ok_or_else(|| "[provider] must be a table".to_string())?;
     let entry = provider
         .entry(id)
         .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
         .as_table_mut()
-        .expect("[provider.<id>] must be a table");
+        .ok_or_else(|| format!("[provider.{id}] must be a table").to_string())?;
     if !api_key.is_empty() {
         entry["api_key"] = toml_edit::value(api_key);
     }
     if !base_url.is_empty() {
         entry["base_url"] = toml_edit::value(base_url);
     }
-    let _ = std::fs::write(&config_path, doc.to_string());
+    std::fs::write(&config_path, doc.to_string())
+        .map_err(|e| format!("cannot write config: {e}"))
 }
 
 fn adjust_scroll(state: &mut ProvidersModalState) {

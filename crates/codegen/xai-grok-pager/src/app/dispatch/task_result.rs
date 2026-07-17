@@ -1061,5 +1061,18 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             app.show_toast(&format!("\u{2717} Could not save {key}: {scrubbed}"));
             vec![]
         }
+        TaskResult::ProviderConfigSaved { provider_id, result } => {
+            match result {
+                Ok(()) => {
+                    tracing::info!(provider = %provider_id, "provider config saved");
+                    app.show_toast(&format!("\u{2713} {provider_id} configuration saved"));
+                }
+                Err(e) => {
+                    tracing::error!(provider = %provider_id, error = %e, "provider config save failed");
+                    app.show_toast(&format!("\u{2717} Could not save {provider_id}: {e}"));
+                }
+            }
+            vec![]
+        }
     }
 }

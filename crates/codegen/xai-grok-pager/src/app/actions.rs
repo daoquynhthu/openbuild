@@ -2017,6 +2017,12 @@ pub enum Effect {
     PreparePromptImagePreview {
         preparation: crate::prompt_images::PromptImagePreviewPreparation,
     },
+    /// Persist a provider configuration to disk and trigger runtime rebuild.
+    SaveProviderConfig {
+        provider_id: String,
+        api_key: String,
+        base_url: String,
+    },
 }
 /// Outcome of an `x.ai/subagent/cancel` request, telling dispatch whether the
 /// pager must finalize the subagent row itself.
@@ -2690,6 +2696,11 @@ pub enum TaskResult {
     },
     /// Shared prompt-image preview state was resolved off-thread.
     PromptImagePreviewPrepared,
+    /// Provider configuration persisted and runtime rebuild initiated.
+    ProviderConfigSaved {
+        provider_id: String,
+        result: Result<(), String>,
+    },
 }
 #[cfg(test)]
 mod tests {

@@ -4095,6 +4095,19 @@ pub(crate) fn execute(
                     }
                 });
         }
+        Effect::SaveProviderConfig { provider_id, api_key, base_url } => {
+            let result = crate::views::providers_modal::persist_provider_config(
+                &provider_id, &api_key, &base_url,
+            );
+            tracing::info!(
+                provider = %provider_id,
+                success = result.is_ok(),
+                "SaveProviderConfig effect completed"
+            );
+            tasks.spawn(async move {
+                TaskResult::ProviderConfigSaved { provider_id, result }
+            });
+        }
     }
     (false, meta)
 }
