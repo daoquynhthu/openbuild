@@ -607,3 +607,25 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 ### Scope review
 - No unrelated files changed
 - No dependency added
+
+---
+
+## Provider Adapter V1 — Phase 7: Asynchronous Model Catalog — 2026-07-17
+
+### Base and result
+- Start commit: `d1d93f6`
+- End commit: `f3c7070`
+- Tasks completed: `P7-01` through `P7-07`
+
+### Files changed
+- `xai-grok-shell/src/agent/provider_catalog.rs` — parsers, snapshots, async service, TTL, persistence
+- `xai-grok-shell/src/agent/mod.rs` — exported provider_catalog
+- `xai-grok-shell/src/agent/config.rs` — provider_catalog field
+- `xai-grok-pager-bin/src/main.rs` — create catalog after registry
+- `xai-grok-shell/src/agent/provider_resolution.rs` — clippy fix
+
+### Phase 7 gate (T2)
+- C-05: `derive_model_list_url()` uses resolved provider base URL ✅
+- C-06: `ProviderCatalogEntry::is_stale()` + `RefreshStrategy` + `DEFAULT_CACHE_TTL` ✅
+- C-09: OpenCode public mode via `CredentialSource::Public` ✅
+- C-07: `derive_model_list_url()` with user base_url override ✅
