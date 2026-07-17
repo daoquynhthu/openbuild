@@ -79,7 +79,7 @@ pub fn build_provider_config(
 }
 
 /// Configure all providers in the registry with merged config from all sources.
-/// Priority (low→high): env → TOML → compat (old [endpoints]) → CLI.
+/// Priority (low→high): env → TOML → compat (old `[endpoints]`) → CLI.
 /// Stores resolved routes back into the registry for later model resolution.
 /// The `compat` parameter provides backward-compatible overrides (e.g., from old
 /// `[endpoints]` config) that apply between TOML and CLI layers.
