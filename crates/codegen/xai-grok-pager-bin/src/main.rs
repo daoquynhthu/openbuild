@@ -869,6 +869,16 @@ async fn run_agent_command(
     tokio::task::spawn_blocking(|| {});
     let is_stdio = matches!(agent_args.mode, Some(AgentCmd::Stdio));
     let is_leader = matches!(agent_args.mode, Some(AgentCmd::Leader(_)));
+
+    // Initialize ProviderRegistry (needed by both TUI and headless paths).
+    let provider_registry = {
+        let reg = std::sync::Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
+        xai_grok_provider::providers::register_all(&reg);
+        reg
+    };
+    let provider_catalog =
+        std::sync::Arc::new(xai_grok_shell::agent::provider_catalog::ProviderCatalogService::new());
+
     if !is_stdio && !is_leader {
         eprintln!(
             "Grok Build (pager) - v{}",
@@ -894,11 +904,9 @@ async fn run_agent_command(
     let mut agent_config = AgentConfig::new_from_toml_cfg(&raw_config)
         .map_err(|e| anyhow::anyhow!("Failed to create agent config: {}", e))?;
 
-    // Initialize ProviderRegistry with built-in providers, user config,
-    // environment variables, and CLI overrides.
-    let provider_registry = {
-        let reg = std::sync::Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
-        xai_grok_provider::providers::register_all(&reg);
+    // Configure ProviderRegistry: apply user config, env, CLI, compat.
+    {
+        let reg = &provider_registry;
 
         // Determine which provider the CLI overrides target.
         let cli_provider_name: Option<String> = agent_args.provider.clone().or_else(|| {
@@ -936,13 +944,14 @@ async fn run_agent_command(
 
         // Apply all config layers: env → TOML → [endpoints] → CLI.
         xai_grok_provider::providers::configure_providers(
-            &reg,
+            reg,
             &raw_config,
             compat_override,
             cli_override,
         );
-        reg
-    };
+    }
+
+    agent_config.provider_catalog = Some(provider_catalog.clone());
 
     // Thread the registry into config for downstream model resolution.
     agent_config.provider_registry = Some(provider_registry.clone());

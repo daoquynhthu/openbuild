@@ -1402,6 +1402,9 @@ pub struct Config {
     /// Set during startup in main.rs, threaded through to model resolution.
     #[serde(skip)]
     pub provider_registry: Option<std::sync::Arc<xai_grok_provider::registry::ProviderRegistry>>,
+    #[serde(skip)]
+    pub provider_catalog:
+        Option<std::sync::Arc<crate::agent::provider_catalog::ProviderCatalogService>>,
     /// CLI override for API key (from --api-key).
     #[serde(skip)]
     pub api_key_override: Option<String>,
@@ -1767,6 +1770,7 @@ impl Default for Config {
             default_model_override: None,
             provider_override: None,
             provider_registry: None,
+            provider_catalog: None,
             api_key_override: None,
             base_url_override: None,
             reasoning_effort_override: None,
