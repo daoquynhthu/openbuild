@@ -63,6 +63,9 @@ pub enum ConfigUpdate {
     /// The `[model.*]` entries in config.toml changed. Agent should re-resolve
     /// its model list (BYOK models added/removed, default or surprise changed).
     ModelsChanged,
+    /// The `[provider.*]` entries changed. Runtime should rebuild registry
+    /// snapshots and refresh the catalog.
+    ProvidersChanged,
     /// `~/.grok/models_cache.json` was rewritten on disk (possibly by another
     /// via `ModelsManager::reload_from_disk_cache`, which content-dedupes
     /// self-writes (`persist` / `renew_ttl`) before applying. No payload —
@@ -402,6 +405,14 @@ impl ConfigReloader {
                 yolo: new_ui.1,
                 fork_secondary_model: new_ui.2,
             });
+        }
+
+        // Provider config — detect [provider.*] changes
+        let old_provider_table = self.last_global_config.get("provider");
+        let new_provider_table = new_global.get("provider");
+        if old_provider_table != new_provider_table {
+            info!("provider config change detected");
+            let _ = self.config_update_tx.send(ConfigUpdate::ProvidersChanged);
         }
 
         self.last_global_config = new_global;

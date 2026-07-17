@@ -1647,6 +1647,11 @@ pub async fn run_leader(
                             });
                             let _ = ipc_tx_for_config.send(notification.to_string());
                         }
+                        ConfigUpdate::ProvidersChanged => {
+                            info!("Provider config change detected — rebuild pending");
+                            // The session actor handles the actual rebuild
+                            // via provider runtime when it receives this signal.
+                        }
                     }
                 }
             });

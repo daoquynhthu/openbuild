@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use indexmap::IndexMap;
 use tokio::sync::RwLock;
@@ -15,17 +16,19 @@ use super::provider_catalog::{self, ProviderCatalogService};
 /// Provides transactional rebuild and explicit refresh.
 #[derive(Debug)]
 pub struct ProviderRuntime {
-    pub registry: ProviderRegistry,
-    pub catalog: ProviderCatalogService,
+    pub registry: Arc<ProviderRegistry>,
+    pub catalog: Arc<ProviderCatalogService>,
     config_revision: RwLock<u64>,
+    cancelled: AtomicBool,
 }
 
 impl ProviderRuntime {
     pub fn new() -> Self {
         Self {
-            registry: ProviderRegistry::new(),
-            catalog: ProviderCatalogService::new(),
+            registry: Arc::new(ProviderRegistry::new()),
+            catalog: Arc::new(ProviderCatalogService::new()),
             config_revision: RwLock::new(0),
+            cancelled: AtomicBool::new(false),
         }
     }
 
@@ -52,6 +55,11 @@ impl ProviderRuntime {
         let mut rev = self.config_revision.write().await;
         *rev = revision;
         Ok(revision)
+    }
+
+    /// Cancel outstanding catalog operations.
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Relaxed);
     }
 
     /// Current config revision.
