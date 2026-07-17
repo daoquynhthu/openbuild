@@ -316,7 +316,7 @@ impl SessionActor {
             top_p: cfg.top_p,
             protocol_id: Some(
                 xai_grok_sampler::protocols::api_backend_to_protocol_id(&cfg.api_backend)
-                    .to_owned(),
+                    .into(),
             ),
             api_backend: cfg.api_backend,
             auth_scheme,

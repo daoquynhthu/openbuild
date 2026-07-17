@@ -5,7 +5,7 @@ use crate::error::ProviderError;
 use crate::events::LLMEvent;
 use crate::types::LLMRequest;
 
-pub type ProtocolId = String;
+pub use xai_grok_sampling_types::ProtocolId;
 
 /// Schema for validating and decoding provider-native types.
 pub struct Schema<T> {

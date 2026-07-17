@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::auth::{AuthFn, NoopAuth};
 use crate::endpoint::{Endpoint, EndpointPatch};
 use crate::framing::Framing;
-use crate::model::Model;
+use crate::model::{GenerationOptions, Model, ModelLimits};
 use crate::types::{HeaderMap, LLMRequest, ModelId, ProviderId};
 
 /// Static defaults for a Route.
@@ -11,6 +11,8 @@ use crate::types::{HeaderMap, LLMRequest, ModelId, ProviderId};
 #[non_exhaustive]
 pub struct RouteDefaults {
     pub headers: Option<HeaderMap>,
+    pub generation: Option<GenerationOptions>,
+    pub limits: Option<ModelLimits>,
 }
 
 /// Input for constructing a Route.
@@ -87,7 +89,11 @@ impl Route {
             endpoint: input.endpoint,
             auth: input.auth.unwrap_or_else(|| Box::new(NoopAuth)),
             framing: input.framing,
-            defaults: input.defaults.unwrap_or(RouteDefaults { headers: None }),
+            defaults: input.defaults.unwrap_or(RouteDefaults {
+                headers: None,
+                generation: None,
+                limits: None,
+            }),
             headers: None,
         }
     }
@@ -151,7 +157,7 @@ mod tests {
             },
             auth: Some(Credential::optional(Some("sk-test".into()), "api_key").bearer()),
             framing: Box::new(SseFraming),
-            defaults: Some(RouteDefaults { headers: None }),
+            defaults: Some(RouteDefaults { headers: None, generation: None, limits: None }),
         })
     }
 

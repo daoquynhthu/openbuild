@@ -50,7 +50,7 @@ pub struct SamplerConfig {
     /// Protocol identifier for stream dispatch.
     /// `None` falls back to the protocol derived from `api_backend`.
     #[serde(default)]
-    pub protocol_id: Option<String>,
+    pub protocol_id: Option<xai_grok_sampling_types::ProtocolId>,
     #[serde(default)]
     pub auth_scheme: AuthScheme,
     /// Extra request headers applied verbatim. The sampler never inspects

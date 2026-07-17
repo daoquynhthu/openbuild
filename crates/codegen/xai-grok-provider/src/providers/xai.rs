@@ -89,6 +89,8 @@ impl Provider for XaiProvider {
             framing: Box::new(SseFraming),
             defaults: Some(crate::route::RouteDefaults {
                 headers: Some(xai_headers),
+                generation: None,
+                limits: None,
             }),
         });
         let pid = self.defaults.id.clone();

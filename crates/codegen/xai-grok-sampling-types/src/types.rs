@@ -1040,6 +1040,47 @@ pub enum AuthScheme {
     None,
 }
 
+/// Protocol identifier newtype.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ProtocolId(pub String);
+
+impl std::fmt::Display for ProtocolId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<String> for ProtocolId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<&str> for ProtocolId {
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
+    }
+}
+
+impl std::borrow::Borrow<str> for ProtocolId {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for ProtocolId {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl PartialEq<&str> for ProtocolId {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
 /// Sampling client configuration (API key excluded — that stays in the client).
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SamplingConfig {

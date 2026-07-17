@@ -83,6 +83,8 @@ impl Provider for AnthropicProvider {
             framing: Box::new(SseFraming),
             defaults: Some(crate::route::RouteDefaults {
                 headers: Some(route_headers),
+                generation: None,
+                limits: None,
             }),
         });
         let pid = self.defaults.id.clone();

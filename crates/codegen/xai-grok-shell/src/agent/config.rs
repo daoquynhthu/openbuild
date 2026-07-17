@@ -4653,7 +4653,7 @@ pub fn sampling_config_for_model(
         temperature,
         top_p,
         protocol_id: Some(
-            xai_grok_sampler::protocols::api_backend_to_protocol_id(&api_backend).to_owned(),
+            xai_grok_sampler::protocols::api_backend_to_protocol_id(&api_backend).into(),
         ),
         api_backend,
         auth_scheme: credentials.auth_scheme,

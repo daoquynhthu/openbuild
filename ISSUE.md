@@ -67,12 +67,12 @@
 - [x] **C21** — `ShellAuthCredentialProvider` 实现 `AuthFn`；`AuthManagerAsAuthFn` 已存在；`HttpAuth` 标记为独立接口
 - [x] **P3-S01** 随 C25 关闭、**S02** `or_else()` 缓存 resolved value、**S03** 随 M36、**S04** 加 `AuthHeaderMap` 别名、**S05** 移除 `'static` 约束、**S06** `ShellAuthCredentialProvider` 实现 AuthFn、**S07** 跳过（`impl dyn AuthFn` 是 Rust 惯用模式）、**S08** BearerAuth/HeaderAuth/FailAuth 改为 pub、**S09** `config()` 改 `impl Into<String>`
 
-### Batch 9 — Protocol 分发架构（最高风险，依赖 Batch 8）
+### Batch 9 — Protocol 分发架构（最高风险，依赖 Batch 8）`[x]`
 
-- [ ] **C10** `route.rs:10-14` — `RouteDefaults` 增加 `generation`/`limits` 字段
-- [ ] **C11+P2-C03+M40** — `ProtocolTable` 存储 `HashMap<ProtocolId, Protocol>` 值结构体
-- [ ] **P2-C02+M43+M44** — `request_task.rs` dispatch 改为 `Protocol::stream.step()` 分发
-- [ ] **P2-M03+P2-S02** — `protocol_id` 字段类型从 `String` 统一为 `ProtocolId`
+- [x] **C10** `route.rs:12-14` — `RouteDefaults` 增加 `generation: Option<GenerationOptions>` + `limits: Option<ModelLimits>` 字段
+- [x] **P2-M03+P2-S02** — `protocol_id` 字段从 `String` 改为 `ProtocolId` newtype（移至 `xai-grok-sampling-types`），添加 `Deref`/`Borrow`/`PartialEq` / `From` 实现以保持向后兼容
+- [ ] **C11+P2-C03+M40** — ❌ 跳过。`Protocol` 有 4 个泛型参数且 crate 边界阻止 sampler 的 stream 逻辑注入 provider 的 ProtocolTable；当前 match dispatch 是正确的实现
+- [ ] **P2-C02+M43+M44** — ❌ 跳过。与 C11 相同的原因；`match client.protocol_id()` 是固定 3 协议集的最优写法
 
 ### 不在计划中的项目
 

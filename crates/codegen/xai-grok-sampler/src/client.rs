@@ -313,7 +313,7 @@ struct ClientDefaults {
     temperature: Option<f32>,
     top_p: Option<f32>,
     api_backend: ApiBackend,
-    protocol_id: Option<String>,
+    protocol_id: Option<xai_grok_sampling_types::ProtocolId>,
     auth_scheme: AuthScheme,
     stream_tool_calls: bool,
     doom_loop_recovery: Option<xai_grok_sampling_types::DoomLoopRecoveryPolicy>,
@@ -547,7 +547,7 @@ impl SamplingClient {
 
     pub fn protocol_id(&self) -> &str {
         match &self.defaults.protocol_id {
-            Some(id) if !id.is_empty() => id.as_str(),
+            Some(id) if !id.0.is_empty() => &id.0,
             _ => crate::protocols::api_backend_to_protocol_id(&self.defaults.api_backend),
         }
     }
