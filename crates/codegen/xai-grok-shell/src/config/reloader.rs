@@ -2,11 +2,13 @@ use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
+use crate::agent::provider_runtime::ProviderRuntime;
 use crate::auth::{GrokAuth, read_auth_json};
 
 use super::watcher::ConfigChangeEvent;
@@ -99,6 +101,8 @@ pub struct ConfigReloader {
     experimental_memory: bool,
     /// Whether --no-memory was passed at startup. Persists across config reloads.
     no_memory: bool,
+    /// Optional provider runtime for transactional config rebuild.
+    provider_runtime: Option<Arc<ProviderRuntime>>,
 }
 
 impl ConfigReloader {
@@ -111,6 +115,7 @@ impl ConfigReloader {
         config_update_tx: mpsc::UnboundedSender<ConfigUpdate>,
         experimental_memory: bool,
         no_memory: bool,
+        provider_runtime: Option<Arc<ProviderRuntime>>,
     ) -> Self {
         Self {
             last_auth_key_hash: initial_auth_key_hash,
@@ -122,6 +127,7 @@ impl ConfigReloader {
             config_update_tx,
             experimental_memory,
             no_memory,
+            provider_runtime,
         }
     }
 
@@ -412,6 +418,10 @@ impl ConfigReloader {
         let new_provider_table = new_global.get("provider");
         if old_provider_table != new_provider_table {
             info!("provider config change detected");
+            // Signal the agent to rebuild the provider registry asynchronously.
+            // The agent processes this signal via its async runtime, calling
+            // ProviderRuntime::rebuild which atomically publishes the new snapshot
+            // or retains the previous one on failure.
             let _ = self.config_update_tx.send(ConfigUpdate::ProvidersChanged);
         }
 

@@ -1468,6 +1468,7 @@ pub async fn run_leader(
                     config_update_tx,
                     agent_config.cli_experimental_memory,
                     agent_config.cli_no_memory,
+                    None, // provider_runtime — injected in P9-07
                 );
                 tokio::spawn(reloader.run(events_rx, cancel_clone.clone()));
                 Some(watcher)
