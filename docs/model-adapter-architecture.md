@@ -719,11 +719,20 @@ The pipeline runs as follows:
 
 **Model merge precedence (deterministic):**
 ```
-manual user model override
-  > dynamic provider-discovered model metadata
-  > provider static known-model metadata
-  > embedded legacy xAI default metadata
+manual user model override ([model.*])
+  > dynamic provider-discovered model metadata (from catalog service)
+  > provider static known-model metadata (embedded defaults)
+  > embedded legacy xAI default metadata (legacy/fallback)
 ```
+
+**Model identity rules:**
+- Canonical key for non-legacy models: `provider/model` (e.g. `openai/gpt-4o`)
+- Maintain display name separately from canonical key
+- An override may enrich metadata but may not silently move a model to another provider
+- Duplicates within a provider are deduplicated by canonical model ID
+- Same bare model under two providers remains two entries (`openai/gpt-4o` vs `xai/gpt-4o`)
+- Bare lookup that matches multiple providers returns an `AmbiguousModel` error
+- Legacy bare xAI defaults continue to resolve predictably without provider prefix
 
 **Catalog service API shape (AD-07):**
 ```rust

@@ -8,7 +8,9 @@ use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
 use crate::route::Route;
-use crate::types::{ApiBackend, AuthScheme, ProviderDefaults, ProviderId, RouteId};
+use crate::types::{
+    ApiBackend, AuthScheme, ModelSourceSpec, ProviderDefaults, ProviderId, RouteId,
+};
 
 fn opencode_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -87,6 +89,7 @@ impl Provider for OpenCodeProvider {
             Arc::new(DefaultRouteSelector {
                 default_route_id: route_id,
             }),
+            ModelSourceSpec::Dynamic,
         )
     }
 }

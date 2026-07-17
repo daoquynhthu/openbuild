@@ -121,7 +121,7 @@ mod tests {
     use super::*;
     use crate::config::ProviderConfig;
     use crate::registry::ProviderRegistry;
-    use crate::types::ProviderId;
+    use crate::types::{ModelSourceSpec, ProviderId};
 
     fn dummy_registry() -> ProviderRegistry {
         let reg = ProviderRegistry::new();
@@ -184,6 +184,7 @@ mod tests {
                 Arc::new(crate::provider::DefaultRouteSelector {
                     default_route_id: route_id,
                 }),
+                ModelSourceSpec::Dynamic,
             )
         }
     }

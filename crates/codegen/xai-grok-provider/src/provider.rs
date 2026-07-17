@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use crate::config::ProviderConfig;
 use crate::error::ProviderError;
 use crate::route::Route;
-use crate::types::{ProviderDefaults, ProviderId, RouteId};
+use crate::types::{ModelSourceSpec, ProviderDefaults, ProviderId, RouteId};
 
 /// A provider fully configured with user overrides, owning a route set.
 ///
@@ -19,6 +19,7 @@ pub struct ConfiguredProvider {
     pub routes: IndexMap<RouteId, Arc<Route>>,
     pub default_route_id: RouteId,
     pub route_selector: Arc<dyn RouteSelector>,
+    pub model_source: ModelSourceSpec,
 }
 
 impl ConfiguredProvider {
@@ -30,6 +31,7 @@ impl ConfiguredProvider {
         routes: IndexMap<RouteId, Arc<Route>>,
         default_route_id: RouteId,
         route_selector: Arc<dyn RouteSelector>,
+        model_source: ModelSourceSpec,
     ) -> Self {
         Self {
             id,
@@ -38,6 +40,7 @@ impl ConfiguredProvider {
             routes,
             default_route_id,
             route_selector,
+            model_source,
         }
     }
 }

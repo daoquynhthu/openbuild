@@ -230,7 +230,7 @@ mod tests {
     use crate::config::ProviderConfig;
     use crate::endpoint::{Endpoint, EndpointPart};
     use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
-    use crate::types::ProviderDefaults;
+    use crate::types::{ModelSourceSpec, ProviderDefaults};
 
     #[derive(Debug)]
     struct DummyProvider {
@@ -282,6 +282,7 @@ mod tests {
                 Arc::new(DefaultRouteSelector {
                     default_route_id: RouteId::new("dummy-route"),
                 }),
+                ModelSourceSpec::Dynamic,
             )
         }
     }
@@ -390,6 +391,7 @@ mod tests {
                     Arc::new(DefaultRouteSelector {
                         default_route_id: RouteId::new("route-a"),
                     }),
+                    ModelSourceSpec::Dynamic,
                 )
             }
         }
@@ -437,6 +439,7 @@ mod tests {
                     Arc::new(DefaultRouteSelector {
                         default_route_id: RouteId::new("route-b"),
                     }),
+                    ModelSourceSpec::Dynamic,
                 )
             }
         }
@@ -532,6 +535,7 @@ mod tests {
                     Arc::new(DefaultRouteSelector {
                         default_route_id: RouteId::new("bad-route"),
                     }),
+                    ModelSourceSpec::Dynamic,
                 )
             }
         }

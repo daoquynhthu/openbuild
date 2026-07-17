@@ -9,6 +9,7 @@ use xai_grok_sampler::SamplerConfig;
 use xai_grok_sampling_types::ApiBackend;
 
 use super::config::ModelEntry;
+use super::provider_catalog::ModelCatalogSnapshot;
 
 /// Error returned by the route compiler.
 #[derive(Debug, thiserror::Error)]
@@ -133,4 +134,73 @@ pub fn resolve_model_execution(
         stream_tool_calls: model.info.stream_tool_calls.unwrap_or(false),
         ..Default::default()
     })
+}
+
+/// Merge models from multiple sources into a deterministic catalog.
+///
+/// Precedence (high → low):
+///   manual user model override
+///   > dynamic provider-discovered model metadata
+///   > provider static known-model metadata
+///   > embedded legacy xAI default metadata
+///
+/// Canonical key: `provider/model` for non-legacy models.
+/// Bare lookup that matches multiple providers returns `AmbiguousModel`.
+pub fn merge_model_catalog(
+    registry_snapshot: &RegistrySnapshot,
+    catalog_snapshot: &ModelCatalogSnapshot,
+    manual_overrides: &IndexMap<String, ModelEntry>,
+    legacy_defaults: &IndexMap<String, ModelEntry>,
+    endpoints: &crate::agent::config::EndpointsConfig,
+) -> IndexMap<String, ModelEntry> {
+    let mut merged: IndexMap<String, ModelEntry> = IndexMap::new();
+
+    // Layer 1: embedded legacy xAI defaults (lowest priority)
+    for (key, entry) in legacy_defaults {
+        merged.entry(key.clone()).or_insert_with(|| entry.clone());
+    }
+
+    // Layer 2: dynamic provider-discovered models from catalog
+    for (_pid, catalog_entry) in &catalog_snapshot.providers {
+        if catalog_entry.state != super::provider_catalog::ProviderCatalogState::Ready {
+            continue;
+        }
+        for model_cfg in &catalog_entry.models {
+            let key = format!("{}/{}", catalog_entry.provider_id.0, model_cfg.model);
+            if !merged.contains_key(&key) {
+                let display_name = model_cfg.name.clone().unwrap_or_default();
+                let mut entry = ModelEntry::from_config_entry(model_cfg);
+                entry.provider_id = Some(catalog_entry.provider_id.0.clone());
+                merged.insert(key, entry);
+            }
+        }
+    }
+
+    // Layer 3: provider static known-model metadata (from registry snapshot
+    // provider defaults). These fill in gaps when no dynamic model exists.
+    for (_pid, configured) in &registry_snapshot.providers {
+        if let xai_grok_provider::types::ModelSourceSpec::Static(models) = &configured.model_source
+        {
+            for model_id in models {
+                let key = format!("{}/{}", configured.id.0, model_id);
+                merged.entry(key).or_insert_with(|| {
+                    let mut entry = ModelEntry::fallback(model_id, endpoints);
+                    entry.provider_id = Some(configured.id.0.clone());
+                    entry.info.base_url = configured
+                        .routes
+                        .get(&configured.default_route_id)
+                        .and_then(|r| r.endpoint.base_url.clone())
+                        .unwrap_or_default();
+                    entry
+                });
+            }
+        }
+    }
+
+    // Layer 4: manual user model overrides (highest priority)
+    for (key, entry) in manual_overrides {
+        merged.insert(key.clone(), entry.clone());
+    }
+
+    merged
 }
