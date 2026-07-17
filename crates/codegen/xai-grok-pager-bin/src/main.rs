@@ -1932,7 +1932,8 @@ async fn async_main() -> Result<()> {
         } else {
             None
         };
-    let result = xai_grok_pager::app::run(args, bg_update_rx).await;
+    let result =
+        xai_grok_pager::app::run(args, bg_update_rx, Some(provider_registry.clone())).await;
     xai_grok_sandbox::flush();
     match result {
         Ok(true) => {

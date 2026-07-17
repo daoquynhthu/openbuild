@@ -6,7 +6,9 @@ use xai_grok_provider::registry::ProviderRegistry;
 static PROVIDER_REGISTRY: OnceLock<Arc<ProviderRegistry>> = OnceLock::new();
 
 pub fn init(registry: Arc<ProviderRegistry>) {
-    PROVIDER_REGISTRY.set(registry).ok();
+    if PROVIDER_REGISTRY.set(registry).is_err() {
+        tracing::warn!("provider_state::init called more than once — second call ignored");
+    }
 }
 
 pub fn registry() -> Option<&'static Arc<ProviderRegistry>> {
