@@ -16,6 +16,7 @@ pub struct ProviderEntry {
     pub status_color: Color,
     pub endpoint: String,
     pub configured: bool,
+    pub models: Option<usize>,
 }
 
 /// Which view the Providers modal is showing.
@@ -89,6 +90,7 @@ fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
             status_color: if is_configured("xai", configured) { Color::Green } else { Color::Red },
             endpoint: "api.x.ai".into(),
             configured: is_configured("xai", configured),
+            models: None,
         },
         ProviderEntry {
             id: "openai".into(),
@@ -101,6 +103,7 @@ fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
             status_color: if is_configured("openai", configured) { Color::Green } else { Color::Red },
             endpoint: "api.openai.com".into(),
             configured: is_configured("openai", configured),
+            models: None,
         },
         ProviderEntry {
             id: "anthropic".into(),
@@ -117,6 +120,7 @@ fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
             },
             endpoint: "api.anthropic.com".into(),
             configured: is_configured("anthropic", configured),
+            models: None,
         },
         ProviderEntry {
             id: "opencode".into(),
@@ -133,6 +137,7 @@ fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
             },
             endpoint: "opencode.ai".into(),
             configured: is_configured("opencode", configured),
+            models: None,
         },
         ProviderEntry {
             id: "ollama".into(),
@@ -141,6 +146,7 @@ fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
             status_color: Color::Cyan,
             endpoint: "localhost:11434".into(),
             configured: true,
+            models: None,
         },
         ProviderEntry {
             id: "openai-compatible".into(),
@@ -149,6 +155,7 @@ fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
             status_color: Color::Red,
             endpoint: "\u{2014}".into(),
             configured: false,
+            models: None,
         },
     ]
 }
@@ -230,6 +237,7 @@ fn handle_detail_key(
     use crossterm::event::KeyCode;
 
     let ProvidersView::Detail {
+        ref provider_idx,
         ref mut api_key,
         ref mut base_url,
         ref mut focused_field,
@@ -286,11 +294,42 @@ fn handle_detail_key(
             ProvidersKeyOutcome::Changed
         }
         KeyCode::Enter => {
+            if let Some(provider) = state.providers.get(*provider_idx) {
+                let key = api_key.clone();
+                let url = base_url.clone();
+                save_provider_config(&provider.id, &key, &url);
+            }
             state.mode = ProvidersView::List;
             ProvidersKeyOutcome::Changed
         }
         _ => ProvidersKeyOutcome::Unchanged,
     }
+}
+
+fn save_provider_config(id: &str, api_key: &str, base_url: &str) {
+    let config_path = xai_grok_config::grok_home().join("config.toml");
+    if let Some(parent) = config_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let content = std::fs::read_to_string(&config_path).unwrap_or_default();
+    let mut doc: toml_edit::DocumentMut = content.parse().unwrap_or_default();
+    let provider = doc
+        .entry("provider")
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_mut()
+        .expect("[provider] must be a table");
+    let entry = provider
+        .entry(id)
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_mut()
+        .expect("[provider.<id>] must be a table");
+    if !api_key.is_empty() {
+        entry["api_key"] = toml_edit::value(api_key);
+    }
+    if !base_url.is_empty() {
+        entry["base_url"] = toml_edit::value(base_url);
+    }
+    let _ = std::fs::write(&config_path, doc.to_string());
 }
 
 fn adjust_scroll(state: &mut ProvidersModalState) {
@@ -363,7 +402,7 @@ fn render_list(
 
     let header_style = Style::default().fg(theme.gray).add_modifier(Modifier::BOLD);
     let header = Line::styled(
-        format!("{:<14} {:>16}  {}", "Provider", "Status", "Endpoint"),
+        format!("{:<14} {:>5} {:>10}  {}", "Provider", "Models", "Status", "Endpoint"),
         header_style,
     );
     header.render(
@@ -401,9 +440,11 @@ fn render_list(
         let status_style = Style::default().fg(provider.status_color).bg(bg);
         let row_style = Style::default().fg(fg).bg(bg);
 
+        let models_label = provider.models.map(|n| n.to_string()).unwrap_or_else(|| "—".into());
         let line = Line::from(vec![
             ratatui::text::Span::styled(format!(" {:<14}", provider.name), row_style),
-            ratatui::text::Span::styled(format!(" {:>16} ", provider.status), status_style),
+            ratatui::text::Span::styled(format!(" {:>5} ", models_label), row_style),
+            ratatui::text::Span::styled(format!(" {:>10} ", provider.status), status_style),
             ratatui::text::Span::styled(format!("  {}", provider.endpoint), row_style),
         ]);
         line.render(Rect::new(row_area.x, y, row_area.width, 1), buf);

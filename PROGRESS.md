@@ -445,3 +445,39 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 - `cargo clippy -p xai-grok-sampler -p xai-grok-shell -- --deny warnings` — 零警告 ✅
 - `cargo test -p xai-grok-sampler --lib` — 154/154 ✅
 - `cargo test -p xai-grok-shell --lib` — 4939/5530 ✅（591 预存失败，全部为 agent infra 测试，与 batch 3 无关）
+
+---
+
+## Provider Adapter V1 — Phase 0: Restore Trustworthy Baseline — 2026-07-17
+
+### Base and result
+- Start commit: `e284cc1`
+- End commit: `e284cc1` (no source changes)
+- Tasks completed: `P0-01`, `P0-02`, `P0-03`, `P0-04`, `P0-05`
+
+### Files changed
+- `docs/provider-adapter-v1/baseline.md` — created
+- `PROGRESS.md` — appended
+
+### Regression issues
+- `C-01`: confirmed — `Model::make` undeclared at `registry.rs:156`, `registry.model()` missing at `registry.rs:222`
+- `C-02` through `M-03`: presumed present per plan audit
+
+### Verification
+- `git rev-parse --show-toplevel` — exit 0 — `D:/grok_build`
+- `git branch --show-current` — exit 0 — `feat/provider-adapter`
+- `rustc --version` — `1.92.0`
+- `protoc --version` — `libprotoc 35.0`
+- `cargo test -p xai-grok-provider --all-targets` — exit 1 — 2 compile errors (C-01)
+- `cargo check -p xai-grok-sampler --all-targets` — exit 0 — pass
+- `cargo check -p xai-grok-shell --all-targets` — exit 1 — 32+ pre-existing errors
+
+### Deferred or blocked
+- `xai-grok-pager` and `xai-grok-pager-bin` check timed out at 5 min (dependency compilation)
+- Pre-existing working-tree change in `providers_modal.rs` (43+2 lines) preserved
+
+### Scope review
+- No unrelated files changed.
+- No dependency added.
+- No secret present in diff or logs.
+- Baseline manifest documents all known pre-existing failures.
