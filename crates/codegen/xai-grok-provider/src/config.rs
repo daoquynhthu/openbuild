@@ -1,9 +1,15 @@
+use std::fmt;
+
 use indexmap::IndexMap;
 use serde::Deserialize;
 
+use crate::error::ProviderError;
+
 /// Merged configuration for a single provider.
 /// Priority order (low→high): env var → TOML config → CLI override.
-#[derive(Debug, Clone, Default, Deserialize)]
+///
+/// Custom Debug implementation redacts the api_key field.
+#[derive(Clone, Default, Deserialize)]
 #[non_exhaustive]
 #[serde(default)]
 pub struct ProviderConfig {
@@ -12,6 +18,34 @@ pub struct ProviderConfig {
     pub env_key: Option<Vec<String>>,
     pub base_url: Option<String>,
     pub extra_headers: Option<IndexMap<String, String>>,
+}
+
+impl fmt::Debug for ProviderConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ProviderConfig")
+            .field("id", &self.id)
+            .field("api_key", &self.api_key.as_ref().map(|_| "[REDACTED]"))
+            .field("env_key", &self.env_key)
+            .field("base_url", &self.base_url)
+            .field("extra_headers", &self.extra_headers)
+            .finish()
+    }
+}
+
+impl ProviderConfig {
+    /// Validate header names in extra_headers.
+    pub fn validate_headers(&self) -> Result<(), ProviderError> {
+        if let Some(ref headers) = self.extra_headers {
+            for (name, _) in headers {
+                if name.is_empty() || name.bytes().any(|b| b <= 32 || b > 126 || b == 58) {
+                    return Err(ProviderError::InvalidHeader(format!(
+                        "invalid header name: {name:?}"
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ProviderConfig {
@@ -91,6 +125,39 @@ mod tests {
         assert!(c.api_key.is_none());
         assert!(c.base_url.is_none());
         assert!(c.id.is_none());
+    }
+
+    #[test]
+    fn provider_config_debug_redacts_secret() {
+        let c = ProviderConfig {
+            id: Some("test".into()),
+            api_key: Some("test-secret-not-real".into()),
+            ..Default::default()
+        };
+        let debug = format!("{c:?}");
+        assert!(
+            !debug.contains("test-secret-not-real"),
+            "Debug must not contain the secret key"
+        );
+        assert!(
+            debug.contains("[REDACTED]"),
+            "Debug must show [REDACTED] for api_key"
+        );
+    }
+
+    #[test]
+    fn provider_config_validate_headers() {
+        let valid = ProviderConfig {
+            extra_headers: Some([("x-custom".into(), "value".into())].into()),
+            ..Default::default()
+        };
+        assert!(valid.validate_headers().is_ok());
+
+        let invalid = ProviderConfig {
+            extra_headers: Some([("".into(), "value".into())].into()),
+            ..Default::default()
+        };
+        assert!(invalid.validate_headers().is_err());
     }
 
     #[test]

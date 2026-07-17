@@ -6,6 +6,123 @@ pub type AuthHeaderMap = HeaderMap;
 
 use crate::error::ProviderError;
 
+/// Declarative credential source. Provider constructors declare the source
+/// but do not resolve it — resolution happens at request time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CredentialSource {
+    /// Inline key from config or CLI.
+    Inline,
+    /// Ordered list of environment variable names to try.
+    Environment(Vec<String>),
+    /// xAI OAuth session token.
+    Session,
+    /// No auth required; allow discovery/inference without credentials.
+    Public,
+    /// No credential available.
+    None,
+}
+
+/// Declarative authentication policy for a route.
+/// Provider constructors set this; the shell runtime resolves it.
+#[derive(Debug, Clone)]
+pub enum AuthPolicy {
+    /// No authentication.
+    None,
+    /// Bearer token from a credential source.
+    Bearer(CredentialSource),
+    /// Arbitrary header from a credential source.
+    Header {
+        name: String,
+        source: CredentialSource,
+    },
+}
+
+impl AuthPolicy {
+    /// Validate header names against HTTP token rules.
+    pub fn validate(&self) -> Result<(), ProviderError> {
+        match self {
+            AuthPolicy::Header { name, .. } => {
+                if name.is_empty() || name.bytes().any(|b| b <= 32 || b > 126 || b == 58) {
+                    return Err(ProviderError::InvalidHeader(format!(
+                        "invalid header name: {name:?}"
+                    )));
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+/// Resolved credential with the key material.
+/// This struct is deliberately NOT Clone/Debug to avoid leaking secrets.
+#[derive(Default)]
+pub struct ResolvedCredential {
+    pub value: Option<String>,
+}
+
+/// Resolve a CredentialSource at runtime.
+/// Returns an error if required credentials are missing.
+pub fn resolve_credential_source(
+    source: &CredentialSource,
+) -> Result<ResolvedCredential, ProviderError> {
+    match source {
+        CredentialSource::Inline => Ok(ResolvedCredential { value: None }),
+        CredentialSource::Environment(keys) => {
+            for key in keys {
+                if let Ok(val) = std::env::var(key)
+                    && !val.is_empty()
+                {
+                    return Ok(ResolvedCredential { value: Some(val) });
+                }
+            }
+            Ok(ResolvedCredential { value: None })
+        }
+        CredentialSource::Session => match std::env::var("XAI_SESSION_TOKEN") {
+            Ok(val) if !val.is_empty() => Ok(ResolvedCredential { value: Some(val) }),
+            _ => Ok(ResolvedCredential { value: None }),
+        },
+        CredentialSource::Public => Ok(ResolvedCredential { value: None }),
+        CredentialSource::None => Ok(ResolvedCredential { value: None }),
+    }
+}
+
+/// Apply an AuthPolicy to produce headers at request time.
+pub fn apply_auth_policy(
+    policy: &AuthPolicy,
+    existing: &HeaderMap,
+) -> Result<HeaderMap, ProviderError> {
+    match policy {
+        AuthPolicy::None => Ok(existing.clone()),
+        AuthPolicy::Bearer(source) => {
+            let cred = resolve_credential_source(source)?;
+            match cred.value {
+                Some(token) => {
+                    let mut headers = existing.clone();
+                    headers.insert("Authorization".into(), format!("Bearer {token}"));
+                    Ok(headers)
+                }
+                None => Err(ProviderError::MissingCredential(
+                    "Bearer credential not resolved".into(),
+                )),
+            }
+        }
+        AuthPolicy::Header { name, source } => {
+            let cred = resolve_credential_source(source)?;
+            match cred.value {
+                Some(value) => {
+                    let mut headers = existing.clone();
+                    headers.insert(name.clone(), value);
+                    Ok(headers)
+                }
+                None => Err(ProviderError::MissingCredential(format!(
+                    "header credential for {name} not resolved"
+                ))),
+            }
+        }
+    }
+}
+
 /// Input to an [`AuthFn::apply`] call. Carries request metadata and
 /// existing headers that the auth function may augment.
 #[non_exhaustive]
@@ -219,6 +336,56 @@ mod tests {
             url: "http://localhost".into(),
             headers: HeaderMap::new(),
         }
+    }
+
+    #[test]
+    fn auth_policy_none_produces_no_headers() {
+        let headers = apply_auth_policy(&AuthPolicy::None, &HeaderMap::new()).unwrap();
+        assert!(headers.is_empty());
+    }
+
+    #[test]
+    fn auth_policy_public_no_header() {
+        let policy = AuthPolicy::Bearer(CredentialSource::Public);
+        let result = apply_auth_policy(&policy, &HeaderMap::new());
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProviderError::MissingCredential(_)
+        ));
+    }
+
+    #[test]
+    fn auth_policy_validate_header_name() {
+        let valid = AuthPolicy::Header {
+            name: "x-api-key".into(),
+            source: CredentialSource::None,
+        };
+        assert!(valid.validate().is_ok());
+
+        let invalid = AuthPolicy::Header {
+            name: "".into(),
+            source: CredentialSource::None,
+        };
+        assert!(invalid.validate().is_err());
+
+        let with_colon = AuthPolicy::Header {
+            name: "bad:name".into(),
+            source: CredentialSource::None,
+        };
+        assert!(with_colon.validate().is_err());
+    }
+
+    #[test]
+    fn credential_source_public_vs_none() {
+        assert_eq!(CredentialSource::Public, CredentialSource::Public);
+        assert_ne!(CredentialSource::Public, CredentialSource::None);
+    }
+
+    #[test]
+    fn credential_source_resolve_inline_none() {
+        let result = resolve_credential_source(&CredentialSource::Inline).unwrap();
+        assert!(result.value.is_none());
     }
 
     #[test]
