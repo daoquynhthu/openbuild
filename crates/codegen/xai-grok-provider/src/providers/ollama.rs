@@ -64,7 +64,6 @@ impl Provider for OllamaProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        // Ollama requires no authentication.
         let route = Route::make(RouteInput {
             id: "ollama-chat".into(),
             provider: Some(self.defaults.id.clone()),

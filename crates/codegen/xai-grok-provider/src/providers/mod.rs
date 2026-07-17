@@ -44,6 +44,8 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
             }
         }
     }
+    result
+}
 
     #[cfg(test)]
     mod tests {
@@ -245,12 +247,9 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
         fn detect_env_vars_empty_when_not_set() {
             let reg = dummy_registry();
             let env = detect_env_vars(&reg);
-            // TEST_API_KEY is not set in test environment
             assert!(env.is_empty() || env.get("test-provider").is_none());
         }
     }
-    result
-}
 
 /// Build the final `ProviderConfig` for a single provider by merging
 /// env vars → TOML config → CLI overrides (later overrides earlier).
@@ -265,17 +264,14 @@ pub fn build_provider_config(
         ..Default::default()
     };
 
-    // Lowest priority: env vars
     if let Some(env_cfg) = env_configs.get(pid) {
         merged = merged.merge(env_cfg.clone());
     }
 
-    // Middle priority: TOML [provider.*]
     if let Some((_, toml_cfg)) = toml_configs.iter().find(|(id, _)| id == pid) {
         merged = merged.merge(toml_cfg.clone());
     }
 
-    // Highest priority: CLI overrides (--api-key, --base-url)
     if let Some(cli) = cli_override
         && cli.id.as_deref() == Some(pid)
     {
@@ -300,18 +296,14 @@ pub fn configure_providers(
     let env_configs = detect_env_vars(registry);
 
     for pid in registry.all_ids() {
-        // Layer 1: env vars
-        // Layer 2: TOML [provider.*]
         let mut merged = build_provider_config(&pid.0, &toml_configs, &env_configs, None);
 
-        // Layer 3: backward-compat overrides (old [endpoints] → xAI mapping)
         if let Some(ref compat_cfg) = compat
             && compat_cfg.id.as_deref() == Some(&pid.0)
         {
             merged = merged.merge(compat_cfg.clone());
         }
 
-        // Layer 4: CLI overrides (--api-key, --base-url) — highest priority
         if let Some(ref cli) = cli_override
             && cli.id.as_deref() == Some(&pid.0)
         {

@@ -65,7 +65,6 @@ impl Provider for AnthropicProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        // Anthropic uses x-api-key header (not Bearer), demonstrating the composable auth pattern.
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("ANTHROPIC_API_KEY"))
             .header("x-api-key");

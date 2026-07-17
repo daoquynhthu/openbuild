@@ -52,11 +52,11 @@
 - [x] **C19** 跨 crate — `ApiBackend` 统一到 `xai-grok-sampling-types`，`AuthScheme` 统一到 `xai-grok-sampling-types`；从 `xai-grok-provider/types.rs` 和 `xai-grok-sampler/config.rs` 删除本地定义；删除桥函数 `to_api_backend()`/`to_auth_scheme()`；`ConfiguredProvider.model` 从 `fn` 改为 `Box<dyn Fn>` 以支持闭包捕获
 - [x] **P5-M04** `providers/mod.rs:347-351` — 已有 `tracing::warn!` 警告
 
-### Batch 7 — 注释 + 测试规范（低风险）
+### Batch 7 — 注释 + 测试规范（低风险）`[x]`
 
-- [ ] **C23+S18** `providers/mod.rs:48-255` — `detect_env_vars()` 体内 `#[cfg(test)]` 移至模块级
-- [ ] **M63+S19** 多文件 — 删除违反 AGENTS.md §3.1 的 6 处内联注释
-- [ ] **S02+S14** 多文件 — 补充 `pub` 项 `///` 文档注释（覆盖面评估后增量补齐）
+- [x] **C23+S18** `providers/mod.rs:48-255` — `#[cfg(test)] mod tests` 从 `detect_env_vars()` 体内移至模块级
+- [x] **M63+S19** 5 文件 12 处 — 删除所有违反 AGENTS.md §3.1 的内联注释（config.rs、auth.rs、mod.rs、anthropic.rs、ollama.rs）
+- [ ] **S02+S14** 多文件 — 跳过（建议项，Batch 7 快速实施不包含）
 
 ### Batch 8 — Auth 栈对齐（高风险，需深入理解）
 

@@ -234,7 +234,6 @@ mod tests {
 
     #[test]
     fn credential_or_else_uses_credential_style() {
-        // Verify the Arch §3.9 pattern: Credential::opt().or_else().bearer()
         let auth = Credential::optional(Some("primary".into()), "p")
             .or_else(Credential::optional(Some("fallback".into()), "f"))
             .bearer();

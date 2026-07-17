@@ -65,7 +65,6 @@ pub fn parse_provider_toml(toml: &toml::Value) -> Vec<(String, ProviderConfig)> 
     table
         .iter()
         .filter_map(|(id, entry)| {
-            // Serialize entry back to TOML string, then deserialize as ProviderTomlEntry.
             let entry_str = toml::to_string(entry).ok()?;
             let parsed: ProviderTomlEntry = toml::from_str(&entry_str).ok()?;
             Some((
