@@ -1,7 +1,50 @@
 use std::collections::HashMap;
 use url::Url;
 
+use crate::error::ProviderError;
 use crate::types::LLMRequest;
+
+/// Validate endpoint URL for safety.
+/// - Remote providers require https.
+/// - Local/loopback hosts may use http.
+/// - Reject embedded credentials, fragments, unsupported schemes, empty host.
+fn validate_endpoint_url(url: &Url) -> Result<(), ProviderError> {
+    let host = url
+        .host_str()
+        .ok_or_else(|| ProviderError::InvalidEndpoint("endpoint URL has no host".into()))?;
+
+    if url.fragment().is_some() {
+        return Err(ProviderError::InvalidEndpoint(
+            "endpoint URL must not contain a fragment".into(),
+        ));
+    }
+
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(ProviderError::InvalidEndpoint(
+            "endpoint URL must not contain embedded credentials".into(),
+        ));
+    }
+
+    match url.scheme() {
+        "https" => Ok(()),
+        "http" => {
+            if host == "localhost"
+                || host == "127.0.0.1"
+                || host == "::1"
+                || host.starts_with("127.")
+            {
+                Ok(())
+            } else {
+                Err(ProviderError::InvalidEndpoint(format!(
+                    "remote endpoint {host} requires https, got http"
+                )))
+            }
+        }
+        scheme => Err(ProviderError::InvalidEndpoint(format!(
+            "unsupported URL scheme {scheme:?} in endpoint"
+        ))),
+    }
+}
 
 #[non_exhaustive]
 pub struct EndpointInput<Body> {
@@ -46,24 +89,40 @@ pub struct EndpointPatch<Body> {
 }
 
 impl<Body> Endpoint<Body> {
-    pub fn render(&self, input: &EndpointInput<Body>) -> Url {
-        let base = self.base_url.as_deref().unwrap_or_else(|| {
-            tracing::warn!("no base_url configured, falling back to http://localhost");
-            "http://localhost"
-        });
-        let base = base.trim_end_matches('/');
+    /// Render the endpoint into a full URL.
+    ///
+    /// Returns `ProviderError::InvalidEndpoint` if the base URL is missing,
+    /// malformed, contains credentials/fragments, uses an unsupported scheme,
+    /// or is a remote HTTP endpoint.
+    pub fn render(&self, input: &EndpointInput<Body>) -> Result<Url, ProviderError> {
+        let base_str = self
+            .base_url
+            .as_deref()
+            .ok_or_else(|| ProviderError::InvalidEndpoint("no base_url configured".into()))?;
+        let base = base_str.trim_end_matches('/');
         let path = match &self.path {
             EndpointPart::Static(s) => s.clone(),
             EndpointPart::Dynamic(f) => f(input),
         };
-        let mut url = Url::parse(&format!("{base}{path}"))
-            .unwrap_or_else(|_| Url::parse("http://localhost/").unwrap_or_else(|_| unreachable!()));
+        let path = if path.starts_with('/') {
+            path
+        } else {
+            format!("/{path}")
+        };
+        let url_str = format!("{base}{path}");
+        let url = Url::parse(&url_str).map_err(|e| {
+            ProviderError::InvalidEndpoint(format!("malformed endpoint URL {url_str}: {e}"))
+        })?;
+
+        validate_endpoint_url(&url)?;
+
+        let mut url = url;
         if let Some(query) = &self.query {
             for (k, v) in query {
                 url.query_pairs_mut().append_pair(k, v);
             }
         }
-        url
+        Ok(url)
     }
 }
 
@@ -107,7 +166,7 @@ mod tests {
             },
             body: (),
         };
-        let url = ep.render(&input);
+        let url = ep.render(&input).unwrap();
         assert_eq!(url.as_str(), "https://api.openai.com/v1/chat/completions");
     }
 
@@ -127,12 +186,12 @@ mod tests {
             },
             body: (),
         };
-        let url = ep.render(&input);
+        let url = ep.render(&input).unwrap();
         assert!(url.as_str().contains("limit=10"));
     }
 
     #[test]
-    fn endpoint_no_base_url_defaults_to_localhost() {
+    fn endpoint_no_base_url_returns_error() {
         let ep = Endpoint {
             base_url: None,
             path: EndpointPart::Static("/test".into()),
@@ -147,8 +206,96 @@ mod tests {
             },
             body: (),
         };
-        let url = ep.render(&input);
-        assert_eq!(url.as_str(), "http://localhost/test");
+        let result = ep.render(&input);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProviderError::InvalidEndpoint(_)
+        ));
+    }
+
+    #[test]
+    fn endpoint_rejects_http_remote() {
+        let ep = Endpoint {
+            base_url: Some("http://api.example.com/v1".into()),
+            path: EndpointPart::Static("/chat".into()),
+            query: None,
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let result = ep.render(&input);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProviderError::InvalidEndpoint(_)
+        ));
+    }
+
+    #[test]
+    fn endpoint_accepts_http_localhost() {
+        let ep = Endpoint {
+            base_url: Some("http://localhost:11434".into()),
+            path: EndpointPart::Static("/v1/chat".into()),
+            query: None,
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let url = ep.render(&input).unwrap();
+        assert!(url.as_str().starts_with("http://localhost:11434"));
+    }
+
+    #[test]
+    fn endpoint_rejects_embedded_credentials() {
+        let ep = Endpoint {
+            base_url: Some("https://user:pass@api.example.com/v1".into()),
+            path: EndpointPart::Static("/chat".into()),
+            query: None,
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let result = ep.render(&input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn endpoint_rejects_fragment() {
+        let ep = Endpoint {
+            base_url: Some("https://api.example.com/v1#frag".into()),
+            path: EndpointPart::Static("/chat".into()),
+            query: None,
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let result = ep.render(&input);
+        assert!(result.is_err());
     }
 
     #[test]
