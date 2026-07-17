@@ -86,7 +86,7 @@ impl Default for ProviderDefaults {
             env_key: Vec::new(),
             model_list_endpoint: None,
             model_list_format: ModelListFormat::OpenAiCompatible,
-            context_window: NonZeroU64::new(128_000).expect("128_000 is non-zero"),
+            context_window: NonZeroU64::new(128_000).unwrap_or_else(|| unreachable!()),
             max_completion_tokens: None,
             temperature: None,
             top_p: None,

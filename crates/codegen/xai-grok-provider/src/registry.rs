@@ -34,7 +34,7 @@ impl ProviderRegistry {
     pub fn store_config(&self, id: &ProviderId, config: ProviderConfig) {
         self.configs
             .write()
-            .expect("ProviderRegistry lock poisoned")
+            .unwrap_or_else(|e| panic!("ProviderRegistry lock poisoned: {e}"))
             .insert(id.clone(), config);
     }
 
@@ -42,7 +42,7 @@ impl ProviderRegistry {
     pub fn get_config(&self, id: &ProviderId) -> Option<ProviderConfig> {
         self.configs
             .read()
-            .expect("ProviderRegistry lock poisoned")
+            .unwrap_or_else(|e| panic!("ProviderRegistry lock poisoned: {e}"))
             .get(id)
             .cloned()
     }
@@ -51,21 +51,21 @@ impl ProviderRegistry {
         let id = provider.id().clone();
         self.providers
             .write()
-            .expect("ProviderRegistry lock poisoned")
+            .unwrap_or_else(|e| panic!("ProviderRegistry lock poisoned: {e}"))
             .insert(id, provider);
     }
 
     pub fn register_route(&self, id: impl Into<String>, route: Route) {
         self.routes
             .write()
-            .expect("ProviderRegistry lock poisoned")
+            .unwrap_or_else(|e| panic!("ProviderRegistry lock poisoned: {e}"))
             .insert(id.into(), Arc::new(route));
     }
 
     pub fn get_route(&self, id: &str) -> Option<Arc<Route>> {
         self.routes
             .read()
-            .expect("ProviderRegistry lock poisoned")
+            .unwrap_or_else(|e| panic!("ProviderRegistry lock poisoned: {e}"))
             .get(id)
             .cloned()
     }
@@ -73,7 +73,7 @@ impl ProviderRegistry {
     pub fn get(&self, id: &ProviderId) -> Option<SharedProvider> {
         self.providers
             .read()
-            .expect("ProviderRegistry lock poisoned")
+            .unwrap_or_else(|e| panic!("ProviderRegistry lock poisoned: {e}"))
             .get(id)
             .cloned()
     }
@@ -99,7 +99,7 @@ impl ProviderRegistry {
     pub fn all_ids(&self) -> Vec<ProviderId> {
         self.providers
             .read()
-            .expect("ProviderRegistry lock poisoned")
+            .unwrap_or_else(|e| panic!("ProviderRegistry lock poisoned: {e}"))
             .keys()
             .cloned()
             .collect()

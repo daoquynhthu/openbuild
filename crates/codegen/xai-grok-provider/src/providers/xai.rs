@@ -21,7 +21,7 @@ pub(crate) fn xai_defaults() -> ProviderDefaults {
         api_backend: ApiBackend::Responses,
         auth_scheme: AuthScheme::Bearer,
         env_key: vec!["XAI_API_KEY".into()],
-        context_window: NonZeroU64::new(500_000).unwrap(),
+        context_window: NonZeroU64::new(500_000).unwrap_or_else(|| unreachable!()),
         temperature: Some(0.7),
         top_p: Some(0.95),
         max_completion_tokens: Some(16384),

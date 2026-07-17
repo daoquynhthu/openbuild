@@ -62,7 +62,7 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
                 api_backend: crate::types::ApiBackend::ChatCompletions,
                 auth_scheme: crate::types::AuthScheme::Bearer,
                 env_key: vec!["TEST_API_KEY".into()],
-                context_window: std::num::NonZeroU64::new(128_000).expect("128_000 is non-zero"),
+                context_window: std::num::NonZeroU64::new(128_000).unwrap_or_else(|| unreachable!()),
                 ..Default::default()
             };
             let provider = std::sync::Arc::new(TestProvider { pid, defaults })

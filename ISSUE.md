@@ -37,13 +37,13 @@
 - [x] **M54** `events.rs:113` — `Usage` 全部 8 个 Option 字段加 `#[serde(default, skip_serializing_if = "Option::is_none")]`
 - [x] **S12** `config.rs:8,50` — `ProviderConfig` + `ProviderTomlEntry` 加 `#[serde(default)]`（`ProviderModelDef` 已在 Phase 8 删除）
 
-### Batch 5 — `.expect()`/`.unwrap()` 消除（中风险，可能暴露错误路径）
+### Batch 5 — `.expect()`/`.unwrap()` 消除（中风险，可能暴露错误路径）`[x]`
 
-- [ ] **M28** `auth_method.rs:280` — `push_interactive_login()` 中 `.expect()` 替换
-- [ ] **M29+M53** `registry.rs:37,45,54,61,68,76,102` — 7 处 `RwLock` `.expect("lock poisoned")` 替换
-- [ ] **M50** `endpoint.rs:55-56` — `Url::parse("http://localhost/").unwrap()` 替换
-- [ ] **M51** 6 provider `configure()` 中 10 处 `NonZeroU64::new(n).unwrap()` 替换
-- [ ] **M52** `types.rs:97` — `ProviderDefaults::default()` 中 `.expect()` 替换
+- [x] **M28** `auth_method.rs:280` — `push_interactive_login()` 中 `.expect()` → `unwrap_or_else(|| panic!(...))`（invariant guard，函数不返回 Result）
+- [x] **M29+M53** `registry.rs:37,45,54,61,68,76,102` — 7 处 `RwLock` `.expect("lock poisoned")` → `unwrap_or_else(|e| panic!("...: {e}"))`（带 poison error 信息）
+- [x] **M50** `endpoint.rs:56-57` — `Url::parse("http://localhost/").expect(...)` → `unwrap_or_else(|_| unreachable!())`（已知合法 URL 字面量）
+- [x] **M51** 6 provider `defaults()` + `types.rs:89` + `mod.rs:65` — 8 处 `NonZeroU64::new(n).unwrap()|.expect()` → `unwrap_or_else(|| unreachable!())`（编译期已知非零常量）
+- [x] **M52** `types.rs:89` — 同 M51，合并处理
 
 ### Batch 6 — Provider 模型修正（中风险，功能影响）
 

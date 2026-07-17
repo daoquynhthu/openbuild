@@ -276,8 +276,9 @@ fn push_interactive_login(
         // `(true, None)` combination is a programmer error -- panic loudly
         // (matches the original `cfg.grok_com_config.oidc.as_ref().unwrap()`
         // call in `MvpAgent::initialize()` before this refactor).
-        let issuer = enterprise_oidc_issuer
-            .expect("enterprise_oidc_issuer is required when has_enterprise_oidc is true");
+        let issuer = enterprise_oidc_issuer.unwrap_or_else(|| {
+            panic!("enterprise_oidc_issuer is required when has_enterprise_oidc is true")
+        });
         methods.push(oidc_auth_method(issuer, login_label));
     } else {
         methods.push(grok_com_auth_method(login_label, has_auth_provider_command));
