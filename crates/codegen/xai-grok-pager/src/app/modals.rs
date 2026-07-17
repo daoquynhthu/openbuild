@@ -415,13 +415,15 @@ impl AgentView {
                         }
                         ProvidersKeyOutcome::Save { provider_id, api_key, base_url } => {
                             let provider_state = &mut prov_state.provider_state;
-                            if let Err(e) = persist_provider_config(&provider_id, &api_key, &base_url) {
-                                provider_state.update_error(
-                                    &xai_grok_provider::types::ProviderId::new(&provider_id),
-                                    Some(e),
-                                );
-                            } else {
-                                provider_state.refresh();
+                            match persist_provider_config(&provider_id, &api_key, &base_url) {
+                                Ok(()) => {
+                                    provider_state.refresh();
+                                    prov_state.reset_to_list();
+                                }
+                                Err(e) => {
+                                    let pid = xai_grok_provider::types::ProviderId::new(&provider_id);
+                                    provider_state.update_error(&pid, Some(e));
+                                }
                             }
                             InputOutcome::Changed
                         }

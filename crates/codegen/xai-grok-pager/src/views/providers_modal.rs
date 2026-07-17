@@ -4,6 +4,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Widget;
 
+use crate::config_toml_edit::read_config_document_for_edit;
 use crate::provider_state::{CredentialState, ProviderState, ProviderView};
 use crate::theme::Theme;
 use crate::views::modal_window::{self as mw, Shortcut};
@@ -77,6 +78,10 @@ impl ProvidersModalState {
     pub fn selected_provider(&self) -> Option<&ProviderView> {
         let providers = self.provider_state.ordered_views();
         providers.get(self.selected).copied()
+    }
+
+    pub fn reset_to_list(&mut self) {
+        self.mode = ProvidersView::List;
     }
 }
 
@@ -239,7 +244,6 @@ fn handle_detail_key(
                     base_url.clone(),
                 )
             });
-            state.mode = ProvidersView::List;
             match save_outcome {
                 Some((provider_id, key, url)) => ProvidersKeyOutcome::Save {
                     provider_id,
@@ -253,16 +257,46 @@ fn handle_detail_key(
     }
 }
 
-/// Persist a provider configuration to disk.
-/// Called by the SaveProviderConfig effect handler.
+/// Validate a provider identifier.
+fn validate_provider_id(id: &str) -> Result<(), String> {
+    if id.is_empty() {
+        return Err("provider ID cannot be empty".into());
+    }
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+        return Err("provider ID must contain only letters, numbers, underscores, and hyphens".into());
+    }
+    Ok(())
+}
+
+/// Validate a base URL.
+fn validate_base_url(url: &str) -> Result<(), String> {
+    if url.is_empty() {
+        return Ok(());
+    }
+    let parsed = url::Url::parse(url).map_err(|e| format!("invalid base URL: {e}"))?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err("base URL must use http or https scheme".into());
+    }
+    if parsed.host_str().unwrap_or_default().is_empty() {
+        return Err("base URL must have a host".into());
+    }
+    Ok(())
+}
+
+/// Persist a provider configuration to disk using the repository's atomic
+/// config editing facility. Validates provider ID and base URL before writing.
+/// Called by the SaveProviderConfig effect handler and modals handler.
 pub fn persist_provider_config(id: &str, api_key: &str, base_url: &str) -> Result<(), String> {
+    validate_provider_id(id)?;
+    validate_base_url(base_url)?;
+
     let config_path = xai_grok_config::grok_home().join("config.toml");
     if let Some(parent) = config_path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("cannot create config directory: {e}"))?;
     }
-    let content = std::fs::read_to_string(&config_path).unwrap_or_default();
-    let mut doc: toml_edit::DocumentMut = content.parse().map_err(|e| format!("invalid config: {e}"))?;
+    let mut doc = read_config_document_for_edit(&config_path)
+        .ok_or_else(|| "config.toml is not valid TOML; refusing to overwrite".to_string())?;
     let provider = doc
         .entry("provider")
         .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
@@ -549,6 +583,21 @@ fn render_detail(
         buf,
     );
     render_y += 1;
+
+    render_y += 1;
+
+    if let Some(ref error) = view.last_error {
+        let error_style = Style::default().fg(Color::Red);
+        let error_line = Line::from(vec![
+            ratatui::text::Span::styled("  Error:  ", Style::default().fg(theme.gray).add_modifier(Modifier::BOLD)),
+            ratatui::text::Span::styled(error, error_style),
+        ]);
+        error_line.render(
+            Rect::new(content.inner_x, render_y, content.inner_width, 1),
+            buf,
+        );
+        render_y += 1;
+    }
 
     let hint = Line::styled(
         "Tab to switch fields  \u{2022}  Ctrl+R to toggle API key visibility  \u{2022}  Enter to save",
