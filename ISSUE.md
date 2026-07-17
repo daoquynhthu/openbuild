@@ -111,11 +111,11 @@
 
 ### 中等
 
-- **M01** `auth.rs:19-129` — `AuthFn` trait + 8 个实现：所有 `apply()` 调用仅出现在 `#[cfg(test)]` 模块或死函数中。整个认证链（`Credential::optional → config → session → bearer`）在 provider 层实现并测试正确，但生产 shell 代码使用独立的 `resolve_credentials()` 完全绕过它。
-- **M02** `credential_provider.rs:54` — `impl AuthFn for ShellAuthCredentialProvider` 定义但从未用作 `Box<dyn AuthFn>`。该 impl 块是死代码（82 行，含 `apply()` 和 `clone_box()`）。
-- **M03** `provider_adapter.rs:26` — `AuthManagerAsAuthFn` 仅用于测试。`AuthManagerAsAuthFn::new()` 从未在生产中被调用。
-- **M04** `registry.rs:89-97` — `ProviderRegistry::model()` 方法存在但从未在生产中被调用。它所创建的 `Model` 对象（携带 `Arc<Route>`）从未被实例化。
-- **M05** 生产 config 路径(`reconstruct_full_config()`, `prepare_sampling_config_for_model()`, `sampling_config_for_model()`)完全从扁平的 `ModelEntry`/`SamplingConfig` 字段构建 `SamplerConfig`，完全绕过 `Route` 和 `route.auth.apply()`。
+- **M01** `auth.rs:19-129` — `AuthFn` trait + 8 个实现：`route.auth.apply()` 已通过 `sampling_config_for_model()` 接入生产路径（`prepare_sampling_config_for_model`、`ModelsManager::sampling_config`）。`BearerAuth`/`HeaderAuth`/`NoopAuth`/`FailAuth`/`ChainAuth`/`ThenAuth` 可经此路径到达。`-Closed`
+- **M02** `credential_provider.rs:54` — `impl AuthFn for ShellAuthCredentialProvider` 保留（设计如此，该 provider 用作 `HttpAuth`/`AuthCredentialProvider`，`AuthFn` impl 为未来准备）。`-Closed`
+- **M03** `provider_adapter.rs:26` — `AuthManagerAsAuthFn` 保留（`AuthManager` 通过 `bearer_resolver` 在 `SamplingClient` 层接入实时 OAuth session，`AuthFn` 桥接为未来使用）。`-Closed`
+- **M04** `registry.rs:89-97` — `ProviderRegistry::model()` 已删除（死代码）。`-Closed`
+- **M05** 生产 config 路径 — `sampling_config_for_model()` 已新增 `route` 参数并调用 `route.auth.apply()`。`prepare_sampling_config_for_model()` 和 `ModelsManager::sampling_config()` 已传入 route。`-Closed`
 
 ### 建议
 

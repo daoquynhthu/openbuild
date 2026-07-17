@@ -86,16 +86,6 @@ impl ProviderRegistry {
         self.get(id).map(|p| p.configure(overrides))
     }
 
-    pub fn model(
-        &self,
-        provider_id: &ProviderId,
-        model_id: &str,
-        overrides: ProviderConfig,
-    ) -> Option<Model> {
-        self.configure(provider_id, overrides)
-            .map(|cp| (cp.model)(model_id, &cp.route))
-    }
-
     pub fn all_ids(&self) -> Vec<ProviderId> {
         self.providers
             .read()
