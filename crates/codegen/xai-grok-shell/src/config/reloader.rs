@@ -4,9 +4,12 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use indexmap::IndexMap;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
+use xai_grok_provider::config::ProviderConfig;
+use xai_grok_provider::types::ProviderId;
 
 use crate::agent::provider_runtime::ProviderRuntime;
 use crate::auth::{GrokAuth, read_auth_json};
@@ -413,16 +416,43 @@ impl ConfigReloader {
             });
         }
 
-        // Provider config — detect [provider.*] changes
+        // Provider config — detect [provider.*] changes and rebuild
         let old_provider_table = self.last_global_config.get("provider");
         let new_provider_table = new_global.get("provider");
         if old_provider_table != new_provider_table {
             info!("provider config change detected");
-            // Signal the agent to rebuild the provider registry asynchronously.
-            // The agent processes this signal via its async runtime, calling
-            // ProviderRuntime::rebuild which atomically publishes the new snapshot
-            // or retains the previous one on failure.
-            let _ = self.config_update_tx.send(ConfigUpdate::ProvidersChanged);
+            if let Some(ref runtime) = self.provider_runtime {
+                // Step 1: Parse new configs (already done by reloader)
+                // Step 2: Resolve provider configs from TOML
+                let parsed = xai_grok_provider::config::parse_provider_toml(&new_global);
+                let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+                for (id_str, cfg) in parsed {
+                    let pid = ProviderId::new(id_str);
+                    config_map.insert(pid, cfg);
+                }
+                // Step 3-5: Build candidate snapshot and atomically publish
+                // (ProviderRuntime::rebuild is async — spawn a blocking task)
+                let runtime = runtime.clone();
+                let tx = self.config_update_tx.clone();
+                tokio::task::spawn(async move {
+                    match runtime.rebuild(&config_map).await {
+                        Ok(rev) => {
+                            info!(revision = rev, "provider registry rebuilt");
+                            // Step 6-7: Signal catalog refresh and model rebuild
+                            let _ = tx.send(ConfigUpdate::ProvidersChanged);
+                        }
+                        Err(e) => {
+                            // Step 8: On failure, retain previous state
+                            error!(
+                                error = %e,
+                                "provider rebuild failed — retaining previous configuration"
+                            );
+                        }
+                    }
+                });
+            } else {
+                let _ = self.config_update_tx.send(ConfigUpdate::ProvidersChanged);
+            }
         }
 
         self.last_global_config = new_global;
