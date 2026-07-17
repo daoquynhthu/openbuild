@@ -4659,12 +4659,56 @@ pub fn resolve_chat_state_auth_type(
         .map(|r| r.auth_type)
         .unwrap_or(fallback)
 }
-/// Primary SamplerConfig constructor — delegates to the route compiler
-/// (`crate::agent::provider_resolution::resolve_model_execution`) when
-/// a registry snapshot is available. Falls back to legacy path for
-/// backward compatibility.
+/// Primary SamplerConfig constructor.
 ///
-/// Classification: PROVIDER-AWARE PRODUCTION PATH
+/// Classification: PROVIDER-AWARE PRODUCTION PATH.
+/// Delegates to `resolve_model_execution` when a registry snapshot is
+/// provided via `registry_override`. Falls back to legacy path for
+/// backward compatibility when no registry is available.
+/// Same as `sampling_config_for_model` but delegates to the route compiler
+/// when a registry snapshot is available. This is the primary entry point
+/// for production inference paths.
+pub fn sampling_config_for_model_with_registry(
+    model: &ModelEntry,
+    credentials: ResolvedCredentials,
+    alpha_test_key: Option<String>,
+    client_version: Option<String>,
+    deployment_id: Option<String>,
+    user_id: Option<String>,
+    route: Option<&xai_grok_provider::route::Route>,
+    registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
+) -> SamplerConfig {
+    // When registry is available and model has a provider_id, delegate
+    // to the route compiler for full provider-aware resolution.
+    if let (Some(snapshot), Some(pid)) = (registry, model.provider_id.as_deref()) {
+        let base_url = credentials.base_url.clone();
+        if let Ok(sampler_config) = crate::agent::provider_resolution::resolve_model_execution(
+            model,
+            snapshot,
+            credentials.api_key.as_deref(),
+            Some(&base_url),
+        ) {
+            return sampler_config;
+        }
+    }
+    // Fallback to legacy path
+    sampling_config_for_model(
+        model,
+        credentials,
+        alpha_test_key,
+        client_version,
+        deployment_id,
+        user_id,
+        route,
+    )
+}
+
+/// Primary SamplerConfig constructor.
+///
+/// Classification: PROVIDER-AWARE PRODUCTION PATH.
+/// Delegates to `resolve_model_execution` when a registry snapshot is
+/// provided via `registry_override`. Falls back to legacy path for
+/// backward compatibility when no registry is available.
 pub fn sampling_config_for_model(
     model: &ModelEntry,
     credentials: ResolvedCredentials,
