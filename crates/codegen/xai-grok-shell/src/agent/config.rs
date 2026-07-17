@@ -4656,6 +4656,12 @@ pub fn resolve_chat_state_auth_type(
         .map(|r| r.auth_type)
         .unwrap_or(fallback)
 }
+/// Primary SamplerConfig constructor — delegates to the route compiler
+/// (`crate::agent::provider_resolution::resolve_model_execution`) when
+/// a registry snapshot is available. Falls back to legacy path for
+/// backward compatibility.
+///
+/// Classification: PROVIDER-AWARE PRODUCTION PATH
 pub fn sampling_config_for_model(
     model: &ModelEntry,
     credentials: ResolvedCredentials,
