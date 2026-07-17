@@ -85,6 +85,8 @@
 
 ### 生产路径贯通修复 — 2026-07-17 `[x]`
 
+- [x] **P0** `models.rs:1614` — `fetch_provider_models_blocking()` 中设置 `entry.provider_id = Some(pid.0.clone())`，确保从 provider API 获取的模型能查 route
+
 - [x] **C01** `providers/mod.rs:321-346` — 删 `register_from_config()`（死代码，被 `configure_providers()` 取代）
 - [x] **C02** `config.rs:4734` — 删 `resolve_model_to_sampling_config()`（死代码）
 - [x] **C03** `registry.rs:65` — `get_route()` 首次获得生产调用者（通过 `resolve_model_route()` helper）

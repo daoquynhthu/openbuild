@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use crate::config::ProviderConfig;
-use crate::model::Model;
 use crate::provider::{ConfiguredProvider, SharedProvider};
 use crate::route::Route;
 use crate::types::ProviderId;

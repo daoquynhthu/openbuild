@@ -1611,7 +1611,8 @@ pub fn fetch_provider_models_blocking(
                 let mut provider_models = IndexMap::new();
                 for mc in model_configs {
                     let key = format!("{}/{}", pid.0, mc.model);
-                    let entry = ModelEntry::from_config_entry(&mc);
+                    let mut entry = ModelEntry::from_config_entry(&mc);
+                    entry.provider_id = Some(pid.0.clone());
                     provider_models.insert(key, entry);
                 }
 
