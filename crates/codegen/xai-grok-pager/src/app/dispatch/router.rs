@@ -600,8 +600,10 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             let Some(agent) = app.agents.get_mut(&id) else {
                 return vec![];
             };
+            let provider_ids = crate::provider_state::configured_providers();
+            let configured: Vec<&str> = provider_ids.iter().map(|s| s.as_str()).collect();
             let modal = ActiveModal::Providers {
-                state: Box::new(ProvidersModalState::new(&[])),
+                state: Box::new(ProvidersModalState::new(&configured)),
             };
             agent.active_modal = Some(modal);
             vec![]

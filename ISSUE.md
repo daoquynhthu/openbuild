@@ -86,6 +86,9 @@
 ### 生产路径贯通修复 — 2026-07-17 `[x]`
 
 - [x] **P0** `models.rs:1614` — `fetch_provider_models_blocking()` 中设置 `entry.provider_id = Some(pid.0.clone())`，确保从 provider API 获取的模型能查 route
+- [x] **T01** `app::run()` — TUI 启动路径创建 ProviderRegistry 并通过 `crate::provider_state::init()` 全局注册（Arch §7）
+- [x] **T02** `dispatch/router.rs:604` — `Action::OpenProviders` 从 `provider_state::configured_providers()` 获取真实已配置列表，替代硬编码 `&[]`
+- [x] **T03** `lib.rs` + `provider_state.rs` — 新增 `provider_state` 模块，`OnceLock` 持有 `Arc<ProviderRegistry>`，提供 `configured_providers()` 查询
 
 - [x] **C01** `providers/mod.rs:321-346` — 删 `register_from_config()`（死代码，被 `configure_providers()` 取代）
 - [x] **C02** `config.rs:4734` — 删 `resolve_model_to_sampling_config()`（死代码）

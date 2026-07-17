@@ -13338,6 +13338,7 @@ dependencies = [
  "xai-grok-pager-pty-harness",
  "xai-grok-pager-render",
  "xai-grok-plugin-marketplace",
+ "xai-grok-provider",
  "xai-grok-sandbox",
  "xai-grok-shell",
  "xai-grok-telemetry",

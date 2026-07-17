@@ -393,6 +393,15 @@ pub async fn run(
     let startup_start = std::time::Instant::now();
     let raw_config = xai_grok_shell::config::load_effective_config()
         .map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
+
+    // Initialize ProviderRegistry (Arch §7).
+    {
+        let reg = std::sync::Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
+        xai_grok_provider::providers::register_all(&reg);
+        xai_grok_provider::providers::configure_providers(&reg, &raw_config, None, None);
+        crate::provider_state::init(reg);
+    }
+
     let grok_com_config =
         match xai_grok_shell::agent::config::Config::new_from_toml_cfg(&raw_config) {
             Ok(c) => c.grok_com_config,

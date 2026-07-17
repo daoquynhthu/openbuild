@@ -65,6 +65,7 @@ pub use xai_grok_pager_render::{
 };
 pub mod trace_cmd;
 pub mod tracing;
+pub mod provider_state;
 pub mod unified_log;
 pub mod views;
 pub mod voice;
