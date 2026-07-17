@@ -68,6 +68,7 @@ pub struct ProviderView {
     pub model_count: usize,
     pub last_error: Option<String>,
     pub registry_revision: u64,
+    pub catalog_revision: u64,
 }
 
 /// Runtime-backed provider state container.
@@ -118,6 +119,7 @@ impl ProviderState {
                     model_count,
                     last_error: None,
                     registry_revision: snapshot.revision,
+                    catalog_revision: 0,
                 },
             );
         }
@@ -143,6 +145,7 @@ impl ProviderState {
                         model_count: 0,
                         last_error: None,
                         registry_revision: snapshot.revision,
+                        catalog_revision: 0,
                     },
                 );
             }
@@ -173,6 +176,21 @@ impl ProviderState {
 
     pub fn ordered_views(&self) -> Vec<&ProviderView> {
         self.views.values().collect()
+    }
+
+    /// Update catalog state for a provider. Called by effects after refresh.
+    pub fn update_catalog(&mut self, pid: &ProviderId, state: CatalogState, revision: u64) {
+        if let Some(view) = self.views.get_mut(pid) {
+            view.catalog = state;
+            view.catalog_revision = revision;
+        }
+    }
+
+    /// Update the last error for a provider.
+    pub fn update_error(&mut self, pid: &ProviderId, error: Option<String>) {
+        if let Some(view) = self.views.get_mut(pid) {
+            view.last_error = error;
+        }
     }
 }
 
