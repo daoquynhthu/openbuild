@@ -498,6 +498,7 @@ impl SessionActor {
             disable_api_key_auth,
             creds.alpha_test_key.clone(),
             creds.client_version.clone(),
+            None,
         )
     }
     /// Resolve a dedicated sampler for the Auto-mode classifier model `slug`,

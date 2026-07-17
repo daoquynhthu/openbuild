@@ -36,6 +36,12 @@ impl MvpAgent {
                 cfg.client_version.clone(),
             )
         };
+        let registry_snapshot = self
+            .cfg
+            .borrow()
+            .provider_registry
+            .as_ref()
+            .map(|reg| reg.snapshot());
         let config = match crate::agent::config::resolve_aux_model_sampling_config(
             &slug,
             &models,
@@ -44,6 +50,7 @@ impl MvpAgent {
             disable_api_key_auth,
             alpha_test_key,
             client_version,
+            registry_snapshot.as_deref(),
         ) {
             Some(mut cfg) => {
                 cfg.client_identifier = primary.client_identifier.clone();

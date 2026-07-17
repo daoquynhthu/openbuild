@@ -4520,11 +4520,12 @@ pub fn resolve_aux_model_sampling_config(
     disable_api_key_auth: bool,
     alpha_test_key: Option<String>,
     client_version: Option<String>,
+    registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
 ) -> Option<SamplerConfig> {
     let catalog_entry = find_model_by_id(models, model_id).cloned();
     if let Some(entry) = &catalog_entry {
         let credentials = resolve_credentials_enforced(entry, session_key, disable_api_key_auth);
-        let sampler = sampling_config_for_model(
+        let sampler = sampling_config_for_model_with_registry(
             entry,
             credentials,
             alpha_test_key.clone(),
@@ -4532,6 +4533,7 @@ pub fn resolve_aux_model_sampling_config(
             None,
             None,
             None,
+            registry,
         );
         if sampler.api_key.is_some() {
             return Some(sampler);
@@ -5448,6 +5450,7 @@ reasoning_effort = "low"
             &endpoints,
             None,
             false,
+            None,
             None,
             None,
         )
