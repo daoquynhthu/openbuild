@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #[cfg(all(feature = "jemalloc", unix))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;

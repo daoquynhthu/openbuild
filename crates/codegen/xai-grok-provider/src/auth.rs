@@ -10,6 +10,12 @@ pub struct AuthInput {
     pub headers: HeaderMap,
 }
 
+impl AuthInput {
+    pub fn new(request: String, body: String, method: String, url: String, headers: HeaderMap) -> Self {
+        Self { request, body, method, url, headers }
+    }
+}
+
 pub trait AuthFn: Send + Sync + core::fmt::Debug + 'static {
     fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String>;
     fn clone_box(&self) -> Box<dyn AuthFn>;

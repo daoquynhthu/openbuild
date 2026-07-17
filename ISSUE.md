@@ -4,6 +4,97 @@
 
 ---
 
+## 修复执行顺序（权威计划）
+
+**规则**: 按 Batch 顺序执行，每 Batch 4 项。完成后在项目前加 `[x]`。
+
+### Batch 1 — `#[allow(...)]` 清理（低风险，暴露真问题）`[x]`
+
+- [x] **C22** `main.rs:1` — 移除 `#![allow(dead_code)]`
+- [x] **P5-M05** `main.rs:1-7` — 移除 `#![allow(unused_imports, ...)]`
+- [x] **M61** `openai_compatible.rs:15` — `profile_base_url` 从未被调用，`configure()` 注释描述意图但未实现。已在 `configure()` 中接上 caller：当 `base_url` 未设置时，通过 `overrides.id` 查 `profile_base_url` 推得知名服务商 base URL
+- [x] **M62** `providers/mod.rs:49` — 移除内联测试上 `#[allow(dead_code)]`
+
+### Batch 2 — 死代码移除（低风险）
+
+- [ ] **C20** 跨 crate — 移除 Provider `Model` 死类型 (~80 行，被 `resolve_model_list()` 绕过)
+- [ ] **M48** `registry.rs:89-97` — 移除 `ProviderRegistry::model()` + `Route::model()`（仅测试可达）
+- [ ] **M49** `registry.rs:108-128` — 移除 `detect_from_url()` + `url` 依赖（仅测试可达 + 死依赖）
+- [ ] **P2-M02** `xai-grok-sampler/Cargo.toml:10` — 移除未使用的 `xai-grok-provider` 依赖
+- [ ] **P3-M04** `xai-grok-sampler/Cargo.toml:10` — 同 P2-M02，P3-M04 曾被误标 `-Closed`，一并关闭
+
+### Batch 3 — `#[non_exhaustive]` 保护（低风险，机械操作）
+
+- [ ] **M55** `sampler/src/events.rs:18,28,121,152` — 4 类型加 `#[non_exhaustive]`
+- [ ] **M56** `sampler/src/config.rs:49,186,207` — 3 类型加 `#[non_exhaustive]`
+- [ ] **M57** `sampler/src/metrics.rs:32` — `InferenceLatencyStats` 加 `#[non_exhaustive]`
+- [ ] **M58** `sampler/src/types.rs:13` — `RequestId` 加 `#[non_exhaustive]`
+- [ ] **M59** `sampler/src/sampling_log.rs:10` — `AuthInfo` 加 `#[non_exhaustive]`
+- [ ] **M60** `sampler/src/attribution.rs:39` — `SamplingConsumer` 加 `#[non_exhaustive]`
+
+### Batch 4 — `serde` 属性补全（低风险）
+
+- [ ] **M54** `events.rs:113` — `Usage` Option 字段加 `#[serde(default, skip_serializing_if = "Option::is_none")]`
+- [ ] **S12** 多文件 — `ProviderModelDef`、`ProviderConfig`、`ProviderTomlEntry` 等 Option 字段加 serde 属性
+
+### Batch 5 — `.expect()`/`.unwrap()` 消除（中风险，可能暴露错误路径）
+
+- [ ] **M28** `auth_method.rs:280` — `push_interactive_login()` 中 `.expect()` 替换
+- [ ] **M29+M53** `registry.rs:37,45,54,61,68,76,102` — 7 处 `RwLock` `.expect("lock poisoned")` 替换
+- [ ] **M50** `endpoint.rs:55-56` — `Url::parse("http://localhost/").unwrap()` 替换
+- [ ] **M51** 6 provider `configure()` 中 10 处 `NonZeroU64::new(n).unwrap()` 替换
+- [ ] **M52** `types.rs:97` — `ProviderDefaults::default()` 中 `.expect()` 替换
+
+### Batch 6 — Provider 模型修正（中风险，功能影响）
+
+- [ ] **M34+M39** `providers/openai.rs:32-53` — 补充缺的 4 模型（`o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini`）+ 双 Route
+- [ ] **M65** `providers/opencode.rs:68-71` — auth 链顺序改为 `PublicKey → EnvVar`（Arch §5.4）
+- [ ] **C19** 跨 crate — `ApiBackend`/`AuthScheme` 枚举去重（当前两处定义）
+- [ ] **P5-M04** `providers/mod.rs:30-38` — `register_from_config()` 对未知 provider ID 添加警告
+
+### Batch 7 — 注释 + 测试规范（低风险）
+
+- [ ] **C23+S18** `providers/mod.rs:48-255` — `detect_env_vars()` 体内 `#[cfg(test)]` 移至模块级
+- [ ] **M63+S19** 多文件 — 删除违反 AGENTS.md §3.1 的 6 处内联注释
+- [ ] **S02+S14** 多文件 — 补充 `pub` 项 `///` 文档注释（覆盖面评估后增量补齐）
+
+### Batch 8 — Auth 栈对齐（高风险，需深入理解）
+
+- [ ] **C21** 跨 crate — 三套认证抽象栈统一（`AuthFn`/`HttpAuth`/`AuthManager`）
+- [ ] **C25** `auth.rs:14`, `framing.rs:8-9`, `protocol.rs` — 底层 trait 从 `String` 错误转为 `thiserror` 类型
+- [ ] **M36+M37+M45** — `AuthInput.request` 类型修正 + `Route::with` auth 透传 + `resolve_model_to_sampling_config()` 调用 `route.auth.apply()`
+- [ ] **P3-S01～S09** — 9 项 Auth 建议项逐步清理
+
+### Batch 9 — Protocol 分发架构（最高风险，依赖 Batch 8）
+
+- [ ] **C10** `route.rs:10-14` — `RouteDefaults` 增加 `generation`/`limits` 字段
+- [ ] **C11+P2-C03+M40** — `ProtocolTable` 存储 `HashMap<ProtocolId, Protocol>` 值结构体
+- [ ] **P2-C02+M43+M44** — `request_task.rs` dispatch 改为 `Protocol::stream.step()` 分发
+- [ ] **P2-M03+P2-S02** — `protocol_id` 字段类型从 `String` 统一为 `ProtocolId`
+
+### 不在计划中的项目
+
+| 条目 | 原因 |
+|------|------|
+| C17 | 已 `-Deferred`，等待 auth 栈统一 |
+| C24 | `anyhow::Result` 在 main.rs 广泛使用，单项替换无意义 |
+| M64 | 单文件过大，纯风格，无功能价值 |
+| P5-C01/C02/M01/M02/M03/M46 | TUI Providers Modal 当前无消费者 |
+| S15–S45 | 纯建议项（pub 可见性、硬编码常量、命名提炼等） |
+
+### `-Fixed` 待确认关闭项
+
+以下条目已修复，需用户再审确认后关闭：
+
+- S02, S04, S05, S07, S08, S09, S10
+- P2-C01, P2-M01, P2-S01
+- P4-C01, P4-C02, P4-C03, P4-M01, P4-M02, P4-M03, P4-M04
+- C06, C07, C08
+- M22, M23, M24, M25, M26, M27, M30, M31, M32, M33, M35, M38
+- C12, C13, C14, C15, C16, C18
+
+---
+
 ## 审计: 2026-07-16
 
 **范围**: `crates/codegen/xai-grok-provider/src/` Phase 1 实现 (13 个模块)

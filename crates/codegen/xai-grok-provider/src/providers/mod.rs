@@ -46,7 +46,6 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
     }
 
     #[cfg(test)]
-    #[allow(dead_code)]
     mod tests {
         use super::*;
         use crate::config::ProviderConfig;

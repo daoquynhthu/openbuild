@@ -929,6 +929,7 @@ async fn set_session_model_invalidates_byok_memo_for_same_model_id() {
                 api_key: Some("byok-key".to_string()),
                 base_url: "https://third-party.example/v1".to_string(),
                 model: model.clone(),
+                protocol_id: None,
                 max_completion_tokens: None,
                 temperature: None,
                 top_p: None,

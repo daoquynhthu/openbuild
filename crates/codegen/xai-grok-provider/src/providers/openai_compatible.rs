@@ -12,7 +12,6 @@ use crate::types::{
 };
 
 /// Known OpenAI-compatible profile configurations.
-#[allow(dead_code)]
 pub(crate) fn profile_base_url(profile: &str) -> Option<&'static str> {
     match profile {
         "groq" => Some("https://api.groq.com/openai/v1"),
@@ -78,9 +77,13 @@ impl Provider for OpenAiCompatibleProvider {
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
         let base_url = overrides.base_url.clone().unwrap_or_default();
-        // If base_url was inferred from a profile name via provider config id, resolve it.
         let resolved_url = if base_url.is_empty() {
-            "http://localhost:8080/v1".into()
+            overrides
+                .id
+                .as_deref()
+                .and_then(profile_base_url)
+                .unwrap_or("http://localhost:8080/v1")
+                .into()
         } else {
             base_url
         };
