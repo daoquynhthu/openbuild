@@ -11427,4 +11427,199 @@ default = "grok-4.5"
         assert!(!r.value);
         assert_eq!(r.source, ConfigSource::Remote);
     }
+
+    #[test]
+    fn sampling_config_with_registry_uses_route_compiler_when_provider_id_set() {
+        use crate::agent::provider_runtime::ProviderRuntime;
+        use xai_grok_provider::config::ProviderConfig;
+        use xai_grok_provider::types::ProviderId;
+
+        let rt = ProviderRuntime::new();
+        xai_grok_provider::providers::register_all(&rt.registry);
+        let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_map.insert(
+            ProviderId::new("xai"),
+            ProviderConfig::new(
+                Some("xai".into()),
+                Some("sk-test".into()),
+                Some("https://api.x.ai/v1".into()),
+            ),
+        );
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(rt.rebuild(&config_map))
+            .expect("rebuild");
+        let snapshot = rt.snapshot();
+
+        let mut model = ModelEntry::fallback("grok-4.5", &EndpointsConfig::default());
+        model.provider_id = Some("xai".into());
+
+        let credentials = resolve_credentials_enforced(&model, None, false);
+        let config = sampling_config_for_model_with_registry(
+            &model,
+            credentials,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&snapshot),
+        );
+        // Route compiler was invoked: protocol_id reflects the route, not fallback
+        assert_eq!(
+            config.protocol_id.as_deref(),
+            Some("responses"),
+            "route compiler should set protocol_id from xAI provider route"
+        );
+        assert!(
+            config.endpoint_path.is_some(),
+            "route compiler should set endpoint_path from route"
+        );
+    }
+
+    #[test]
+    fn web_search_sampling_config_with_registry_uses_route_compiler() {
+        use xai_grok_provider::config::ProviderConfig;
+        use xai_grok_provider::types::ProviderId;
+
+        let rt = crate::agent::provider_runtime::ProviderRuntime::new();
+        xai_grok_provider::providers::register_all(&rt.registry);
+        let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_map.insert(
+            ProviderId::new("xai"),
+            ProviderConfig::new(
+                Some("xai".into()),
+                Some("sk-test".into()),
+                Some("https://api.x.ai/v1".into()),
+            ),
+        );
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(rt.rebuild(&config_map))
+            .expect("rebuild");
+
+        let mut model = ModelEntry::fallback("grok-search", &EndpointsConfig::default());
+        model.provider_id = Some("xai".into());
+        let mut models = IndexMap::new();
+        models.insert("grok-search".into(), model);
+
+        let endpoints = EndpointsConfig::default();
+        let result = resolve_web_search_sampling_config(
+            "grok-search",
+            &models,
+            Some("session-token"),
+            false,
+            None,
+            None,
+            &endpoints,
+            Some(&rt.snapshot()),
+        );
+        assert!(result.is_some());
+        let config = result.unwrap();
+        assert_eq!(
+            config.protocol_id.as_deref(),
+            Some("responses"),
+            "route compiler should set protocol_id for web-search"
+        );
+    }
+
+    #[test]
+    fn aux_model_sampling_config_with_registry_uses_route_compiler() {
+        use xai_grok_provider::config::ProviderConfig;
+        use xai_grok_provider::types::ProviderId;
+
+        let rt = crate::agent::provider_runtime::ProviderRuntime::new();
+        xai_grok_provider::providers::register_all(&rt.registry);
+        let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_map.insert(
+            ProviderId::new("xai"),
+            ProviderConfig::new(
+                Some("xai".into()),
+                Some("sk-test".into()),
+                Some("https://api.x.ai/v1".into()),
+            ),
+        );
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(rt.rebuild(&config_map))
+            .expect("rebuild");
+
+        let mut model = ModelEntry::fallback("grok-image", &EndpointsConfig::default());
+        model.provider_id = Some("xai".into());
+        model.api_key = Some("sk-test-xai".into());
+        let mut models = IndexMap::new();
+        models.insert("grok-image".into(), model);
+
+        let endpoints = EndpointsConfig::default();
+        let result = resolve_aux_model_sampling_config(
+            "grok-image",
+            &models,
+            &endpoints,
+            None,
+            false,
+            None,
+            None,
+            Some(&rt.snapshot()),
+        );
+        assert!(result.is_some());
+        let config = result.unwrap();
+        assert_eq!(
+            config.protocol_id.as_deref(),
+            Some("responses"),
+            "route compiler should set protocol_id for aux model"
+        );
+    }
+
+    #[test]
+    fn concurrent_rebuild_preserves_active_snapshot() {
+        use crate::agent::provider_runtime::ProviderRuntime;
+        use xai_grok_provider::config::ProviderConfig;
+        use xai_grok_provider::types::ProviderId;
+
+        let rt = std::sync::Arc::new(ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
+
+        let mut config_a: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_a.insert(
+            ProviderId::new("xai"),
+            ProviderConfig::new(
+                Some("xai".into()),
+                Some("sk-a".into()),
+                Some("https://api.x.ai/v1".into()),
+            ),
+        );
+        let rev0 = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(rt.rebuild(&config_a))
+            .expect("initial rebuild");
+
+        let rt_clone = rt.clone();
+        let config_b = config_a.clone();
+        let jh1 = std::thread::spawn(move || {
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(rt_clone.rebuild(&config_b))
+        });
+        let rt_clone2 = rt.clone();
+        let config_c = config_a.clone();
+        let jh2 = std::thread::spawn(move || {
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(rt_clone2.rebuild(&config_c))
+        });
+
+        let rev1 = jh1.join().expect("thread1").expect("rebuild1");
+        let rev2 = jh2.join().expect("thread2").expect("rebuild2");
+        assert_ne!(rev1, rev2, "concurrent rebuilds produce different revisions");
+
+        let final_rev = rt.snapshot().revision;
+        assert!(
+            final_rev > rev0,
+            "final revision must be greater than initial"
+        );
+        assert!(
+            final_rev >= rev1.max(rev2),
+            "final revision must be at least max(rev1, rev2)"
+        );
+    }
 }
