@@ -522,6 +522,16 @@ impl SamplingClient {
             has_x_api_key_header = headers.get(HeaderName::from_static("x-api-key")).is_some(),
         );
 
+        // Validate protocol_id during construction.
+        // `Some(unknown)` is an error; `None` falls back to api_backend.
+        if let Some(ref pid) = config.protocol_id {
+            crate::protocols::resolve_protocol_id(&pid.0).map_err(|_| {
+                xai_grok_sampling_types::error::SamplingError::InvalidConfiguration(
+                    "invalid protocol_id in SamplerConfig",
+                )
+            })?;
+        }
+
         let defaults = ClientDefaults {
             model: config.model,
             max_completion_tokens: config.max_completion_tokens,
