@@ -1,12 +1,14 @@
 use std::num::NonZeroU64;
+use std::sync::Arc;
+
+use indexmap::IndexMap;
 
 use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::model::Model;
-use crate::provider::{ConfiguredProvider, Provider};
+use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
 use crate::route::Route;
-use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
+use crate::types::{ApiBackend, AuthScheme, ProviderDefaults, ProviderId, RouteId};
 
 fn opencode_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -74,18 +76,17 @@ impl Provider for OpenCodeProvider {
             AuthPolicy::None,
         );
         let pid = self.defaults.id.clone();
-        ConfiguredProvider {
-            id: pid,
-            route,
-            model: Box::new(|id, route| {
-                Model::make(
-                    ModelId::new(id),
-                    ProviderId::new(ProviderId::OPENCODE),
-                    std::sync::Arc::new(route.clone()),
-                    None,
-                )
+        let route_id = RouteId::new("opencode-chat");
+        let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);
+        ConfiguredProvider::new(
+            pid,
+            self.defaults.name.clone(),
+            overrides,
+            routes,
+            route_id.clone(),
+            Arc::new(DefaultRouteSelector {
+                default_route_id: route_id,
             }),
-            configure: Box::new(move |c| OpenCodeProvider::new().configure(c)),
-        }
+        )
     }
 }

@@ -1,13 +1,14 @@
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
+use indexmap::IndexMap;
+
 use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::model::Model;
-use crate::provider::{ConfiguredProvider, Provider};
+use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
 use crate::route::Route;
-use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
+use crate::types::{ApiBackend, AuthScheme, ProviderDefaults, ProviderId, RouteId};
 
 pub fn openai_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -87,24 +88,21 @@ impl Provider for OpenAIProvider {
         ));
 
         let pid = self.defaults.id.clone();
-        ConfiguredProvider {
-            id: pid,
-            route: (*route_chat).clone(),
-            model: Box::new(move |id, _| {
-                let r = if id.starts_with("o1") || id.starts_with("o3") || id.starts_with("gpt-4.1")
-                {
-                    route_responses.clone()
-                } else {
-                    route_chat.clone()
-                };
-                Model::make(
-                    ModelId::new(id),
-                    ProviderId::new(ProviderId::OPENAI),
-                    r,
-                    None,
-                )
+        let route_id_chat = RouteId::new("openai-chat");
+        let route_id_responses = RouteId::new("openai-responses");
+        let routes = IndexMap::from([
+            (route_id_chat.clone(), route_chat),
+            (route_id_responses.clone(), route_responses),
+        ]);
+        ConfiguredProvider::new(
+            pid,
+            self.defaults.name.clone(),
+            overrides,
+            routes,
+            route_id_chat.clone(),
+            Arc::new(DefaultRouteSelector {
+                default_route_id: route_id_chat,
             }),
-            configure: Box::new(move |c| OpenAIProvider::new().configure(c)),
-        }
+        )
     }
 }

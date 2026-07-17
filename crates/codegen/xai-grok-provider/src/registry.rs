@@ -100,9 +100,10 @@ mod tests {
     use super::*;
     use crate::config::ProviderConfig;
     use crate::endpoint::{Endpoint, EndpointPart};
-    use crate::provider::{ConfiguredProvider, Provider};
+    use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
     use crate::route::Route;
-    use crate::types::{ModelId, ProviderDefaults};
+    use crate::types::{ProviderDefaults, RouteId};
+    use indexmap::IndexMap;
 
     #[derive(Debug)]
     struct DummyProvider {
@@ -132,7 +133,7 @@ mod tests {
             &self.defaults
         }
 
-        fn configure(&self, _overrides: ProviderConfig) -> ConfiguredProvider {
+        fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
             let route = Route::make(
                 "dummy",
                 Some(ProviderId::new("dummy")),
@@ -145,19 +146,18 @@ mod tests {
                 crate::auth::AuthPolicy::None,
             );
             let id = ProviderId::new("dummy");
-            ConfiguredProvider {
-                id: id.clone(),
-                route,
-                model: Box::new(|id: &str, rt: &Route| {
-                    Model::make(
-                        ModelId::new(id),
-                        ProviderId::new("dummy"),
-                        Arc::new((*rt).clone()),
-                        None,
-                    )
+            let route_id = RouteId::new("dummy");
+            let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);
+            ConfiguredProvider::new(
+                id,
+                "Dummy".into(),
+                overrides,
+                routes,
+                route_id.clone(),
+                Arc::new(DefaultRouteSelector {
+                    default_route_id: route_id,
                 }),
-                configure: Box::new(move |c| DummyProvider::new().configure(c)),
-            }
+            )
         }
     }
 
@@ -205,20 +205,23 @@ mod tests {
         registry.register(dummy_provider());
         let cp = registry.configure(&ProviderId::new("dummy"), ProviderConfig::default());
         assert!(cp.is_some());
-        assert_eq!(cp.unwrap().route.protocol_id, "chat_completions");
+        let cp = cp.unwrap();
+        assert_eq!(
+            cp.routes.get(&RouteId::new("dummy")).unwrap().protocol_id,
+            "chat_completions"
+        );
     }
 
     #[test]
-    fn registry_model_creates_model() {
+    fn registry_configure_has_routes() {
         let registry = ProviderRegistry::new();
         registry.register(dummy_provider());
-        let model = registry.model(
-            &ProviderId::new("dummy"),
-            "dummy-model",
-            ProviderConfig::default(),
-        );
-        assert!(model.is_some());
-        assert_eq!(model.unwrap().id.0, "dummy-model");
+        let cp = registry.configure(&ProviderId::new("dummy"), ProviderConfig::default());
+        assert!(cp.is_some());
+        let cp = cp.unwrap();
+        let route = cp.routes.get(&RouteId::new("dummy")).expect("dummy route");
+        assert_eq!(route.id.0, "dummy");
+        assert_eq!(route.protocol_id, "chat_completions");
     }
 
     #[test]

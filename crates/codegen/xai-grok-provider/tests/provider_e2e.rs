@@ -1,6 +1,6 @@
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::registry::ProviderRegistry;
-use xai_grok_provider::types::ProviderId;
+use xai_grok_provider::types::{ProviderId, RouteId};
 
 /// Integration test: full provider config → registry → Route → SamplerConfig.
 /// Verifies that the entire chain from configuration to a valid SamplerConfig
@@ -21,10 +21,14 @@ fn openai_provider_full_pipeline() {
     let configured = reg.configure(&pid, overrides).expect("configure openai");
 
     // Route fields
-    assert_eq!(configured.route.id.0, "openai-chat");
-    assert_eq!(configured.route.protocol_id, "chat_completions");
+    let chat_route = configured
+        .routes
+        .get(&RouteId::new("openai-chat"))
+        .expect("openai-chat route");
+    assert_eq!(chat_route.id.0, "openai-chat");
+    assert_eq!(chat_route.protocol_id, "chat_completions");
     assert_eq!(
-        configured.route.endpoint.base_url.as_deref(),
+        chat_route.endpoint.base_url.as_deref(),
         Some("https://mock.local/v1")
     );
 

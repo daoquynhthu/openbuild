@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use crate::config::ProviderConfig;
 use crate::registry::ProviderRegistry;
+use crate::route::Route;
 
 mod anthropic;
 mod ollama;
@@ -45,6 +46,74 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
         }
     }
     result
+}
+
+/// Build the final `ProviderConfig` for a single provider by merging
+/// env vars → TOML config → CLI overrides (later overrides earlier).
+pub fn build_provider_config(
+    pid: &str,
+    toml_configs: &[(String, ProviderConfig)],
+    env_configs: &IndexMap<String, ProviderConfig>,
+    cli_override: Option<&ProviderConfig>,
+) -> ProviderConfig {
+    let mut merged = ProviderConfig {
+        id: Some(pid.into()),
+        ..Default::default()
+    };
+
+    if let Some(env_cfg) = env_configs.get(pid) {
+        merged = merged.merge(env_cfg.clone());
+    }
+
+    if let Some((_, toml_cfg)) = toml_configs.iter().find(|(id, _)| id == pid) {
+        merged = merged.merge(toml_cfg.clone());
+    }
+
+    if let Some(cli) = cli_override
+        && cli.id.as_deref() == Some(pid)
+    {
+        merged = merged.merge(cli.clone());
+    }
+
+    merged
+}
+
+/// Configure all providers in the registry with merged config from all sources.
+/// Priority (low→high): env → TOML → compat (old [endpoints]) → CLI.
+/// Stores resolved routes back into the registry for later model resolution.
+/// The `compat` parameter provides backward-compatible overrides (e.g., from old
+/// `[endpoints]` config) that apply between TOML and CLI layers.
+pub fn configure_providers(
+    registry: &ProviderRegistry,
+    toml: &toml::Value,
+    compat: Option<ProviderConfig>,
+    cli_override: Option<ProviderConfig>,
+) {
+    let toml_configs = crate::config::parse_provider_toml(toml);
+    let env_configs = detect_env_vars(registry);
+
+    for pid in registry.all_ids() {
+        let mut merged = build_provider_config(&pid.0, &toml_configs, &env_configs, None);
+
+        if let Some(ref compat_cfg) = compat
+            && compat_cfg.id.as_deref() == Some(&pid.0)
+        {
+            merged = merged.merge(compat_cfg.clone());
+        }
+
+        if let Some(ref cli) = cli_override
+            && cli.id.as_deref() == Some(&pid.0)
+        {
+            merged = merged.merge(cli.clone());
+        }
+
+        registry.store_config(&pid, merged.clone());
+        if let Some(cp) = registry.configure(&pid, merged) {
+            for (route_id, route_arc) in &cp.routes {
+                registry.register_route(route_id.0.clone(), Route::clone(route_arc));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -104,25 +173,18 @@ mod tests {
                 },
                 crate::auth::AuthPolicy::None,
             );
-            crate::provider::ConfiguredProvider {
-                id: self.pid.clone(),
-                route,
-                model: Box::new(|id, rt| {
-                    crate::model::Model::make(
-                        crate::types::ModelId::new(id),
-                        crate::types::ProviderId::new("test-provider"),
-                        std::sync::Arc::new(rt.clone()),
-                        None,
-                    )
+            let route_id = crate::types::RouteId::new("test-route");
+            let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);
+            crate::provider::ConfiguredProvider::new(
+                self.pid.clone(),
+                "Test".into(),
+                overrides,
+                routes,
+                route_id.clone(),
+                Arc::new(crate::provider::DefaultRouteSelector {
+                    default_route_id: route_id,
                 }),
-                configure: Box::new(|c| {
-                    TestProvider {
-                        pid: crate::types::ProviderId::new("test-provider"),
-                        defaults: crate::types::ProviderDefaults::default(),
-                    }
-                    .configure(c)
-                }),
-            }
+            )
         }
     }
 
@@ -246,72 +308,5 @@ mod tests {
         let reg = dummy_registry();
         let env = detect_env_vars(&reg);
         assert!(env.is_empty() || env.get("test-provider").is_none());
-    }
-}
-
-/// Build the final `ProviderConfig` for a single provider by merging
-/// env vars → TOML config → CLI overrides (later overrides earlier).
-pub fn build_provider_config(
-    pid: &str,
-    toml_configs: &[(String, ProviderConfig)],
-    env_configs: &IndexMap<String, ProviderConfig>,
-    cli_override: Option<&ProviderConfig>,
-) -> ProviderConfig {
-    let mut merged = ProviderConfig {
-        id: Some(pid.into()),
-        ..Default::default()
-    };
-
-    if let Some(env_cfg) = env_configs.get(pid) {
-        merged = merged.merge(env_cfg.clone());
-    }
-
-    if let Some((_, toml_cfg)) = toml_configs.iter().find(|(id, _)| id == pid) {
-        merged = merged.merge(toml_cfg.clone());
-    }
-
-    if let Some(cli) = cli_override
-        && cli.id.as_deref() == Some(pid)
-    {
-        merged = merged.merge(cli.clone());
-    }
-
-    merged
-}
-
-/// Configure all providers in the registry with merged config from all sources.
-/// Priority (low→high): env → TOML → compat (old [endpoints]) → CLI.
-/// Stores resolved routes back into the registry for later model resolution.
-/// The `compat` parameter provides backward-compatible overrides (e.g., from old
-/// `[endpoints]` config) that apply between TOML and CLI layers.
-pub fn configure_providers(
-    registry: &ProviderRegistry,
-    toml: &toml::Value,
-    compat: Option<ProviderConfig>,
-    cli_override: Option<ProviderConfig>,
-) {
-    let toml_configs = crate::config::parse_provider_toml(toml);
-    let env_configs = detect_env_vars(registry);
-
-    for pid in registry.all_ids() {
-        let mut merged = build_provider_config(&pid.0, &toml_configs, &env_configs, None);
-
-        if let Some(ref compat_cfg) = compat
-            && compat_cfg.id.as_deref() == Some(&pid.0)
-        {
-            merged = merged.merge(compat_cfg.clone());
-        }
-
-        if let Some(ref cli) = cli_override
-            && cli.id.as_deref() == Some(&pid.0)
-        {
-            merged = merged.merge(cli.clone());
-        }
-
-        registry.store_config(&pid, merged.clone());
-        if let Some(cp) = registry.configure(&pid, merged) {
-            let route_id = cp.route.id.0.clone();
-            registry.register_route(route_id, cp.route);
-        }
     }
 }

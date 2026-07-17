@@ -141,6 +141,15 @@ pub enum ModelListFormat {
 /// Shared header map type used across the provider crate.
 pub type HeaderMap = std::collections::HashMap<String, String>;
 
+/// Specifies how a provider's model list is sourced.
+#[derive(Debug, Clone)]
+pub enum ModelSourceSpec {
+    /// Models come from a provider-discovered list.
+    Dynamic,
+    /// Models are statically defined in the provider.
+    Static(Vec<String>),
+}
+
 /// A portable, provider-independent request body for an LLM call.
 /// Protocol implementations convert this to their native wire format.
 #[derive(Debug, Clone)]
