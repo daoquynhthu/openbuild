@@ -1358,6 +1358,11 @@ pub struct Config {
     /// `[desktop]` section — owned by grok-desktop (Electron app), opaque to the CLI agent.
     #[serde(default, skip_serializing)]
     pub desktop: Option<toml::Value>,
+    /// `[provider.*]` sections — provider-adapter V1 typed config.
+    /// Absorbs arbitrary `[provider.<id>]` entries so they don't produce
+    /// unknown-key warnings. Parsed by `xai_grok_provider::config::parse_provider_toml`.
+    #[serde(default, skip_serializing)]
+    pub provider: Option<toml::Value>,
     /// Top-level `announcements` array — consumed by `resolve_announcements`.
     #[serde(default, skip_serializing)]
     pub announcements: Vec<xai_grok_announcements::RemoteAnnouncement>,
@@ -1749,6 +1754,7 @@ impl Default for Config {
             managed_mcps: crate::config::ManagedMcpsConfig::default(),
             auth: None,
             desktop: None,
+            provider: None,
             announcements: Vec::new(),
             tips: None,
             permission: PermissionKnownKeys::default(),
@@ -4655,13 +4661,10 @@ pub fn sampling_config_for_model(
     let api_backend = info.api_backend.clone();
 
     let (api_key, auth_scheme) = if let Some(route) = route {
-        let input = xai_grok_provider::auth::AuthInput::new(
-            String::new(),
-            "POST".into(),
-            credentials.base_url.clone(),
-            xai_grok_provider::auth::HeaderMap::new(),
-        );
-        if let Ok(auth_headers) = route.auth.apply(&input) {
+        if let Ok(auth_headers) = xai_grok_provider::auth::apply_auth_policy(
+            &route.auth,
+            &std::collections::HashMap::new(),
+        ) {
             for (key, value) in auth_headers {
                 extra_headers.entry(key).or_insert(value);
             }
