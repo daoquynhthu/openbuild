@@ -1405,6 +1405,8 @@ pub struct Config {
     #[serde(skip)]
     pub provider_catalog:
         Option<std::sync::Arc<crate::agent::provider_catalog::ProviderCatalogService>>,
+    #[serde(skip)]
+    pub provider_runtime: Option<std::sync::Arc<crate::agent::provider_runtime::ProviderRuntime>>,
     /// CLI override for API key (from --api-key).
     #[serde(skip)]
     pub api_key_override: Option<String>,
@@ -1771,6 +1773,7 @@ impl Default for Config {
             provider_override: None,
             provider_registry: None,
             provider_catalog: None,
+            provider_runtime: None,
             api_key_override: None,
             base_url_override: None,
             reasoning_effort_override: None,

@@ -870,14 +870,12 @@ async fn run_agent_command(
     let is_stdio = matches!(agent_args.mode, Some(AgentCmd::Stdio));
     let is_leader = matches!(agent_args.mode, Some(AgentCmd::Leader(_)));
 
-    // Initialize ProviderRegistry (needed by both TUI and headless paths).
-    let provider_registry = {
-        let reg = std::sync::Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
-        xai_grok_provider::providers::register_all(&reg);
-        reg
-    };
-    let provider_catalog =
-        std::sync::Arc::new(xai_grok_shell::agent::provider_catalog::ProviderCatalogService::new());
+    // Initialize ProviderRuntime (needed by both TUI and headless paths).
+    // Single container holding registry + catalog + rebuild methods.
+    let provider_runtime =
+        std::sync::Arc::new(xai_grok_shell::agent::provider_runtime::ProviderRuntime::new());
+    xai_grok_provider::providers::register_all(&provider_runtime.registry);
+    let provider_registry = provider_runtime.registry.clone();
 
     if !is_stdio && !is_leader {
         eprintln!(
@@ -951,7 +949,8 @@ async fn run_agent_command(
         );
     }
 
-    agent_config.provider_catalog = Some(provider_catalog.clone());
+    agent_config.provider_catalog = Some(provider_runtime.catalog.clone());
+    agent_config.provider_runtime = Some(provider_runtime.clone());
 
     // Thread the registry into config for downstream model resolution.
     agent_config.provider_registry = Some(provider_registry.clone());
@@ -1941,8 +1940,9 @@ async fn async_main() -> Result<()> {
         } else {
             None
         };
-    let result =
-        xai_grok_pager::app::run(args, bg_update_rx, Some(provider_registry.clone())).await;
+    // Registry is already attached to agent_config for headless mode.
+    // The TUI pager creates its own reference via provider_state.
+    let result = xai_grok_pager::app::run(args, bg_update_rx, None).await;
     xai_grok_sandbox::flush();
     match result {
         Ok(true) => {
