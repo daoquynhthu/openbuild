@@ -4,20 +4,9 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Widget;
 
+use crate::provider_state::{CredentialState, ProviderState, ProviderView};
 use crate::theme::Theme;
 use crate::views::modal_window::{self as mw, Shortcut};
-
-/// Provider entry for the modal list.
-#[derive(Debug, Clone)]
-pub struct ProviderEntry {
-    pub id: String,
-    pub name: String,
-    pub status: &'static str,
-    pub status_color: Color,
-    pub endpoint: String,
-    pub configured: bool,
-    pub models: Option<usize>,
-}
 
 /// Which view the Providers modal is showing.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,135 +26,46 @@ pub struct ProvidersModalState {
     pub window: mw::ModalWindowState,
     selected: usize,
     scroll_offset: usize,
-    providers: Vec<ProviderEntry>,
+    pub provider_state: ProviderState,
     mode: ProvidersView,
 }
 
 const VISIBLE_ROWS: usize = 8;
 
-impl Default for ProvidersModalState {
-    fn default() -> Self {
-        Self::new(&[])
-    }
-}
-
 impl ProvidersModalState {
-    pub fn new(configured: &[&str]) -> Self {
+    pub fn new(provider_state: ProviderState) -> Self {
         Self {
             window: mw::ModalWindowState::new(),
             selected: 0,
             scroll_offset: 0,
-            providers: builtin_providers(configured),
+            provider_state,
             mode: ProvidersView::List,
         }
     }
 
     fn visible_range(&self, height: usize) -> std::ops::Range<usize> {
+        let providers = self.provider_state.ordered_views();
         let start = self
             .scroll_offset
-            .min(self.providers.len().saturating_sub(1));
-        let end = (start + height).min(self.providers.len());
+            .min(providers.len().saturating_sub(1));
+        let end = (start + height).min(providers.len());
         start..end
     }
 
-    pub fn selected_provider(&self) -> Option<&ProviderEntry> {
-        self.providers.get(self.selected)
+    pub fn selected_provider(&self) -> Option<&ProviderView> {
+        let providers = self.provider_state.ordered_views();
+        providers.get(self.selected).copied()
     }
 }
 
-fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
-    fn is_configured(id: &str, configured: &[&str]) -> bool {
-        configured.contains(&id)
+fn credential_status(view: &ProviderView) -> (&'static str, Color) {
+    match view.credential {
+        CredentialState::NotRequired => ("Not required", Color::Cyan),
+        CredentialState::Configured => ("Configured", Color::Green),
+        CredentialState::Missing => ("Missing", Color::Red),
+        CredentialState::Session => ("Session", Color::Blue),
+        CredentialState::Public => ("Free tier", Color::Gray),
     }
-
-    vec![
-        ProviderEntry {
-            id: "xai".into(),
-            name: "xAI".into(),
-            status: if is_configured("xai", configured) {
-                "Connected"
-            } else {
-                "Not configured"
-            },
-            status_color: if is_configured("xai", configured) {
-                Color::Green
-            } else {
-                Color::Red
-            },
-            endpoint: "api.x.ai".into(),
-            configured: is_configured("xai", configured),
-            models: None,
-        },
-        ProviderEntry {
-            id: "openai".into(),
-            name: "OpenAI".into(),
-            status: if is_configured("openai", configured) {
-                "Connected"
-            } else {
-                "Not configured"
-            },
-            status_color: if is_configured("openai", configured) {
-                Color::Green
-            } else {
-                Color::Red
-            },
-            endpoint: "api.openai.com".into(),
-            configured: is_configured("openai", configured),
-            models: None,
-        },
-        ProviderEntry {
-            id: "anthropic".into(),
-            name: "Anthropic".into(),
-            status: if is_configured("anthropic", configured) {
-                "Connected"
-            } else {
-                "Not configured"
-            },
-            status_color: if is_configured("anthropic", configured) {
-                Color::Green
-            } else {
-                Color::Red
-            },
-            endpoint: "api.anthropic.com".into(),
-            configured: is_configured("anthropic", configured),
-            models: None,
-        },
-        ProviderEntry {
-            id: "opencode".into(),
-            name: "OpenCode Zen".into(),
-            status: if is_configured("opencode", configured) {
-                "Connected"
-            } else {
-                "Free tier"
-            },
-            status_color: if is_configured("opencode", configured) {
-                Color::Green
-            } else {
-                Color::Gray
-            },
-            endpoint: "opencode.ai".into(),
-            configured: is_configured("opencode", configured),
-            models: None,
-        },
-        ProviderEntry {
-            id: "ollama".into(),
-            name: "Ollama".into(),
-            status: "Local",
-            status_color: Color::Cyan,
-            endpoint: "localhost:11434".into(),
-            configured: true,
-            models: None,
-        },
-        ProviderEntry {
-            id: "openai-compatible".into(),
-            name: "OpenAI Compatible".into(),
-            status: "Not configured",
-            status_color: Color::Red,
-            endpoint: "\u{2014}".into(),
-            configured: false,
-            models: None,
-        },
-    ]
 }
 
 /// Outcome from handling a key press on the Providers modal.
@@ -219,7 +119,8 @@ fn handle_list_key(
             ProvidersKeyOutcome::Changed
         }
         KeyCode::Down | KeyCode::Char('j') if key.modifiers.is_empty() => {
-            if state.selected + 1 < state.providers.len() {
+            let providers = state.provider_state.ordered_views();
+            if state.selected + 1 < providers.len() {
                 state.selected += 1;
                 adjust_scroll(state);
             }
@@ -231,7 +132,8 @@ fn handle_list_key(
             ProvidersKeyOutcome::Changed
         }
         KeyCode::End => {
-            state.selected = state.providers.len().saturating_sub(1);
+            let providers = state.provider_state.ordered_views();
+            state.selected = providers.len().saturating_sub(1);
             ProvidersKeyOutcome::Changed
         }
         _ => ProvidersKeyOutcome::Unchanged,
@@ -302,10 +204,11 @@ fn handle_detail_key(
             ProvidersKeyOutcome::Changed
         }
         KeyCode::Enter => {
-            if let Some(provider) = state.providers.get(*provider_idx) {
+            let providers = state.provider_state.ordered_views();
+            if let Some(view) = providers.get(*provider_idx) {
                 let key = api_key.clone();
                 let url = base_url.clone();
-                save_provider_config(&provider.id, &key, &url);
+                save_provider_config(&view.id.0, &key, &url);
             }
             state.mode = ProvidersView::List;
             ProvidersKeyOutcome::Changed
@@ -428,10 +331,11 @@ fn render_list(
         content.content.height.saturating_sub(1),
     );
 
+    let providers = state.provider_state.ordered_views();
     let range = state.visible_range(row_area.height as usize);
 
     for (i, idx) in range.enumerate() {
-        let Some(provider) = state.providers.get(idx) else {
+        let Some(view) = providers.get(idx) else {
             continue;
         };
         let y = row_area.top() + i as u16;
@@ -448,18 +352,20 @@ fn render_list(
             theme.gray_bright
         };
 
-        let status_style = Style::default().fg(provider.status_color).bg(bg);
+        let (status, status_color) = credential_status(view);
+        let status_style = Style::default().fg(status_color).bg(bg);
         let row_style = Style::default().fg(fg).bg(bg);
 
-        let models_label = provider
-            .models
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| "—".into());
+        let models_label = if view.model_count > 0 {
+            view.model_count.to_string()
+        } else {
+            "—".into()
+        };
         let line = Line::from(vec![
-            ratatui::text::Span::styled(format!(" {:<14}", provider.name), row_style),
+            ratatui::text::Span::styled(format!(" {:<14}", view.display_name), row_style),
             ratatui::text::Span::styled(format!(" {:>5} ", models_label), row_style),
-            ratatui::text::Span::styled(format!(" {:>10} ", provider.status), status_style),
-            ratatui::text::Span::styled(format!("  {}", provider.endpoint), row_style),
+            ratatui::text::Span::styled(format!(" {:>10} ", status), status_style),
+            ratatui::text::Span::styled(format!("  {}", view.endpoint), row_style),
         ]);
         line.render(Rect::new(row_area.x, y, row_area.width, 1), buf);
     }
@@ -490,11 +396,12 @@ fn render_detail(
     };
     let (provider_idx, api_key_str, base_url_str, focused_field, show_api_key) = detail;
 
-    let Some(provider) = state.providers.get(provider_idx) else {
+    let providers = state.provider_state.ordered_views();
+    let Some(view) = providers.get(provider_idx) else {
         return;
     };
 
-    let title = format!("Configure: {}", provider.name);
+    let title = format!("Configure: {}", view.display_name);
 
     let shortcuts: &[Shortcut<'static>] = &[
         Shortcut {
@@ -574,14 +481,15 @@ fn render_detail(
     );
     render_y += 1;
 
-    let field_label = "Status:";
-    let status_style = Style::default().fg(provider.status_color);
+    let (status, status_color) = credential_status(view);
+    let status_label = "Status:";
+    let status_style = Style::default().fg(status_color);
     let status_line = Line::from(vec![
         ratatui::text::Span::styled(
-            format!("  {}  ", field_label),
+            format!("  {}  ", status_label),
             Style::default().fg(theme.gray).add_modifier(Modifier::BOLD),
         ),
-        ratatui::text::Span::styled(provider.status, status_style),
+        ratatui::text::Span::styled(status, status_style),
     ]);
     status_line.render(
         Rect::new(content.inner_x, render_y, content.inner_width, 1),
@@ -594,7 +502,7 @@ fn render_detail(
             "  Endpoint:  ",
             Style::default().fg(theme.gray).add_modifier(Modifier::BOLD),
         ),
-        ratatui::text::Span::styled(&provider.endpoint, Style::default().fg(theme.gray_bright)),
+        ratatui::text::Span::styled(&view.endpoint, Style::default().fg(theme.gray_bright)),
     ]);
     endpoint_line.render(
         Rect::new(content.inner_x, render_y, content.inner_width, 1),
