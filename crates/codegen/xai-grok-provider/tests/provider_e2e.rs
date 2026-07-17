@@ -135,3 +135,90 @@ fn configure_stores_api_key() {
     // OpenAI got its key from TOML. xAI may have one from XAI_API_KEY env var
     // (set in dev environments), so we only check the TOML-sourced provider.
 }
+
+/// Legacy xAI compatibility: [endpoints].xai_api_base_url maps to xAI provider.
+#[test]
+fn legacy_endpoints_xai_api_base_url_maps_to_xai_provider() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    // Simulate old [endpoints] config with a custom xAI URL.
+    let endpoints_xai_url = "https://custom.x.ai/v1";
+    let compat = ProviderConfig::new(
+        Some("xai".into()),
+        Some("test-legacy-key".into()),
+        Some(endpoints_xai_url.into()),
+    );
+
+    xai_grok_provider::providers::configure_providers(
+        &reg,
+        &toml::from_str("").unwrap(),
+        Some(compat),
+        None,
+    );
+
+    // The xAI provider should have its config stored.
+    let xai_pid = ProviderId::new("xai");
+    let stored = reg.get_config(&xai_pid).expect("xAI config must be stored");
+    assert_eq!(
+        stored.api_key.as_deref(),
+        Some("test-legacy-key"),
+        "legacy key must reach xAI provider"
+    );
+    assert_eq!(
+        stored.base_url.as_deref(),
+        Some(endpoints_xai_url),
+        "legacy base_url must reach xAI provider"
+    );
+}
+
+/// Legacy xAI compatibility: bare model names without provider field resolve to xAI.
+#[test]
+fn legacy_bare_model_defaults_to_xai() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+    xai_grok_provider::providers::configure_providers(
+        &reg,
+        &toml::from_str("").unwrap(),
+        None,
+        None,
+    );
+
+    // The xAI provider must exist and be configured.
+    let xai_pid = ProviderId::new("xai");
+    let xai_provider = reg.get(&xai_pid).expect("xAI provider must be registered");
+    assert_eq!(xai_provider.name(), "xAI");
+
+    // Default model "grok-build" must be resolvable syntactically as xAI.
+    let (provider_from_ref, model) = xai_grok_provider::types::parse_model_ref("grok-build");
+    assert!(
+        provider_from_ref.is_none(),
+        "bare model has no provider prefix"
+    );
+    assert_eq!(model, "grok-build");
+}
+
+/// Legacy xAI compatibility: XAI_API_KEY env var detection.
+#[test]
+fn legacy_xai_api_key_env_detected() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    // SAFETY: test-only env mutation, single-threaded.
+    unsafe {
+        std::env::set_var("XAI_API_KEY", "test-env-key-not-real");
+    }
+
+    let env_configs = xai_grok_provider::providers::detect_env_vars(&reg);
+    let xai_key = env_configs.get("xai").and_then(|c| c.api_key.clone());
+
+    unsafe {
+        std::env::remove_var("XAI_API_KEY");
+    }
+
+    assert_eq!(
+        xai_key.as_deref(),
+        Some("test-env-key-not-real"),
+        "XAI_API_KEY must be detected for xAI provider"
+    );
+}
