@@ -1,6 +1,14 @@
+//! Stream framing/decoding.
+//!
+//! **Deprecated for production use in V1.** Stream framing/decoding is now owned
+//! by the protocol implementation selected by `protocol_id`. This module remains
+//! as deprecated internal code with no production callers. It will be removed in
+//! Phase 14 after all equivalent tests pass through the protocol path.
+
 use bytes::Bytes;
 use futures::Stream;
 
+#[allow(unused)]
 pub trait Framing<Frame>: Send + Sync + core::fmt::Debug {
     fn id(&self) -> &str;
     fn frame(

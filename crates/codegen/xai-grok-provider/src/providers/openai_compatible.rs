@@ -1,12 +1,11 @@
 use std::num::NonZeroU64;
 
-use crate::auth::Credential;
+use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
-use crate::route::{Route, RouteInput};
+use crate::route::Route;
 use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 /// Known OpenAI-compatible profile configurations.
@@ -85,22 +84,17 @@ impl Provider for OpenAiCompatibleProvider {
         } else {
             base_url
         };
-        let auth = Credential::optional(overrides.api_key, "api_key")
-            .or_else(Credential::config("XAI_API_KEY"))
-            .bearer();
-        let route = Route::make(RouteInput {
-            id: "openai-compatible-chat".into(),
-            provider: Some(self.defaults.id.clone()),
-            protocol: "chat_completions".into(),
-            endpoint: Endpoint {
+        let route = Route::make(
+            "openai-compatible-chat",
+            Some(self.defaults.id.clone()),
+            "chat_completions",
+            Endpoint {
                 base_url: Some(resolved_url),
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            auth: Some(auth),
-            framing: Box::new(SseFraming),
-            defaults: None,
-        });
+            AuthPolicy::None,
+        );
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
             id: pid,

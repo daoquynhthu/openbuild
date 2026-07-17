@@ -1,202 +1,125 @@
 use std::sync::Arc;
 
-use crate::auth::{AuthFn, NoopAuth};
-use crate::endpoint::{Endpoint, EndpointPatch};
-use crate::framing::Framing;
+use indexmap::IndexMap;
+
+use crate::auth::AuthPolicy;
+use crate::endpoint::Endpoint;
+use crate::error::ProviderError;
 use crate::model::{GenerationOptions, Model, ModelLimits};
-use crate::types::{HeaderMap, LLMRequest, ModelId, ProviderId};
+use crate::types::{ModelId, ProviderId, RouteId};
 
-/// Static defaults for a Route.
+/// A Route represents one declarative inference endpoint.
+///
+/// V1 architecture (AD-02): Route is cloneable and contains all information
+/// needed to construct a sampler request. Stream framing/decoding is owned
+/// by the protocol implementation selected by `protocol_id`.
 #[derive(Debug, Clone)]
-#[non_exhaustive]
-pub struct RouteDefaults {
-    pub headers: Option<HeaderMap>,
-    pub generation: Option<GenerationOptions>,
-    pub limits: Option<ModelLimits>,
-}
-
-/// Input for constructing a Route.
-#[non_exhaustive]
-pub struct RouteInput {
-    pub id: String,
-    pub provider: Option<ProviderId>,
-    pub protocol: String,
-    pub endpoint: Endpoint<()>,
-    pub auth: Option<Box<dyn AuthFn>>,
-    pub framing: Box<dyn Framing<String>>,
-    pub defaults: Option<RouteDefaults>,
-}
-
-impl core::fmt::Debug for RouteInput {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("RouteInput")
-            .field("id", &self.id)
-            .field("provider", &self.provider)
-            .field("protocol", &self.protocol)
-            .field("endpoint", &self.endpoint)
-            .field("framing", &self.framing.id())
-            .finish()
-    }
-}
-
-/// A Route composes the four orthogonal deployment axes:
-/// Protocol + Endpoint + Auth + Framing.
-#[non_exhaustive]
 pub struct Route {
-    pub id: String,
-    pub provider: Option<ProviderId>,
-    pub protocol: String,
+    pub id: RouteId,
+    pub provider_id: ProviderId,
+    pub protocol_id: String,
     pub endpoint: Endpoint<()>,
-    pub auth: Box<dyn AuthFn>,
-    pub framing: Box<dyn Framing<String>>,
-    pub defaults: RouteDefaults,
-    pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
-}
-
-impl Clone for Route {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id.clone(),
-            provider: self.provider.clone(),
-            protocol: self.protocol.clone(),
-            endpoint: self.endpoint.clone(),
-            auth: self.auth.clone_box(),
-            framing: self.framing.clone_box(),
-            defaults: self.defaults.clone(),
-            headers: self.headers,
-        }
-    }
-}
-
-impl core::fmt::Debug for Route {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Route")
-            .field("id", &self.id)
-            .field("provider", &self.provider)
-            .field("protocol", &self.protocol)
-            .field("endpoint", &self.endpoint)
-            .field("framing", &self.framing.id())
-            .finish()
-    }
+    pub auth: AuthPolicy,
+    pub static_headers: IndexMap<String, String>,
+    pub generation_defaults: GenerationOptions,
+    pub limits: ModelLimits,
 }
 
 impl Route {
-    pub fn make(input: RouteInput) -> Self {
+    /// Create a Route from its required fields.
+    pub fn new(
+        id: RouteId,
+        provider_id: ProviderId,
+        protocol_id: impl Into<String>,
+        endpoint: Endpoint<()>,
+        auth: AuthPolicy,
+    ) -> Self {
         Self {
-            id: input.id,
-            provider: input.provider,
-            protocol: input.protocol,
-            endpoint: input.endpoint,
-            auth: input.auth.unwrap_or_else(|| Box::new(NoopAuth)),
-            framing: input.framing,
-            defaults: input.defaults.unwrap_or(RouteDefaults {
-                headers: None,
-                generation: None,
-                limits: None,
-            }),
-            headers: None,
-        }
-    }
-
-    pub fn with(self, patch: RoutePatch) -> Self {
-        let endpoint = match patch.endpoint {
-            Some(ref ep) => crate::endpoint::merge_endpoints(&self.endpoint, ep),
-            None => self.endpoint,
-        };
-        Self {
+            id,
+            provider_id,
+            protocol_id: protocol_id.into(),
             endpoint,
-            auth: patch.auth.unwrap_or(self.auth),
-            provider: patch.provider.or(self.provider),
-            defaults: patch.defaults.unwrap_or(self.defaults),
-            headers: patch.headers.or(self.headers),
-            ..self
+            auth,
+            static_headers: IndexMap::new(),
+            generation_defaults: GenerationOptions::default(),
+            limits: ModelLimits::default(),
         }
     }
 
+    /// Convenience constructor for backward compatibility.
+    /// Wraps the new Route::new with string IDs.
+    pub fn make(
+        id: impl Into<String>,
+        provider_id: Option<ProviderId>,
+        protocol: impl Into<String>,
+        endpoint: Endpoint<()>,
+        auth: AuthPolicy,
+    ) -> Self {
+        Self {
+            id: RouteId::new(id),
+            provider_id: provider_id.unwrap_or_else(|| ProviderId::new("unknown")),
+            protocol_id: protocol.into(),
+            endpoint,
+            auth,
+            static_headers: IndexMap::new(),
+            generation_defaults: GenerationOptions::default(),
+            limits: ModelLimits::default(),
+        }
+    }
+
+    /// Bind a model ID to this route.
     pub fn model(&self, id: &str) -> Model {
         Model::make(
             ModelId::new(id),
-            self.provider
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(|| ProviderId::new("unknown")),
+            self.provider_id.clone(),
             Arc::new(self.clone()),
             None,
         )
     }
-}
 
-/// Partial overrides for Route::with().
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct RoutePatch {
-    pub provider: Option<ProviderId>,
-    pub endpoint: Option<EndpointPatch<()>>,
-    pub defaults: Option<RouteDefaults>,
-    pub auth: Option<Box<dyn AuthFn>>,
-    pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
+    /// Validate the route's fields.
+    pub fn validate(&self) -> Result<(), ProviderError> {
+        if self.id.0.trim().is_empty() {
+            return Err(ProviderError::InvalidRouteId(
+                "route ID must not be empty".into(),
+            ));
+        }
+        if self.protocol_id.trim().is_empty() {
+            return Err(ProviderError::UnknownProtocol(
+                "protocol_id must not be empty".into(),
+            ));
+        }
+        self.auth.validate()?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::Credential;
+    use crate::auth::CredentialSource;
     use crate::endpoint::EndpointPart;
-    use crate::framing::SseFraming;
-    use crate::types::ProviderId;
 
     fn test_route() -> Route {
-        Route::make(RouteInput {
-            id: "test-chat".into(),
-            provider: Some(ProviderId::new("openai")),
-            protocol: "chat_completions".into(),
-            endpoint: Endpoint {
+        Route::make(
+            "test-chat",
+            Some(ProviderId::new("openai")),
+            "chat_completions",
+            Endpoint {
                 base_url: Some("https://api.openai.com/v1".into()),
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            auth: Some(Credential::optional(Some("sk-test".into()), "api_key").bearer()),
-            framing: Box::new(SseFraming),
-            defaults: Some(RouteDefaults {
-                headers: None,
-                generation: None,
-                limits: None,
-            }),
-        })
+            AuthPolicy::Bearer(CredentialSource::Environment(vec!["OPENAI_API_KEY".into()])),
+        )
     }
 
     #[test]
     fn route_make_sets_fields() {
         let route = test_route();
-        assert_eq!(route.id, "test-chat");
-        assert_eq!(route.provider.unwrap().0, "openai");
-        assert_eq!(route.protocol, "chat_completions");
-    }
-
-    #[test]
-    fn route_make_preserves_auth_and_framing() {
-        let route = test_route();
-        assert_eq!(route.framing.id(), "sse");
-    }
-
-    #[test]
-    fn route_with_updates_endpoint() {
-        let route = test_route();
-        let patched = route.with(RoutePatch {
-            provider: None,
-            endpoint: Some(EndpointPatch {
-                base_url: Some("https://override.com/v1".into()),
-                path: None,
-                query: None,
-            }),
-            defaults: None,
-            auth: None,
-            headers: None,
-        });
-        assert_eq!(
-            patched.endpoint.base_url.unwrap(),
-            "https://override.com/v1"
-        );
+        assert_eq!(route.id.0, "test-chat");
+        assert_eq!(route.provider_id.0, "openai");
+        assert_eq!(route.protocol_id, "chat_completions");
     }
 
     #[test]
@@ -208,20 +131,33 @@ mod tests {
     }
 
     #[test]
-    fn route_defaults_none_when_not_provided() {
-        let route = Route::make(RouteInput {
-            id: "minimal".into(),
-            provider: None,
-            protocol: "chat".into(),
-            endpoint: Endpoint {
-                base_url: None,
-                path: EndpointPart::Static("/test".into()),
+    fn route_validate_valid() {
+        let route = test_route();
+        assert!(route.validate().is_ok());
+    }
+
+    #[test]
+    fn route_validate_rejects_empty_protocol() {
+        let route = Route::make(
+            "test",
+            Some(ProviderId::new("p")),
+            "",
+            Endpoint {
+                base_url: Some("https://example.com".into()),
+                path: EndpointPart::Static("/chat".into()),
                 query: None,
             },
-            auth: None,
-            framing: Box::new(SseFraming),
-            defaults: None,
-        });
-        assert!(route.defaults.headers.is_none());
+            AuthPolicy::None,
+        );
+        assert!(route.validate().is_err());
+    }
+
+    #[test]
+    fn route_clone_is_independent() {
+        let r1 = test_route();
+        let mut r2 = r1.clone();
+        r2.id = RouteId::new("other");
+        assert_eq!(r1.id.0, "test-chat");
+        assert_eq!(r2.id.0, "other");
     }
 }

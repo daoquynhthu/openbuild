@@ -90,11 +90,11 @@ mod tests {
             &self.defaults
         }
         fn configure(&self, overrides: ProviderConfig) -> crate::provider::ConfiguredProvider {
-            let route = crate::route::Route::make(crate::route::RouteInput {
-                id: "test-route".into(),
-                provider: Some(self.pid.clone()),
-                protocol: "chat_completions".into(),
-                endpoint: crate::endpoint::Endpoint {
+            let route = crate::route::Route::make(
+                "test-route",
+                Some(self.pid.clone()),
+                "chat_completions",
+                crate::endpoint::Endpoint {
                     base_url: overrides
                         .base_url
                         .clone()
@@ -102,10 +102,8 @@ mod tests {
                     path: crate::endpoint::EndpointPart::Static("/chat/completions".into()),
                     query: None,
                 },
-                auth: None,
-                framing: Box::new(crate::framing::SseFraming),
-                defaults: None,
-            });
+                crate::auth::AuthPolicy::None,
+            );
             crate::provider::ConfiguredProvider {
                 id: self.pid.clone(),
                 route,
@@ -312,8 +310,8 @@ pub fn configure_providers(
 
         registry.store_config(&pid, merged.clone());
         if let Some(cp) = registry.configure(&pid, merged) {
-            let route_id = cp.route.id.clone();
-            registry.register_route(&route_id, cp.route);
+            let route_id = cp.route.id.0.clone();
+            registry.register_route(route_id, cp.route);
         }
     }
 }

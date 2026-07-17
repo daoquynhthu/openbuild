@@ -100,9 +100,8 @@ mod tests {
     use super::*;
     use crate::config::ProviderConfig;
     use crate::endpoint::{Endpoint, EndpointPart};
-    use crate::framing::SseFraming;
     use crate::provider::{ConfiguredProvider, Provider};
-    use crate::route::{Route, RouteDefaults, RouteInput};
+    use crate::route::Route;
     use crate::types::{ModelId, ProviderDefaults};
 
     #[derive(Debug)]
@@ -134,23 +133,17 @@ mod tests {
         }
 
         fn configure(&self, _overrides: ProviderConfig) -> ConfiguredProvider {
-            let route = Route::make(RouteInput {
-                id: "dummy".into(),
-                provider: Some(ProviderId::new("dummy")),
-                protocol: "chat_completions".into(),
-                endpoint: Endpoint {
+            let route = Route::make(
+                "dummy",
+                Some(ProviderId::new("dummy")),
+                "chat_completions",
+                Endpoint {
                     base_url: Some("https://dummy.com/v1".into()),
                     path: EndpointPart::Static("/chat/completions".into()),
                     query: None,
                 },
-                auth: None,
-                framing: Box::new(SseFraming),
-                defaults: Some(RouteDefaults {
-                    headers: None,
-                    generation: None,
-                    limits: None,
-                }),
-            });
+                crate::auth::AuthPolicy::None,
+            );
             let id = ProviderId::new("dummy");
             ConfiguredProvider {
                 id: id.clone(),
@@ -190,19 +183,17 @@ mod tests {
     #[test]
     fn registry_register_route_and_get() {
         let registry = ProviderRegistry::new();
-        let route = Route::make(RouteInput {
-            id: "test-route".into(),
-            provider: None,
-            protocol: "chat".into(),
-            endpoint: Endpoint {
+        let route = Route::make(
+            "test-route",
+            None::<ProviderId>,
+            "chat",
+            Endpoint {
                 base_url: None,
                 path: EndpointPart::Static("/test".into()),
                 query: None,
             },
-            auth: None,
-            framing: Box::new(SseFraming),
-            defaults: None,
-        });
+            crate::auth::AuthPolicy::None,
+        );
         registry.register_route("my-route", route);
         let r = registry.get_route("my-route");
         assert!(r.is_some());
@@ -214,7 +205,7 @@ mod tests {
         registry.register(dummy_provider());
         let cp = registry.configure(&ProviderId::new("dummy"), ProviderConfig::default());
         assert!(cp.is_some());
-        assert_eq!(cp.unwrap().route.protocol, "chat_completions");
+        assert_eq!(cp.unwrap().route.protocol_id, "chat_completions");
     }
 
     #[test]

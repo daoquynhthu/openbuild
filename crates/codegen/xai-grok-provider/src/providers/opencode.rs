@@ -1,12 +1,11 @@
 use std::num::NonZeroU64;
 
-use crate::auth::Credential;
+use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
-use crate::route::{Route, RouteInput};
+use crate::route::Route;
 use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 fn opencode_defaults() -> ProviderDefaults {
@@ -63,22 +62,17 @@ impl Provider for OpenCodeProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        let auth = Credential::config("OPENCODE_API_KEY")
-            .or_else(Credential::public_key("public"))
-            .bearer();
-        let route = Route::make(RouteInput {
-            id: "opencode-chat".into(),
-            provider: Some(self.defaults.id.clone()),
-            protocol: "chat_completions".into(),
-            endpoint: Endpoint {
+        let route = Route::make(
+            "opencode-chat",
+            Some(self.defaults.id.clone()),
+            "chat_completions",
+            Endpoint {
                 base_url: Some(base_url),
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            auth: Some(auth),
-            framing: Box::new(SseFraming),
-            defaults: None,
-        });
+            AuthPolicy::None,
+        );
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
             id: pid,

@@ -21,8 +21,8 @@ fn openai_provider_full_pipeline() {
     let configured = reg.configure(&pid, overrides).expect("configure openai");
 
     // Route fields
-    assert_eq!(configured.route.id, "openai-chat");
-    assert_eq!(configured.route.protocol, "chat_completions");
+    assert_eq!(configured.route.id.0, "openai-chat");
+    assert_eq!(configured.route.protocol_id, "chat_completions");
     assert_eq!(
         configured.route.endpoint.base_url.as_deref(),
         Some("https://mock.local/v1")

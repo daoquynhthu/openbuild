@@ -1,13 +1,12 @@
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use crate::auth::Credential;
+use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
-use crate::route::{Route, RouteInput};
+use crate::route::Route;
 use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 pub fn openai_defaults() -> ProviderDefaults {
@@ -64,37 +63,28 @@ impl Provider for OpenAIProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        let auth = Credential::optional(overrides.api_key, "api_key")
-            .or_else(Credential::config("OPENAI_API_KEY"))
-            .bearer();
-        let auth_responses = auth.clone_box();
-
-        let route_chat = Arc::new(Route::make(RouteInput {
-            id: "openai-chat".into(),
-            provider: Some(self.defaults.id.clone()),
-            protocol: "chat_completions".into(),
-            endpoint: Endpoint {
+        let route_chat = Arc::new(Route::make(
+            "openai-chat",
+            Some(self.defaults.id.clone()),
+            "chat_completions",
+            Endpoint {
                 base_url: Some(base_url.clone()),
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            auth: Some(auth),
-            framing: Box::new(SseFraming),
-            defaults: None,
-        }));
-        let route_responses = Arc::new(Route::make(RouteInput {
-            id: "openai-responses".into(),
-            provider: Some(self.defaults.id.clone()),
-            protocol: "responses".into(),
-            endpoint: Endpoint {
+            AuthPolicy::None,
+        ));
+        let route_responses = Arc::new(Route::make(
+            "openai-responses",
+            Some(self.defaults.id.clone()),
+            "responses",
+            Endpoint {
                 base_url: Some(base_url),
                 path: EndpointPart::Static("/responses".into()),
                 query: None,
             },
-            auth: Some(auth_responses),
-            framing: Box::new(SseFraming),
-            defaults: None,
-        }));
+            AuthPolicy::None,
+        ));
 
         let pid = self.defaults.id.clone();
         ConfiguredProvider {

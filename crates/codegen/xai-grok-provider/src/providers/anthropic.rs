@@ -1,12 +1,10 @@
 use std::num::NonZeroU64;
 
-use crate::auth::Credential;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
-use crate::route::{Route, RouteInput};
+use crate::route::Route;
 use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 fn anthropic_defaults() -> ProviderDefaults {
@@ -63,28 +61,17 @@ impl Provider for AnthropicProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        let auth = Credential::optional(overrides.api_key, "api_key")
-            .or_else(Credential::config("ANTHROPIC_API_KEY"))
-            .header("x-api-key");
-        let mut route_headers = std::collections::HashMap::new();
-        route_headers.insert("anthropic-version".into(), "2023-06-01".into());
-        let route = Route::make(RouteInput {
-            id: "anthropic-messages".into(),
-            provider: Some(self.defaults.id.clone()),
-            protocol: "messages".into(),
-            endpoint: Endpoint {
+        let route = Route::make(
+            "anthropic-messages",
+            Some(self.defaults.id.clone()),
+            "messages",
+            Endpoint {
                 base_url: Some(base_url),
                 path: EndpointPart::Static("/messages".into()),
                 query: None,
             },
-            auth: Some(auth),
-            framing: Box::new(SseFraming),
-            defaults: Some(crate::route::RouteDefaults {
-                headers: Some(route_headers),
-                generation: None,
-                limits: None,
-            }),
-        });
+            crate::auth::AuthPolicy::None,
+        );
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
             id: pid,

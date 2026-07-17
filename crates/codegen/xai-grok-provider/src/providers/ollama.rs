@@ -2,10 +2,9 @@ use std::num::NonZeroU64;
 
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
-use crate::route::{Route, RouteInput};
+use crate::route::Route;
 use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 fn ollama_defaults() -> ProviderDefaults {
@@ -62,19 +61,17 @@ impl Provider for OllamaProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        let route = Route::make(RouteInput {
-            id: "ollama-chat".into(),
-            provider: Some(self.defaults.id.clone()),
-            protocol: "chat_completions".into(),
-            endpoint: Endpoint {
+        let route = Route::make(
+            "ollama-chat",
+            Some(self.defaults.id.clone()),
+            "chat_completions",
+            Endpoint {
                 base_url: Some(base_url),
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            auth: None,
-            framing: Box::new(SseFraming),
-            defaults: None,
-        });
+            crate::auth::AuthPolicy::None,
+        );
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
             id: pid,

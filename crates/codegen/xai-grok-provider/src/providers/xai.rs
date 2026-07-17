@@ -2,13 +2,12 @@ use std::num::NonZeroU64;
 
 use indexmap::IndexMap;
 
-use crate::auth::Credential;
+use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
-use crate::route::{Route, RouteInput};
+use crate::route::Route;
 use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 pub(crate) fn xai_defaults() -> ProviderDefaults {
@@ -65,32 +64,17 @@ impl Provider for XaiProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        let auth = Credential::optional(overrides.api_key, "api_key")
-            .or_else(Credential::config("XAI_API_KEY"))
-            .or_else(Credential::session())
-            .bearer();
-        let mut xai_headers = std::collections::HashMap::new();
-        xai_headers.insert(
-            "x-grok-client-identifier".into(),
-            "xai-grok-provider".into(),
-        );
-        let route = Route::make(RouteInput {
-            id: "xai-responses".into(),
-            provider: Some(self.defaults.id.clone()),
-            protocol: "responses".into(),
-            endpoint: Endpoint {
+        let route = Route::make(
+            "xai-responses",
+            Some(self.defaults.id.clone()),
+            "responses",
+            Endpoint {
                 base_url: Some(base_url),
                 path: EndpointPart::Static("/responses".into()),
                 query: None,
             },
-            auth: Some(auth),
-            framing: Box::new(SseFraming),
-            defaults: Some(crate::route::RouteDefaults {
-                headers: Some(xai_headers),
-                generation: None,
-                limits: None,
-            }),
-        });
+            AuthPolicy::None,
+        );
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
             id: pid,

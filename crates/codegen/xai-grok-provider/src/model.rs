@@ -24,7 +24,7 @@ pub struct ModelDefaults {
 }
 
 /// Context and output token limits for a model.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub struct ModelLimits {
     pub context: Option<u64>,
@@ -32,7 +32,7 @@ pub struct ModelLimits {
 }
 
 /// Generation parameters sent to the provider.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub struct GenerationOptions {
@@ -74,28 +74,22 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::{AuthPolicy, CredentialSource};
     use crate::endpoint::{Endpoint, EndpointPart};
-    use crate::framing::SseFraming;
-    use crate::route::{Route, RouteDefaults, RouteInput};
+    use crate::route::Route;
 
     fn dummy_route() -> Route {
-        Route::make(RouteInput {
-            id: "test".into(),
-            provider: None,
-            protocol: "chat_completions".into(),
-            endpoint: Endpoint {
-                base_url: None,
-                path: EndpointPart::Static("/test".into()),
+        Route::make(
+            "test",
+            None,
+            "chat_completions",
+            Endpoint {
+                base_url: Some("https://example.com".into()),
+                path: EndpointPart::Static("/chat".into()),
                 query: None,
             },
-            auth: None,
-            framing: Box::new(SseFraming),
-            defaults: Some(RouteDefaults {
-                headers: None,
-                generation: None,
-                limits: None,
-            }),
-        })
+            AuthPolicy::Bearer(CredentialSource::None),
+        )
     }
 
     #[test]
