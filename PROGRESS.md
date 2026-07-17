@@ -357,5 +357,58 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 - 删除 `ProviderModelDef` 和 `known_models` 后编译完全通过
 
 ### 阻塞项
-- Phase 8 的启动集成（调用 `fetch_provider_models_blocking` 并合并到模型解析管线）需要在 shell 启动流程中接入。当前函数已实现，待 caller 接入
+- (已关闭) Phase 8 的启动集成（调用 `fetch_provider_models_blocking` 并合并到模型解析管线）已在 `resolve_model_list()` 内部实现，作为 Layer 2b
 - 预存 `PROGRESS.md` 中 `known_models` 引用为历史记录保留，不影响当前状态
+
+---
+
+## Phase 7.5: `#[non_exhaustive]` 补全 — 2026-07-17
+
+### 完成内容
+- 为 8 个类型添加 `#[non_exhaustive]`
+  - `Route`（`route.rs:42`）
+  - `Endpoint<Body>`（`endpoint.rs:31`）
+  - `ProtocolBody<Body>`（`protocol.rs:29`）
+  - `ProtocolStream<Frame, Event, State>`（`protocol.rs:34`）
+  - `Protocol<Body, Frame, Event, State>`（`protocol.rs:43`）
+  - `ProviderConfig`（`config.rs:7`）
+  - `ProviderTomlEntry`（`config.rs:38`）
+  - `ConfiguredProvider`（`provider.rs:8`）
+- 新增 `ProviderConfig::new()` 构造函数（修复 cross-crate 构造错误）
+- 更新 `xai-grok-pager-bin/src/main.rs` 两处 `ProviderConfig` 构造调用
+
+### 关键结果
+- `cargo check --workspace` — 通过 ✅
+- `cargo clippy --workspace -- --deny warnings` — 零警告 ✅
+- `cargo test -p xai-grok-provider` — 65/65 ✅
+- 所有 8 个类型已添加 `#[non_exhaustive]`
+- S13（ISSUE.md）可标记为 `-Closed`
+
+---
+
+## Phase 8: 启动集成（Layer 2b） — 2026-07-17
+
+### 完成内容
+- 在 `resolve_model_list()` 中，在 Layer 2（prefetched）和 Layer 3（[model.*]）之间插入 Layer 2b
+- Layer 2b 调用 `fetch_provider_models_blocking()`，各 provider 的 API 模型以低优先级（不覆盖 xAI prefetched）注入
+- 使用 `resolved.entry(key).or_insert(entry)` 确保 prefetched/xAI 模型优先级不变
+- 缓存由 `PROVIDER_MODEL_CACHE` 管理，首次调用后复用
+
+### 关键结果
+- `cargo check --workspace` — 通过 ✅
+- `cargo clippy --workspace -- --deny warnings` — 零警告 ✅
+- `cargo test -p xai-grok-provider` — 65/65 ✅
+- 三处集成缺口（provider_registry 读取、fetch 调用、注入 resolve_model_list）全部关闭
+
+### 修改文件
+| 文件 | 变更 |
+|------|------|
+| `crates/codegen/xai-grok-shell/src/agent/config.rs` | `resolve_model_list()` 新增 Layer 2b + `fetch_provider_models_blocking` 调用 |
+| `crates/codegen/xai-grok-provider/src/config.rs` | 新增 `ProviderConfig::new()` 构造函数 |
+| `crates/codegen/xai-grok-provider/src/route.rs` | 添加 `#[non_exhaustive]` 到 `Route` |
+| `crates/codegen/xai-grok-provider/src/endpoint.rs` | 添加 `#[non_exhaustive]` 到 `Endpoint` |
+| `crates/codegen/xai-grok-provider/src/protocol.rs` | 添加 `#[non_exhaustive]` 到 `ProtocolBody`、`ProtocolStream`、`Protocol` |
+| `crates/codegen/xai-grok-provider/src/config.rs` | 添加 `#[non_exhaustive]` 到 `ProviderConfig`、`ProviderTomlEntry` |
+| `crates/codegen/xai-grok-provider/src/provider.rs` | 添加 `#[non_exhaustive]` 到 `ConfiguredProvider` |
+| `crates/codegen/xai-grok-provider/tests/provider_e2e.rs` | 改用 `ProviderConfig::new()` |
+| `crates/codegen/xai-grok-pager-bin/src/main.rs` | 改用 `ProviderConfig::new()` 两处 |

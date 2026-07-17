@@ -4,6 +4,7 @@ use serde::Deserialize;
 /// Merged configuration for a single provider.
 /// Priority order (low→high): env var → TOML config → CLI override.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[non_exhaustive]
 pub struct ProviderConfig {
     pub id: Option<String>,
     pub api_key: Option<String>,
@@ -13,6 +14,16 @@ pub struct ProviderConfig {
 }
 
 impl ProviderConfig {
+    /// Create a ProviderConfig from parts.
+    pub fn new(id: Option<String>, api_key: Option<String>, base_url: Option<String>) -> Self {
+        Self {
+            id,
+            api_key,
+            base_url,
+            ..Default::default()
+        }
+    }
+
     /// Merge `other` on top of `self`. Non-None fields in `other` override.
     pub fn merge(self, other: ProviderConfig) -> ProviderConfig {
         ProviderConfig {
@@ -35,6 +46,7 @@ impl ProviderConfig {
 /// A single `[provider.<id>]` entry from config.toml.
 /// This is a tagless TOML table that serde maps directly.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[non_exhaustive]
 pub struct ProviderTomlEntry {
     pub api_key: Option<String>,
     pub env_key: Option<Vec<String>>,

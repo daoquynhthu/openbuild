@@ -12,12 +12,11 @@ fn openai_provider_full_pipeline() {
     xai_grok_provider::providers::register_all(&reg);
 
     let pid = ProviderId::new("openai");
-    let overrides = ProviderConfig {
-        id: Some("openai".into()),
-        api_key: Some("sk-e2e-test-key".into()),
-        base_url: Some("https://mock.local/v1".into()),
-        ..Default::default()
-    };
+    let overrides = ProviderConfig::new(
+        Some("openai".into()),
+        Some("sk-e2e-test-key".into()),
+        Some("https://mock.local/v1".into()),
+    );
     reg.store_config(&pid, overrides.clone());
     let configured = reg.configure(&pid, overrides).expect("configure openai");
 
@@ -84,11 +83,17 @@ fn all_providers_have_model_list_config() {
                 assert!(defaults.model_list_endpoint.is_some());
             }
             "openai-compatible" => {
-                assert_eq!(defaults.model_list_format, ModelListFormat::OpenAiCompatible);
+                assert_eq!(
+                    defaults.model_list_format,
+                    ModelListFormat::OpenAiCompatible
+                );
                 assert!(defaults.model_list_endpoint.is_none());
             }
             _ => {
-                assert_eq!(defaults.model_list_format, ModelListFormat::OpenAiCompatible);
+                assert_eq!(
+                    defaults.model_list_format,
+                    ModelListFormat::OpenAiCompatible
+                );
                 assert!(
                     defaults.model_list_endpoint.is_none(),
                     "{} should derive endpoint from base_url",

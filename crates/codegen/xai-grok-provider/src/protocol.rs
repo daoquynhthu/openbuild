@@ -26,11 +26,13 @@ impl<T> Clone for Schema<T> {
 }
 
 /// Body construction for a Protocol: schema validation + request lowering.
+#[non_exhaustive]
 pub struct ProtocolBody<Body> {
     pub schema: Schema<Body>,
     pub from: fn(LLMRequest) -> Result<Body, String>,
 }
 
+#[non_exhaustive]
 pub struct ProtocolStream<Frame, Event, State> {
     pub event: Schema<Event>,
     pub initial: fn(LLMRequest) -> State,
@@ -40,6 +42,7 @@ pub struct ProtocolStream<Frame, Event, State> {
     _frame: PhantomData<Frame>,
 }
 
+#[non_exhaustive]
 pub struct Protocol<Body, Frame, Event, State> {
     pub id: ProtocolId,
     pub body: ProtocolBody<Body>,

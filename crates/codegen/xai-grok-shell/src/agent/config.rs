@@ -3169,6 +3169,19 @@ pub fn resolve_model_list(
         }
         resolved = prefetched;
     }
+    // Layer 2b: Provider API models (fetched dynamically).
+    if let Some(registry) = &cfg.provider_registry {
+        let provider_models = crate::agent::models::fetch_provider_models_blocking(registry);
+        if !provider_models.is_empty() {
+            tracing::debug!(
+                count = provider_models.len(),
+                "loaded provider-fetched models (Layer 2b)"
+            );
+            for (key, entry) in provider_models {
+                resolved.entry(key).or_insert(entry);
+            }
+        }
+    }
     for (key, model_override) in &cfg.config_models {
         let had_base = resolved.contains_key(key);
         let base = resolved.shift_remove(key);

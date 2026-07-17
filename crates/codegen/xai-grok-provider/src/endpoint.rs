@@ -28,6 +28,7 @@ impl<Body> core::fmt::Debug for EndpointPart<Body> {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Endpoint<Body> {
     pub base_url: Option<String>,
     pub path: EndpointPart<Body>,

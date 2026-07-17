@@ -911,12 +911,11 @@ async fn run_agent_command(
 
         // Build CLI override ProviderConfig when a target provider is known.
         let cli_override = cli_provider_name.clone().map(|provider_name| {
-            xai_grok_provider::config::ProviderConfig {
-                id: Some(provider_name),
-                api_key: agent_args.api_key.clone(),
-                base_url: agent_args.base_url.clone(),
-                ..Default::default()
-            }
+            xai_grok_provider::config::ProviderConfig::new(
+                Some(provider_name),
+                agent_args.api_key.clone(),
+                agent_args.base_url.clone(),
+            )
         });
 
         // Phase 5.9: Map old [endpoints] section to xAI provider config for
@@ -927,12 +926,11 @@ async fn run_agent_command(
         let compat_override = if endpoints.xai_api_base_url != default_xai_url
             || endpoints.alpha_test_key.is_some()
         {
-            Some(xai_grok_provider::config::ProviderConfig {
-                id: Some("xai".into()),
-                base_url: Some(endpoints.xai_api_base_url.clone()),
-                api_key: endpoints.alpha_test_key.clone(),
-                ..Default::default()
-            })
+            Some(xai_grok_provider::config::ProviderConfig::new(
+                Some("xai".into()),
+                endpoints.alpha_test_key.clone(),
+                Some(endpoints.xai_api_base_url.clone()),
+            ))
         } else {
             None
         };

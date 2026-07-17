@@ -5,6 +5,7 @@ use crate::model::Model;
 use crate::route::Route;
 use crate::types::{ProviderDefaults, ProviderId};
 
+#[non_exhaustive]
 pub struct ConfiguredProvider {
     pub id: ProviderId,
     pub route: Route,

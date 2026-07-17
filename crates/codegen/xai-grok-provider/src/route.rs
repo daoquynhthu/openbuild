@@ -39,6 +39,7 @@ impl core::fmt::Debug for RouteInput {
 
 /// A Route composes the four orthogonal deployment axes:
 /// Protocol + Endpoint + Auth + Framing.
+#[non_exhaustive]
 pub struct Route {
     pub id: String,
     pub provider: Option<ProviderId>,
