@@ -189,7 +189,12 @@ pub struct ProviderDefaults {
 
 Unlike OpenCode (TypeScript), Rust's type system requires a trait for
 dynamic dispatch. The `Provider` trait is `Arc`-clonable and stateless —
-`configure()` returns a `ConfiguredProvider` that holds a concrete `Route`.
+`configure()` returns a `ConfiguredProvider` that owns a **route set**.
+
+**V1 architecture (AD-03):** A configured provider owns zero or more routes,
+a default route ID, a route selector, and a model source spec. The sampler
+never infers endpoint paths or provider headers from provider names or URL
+patterns.
 
 ```rust
 /// Stateless provider definition. Singleton registered in ProviderRegistry.
@@ -213,72 +218,57 @@ pub struct ProviderConfig {
     pub extra_headers: Option<IndexMap<String, String>>,
 }
 
-/// Result of provider.configure(): holds the composed Route and credential
+/// Result of provider.configure(): holds the composed Route set and credential
 /// chain, ready to create Model values.
+///
+/// V1: owns an IndexMap of routes, a default route ID, and a route selector.
 pub struct ConfiguredProvider {
     pub id: ProviderId,
-    pub route: Route,
-    pub model: fn(model_id: &str, route: &Route) -> Model,
-    pub configure: fn(ProviderConfig) -> ConfiguredProvider,
+    pub display_name: String,
+    pub config: ResolvedProviderConfig,
+    pub routes: IndexMap<RouteId, Arc<Route>>,
+    pub default_route_id: RouteId,
+    pub route_selector: Arc<dyn RouteSelector>,
+    pub model_source: ModelSourceSpec,
+}
+
+/// Determines which route a model ID resolves to.
+/// OpenAI uses this seam to select Responses versus Chat Completions.
+pub trait RouteSelector: Send + Sync {
+    fn select(&self, model_id: &str) -> Result<RouteId, ProviderError>;
 }
 ```
 
-### 3.4 Route — The Central Composition
+**Route selection policy:** `RouteSelector::select(model_id)` returns `Result<RouteId, ProviderError>`.
+All providers must test their selector. The default route ID must exist in the
+route map. The selector must never return a route outside the map.
 
-A `Route` composes the four orthogonal deployment axes. It is an **immutable value**:
-`route.with(patch)` returns a new `Route`.
+### 3.4 Route — Declarative Route Shape (V1, AD-02)
+
+**V1 architecture (AD-02):** `Route` is declarative and cloneable. Stream framing/decoding
+is owned by the protocol implementation selected by `protocol_id`. The four-axis route-level
+framing abstraction is removed — no production caller uses `Route.framing` to influence
+wire-format decoding.
 
 ```rust
 pub struct Route {
-    pub id: String,
-    pub provider: Option<ProviderId>,
-    pub protocol: ProtocolId,
+    pub id: RouteId,
+    pub provider_id: ProviderId,
+    pub protocol_id: ProtocolId,
     pub endpoint: Endpoint,
-    pub auth: Box<dyn AuthFn>,
-    pub framing: Box<dyn Framing<String>>,
-    pub defaults: RouteDefaults,
-    pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
-
-    // Builder methods
-    pub fn with(self, patch: RoutePatch) -> Route { ... }
-    pub fn model(&self, input: ModelInput) -> Model { ... }
-}
-
-pub struct RoutePatch {
-    pub auth: Option<Box<dyn AuthFn>>,
-    pub endpoint: Option<EndpointPatch>,
-    pub defaults: Option<RouteDefaultsInput>,
-    pub headers: Option<fn(&LLMRequest) -> HeaderMap>,
-    pub provider: Option<ProviderId>,
-}
-
-impl Route {
-    /// Build a Route from its four orthogonal pieces.
-    pub fn make(input: RouteInput) -> Self { ... }
-}
-
-pub struct RouteInput {
-    pub id: String,
-    pub provider: Option<ProviderId>,
-    pub protocol: ProtocolId,
-    pub endpoint: Endpoint,
-    pub auth: Option<Box<dyn AuthFn>>,
-    pub framing: Box<dyn Framing<String>>,
-    pub defaults: Option<RouteDefaultsInput>,
+    pub auth: AuthPolicy,
+    pub static_headers: IndexMap<String, String>,
+    pub generation_defaults: GenerationDefaults,
+    pub limits: ModelLimits,
 }
 ```
 
-Hooks into the request/response pipeline (modelled after OpenCode's 5-stage hooks):
-
-```rust
-pub enum HookStage {
-    Request,   // Transform the LLMRequest before body construction
-    Body,      // Transform the provider-native body before serialization
-    Transport, // Transform the HTTP request before sending
-    Event,     // Transform a normalized LLMEvent
-    Error,     // Classify or enrich errors
-}
-```
+**Key design rules:**
+- `Route` is cloneable — it may be stored in `Arc<Route>` for shared ownership.
+- `protocol_id` selects the protocol implementation (Chat Completions, Responses, Messages).
+- `Framing` is not a separate route authority; the protocol owns frame/stream decoding.
+- Route validation confirms provider ID, route ID, protocol ID, endpoint, auth policy, and headers.
+- `Route::model()` returns a model binding containing the explicit `route_id`.
 
 ### 3.5 Model — Executable Process-local Value
 
@@ -510,50 +500,54 @@ impl Credential {
 
 ---
 
-## 4. ProviderRegistry
+## 4. ProviderRegistry and Immutable Snapshots (V1, AD-04)
+
+**V1 architecture (AD-04):** Registry state is published as atomic `Arc<RegistrySnapshot>`.
+Readers always see a complete, immutable, revisioned view. Writes validate fully before
+replacing the snapshot. No independent mutable provider/route/config maps are exposed.
 
 ```rust
-/// Global registry of all built-in and user-configured providers.
-/// Populated at startup from:
-///   1. Hardcoded built-in providers (xai-grok-provider/src/providers/*.rs)
-///   2. User [provider.*] config.toml sections
-///   3. Auto-detection from --provider / --api-key / --base-url CLI flags
-#[derive(Debug)]
+/// Immutable, atomic, revisioned view of all configured providers and routes.
+pub struct RegistrySnapshot {
+    pub revision: u64,
+    pub providers: IndexMap<ProviderId, Arc<ConfiguredProvider>>,
+    pub routes: IndexMap<RouteId, Arc<Route>>,
+}
+
+/// Process-wide registry. Holds provider definitions and the current
+/// immutable snapshot. The launcher constructs one instance and injects
+/// it into shell and pager state.
 pub struct ProviderRegistry {
-    providers: RwLock<HashMap<ProviderId, Arc<dyn Provider>>>,
-    routes: RwLock<HashMap<String, Arc<Route>>>,
-    configs: RwLock<HashMap<ProviderId, ProviderConfig>>,
+    definitions: IndexMap<ProviderId, SharedProvider>,
+    snapshot: RwLock<Arc<RegistrySnapshot>>,
 }
 
 impl ProviderRegistry {
     pub fn new() -> Self;
 
-    /// Register a built-in provider.
-    pub fn register(&self, provider: Arc<dyn Provider>);
+    /// Register a built-in provider definition. Rejects duplicates.
+    pub fn register_definition(&mut self, provider: SharedProvider) -> Result<(), ProviderError>;
 
-    /// Resolve a provider by ID. Returns None for unknown IDs.
-    pub fn get(&self, id: &ProviderId) -> Option<Arc<dyn Provider>>;
+    /// Transactional rebuild from resolved configs.
+    /// 1. Resolve all provider configs.
+    /// 2. Configure and validate every provider into a new local snapshot.
+    /// 3. Reject duplicate IDs and invalid routes.
+    /// 4. Replace current Arc<RegistrySnapshot> only if all validation succeeds.
+    /// 5. Increment revision exactly once per successful replacement.
+    /// Failed rebuild leaves old snapshot and revision unchanged.
+    pub fn rebuild(&self, configs: &ResolvedProviderConfigs) -> Result<u64, ProviderError>;
 
-    /// Configure a provider with user overrides, returning a ready-to-use
-    /// ConfiguredProvider that holds the composed Route + model factory.
-    pub fn configure(
-        &self,
-        id: &ProviderId,
-        overrides: ProviderConfig,
-    ) -> Option<ConfiguredProvider>;
+    /// Returns the current immutable snapshot.
+    pub fn snapshot(&self) -> Arc<RegistrySnapshot>;
 
-    /// Persist a ProviderConfig so it can be queried later (e.g. when
-    /// building ModelEntry items from provider-known models).
-    pub fn store_config(&self, id: &ProviderId, config: ProviderConfig);
+    /// Look up a configured provider by ID.
+    pub fn configured(&self, id: &ProviderId) -> Option<Arc<ConfiguredProvider>>;
 
-    /// Retrieve the last-stored configuration for a provider, if any.
-    pub fn get_config(&self, id: &ProviderId) -> Option<ProviderConfig>;
+    /// Look up a route by ID.
+    pub fn route(&self, id: &RouteId) -> Option<Arc<Route>>;
 
-    /// Register a resolved Route under a string key (typically its id).
-    pub fn register_route(&self, id: impl Into<String>, route: Route);
-
-    /// Look up a previously-registered Route by key.
-    pub fn get_route(&self, id: &str) -> Option<Arc<Route>>;
+    /// All registered provider IDs (definitions).
+    pub fn all_ids(&self) -> Vec<ProviderId>;
 
     /// Auto-detect provider from base URL patterns:
     ///   api.x.ai         → xai
@@ -563,20 +557,18 @@ impl ProviderRegistry {
     ///   localhost        → ollama
     ///   *                → openai-compatible
     pub fn detect_from_url(&self, base_url: &str) -> ProviderId;
-
-    /// Create a Model from a provider + model ID.
-    /// Shortcut for: registry.configure(provider_id, config)?.model(model_id)
-    pub fn model(
-        &self,
-        provider_id: &ProviderId,
-        model_id: &str,
-        overrides: ProviderConfig,
-    ) -> Option<Model>;
-
-    /// All registered provider IDs.
-    pub fn all_ids(&self) -> Vec<ProviderId>;
 }
 ```
+
+**Registry rebuild is transactional:**
+1. Resolve all provider configs.
+2. Configure and validate every provider into a new local snapshot.
+3. Reject duplicate IDs and invalid routes.
+4. Replace the current `Arc<RegistrySnapshot>` only if all validation succeeds.
+5. Increment revision exactly once per successful replacement.
+
+Never mutate routes/config maps independently. Lock poisoning is converted into
+an internal provider error; the registry must not panic.
 
 ---
 
@@ -685,7 +677,15 @@ friendly names to base URLs:
 
 ## 6. Integration Points with Existing Code
 
-### 6.1 Model Resolution Pipeline
+### 6.1 Model Resolution Pipeline — V1 Architecture (AD-07, AD-09)
+
+**V1 architecture (AD-07):** Catalog discovery runs asynchronously, concurrently with
+a bounded concurrency limit, per-provider timeout, cancellation, TTL cache, stale
+fallback, and explicit refresh. Startup does not synchronously fetch provider model lists.
+
+**V1 architecture (AD-09):** Canonical reference syntax is `provider/model`. Bare model IDs
+are accepted only when they resolve uniquely under deterministic precedence. Persisted
+model selection must store the canonical provider-qualified reference for non-xAI providers.
 
 The existing `resolve_model_list()` function in `xai-grok-shell/src/agent/config.rs`
 is extended with a dynamic model-fetch layer:
@@ -701,17 +701,9 @@ Unified prefetch priority:
 The pipeline runs as follows:
 
 1. At startup, after `configure_providers()` merges all config sources
-   (env → TOML → CLI), `fetch_provider_models_blocking()` iterates every
-   registered provider and fetches its model list via its API:
-
-   ```
-   for each provider in ProviderRegistry:
-       model_list_url = derive_url(provider.defaults.model_list_endpoint, base_url)
-       headers = derive_auth(provider.defaults.auth_scheme, resolved_config.api_key)
-       response = http_get(model_list_url, headers)
-       models = parse_response(provider.defaults.model_list_format, response)
-       inject_into_catalog(provider.id, models)
-   ```
+   (env → TOML → CLI), provider model lists are fetched **asynchronously**
+   (not blocking startup). A dedicated `ProviderCatalogService` manages
+   concurrent refresh, TTL cache, and cancellation.
 
 2. Models are keyed as `"{provider_id}/{model_id}"` (e.g. `"openai/gpt-4o"`,
    `"ollama/llama3.1:8b"`) to avoid collisions across providers.
@@ -723,8 +715,36 @@ The pipeline runs as follows:
    - Network errors → cached data is used if available
 
 4. The fetched model catalog is merged into the model resolution pipeline
-   as Layer 2, between the xAI server prefetch (Layer 1) and user
-   `[model.*]` overrides (Layer 3).
+   as a layer between provider defaults and user `[model.*]` overrides.
+
+**Model merge precedence (deterministic):**
+```
+manual user model override
+  > dynamic provider-discovered model metadata
+  > provider static known-model metadata
+  > embedded legacy xAI default metadata
+```
+
+**Catalog service API shape (AD-07):**
+```rust
+pub enum RefreshStrategy {
+    CacheOnly,
+    RefreshIfStale,
+    ForceRefresh,
+}
+
+pub struct ProviderCatalogService { /* cancellation, client, cache */ }
+
+impl ProviderCatalogService {
+    pub async fn refresh_provider(...);
+    pub async fn refresh_all(...);
+    pub fn snapshot(&self) -> Arc<ModelCatalogSnapshot>;
+}
+```
+
+Readers receive immutable `Arc<ModelCatalogSnapshot>`. Cache keys include
+provider ID, effective model-list URL, config revision, and credential identity
+class — never credential contents.
 
 ### 6.2 SamplerConfig construction
 
@@ -1110,8 +1130,6 @@ route.with({
 
 ---
 
-## 11. Boundary Conditions
-
 ## 7. TUI Provider Configuration
 
 ### 7.1 Overview
@@ -1239,29 +1257,29 @@ CLI headless:     grok -p "hello" --provider openai --api-key sk-...
 
 ---
 
-## 11. Boundary Conditions
+## 8. Boundary Conditions
 
-### 11.1 What if no provider matches?
+### 8.1 What if no provider matches?
 
-### 11.2 What if both [provider.*] and [model.*] configure the same model?
+### 8.2 What if both [provider.*] and [model.*] configure the same model?
 
 `[model.*]` always wins — it is the highest-priority layer. Provider defaults only
 fill in fields not explicitly set by the user.
 
-### 11.3 What about streaming vs non-streaming?
+### 8.3 What about streaming vs non-streaming?
 
 All providers support streaming. The `Protocol.stream.step()` function handles both
 modes. Non-streaming requests use `collect_response()` which drains the stream and
 assembles the final `ConversationResponse`.
 
-### 11.4 Provider-specific capabilities
+### 8.4 Provider-specific capabilities
 
 The `ProviderDefaults` struct carries capability flags (`supports_tool_calling`,
 `supports_structured_output`, etc.) that the session actor checks before
 enabling features. When a capability is unsupported, the system degrades gracefully
 (e.g. structured output falls back to tool-based generation).
 
-### 11.5 New providers from config
+### 8.5 New providers from config
 
 Users can define entirely new providers without code changes by using the
 `openai-compatible` provider type, which accepts arbitrary `base_url`, `api_key`,
@@ -1269,7 +1287,7 @@ and model definitions in config.toml.
 
 ---
 
-## 12. Key Design Decisions from OpenCode
+## 9. Key Design Decisions from OpenCode
 
 The architecture above is informed by studying OpenCode's model adapter layer at
 `packages/llm/src/`. The following patterns proved most impactful:
@@ -1280,12 +1298,12 @@ The architecture above is informed by studying OpenCode's model adapter layer at
 | **Values over registries** | `Route.make({...})` returns a value, registers nothing globally | `Route::make(...)` returns a `Route` struct; `ProviderRegistry` is explicit |
 | **Auth chaining** | `Auth.optional(key).orElse(Auth.config("ENV")).bearer()` | `Credential::optional(k).or_else(Credential::config("E")).bearer()` |
 | **Immutable patching** | `route.with({ auth, endpoint, ... })` returns new route | `Route::with(self, patch) -> Route` |
-| **4-axis composition** | `Route = Protocol + Endpoint + Auth + Framing` | Same 4-axis composition |
+| **3-axis composition (V1)** | `Route = Protocol + Endpoint + Auth` (framing owned by protocol) | Stream framing/decoding owned by protocol, not route |
 | **Request-level HTTP overlay** | `http.body`/`http.headers`/`http.query` with protocol-field denylist | `HttpOptions` with denylist for protocol-owned fields |
 | **M:N protocol-to-provider** | One protocol → many providers; one provider → many protocols | `OpenAIProvider` exposes both `ChatCompletions` and `Responses` routes |
 | **Provider facade** | `configure({apiKey})` returns `{ id, model, configure }` | `Provider::configure()` returns `ConfiguredProvider` |
 
-## 13. File Map
+## 10. File Map
 
 ```
 crates/codegen/xai-grok-provider/          [NEW]

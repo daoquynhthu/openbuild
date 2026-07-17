@@ -1,5 +1,15 @@
-# Implementation Plan — Model Adapter Layer
+# Implementation Plan — Model Adapter Layer (Historical)
 
+> **⚠️ HISTORICAL — SUPERSEDED**
+>
+> This file is preserved as a historical record. The provider-adapter V1 production
+> closure is now governed by `docs/openbuild_provider_adapter_production_v1_plan_2026-07-17.md`,
+> which supersedes all prior execution sequences in this document.
+>
+> **Do not use this file for execution decisions.**
+>
+> ---
+>
 > **参考架构文档**: `docs/model-adapter-architecture.md`
 > **目标分支**: `feat/provider-adapter`
 >
