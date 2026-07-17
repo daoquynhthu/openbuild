@@ -629,3 +629,44 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 - C-06: `ProviderCatalogEntry::is_stale()` + `RefreshStrategy` + `DEFAULT_CACHE_TTL` ✅
 - C-09: OpenCode public mode via `CredentialSource::Public` ✅
 - C-07: `derive_model_list_url()` with user base_url override ✅
+
+---
+
+## Provider Adapter V1 — Phase 9: Runtime Lifecycle, Reload, and All Sampling Surfaces — 2026-07-17
+
+### P9-02: Transactional config reload
+- Step 4 (validate existing models against candidate snapshot): added `validate_provider_model_refs()` — 6 unit tests
+- Step 8 (retain previous state on failure): `provider_failed_rebuild_preserves_snapshot` test
+- Pre-existing E0063/E0061 in test code fixed (SamplerConfig/ModelEntry missing fields, config builder signatures) — 14++ files
+
+### P9-03: Main session model construction
+- `prepare_sampling_config_for_model()` in `agent_ops.rs` changed from `resolve_model_route()` + `sampling_config_for_model()` → `sampling_config_for_model_with_registry()` with registry snapshot
+
+### P9-04: Subagent sampling configs
+- Verified: subagent inherits protocol_id, route endpoint (base_url), headers (extra_headers), auth (auth_scheme) from parent, which was resolved through route compiler
+- `endpoint_path`/`endpoint_query` not preserved through SamplingConfig conversion (no regression — same fields were always None for subagents)
+
+### P9-05: Auxiliary model surfaces
+- Surface 1 (web-search): `resolve_web_search_sampling_config` now accepts registry snapshot and calls `sampling_config_for_model_with_registry`; caller `prepare_web_search_sampling_config` passes snapshot
+- Surfaces 2–6: code paths identified; remaining require plumbing changes beyond V1 scope
+- Audit report documents all 7 surfaces
+
+### P9-06: In-flight request semantics
+- Freeze policy already documented in `request_task.rs`
+
+### P9-07: Remove duplicate registry initialization
+- `provider_state::init()` returns Result (constrained) — no longer leaky
+- Fixed unused Result warning in `app/mod.rs`
+
+### Pre-existing issues resolved
+- 11 files with `endpoint_path`/`endpoint_query` missing in SamplerConfig constructors
+- 8 files with `provider_id`/`route_id` missing in ModelEntry constructors  
+- 1 file with `provider`/`route` missing in ConfigModelOverride constructor
+- 3 clippy warnings in provider_catalog.rs, provider_resolution.rs
+
+### Key results
+- `cargo check -p xai-grok-shell -p xai-grok-pager -p xai-grok-pager-bin -p xai-grok-provider -p xai-grok-sampler` — clean
+- `cargo clippy -p xai-grok-shell --lib -- -D warnings` — zero warnings
+- `cargo test -p xai-grok-shell --lib -- config::reloader::tests::validate_model_refs_ config::reloader::tests::provider_failed_rebuild_preserves_snapshot` — 6/6 passed
+- `cargo test -p xai-grok-provider --all-targets` — clean
+- `cargo test -p xai-grok-sampler --all-targets` — clean

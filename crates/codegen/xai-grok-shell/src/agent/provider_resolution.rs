@@ -191,13 +191,11 @@ pub fn resolve_cli_model_reference(
                     let provider = matches[0].split('/').next().unwrap_or("xai").to_string();
                     Ok((provider, bare_model))
                 }
-                _ => {
-                    return Err(ProviderResolutionError::AmbiguousModel(format!(
-                        "bare model '{}' matches multiple providers: {}. Use provider/model syntax.",
-                        bare_model,
-                        matches.join(", ")
-                    )));
-                }
+                _ => Err(ProviderResolutionError::AmbiguousModel(format!(
+                    "bare model '{}' matches multiple providers: {}. Use provider/model syntax.",
+                    bare_model,
+                    matches.join(", ")
+                ))),
             }
         }
     }

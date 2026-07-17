@@ -1147,24 +1147,25 @@ impl MvpAgent {
         let deployment_id = crate::managed_config::resolve_deployment_id(
             cfg.endpoints.deployment_key.as_deref(),
         );
-        let route = cfg
+        let registry_snapshot = cfg
             .provider_registry
             .as_ref()
-            .and_then(|reg| crate::agent::config::resolve_model_route(model, Some(reg.as_ref())));
+            .map(|reg| reg.snapshot());
         drop(cfg);
         let user_id = self
             .auth_manager
             .current_or_expired()
             .filter(|a| a.is_xai_auth())
             .map(|a| a.user_id);
-        let mut config = crate::agent::config::sampling_config_for_model(
+        let mut config = crate::agent::config::sampling_config_for_model_with_registry(
             model,
             credentials,
             alpha_test_key,
             client_version,
             deployment_id,
             user_id,
-            route.as_ref(),
+            None,
+            registry_snapshot.as_deref(),
         );
         config.origin_client = origin_client;
         config
@@ -1335,6 +1336,12 @@ impl MvpAgent {
         let session = self.current_or_buffered_auth();
         let alpha_test_key = self.cfg.borrow().endpoints.alpha_test_key.clone();
         let client_version = self.cfg.borrow().client_version.clone();
+        let registry_snapshot = self
+            .cfg
+            .borrow()
+            .provider_registry
+            .as_ref()
+            .map(|reg| reg.snapshot());
         let mut cfg = config::resolve_web_search_sampling_config(
             &model_id,
             &models,
@@ -1343,6 +1350,7 @@ impl MvpAgent {
             alpha_test_key.clone(),
             client_version,
             &self.cfg.borrow().endpoints,
+            registry_snapshot.as_deref(),
         )?;
         inject_proxy_headers(
             &mut cfg.extra_headers,

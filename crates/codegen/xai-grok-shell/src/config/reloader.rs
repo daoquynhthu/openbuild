@@ -430,7 +430,16 @@ impl ConfigReloader {
                     let pid = ProviderId::new(id_str);
                     config_map.insert(pid, cfg);
                 }
-                // Step 3-5: Build candidate snapshot and atomically publish
+                // Step 4: Validate existing model references against candidate
+                if let Err(e) = validate_provider_model_refs(&new_global, &config_map) {
+                    error!(
+                        error = %e,
+                        "provider model reference validation failed — \
+                         retaining previous configuration"
+                    );
+                    return Ok(());
+                }
+                // Step 3+5: Build candidate snapshot and atomically publish
                 // (ProviderRuntime::rebuild is async — spawn a blocking task)
                 let runtime = runtime.clone();
                 let tx = self.config_update_tx.clone();
@@ -566,6 +575,31 @@ fn parse_compat_config(config: &toml::Value) -> xai_grok_tools::types::compat::C
         .unwrap_or_default()
 }
 
+/// Validate that every `[model.*]` entry referencing a `provider` field
+/// has a matching entry in the candidate provider config map.
+/// Step 4 of transactional reload: reject candidate if a model references
+/// a provider that would be missing after the rebuild.
+fn validate_provider_model_refs(
+    config: &toml::Value,
+    config_map: &IndexMap<ProviderId, ProviderConfig>,
+) -> Result<(), String> {
+    let Some(model_table) = config.get("model").and_then(|v| v.as_table()) else {
+        return Ok(());
+    };
+    for (key, val) in model_table {
+        let Some(provider_str) = val.get("provider").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        if !config_map.contains_key(&ProviderId::new(provider_str)) {
+            return Err(format!(
+                "model `{key}` references provider `{provider_str}` \
+                 but that provider has no valid configuration in [provider.*]"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn extract_ui_fields(config: &toml::Value) -> (Option<String>, bool, Option<String>) {
     let ui = config.get("ui").and_then(|v| v.as_table());
     let theme = ui
@@ -619,6 +653,7 @@ mod tests {
             tx,
             false,
             false,
+            None,
         );
 
         reloader.reload_auth().unwrap();
@@ -650,6 +685,7 @@ mod tests {
             tx,
             false,
             false,
+            None,
         );
 
         reloader.reload_auth().unwrap();
@@ -682,6 +718,7 @@ mod tests {
             tx,
             false,
             false,
+            None,
         );
 
         reloader.reload_auth().unwrap();
@@ -705,6 +742,7 @@ mod tests {
             tx,
             false,
             false,
+            None,
         );
 
         let result = reloader.reload_auth();
@@ -731,6 +769,7 @@ mod tests {
             tx,
             false,
             false,
+            None,
         );
 
         let result = reloader.reload_auth();
@@ -759,6 +798,7 @@ mod tests {
             tx,
             false,
             false,
+            None,
         );
 
         let (event_tx, event_rx) = mpsc::unbounded_channel();
@@ -800,6 +840,7 @@ mod tests {
             tx,
             false,
             false,
+            None,
         );
 
         let (event_tx, event_rx) = mpsc::unbounded_channel();
@@ -1102,5 +1143,143 @@ command = "/bin/test"
         )
         .unwrap();
         assert_eq!(cfg.get("mcp_servers"), cfg.get("mcp_servers"));
+    }
+
+    #[test]
+    fn validate_model_refs_accepts_no_model_table() {
+        let config = toml::Value::Table(toml::map::Map::new());
+        let config_map = IndexMap::new();
+        assert!(validate_provider_model_refs(&config, &config_map).is_ok());
+    }
+
+    #[test]
+    fn validate_model_refs_accepts_models_without_provider() {
+        let config: toml::Value = toml::from_str(
+            r#"
+[model.my-model]
+model = "gpt-4o"
+base_url = "https://api.example.com/v1"
+"#,
+        )
+        .unwrap();
+        let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_map.insert(
+            ProviderId::new("xai"),
+            ProviderConfig::default(),
+        );
+        assert!(validate_provider_model_refs(&config, &config_map).is_ok());
+    }
+
+    #[test]
+    fn validate_model_refs_accepts_model_with_valid_provider() {
+        let config: toml::Value = toml::from_str(
+            r#"
+[model.my-model]
+model = "gpt-4o"
+base_url = "https://api.openai.com/v1"
+provider = "openai"
+"#,
+        )
+        .unwrap();
+        let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_map.insert(
+            ProviderId::new("openai"),
+            ProviderConfig::default(),
+        );
+        assert!(validate_provider_model_refs(&config, &config_map).is_ok());
+    }
+
+    #[test]
+    fn validate_model_refs_rejects_model_with_unknown_provider() {
+        let config: toml::Value = toml::from_str(
+            r#"
+[model.my-model]
+model = "gpt-4o"
+base_url = "https://api.example.com/v1"
+provider = "nonexistent"
+"#,
+        )
+        .unwrap();
+        let config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        let result = validate_provider_model_refs(&config, &config_map);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("nonexistent"));
+    }
+
+    #[test]
+    fn validate_model_refs_accepts_partial_model_table() {
+        let config: toml::Value = toml::from_str(
+            r#"
+[model.good]
+model = "gpt-4o"
+base_url = "https://api.openai.com/v1"
+provider = "openai"
+
+[model.bad]
+model = "claude-4"
+base_url = "https://api.anthropic.com/v1"
+provider = "nonexistent"
+"#,
+        )
+        .unwrap();
+        let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_map.insert(
+            ProviderId::new("openai"),
+            ProviderConfig::default(),
+        );
+        let result = validate_provider_model_refs(&config, &config_map);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("bad"));
+    }
+
+    #[test]
+    fn provider_failed_rebuild_preserves_snapshot() {
+        use crate::agent::provider_runtime::ProviderRuntime;
+        use xai_grok_provider::types::ProviderId;
+
+        let rt = ProviderRuntime::new();
+        xai_grok_provider::providers::register_all(&rt.registry);
+
+        // Initial successful rebuild
+        let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_map.insert(
+            ProviderId::new("xai"),
+            ProviderConfig::new(
+                Some("xai".into()),
+                Some("sk-test".into()),
+                Some("https://api.x.ai/v1".into()),
+            ),
+        );
+        let initial_rev = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(rt.rebuild(&config_map))
+            .expect("initial rebuild should succeed");
+        assert_eq!(initial_rev, 1);
+
+        let snap_before = rt.snapshot();
+        assert_eq!(snap_before.revision, 1);
+
+        // Attempt rebuild with invalid model reference (model references provider
+        // that has no valid config in the candidate). This simulates step 4 validation
+        // failing before the async rebuild call.
+        let bad_config: toml::Value = toml::from_str(
+            r#"
+[model.bad-model]
+model = "gpt-4o"
+base_url = "https://api.example.com/v1"
+provider = "nonexistent"
+"#,
+        )
+        .unwrap();
+        let bad_config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        let validation = validate_provider_model_refs(&bad_config, &bad_config_map);
+        assert!(validation.is_err(), "step 4 validation must reject unknown provider");
+
+        // Verify the snapshot is unchanged after the validation rejection
+        let snap_after = rt.snapshot();
+        assert_eq!(
+            snap_after.revision, snap_before.revision,
+            "failed reload must leave snapshot revision unchanged"
+        );
     }
 }

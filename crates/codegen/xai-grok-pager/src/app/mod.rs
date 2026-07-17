@@ -403,7 +403,7 @@ pub async fn run(
         xai_grok_provider::providers::configure_providers(&r, &raw_config, None, None);
         r
     });
-    crate::provider_state::init(reg);
+    let _ = crate::provider_state::init(reg);
 
     let grok_com_config =
         match xai_grok_shell::agent::config::Config::new_from_toml_cfg(&raw_config) {

@@ -181,6 +181,8 @@ async fn build_session_info_sources_show_model_fingerprint_from_catalog() {
                 api_key: None,
                 env_key: None,
                 api_base_url: None,
+                provider_id: None,
+                route_id: None,
             };
             entry.info.show_model_fingerprint = false;
             actor

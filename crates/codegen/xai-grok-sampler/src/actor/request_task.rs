@@ -3,6 +3,16 @@
 //! Spawned by the actor's `Submit` handler. Owns the retry loop and
 //! consumes a Layer 2 stream from the matching backend transform.
 //! Cancellation is cooperative via `CancellationToken`.
+//!
+//! ## Freeze policy (in-flight semantics during reload)
+//!
+//! - Each request task receives a clone of the `SamplerConfig` when it
+//!   starts. In-flight requests keep the `SamplerConfig`/route snapshot
+//!   they started with, even if the provider runtime publishes a new
+//!   revision during the request.
+//! - New requests use the latest published revision.
+//! - Removing the selected model causes a controlled reselection or
+//!   error after the in-flight turn completes — never mid-stream.
 
 use std::pin::pin;
 use std::sync::{Arc, Mutex};

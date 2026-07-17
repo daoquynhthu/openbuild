@@ -97,7 +97,7 @@ pub fn derive_model_list_url(
     }
     let base = base_url_override
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| defaults.base_url.as_str());
+        .unwrap_or(defaults.base_url.as_str());
     let base = base.trim_end_matches('/');
     if defaults.model_list_format == xai_grok_provider::types::ModelListFormat::OllamaTags {
         // Ollama has a separate /api/tags endpoint
@@ -215,7 +215,7 @@ impl ProviderCatalogService {
                     current
                         .providers
                         .get(*pid)
-                        .map_or(true, |e| e.is_stale(ttl))
+                        .is_none_or(|e| e.is_stale(ttl))
                 })
                 .cloned()
                 .collect()
@@ -555,16 +555,15 @@ mod tests {
     }
 
     fn dummy_defaults() -> ProviderDefaults {
-        ProviderDefaults {
-            id: ProviderId::new("ollama"),
-            name: "Ollama".into(),
-            base_url: "http://localhost:11434/v1".into(),
-            api_backend: ApiBackend::ChatCompletions,
-            auth_scheme: AuthScheme::None,
-            context_window: NonZeroU64::new(128_000).unwrap_or_else(|| unreachable!()),
-            extra_headers: IndexMap::new(),
-            model_list_format: ModelListFormat::OllamaTags,
-            ..Default::default()
-        }
+        let mut defaults = ProviderDefaults::default();
+        defaults.id = ProviderId::new("ollama");
+        defaults.name = "Ollama".into();
+        defaults.base_url = "http://localhost:11434/v1".into();
+        defaults.api_backend = ApiBackend::ChatCompletions;
+        defaults.auth_scheme = AuthScheme::None;
+        defaults.context_window = NonZeroU64::new(128_000).unwrap_or_else(|| unreachable!());
+        defaults.extra_headers = IndexMap::new();
+        defaults.model_list_format = ModelListFormat::OllamaTags;
+        defaults
     }
 }

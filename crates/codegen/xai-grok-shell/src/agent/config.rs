@@ -4908,10 +4908,11 @@ pub fn resolve_web_search_sampling_config(
     alpha_test_key: Option<String>,
     client_version: Option<String>,
     endpoints: &EndpointsConfig,
+    registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
 ) -> Option<SamplerConfig> {
     let resolved = if let Some(entry) = find_model_by_id(models, model_id).cloned() {
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
-        Some(sampling_config_for_model(
+        Some(sampling_config_for_model_with_registry(
             &entry,
             credentials,
             alpha_test_key,
@@ -4919,6 +4920,7 @@ pub fn resolve_web_search_sampling_config(
             None,
             None,
             None,
+            registry,
         ))
     } else if model_id == crate::models::default_web_search_model() {
         Some(resolve_hidden_default_web_search_sampling_config(
@@ -5386,6 +5388,7 @@ reasoning_effort = "low"
             None,
             None,
             &endpoints,
+            None,
         )
         .expect("hidden default web search model should resolve");
         assert_eq!(resolved.model, crate::models::default_web_search_model());
@@ -5475,6 +5478,7 @@ reasoning_effort = "low"
             None,
             None,
             &endpoints,
+            None,
         )
         .expect("web search model should resolve");
         assert_eq!(
@@ -5545,6 +5549,8 @@ reasoning_effort = "low"
             api_key: api_key.map(|s| s.to_string()),
             env_key: env_key.map(EnvKeys::single),
             api_base_url: api_base_url.map(|s| s.to_string()),
+            provider_id: None,
+            route_id: None,
         }
     }
     /// The effective-model RE-support lookup must use the model ACTUALLY used:
@@ -5588,6 +5594,7 @@ reasoning_effort = "low"
             None,
             None,
             None,
+            None,
         );
         assert_eq!(
             sampling_config.api_key,
@@ -5606,6 +5613,7 @@ reasoning_effort = "low"
                 auth_type: xai_chat_state::AuthType::ApiKey,
                 auth_scheme: AuthScheme::Bearer,
             },
+            None,
             None,
             None,
             None,
@@ -5887,6 +5895,7 @@ reasoning_effort = "low"
         let config = sampling_config_for_model(
             &model,
             resolve_credentials(&model, Some("tok")),
+            None,
             None,
             None,
             None,
@@ -6343,6 +6352,7 @@ reasoning_effort = "low"
             None,
             None,
             None,
+            None,
         );
         assert_eq!(config.context_window, 200_000);
         let mut model = test_model_entry("any-model", "https://api.x.ai/v1", None, None, None);
@@ -6350,6 +6360,7 @@ reasoning_effort = "low"
         let config = sampling_config_for_model(
             &model,
             resolve_credentials(&model, None),
+            None,
             None,
             None,
             None,
@@ -6485,6 +6496,7 @@ reasoning_effort = "low"
         let sampling_config = sampling_config_for_model(
             &model,
             resolve_credentials(&model, None),
+            None,
             None,
             None,
             None,
@@ -10740,6 +10752,8 @@ default = "grok-4.5"
             api_key: None,
             env_key: None,
             api_base_url: None,
+            provider_id: None,
+            route_id: None,
         }
     }
     #[test]
@@ -11179,7 +11193,7 @@ default = "grok-4.5"
     #[serial]
     fn mcp_liveness_watchers_default_is_true() {
         unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
-        let r = resolve_mcp_liveness_watchers(None, None, None, None, None, None);
+        let r = resolve_mcp_liveness_watchers(None, None, None, None, None);
         assert!(r.value, "default-on by spec");
         assert_eq!(r.source, ConfigSource::Default);
     }
@@ -11245,7 +11259,7 @@ default = "grok-4.5"
     #[serial]
     fn mcp_auto_restart_default_is_true() {
         unsafe { std::env::remove_var("GROK_MCP_AUTO_RESTART") };
-        let r = resolve_mcp_auto_restart(None, None, None, None, None, None);
+        let r = resolve_mcp_auto_restart(None, None, None, None, None);
         assert!(r.value, "recovery is on by default");
         assert_eq!(r.source, ConfigSource::Default);
     }
@@ -11277,7 +11291,7 @@ default = "grok-4.5"
     #[serial]
     fn mcp_push_server_status_default_is_true() {
         unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
-        let r = resolve_mcp_push_server_status(None, None, None, None, None, None);
+        let r = resolve_mcp_push_server_status(None, None, None, None, None);
         assert!(r.value, "default-on by spec");
         assert_eq!(r.source, ConfigSource::Default);
     }
@@ -11343,7 +11357,7 @@ default = "grok-4.5"
     #[serial]
     fn mcp_recursive_config_watch_default_is_true() {
         unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
-        let r = resolve_mcp_recursive_config_watch(None, None, None, None, None, None);
+        let r = resolve_mcp_recursive_config_watch(None, None, None, None, None);
         assert!(r.value, "default-on by spec");
         assert_eq!(r.source, ConfigSource::Default);
     }
