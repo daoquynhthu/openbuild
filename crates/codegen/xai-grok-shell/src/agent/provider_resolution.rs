@@ -82,13 +82,9 @@ pub fn resolve_model_execution(
             .collect::<Vec<_>>()
     });
 
-    let base_url = base_url_override.map(|s| s.to_string()).unwrap_or_else(|| {
-        route
-            .endpoint
-            .base_url
-            .clone()
-            .unwrap_or_else(|| String::new())
-    });
+    let base_url = base_url_override
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| route.endpoint.base_url.clone().unwrap_or_default());
 
     // Merge static headers and auth
     let mut extra_headers = route.static_headers.clone();
