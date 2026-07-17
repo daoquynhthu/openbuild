@@ -4737,6 +4737,12 @@ pub fn sampling_config_for_model(
 ///   get an extra access header from the corresponding key argument.
 ///
 /// Existing entries are never overwritten so callers can pre-set a value.
+/// Inject headers derived from the request URL for legacy xAI proxy compatibility.
+///
+/// This is gated by `is_cli_chat_proxy_url()` so it only applies to the
+/// documented cli-chat-proxy host. Third-party endpoints using similar
+/// hostname substrings do NOT receive xAI proxy headers. Tests at
+/// `inject_url_derived_headers_*` prove this behavior.
 pub fn inject_url_derived_headers(
     headers: &mut IndexMap<String, String>,
     alpha_test_key: Option<&str>,
