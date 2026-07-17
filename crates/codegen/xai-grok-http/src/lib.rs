@@ -70,10 +70,7 @@ pub use xai_grok_sampler::OriginClientInfo;
 pub fn origin_client_info_from_env() -> Option<OriginClientInfo> {
     std::env::var("GROK_CLIENT_NAME")
         .ok()
-        .map(|product| OriginClientInfo {
-            product,
-            version: std::env::var("GROK_CLIENT_VERSION").ok(),
-        })
+        .map(|product| OriginClientInfo::new(product, std::env::var("GROK_CLIENT_VERSION").ok()))
 }
 
 /// Construct an [`OriginClientInfo`] from a shell-side
@@ -83,10 +80,7 @@ pub fn origin_client_info_from_client_type(
     client_type: ClientType,
     version: Option<String>,
 ) -> OriginClientInfo {
-    OriginClientInfo {
-        product: client_type.user_agent_label().to_string(),
-        version,
-    }
+    OriginClientInfo::new(client_type.user_agent_label().to_string(), version)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -208,12 +202,13 @@ pub fn origin_client_info_from_meta(
                 .map(|client_type| client_type.user_agent_label().to_string())
         });
 
-    product.map(|product| OriginClientInfo {
-        product,
-        version: meta
-            .and_then(|m| m.get("clientVersion"))
-            .and_then(|v| v.as_str())
-            .map(str::to_string),
+    product.map(|product| {
+        OriginClientInfo::new(
+            product,
+            meta.and_then(|m| m.get("clientVersion"))
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
+        )
     })
 }
 
@@ -222,10 +217,12 @@ pub fn merge_origin_client_info(
     fallback: Option<OriginClientInfo>,
 ) -> Option<OriginClientInfo> {
     match (primary, fallback) {
-        (Some(primary), Some(fallback)) => Some(OriginClientInfo {
-            product: primary.product,
-            version: primary.version.or(fallback.version),
-        }),
+        (Some(primary), Some(fallback)) => {
+            Some(OriginClientInfo::new(
+                primary.product,
+                primary.version.or(fallback.version),
+            ))
+        }
         (Some(primary), None) => Some(primary),
         (None, Some(fallback)) => Some(fallback),
         (None, None) => None,
@@ -553,10 +550,10 @@ mod tests {
         .unwrap();
         assert_eq!(
             origin_client_info_from_meta(Some(&meta)),
-            Some(OriginClientInfo {
-                product: "grok-desktop".to_string(),
-                version: Some("1.2.3".to_string()),
-            })
+            Some(OriginClientInfo::new(
+                "grok-desktop".to_string(),
+                Some("1.2.3".to_string()),
+            ))
         );
     }
 
@@ -571,47 +568,46 @@ mod tests {
         .unwrap();
         assert_eq!(
             origin_client_info_from_meta(Some(&meta)),
-            Some(OriginClientInfo {
-                product: "grok-pager".to_string(),
-                version: Some("0.1.2".to_string()),
-            })
+            Some(OriginClientInfo::new(
+                "grok-pager".to_string(),
+                Some("0.1.2".to_string()),
+            ))
         );
     }
 
     #[test]
     fn merge_origin_client_info_preserves_primary_product_and_backfills_version() {
         let merged = merge_origin_client_info(
-            Some(OriginClientInfo {
-                product: "grok-web".to_string(),
-                version: None,
-            }),
-            Some(OriginClientInfo {
-                product: "grok-desktop".to_string(),
-                version: Some("1.2.3".to_string()),
-            }),
+            Some(OriginClientInfo::new("grok-web".to_string(), None)),
+            Some(OriginClientInfo::new(
+                "grok-desktop".to_string(),
+                Some("1.2.3".to_string()),
+            )),
         );
         assert_eq!(
             merged,
-            Some(OriginClientInfo {
-                product: "grok-web".to_string(),
-                version: Some("1.2.3".to_string()),
-            })
+            Some(OriginClientInfo::new(
+                "grok-web".to_string(),
+                Some("1.2.3".to_string()),
+            ))
         );
     }
 
     #[test]
     fn session_user_agent_string_renders_expected_variants() {
-        let with_version = session_user_agent_string(&OriginClientInfo {
-            product: "grok-desktop".to_string(),
-            version: Some("1.2.3".to_string()),
-        });
+        let with_version =
+            session_user_agent_string(&OriginClientInfo::new(
+                "grok-desktop".to_string(),
+                Some("1.2.3".to_string()),
+            ));
         assert!(with_version.starts_with("grok-desktop/1.2.3 grok-shell/"));
         assert!(with_version.contains(" ("));
 
-        let without_version = session_user_agent_string(&OriginClientInfo {
-            product: "grok-web".to_string(),
-            version: None,
-        });
+        let without_version =
+            session_user_agent_string(&OriginClientInfo::new(
+                "grok-web".to_string(),
+                None,
+            ));
         assert!(without_version.starts_with("grok-web grok-shell/"));
         assert!(!without_version.starts_with("grok-web/"));
     }
@@ -619,10 +615,10 @@ mod tests {
     #[test]
     fn user_agent_render_collapses_duplicate_origin_and_agent_identity() {
         let ua = UserAgent {
-            origin: OriginClientInfo {
-                product: "grok-shell".to_string(),
-                version: Some("0.1.171".to_string()),
-            },
+            origin: OriginClientInfo::new(
+                "grok-shell".to_string(),
+                Some("0.1.171".to_string()),
+            ),
             agent_product: "grok-shell",
             agent_version: "0.1.171".to_string(),
             platform: PlatformInfo {

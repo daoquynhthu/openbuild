@@ -185,12 +185,22 @@ pub type SharedHeaderInjector = std::sync::Arc<dyn HeaderInjector>;
 
 /// Retry knobs for the sampler's internal transport-error retry loop.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct RetryPolicy {
     /// Maximum number of retries before giving up.
     pub max_retries: u32,
     /// After this many rate-limit (429) retries, escalate to the caller.
     /// Lower than `max_retries` because rate-limit waits can be long.
     pub rate_limit_retry_threshold: u32,
+}
+
+impl RetryPolicy {
+    pub fn new(max_retries: u32, rate_limit_retry_threshold: u32) -> Self {
+        Self {
+            max_retries,
+            rate_limit_retry_threshold,
+        }
+    }
 }
 
 impl Default for RetryPolicy {
@@ -206,9 +216,19 @@ impl Default for RetryPolicy {
 /// User-Agent rendering. The shell layer composes this with platform
 /// info into a final UA string.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct OriginClientInfo {
     pub product: String,
     pub version: Option<String>,
+}
+
+impl OriginClientInfo {
+    pub fn new(product: impl Into<String>, version: Option<String>) -> Self {
+        Self {
+            product: product.into(),
+            version,
+        }
+    }
 }
 
 #[cfg(test)]

@@ -36,6 +36,7 @@ use std::sync::Arc;
 /// hook into the `xai_grok_tools::ApiKeyProvider` trait rather than
 /// this enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SamplingConsumer {
     /// `chat_completion_stream`: OpenAI-compatible streaming OpenAI Chat Completions API.
     ChatCompletionsStream,

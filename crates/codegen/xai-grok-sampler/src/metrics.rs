@@ -29,6 +29,7 @@ pub fn compute_percentiles(sorted: &[u64]) -> (u64, u64, u64, u64, u64) {
 
 /// Per-response inference latency metrics computed from chunk timestamps.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct InferenceLatencyStats {
     /// Time to first content token (ms)
     pub time_to_first_token_ms: Option<u64>,
@@ -64,6 +65,31 @@ impl InferenceLatencyStats {
         }
         if let Some(p99) = self.itl_p99_ms {
             span.record("itl_p99_ms", p99);
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        time_to_first_token_ms: Option<u64>,
+        time_to_last_byte_ms: u64,
+        chunk_count: u32,
+        itl_intervals_ms: Vec<u64>,
+        itl_p50_ms: Option<u64>,
+        itl_p99_ms: Option<u64>,
+        itl_max_ms: Option<u64>,
+        itl_mean_ms: Option<u64>,
+        attempts: u32,
+    ) -> Self {
+        Self {
+            time_to_first_token_ms,
+            time_to_last_byte_ms,
+            chunk_count,
+            itl_intervals_ms,
+            itl_p50_ms,
+            itl_p99_ms,
+            itl_max_ms,
+            itl_mean_ms,
+            attempts,
         }
     }
 

@@ -50,17 +50,12 @@ fn auth_manager_with_refresher(
 /// inner `OaiCompatClient` emit surfaces after recording its own
 /// attribution.
 fn auth_error() -> xai_grok_sampler::SamplingErrorInfo {
-    xai_grok_sampler::SamplingErrorInfo {
-        kind: xai_grok_sampler::SamplingErrorKind::Auth,
-        message: "Unauthorized (401)".to_string(),
-        status_code: Some(401),
-        is_retryable: false,
-        retry_after_secs: None,
-        model_metadata: None,
-        empty_response_context: None,
-        doom_loop_triggers: None,
-        doom_loop_aborted_at_chunk: None,
-    }
+    xai_grok_sampler::SamplingErrorInfo::new(
+        xai_grok_sampler::SamplingErrorKind::Auth,
+        Some(401),
+        "Unauthorized (401)".to_string(),
+        false,
+    )
 }
 
 /// Construct a test actor with the supplied `auth_manager` and
@@ -357,17 +352,12 @@ async fn proactive_refresh_makes_per_turn_refresh_a_cache_hit() {
 }
 
 fn model_not_found_error() -> xai_grok_sampler::SamplingErrorInfo {
-    xai_grok_sampler::SamplingErrorInfo {
-            kind: xai_grok_sampler::SamplingErrorKind::Api,
-            message: "API error (status 404 Not Found): The model grok-build does not exist or your team does not have access".into(),
-            status_code: Some(404),
-            is_retryable: false,
-            retry_after_secs: None,
-            model_metadata: None,
-            empty_response_context: None,
-            doom_loop_triggers: None,
-            doom_loop_aborted_at_chunk: None,
-        }
+    xai_grok_sampler::SamplingErrorInfo::new(
+        xai_grok_sampler::SamplingErrorKind::Api,
+        Some(404),
+        "API error (status 404 Not Found): The model grok-build does not exist or your team does not have access".into(),
+        false,
+    )
 }
 
 /// 404 model-not-found with a legacy WebLogin token appends a
@@ -424,17 +414,12 @@ async fn legacy_auth_hint_on_404_model_not_found() {
 /// condition (`status_code == Some(401)`) without triggering
 /// recovery, making the test environment-independent.
 fn unauthorized_401_error() -> xai_grok_sampler::SamplingErrorInfo {
-    xai_grok_sampler::SamplingErrorInfo {
-            kind: xai_grok_sampler::SamplingErrorKind::Api,
-            message: "Unauthorized (401) from https://cli-chat-proxy.grok.com/v1/responses: {\"error\":\"Invalid or expired credentials (auth_kind=bearer, x_xai_token_auth=xai-grok-cli, upstream=Unauthenticated, reason=no auth context)\"}".into(),
-            status_code: Some(401),
-            is_retryable: false,
-            retry_after_secs: None,
-            model_metadata: None,
-            empty_response_context: None,
-            doom_loop_triggers: None,
-            doom_loop_aborted_at_chunk: None,
-        }
+    xai_grok_sampler::SamplingErrorInfo::new(
+        xai_grok_sampler::SamplingErrorKind::Api,
+        Some(401),
+        "Unauthorized (401) from https://cli-chat-proxy.grok.com/v1/responses: {\"error\":\"Invalid or expired credentials (auth_kind=bearer, x_xai_token_auth=xai-grok-cli, upstream=Unauthenticated, reason=no auth context)\"}".into(),
+        false,
+    )
 }
 
 /// 401 Unauthorized with a legacy WebLogin token appends a

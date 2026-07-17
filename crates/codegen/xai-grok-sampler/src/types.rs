@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 /// (e.g., a session-assigned UUID) or generate a fresh random one via
 /// [`RequestId::random`].
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct RequestId(String);
 
 impl RequestId {

@@ -2208,17 +2208,17 @@ mod tests {
         let (handle, actor) = SessionSignalsActor::new();
         let actor_handle = tokio::spawn(actor.run());
 
-        handle.record_inference_metrics(InferenceLatencyStats {
-            time_to_first_token_ms: Some(150),
-            time_to_last_byte_ms: 2500,
-            chunk_count: 20,
-            itl_intervals_ms: vec![30, 30, 30], // 3 intervals, all 30ms
-            itl_p50_ms: Some(30),
-            itl_p99_ms: Some(30),
-            itl_max_ms: Some(30),
-            itl_mean_ms: Some(30),
-            attempts: 0,
-        });
+        handle.record_inference_metrics(InferenceLatencyStats::new(
+            Some(150),
+            2500,
+            20,
+            vec![30, 30, 30],
+            Some(30),
+            Some(30),
+            Some(30),
+            Some(30),
+            0,
+        ));
 
         let snap = handle.snapshot().await.unwrap();
 
@@ -2306,43 +2306,43 @@ mod tests {
         let actor_handle = tokio::spawn(actor.run());
 
         // Response 1: intervals [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-        handle.record_inference_metrics(InferenceLatencyStats {
-            time_to_first_token_ms: Some(100),
-            time_to_last_byte_ms: 1000,
-            chunk_count: 10,
-            itl_intervals_ms: vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-            itl_p50_ms: Some(40),
-            itl_p99_ms: Some(90),
-            itl_max_ms: Some(100),
-            itl_mean_ms: Some(50),
-            attempts: 0,
-        });
+        handle.record_inference_metrics(InferenceLatencyStats::new(
+            Some(100),
+            1000,
+            10,
+            vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+            Some(40),
+            Some(90),
+            Some(100),
+            Some(50),
+            0,
+        ));
 
         // Response 2: intervals [100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200] (11 intervals)
-        handle.record_inference_metrics(InferenceLatencyStats {
-            time_to_first_token_ms: Some(120),
-            time_to_last_byte_ms: 2000,
-            chunk_count: 20,
-            itl_intervals_ms: vec![100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
-            itl_p50_ms: Some(55),
-            itl_p99_ms: Some(150),
-            itl_max_ms: Some(200),
-            itl_mean_ms: Some(60),
-            attempts: 0,
-        });
+        handle.record_inference_metrics(InferenceLatencyStats::new(
+            Some(120),
+            2000,
+            20,
+            vec![100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
+            Some(55),
+            Some(150),
+            Some(200),
+            Some(60),
+            0,
+        ));
 
         // Response 3: intervals [5, 10, 15, 20, 25] (5 intervals)
-        handle.record_inference_metrics(InferenceLatencyStats {
-            time_to_first_token_ms: Some(90),
-            time_to_last_byte_ms: 1500,
-            chunk_count: 30,
-            itl_intervals_ms: vec![5, 10, 15, 20, 25],
-            itl_p50_ms: Some(25),
-            itl_p99_ms: Some(70),
-            itl_max_ms: Some(80),
-            itl_mean_ms: Some(30),
-            attempts: 0,
-        });
+        handle.record_inference_metrics(InferenceLatencyStats::new(
+            Some(90),
+            1500,
+            30,
+            vec![5, 10, 15, 20, 25],
+            Some(25),
+            Some(70),
+            Some(80),
+            Some(30),
+            0,
+        ));
 
         let snap = handle.snapshot().await.unwrap();
 
@@ -2625,17 +2625,17 @@ mod tests {
         handle1.record_model_usage("grok-3");
 
         // Record inference metrics with ITL intervals for turn 1
-        handle1.record_inference_metrics(InferenceLatencyStats {
-            time_to_first_token_ms: Some(100),
-            time_to_last_byte_ms: 1000,
-            chunk_count: 6,
-            itl_intervals_ms: vec![10, 20, 30, 40, 50],
-            itl_p50_ms: Some(30),
-            itl_p99_ms: Some(50),
-            itl_max_ms: Some(50),
-            itl_mean_ms: Some(30),
-            attempts: 0,
-        });
+        handle1.record_inference_metrics(InferenceLatencyStats::new(
+            Some(100),
+            1000,
+            6,
+            vec![10, 20, 30, 40, 50],
+            Some(30),
+            Some(50),
+            Some(50),
+            Some(30),
+            0,
+        ));
 
         handle1.increment_turn(); // turn 2
         handle1.record_tool_call("search_replace");

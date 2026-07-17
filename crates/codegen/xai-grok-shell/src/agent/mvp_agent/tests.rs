@@ -1162,10 +1162,7 @@ fn make_test_handle(
         model_id: acp::ModelId::new(model),
         reasoning_effort: None,
         yolo_mode: yolo,
-        origin_client: client_id.map(|s| crate::http::OriginClientInfo {
-            product: s.to_string(),
-            version: None,
-        }),
+        origin_client: client_id.map(|s| crate::http::OriginClientInfo::new(s.to_string(), None)),
         code_nav_enabled: false,
         ask_user_question_enabled: true,
         plan_mode: std::sync::Arc::new(parking_lot::Mutex::new(

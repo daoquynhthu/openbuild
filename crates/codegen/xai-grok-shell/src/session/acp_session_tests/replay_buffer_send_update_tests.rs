@@ -781,17 +781,12 @@ async fn failed_event_preserves_streaming_capture_for_takeout() {
             actor
                 .handle_sampling_event(SamplingEvent::Failed {
                     request_id: req,
-                    error: SamplingErrorInfo {
-                        kind: SamplingErrorKind::MaxTokensTruncation,
-                        status_code: None,
-                        message: "max output tokens reached".to_string(),
-                        is_retryable: false,
-                        retry_after_secs: None,
-                        model_metadata: None,
-                        empty_response_context: None,
-                        doom_loop_triggers: None,
-                        doom_loop_aborted_at_chunk: None,
-                    },
+                    error: SamplingErrorInfo::new(
+                        SamplingErrorKind::MaxTokensTruncation,
+                        None,
+                        "max output tokens reached".to_string(),
+                        false,
+                    ),
                 })
                 .await;
             let cap = actor.streaming_turn_capture.lock().clone();
@@ -1185,28 +1180,24 @@ async fn reasoning_only_doomloop_turn_captures_every_generation_as_segments() {
                     chunk_index: 0,
                 })
                 .await;
-            let error = SamplingErrorInfo {
-                kind: SamplingErrorKind::EmptyResponse,
-                status_code: None,
-                message: "empty response from model (reasoning_only)".to_string(),
-                is_retryable: false,
-                retry_after_secs: None,
-                model_metadata: None,
-                empty_response_context: Some(EmptyResponseContext {
-                    reason: EmptyReason::ReasoningOnly,
-                    had_reasoning: true,
-                    content_len: 0,
-                    tool_call_count: 0,
-                    finish_reason: Some("stop".to_string()),
-                    completion_tokens: Some(0),
-                    reasoning_tokens: Some(4096),
-                    prompt_tokens: Some(128),
-                    model: "grok-test".to_string(),
-                    first_choice_seen: true,
-                }),
-                doom_loop_triggers: None,
-                doom_loop_aborted_at_chunk: None,
-            };
+            let error = SamplingErrorInfo::new(
+                SamplingErrorKind::EmptyResponse,
+                None,
+                "empty response from model (reasoning_only)".to_string(),
+                false,
+            )
+            .with_empty_response_context(EmptyResponseContext {
+                reason: EmptyReason::ReasoningOnly,
+                had_reasoning: true,
+                content_len: 0,
+                tool_call_count: 0,
+                finish_reason: Some("stop".to_string()),
+                completion_tokens: Some(0),
+                reasoning_tokens: Some(4096),
+                prompt_tokens: Some(128),
+                model: "grok-test".to_string(),
+                first_choice_seen: true,
+            });
             actor
                 .handle_sampling_event(SamplingEvent::Failed {
                     request_id: req,

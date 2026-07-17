@@ -412,3 +412,36 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 | `crates/codegen/xai-grok-provider/src/provider.rs` | 添加 `#[non_exhaustive]` 到 `ConfiguredProvider` |
 | `crates/codegen/xai-grok-provider/tests/provider_e2e.rs` | 改用 `ProviderConfig::new()` |
 | `crates/codegen/xai-grok-pager-bin/src/main.rs` | 改用 `ProviderConfig::new()` 两处 |
+
+---
+
+## Batch 3: `#[non_exhaustive]` 保护完成 — 2026-07-17
+
+### 完成内容
+- 8 类型加 `#[non_exhaustive]`: `SamplingChannel`, `SamplingEvent`, `SamplingErrorInfo`, `SamplingErrorKind`, `InferenceLatencyStats`, `RequestId`, `AuthInfo`, `SamplingConsumer`
+- 新增构造器: `InferenceLatencyStats::new()`, `SamplingErrorInfo::new()` + `.with_model_metadata()` + `.with_empty_response_context()`, `RetryPolicy::new()`, `OriginClientInfo::new()`
+- `SamplerConfig` 保持原样（5 处生产调用各设 20+ 字段，`#[non_exhaustive]` 不切实际）
+- 修复跨 crate 测试构造: 10 处 `SamplingErrorInfo`、5 处 `InferenceLatencyStats`、1 处 `OriginClientInfo`、1 处 `RetryPolicy`
+- 修复 `SamplingEvent`/`SamplingChannel` match 添加 `_ => {}` 通配臂
+- 修复 `cancel_running_task_tests.rs`: 重复 `extra_headers` 字段 + 遗漏 `protocol_id` 字段
+
+### 修改文件（19 个）
+- `xai-grok-sampler/src/metrics.rs` — `InferenceLatencyStats::new()`
+- `xai-grok-sampler/src/events.rs` — `SamplingErrorInfo::new()` + builder
+- `xai-grok-sampler/src/config.rs` — `RetryPolicy::new()`, `OriginClientInfo::new()`
+- `xai-grok-sampler/src/types.rs`, `attribution.rs`, `sampling_log.rs` — `#[non_exhaustive]`
+- `xai-grok-shell/src/session/signals.rs` — 5 处 `InferenceLatencyStats` → `::new()`
+- `xai-grok-shell/src/session/compaction.rs` — 2 处 `SamplingErrorInfo` → `::new()`
+- `xai-grok-shell/src/session/acp_session_tests/*.rs` — 8 处 `SamplingErrorInfo` → `::new()`
+- `xai-grok-shell/src/agent/mvp_agent/tests.rs` — `OriginClientInfo` → `::new()`
+- `xai-grok-shell/src/session/acp_session_impl/tool_calls.rs` — `_ => {}` match arms
+- `xai-grok-shell/src/session/acp_session_impl/spawn.rs` — `RetryPolicy` → `::new()`
+- `xai-grok-shell/tests/test_doom_loop_recovery.rs` — `RetryPolicy` → `::new()`
+- `xai-grok-http/src/lib.rs`, `xai-grok-telemetry/src/http.rs` — 已有 `OriginClientInfo::new()` 调用者
+- `ISSUE.md` — Batch 3 `[x]`
+
+### 关键结果
+- `cargo check -p xai-grok-sampler -p xai-grok-shell` — 通过 ✅
+- `cargo clippy -p xai-grok-sampler -p xai-grok-shell -- --deny warnings` — 零警告 ✅
+- `cargo test -p xai-grok-sampler --lib` — 154/154 ✅
+- `cargo test -p xai-grok-shell --lib` — 4939/5530 ✅（591 预存失败，全部为 agent infra 测试，与 batch 3 无关）

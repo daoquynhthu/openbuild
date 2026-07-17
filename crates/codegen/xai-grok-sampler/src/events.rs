@@ -15,6 +15,7 @@ use crate::types::RequestId;
 /// new variant here, not new [`SamplingEvent`] variants. Mirrors the
 /// agentic-sampler's `AgentChannel` pattern.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum SamplingChannel {
     Text,
     Reasoning,
@@ -25,6 +26,7 @@ pub enum SamplingChannel {
 /// Sent on the shared event channel that callers subscribe to. The
 /// session translates these into ACP notifications.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum SamplingEvent {
     /// HTTP stream established, headers read. Emitted before any content.
     StreamStarted {
@@ -118,6 +120,7 @@ pub enum SamplingEvent {
 /// boundary. `SamplingErrorInfo` extracts the bits that downstream
 /// consumers (UIs, gRPC adapters) actually need.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SamplingErrorInfo {
     pub kind: SamplingErrorKind,
     pub status_code: Option<u16>,
@@ -141,6 +144,38 @@ pub struct SamplingErrorInfo {
     pub doom_loop_aborted_at_chunk: Option<u64>,
 }
 
+impl SamplingErrorInfo {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        kind: SamplingErrorKind,
+        status_code: Option<u16>,
+        message: String,
+        is_retryable: bool,
+    ) -> Self {
+        Self {
+            kind,
+            status_code,
+            message,
+            is_retryable,
+            retry_after_secs: None,
+            model_metadata: None,
+            empty_response_context: None,
+            doom_loop_triggers: None,
+            doom_loop_aborted_at_chunk: None,
+        }
+    }
+
+    pub fn with_model_metadata(mut self, meta: ResponseModelMetadata) -> Self {
+        self.model_metadata = Some(meta);
+        self
+    }
+
+    pub fn with_empty_response_context(mut self, ctx: EmptyResponseContext) -> Self {
+        self.empty_response_context = Some(ctx);
+        self
+    }
+}
+
 /// Coarse-grained classification of a sampling failure.
 ///
 /// Intentionally narrow — context-window-exceeded does NOT have its own
@@ -149,6 +184,7 @@ pub struct SamplingErrorInfo {
 /// `Api { status: 400, .. }` with model metadata; the session inspects
 /// the metadata and decides whether to compact.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SamplingErrorKind {
     Auth,
     Http,

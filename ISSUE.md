@@ -23,14 +23,14 @@
 - [x] **P2-M02** `xai-grok-sampler/Cargo.toml:10` — 移除未使用的 `xai-grok-provider` 依赖
 - [x] **P3-M04** `xai-grok-sampler/Cargo.toml:10` — 同 P2-M02，P3-M04 曾被误标 `-Closed`，一并关闭
 
-### Batch 3 — `#[non_exhaustive]` 保护（低风险，机械操作）
+### Batch 3 — `#[non_exhaustive]` 保护（低风险，机械操作）`[x]`
 
-- [ ] **M55** `sampler/src/events.rs:18,28,121,152` — 4 类型加 `#[non_exhaustive]`
-- [ ] **M56** `sampler/src/config.rs:49,186,207` — 3 类型加 `#[non_exhaustive]`
-- [ ] **M57** `sampler/src/metrics.rs:32` — `InferenceLatencyStats` 加 `#[non_exhaustive]`
-- [ ] **M58** `sampler/src/types.rs:13` — `RequestId` 加 `#[non_exhaustive]`
-- [ ] **M59** `sampler/src/sampling_log.rs:10` — `AuthInfo` 加 `#[non_exhaustive]`
-- [ ] **M60** `sampler/src/attribution.rs:39` — `SamplingConsumer` 加 `#[non_exhaustive]`
+- [x] **M55** `sampler/src/events.rs:18,28,121,152` — 4 类型加 `#[non_exhaustive]`（`SamplingChannel`, `SamplingEvent`, `SamplingErrorInfo`, `SamplingErrorKind`）；为 `SamplingErrorInfo` 添加 `new()` + `.with_model_metadata()` + `.with_empty_response_context()` 构造器；为 `SamplingEvent` 和 `SamplingChannel` match 添加 `_ => {}` 通配臂
+- [x] **M56** `sampler/src/config.rs:186,207` — `RetryPolicy` + `OriginClientInfo` 加 `#[non_exhaustive]` + `new()` 构造器；`SamplerConfig` 不退（保留原样，5 处生产调用各设 20+ 字段，构造器不现实）
+- [x] **M57** `sampler/src/metrics.rs:32` — `InferenceLatencyStats` 加 `#[non_exhaustive]` + `new()` 构造器（9 参数）
+- [x] **M58** `sampler/src/types.rs:13` — `RequestId` 加 `#[non_exhaustive]`
+- [x] **M59** `sampler/src/sampling_log.rs:10` — `AuthInfo` 加 `#[non_exhaustive]`
+- [x] **M60** `sampler/src/attribution.rs:39` — `SamplingConsumer` 加 `#[non_exhaustive]`
 
 ### Batch 4 — `serde` 属性补全（低风险）
 

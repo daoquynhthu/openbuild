@@ -43,10 +43,7 @@ fn spawn_actor(base_url: &str, doom_loop_enabled: bool) -> SamplerHandle {
         config.doom_loop_recovery = Some(Default::default());
     }
     // Small transport budget so a broken spec fails fast instead of spinning.
-    let retry = RetryPolicy {
-        max_retries: 2,
-        rate_limit_retry_threshold: 2,
-    };
+    let retry = RetryPolicy::new(2, 2);
     let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
     SamplerActor::spawn(config, retry, event_tx)
 }

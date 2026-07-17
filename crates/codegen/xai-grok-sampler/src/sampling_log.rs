@@ -7,6 +7,7 @@ use crate::types::RequestId;
 pub const TARGET: &str = "sampling_log";
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct AuthInfo {
     pub auth_type: &'static str,
     pub auth_prefix: Option<String>,

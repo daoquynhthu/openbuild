@@ -3156,21 +3156,17 @@ mod inline_auto_compact_flow_tests {
             .await;
     }
     fn api_error_with_context_window(context_window: u64) -> xai_grok_sampler::SamplingErrorInfo {
-        xai_grok_sampler::SamplingErrorInfo {
-            kind: xai_grok_sampler::SamplingErrorKind::Api,
-            status_code: Some(400),
-            message: "prompt is too long".to_string(),
-            is_retryable: false,
-            retry_after_secs: None,
-            model_metadata: Some(crate::sampling::ResponseModelMetadata {
-                context_window: Some(context_window),
-                max_completion_tokens: None,
-                models_etag: None,
-            }),
-            empty_response_context: None,
-            doom_loop_triggers: None,
-            doom_loop_aborted_at_chunk: None,
-        }
+        xai_grok_sampler::SamplingErrorInfo::new(
+            xai_grok_sampler::SamplingErrorKind::Api,
+            Some(400),
+            "prompt is too long".to_string(),
+            false,
+        )
+        .with_model_metadata(crate::sampling::ResponseModelMetadata {
+            context_window: Some(context_window),
+            max_completion_tokens: None,
+            models_etag: None,
+        })
     }
     /// Primary scenario: remote settings shrinks the context window mid-session.
     /// The shell's last-known token count (214K) exceeds the new limit (200K) —
@@ -3216,17 +3212,12 @@ mod inline_auto_compact_flow_tests {
                 let (persistence_tx, _) = mpsc::unbounded_channel::<PersistenceMsg>();
                 let actor =
                     create_test_actor(500_000, 200_000, 85, gateway_tx, persistence_tx).await;
-                let err = xai_grok_sampler::SamplingErrorInfo {
-                    kind: xai_grok_sampler::SamplingErrorKind::Api,
-                    status_code: Some(400),
-                    message: "prompt is too long".to_string(),
-                    is_retryable: false,
-                    retry_after_secs: None,
-                    model_metadata: None,
-                    empty_response_context: None,
-                    doom_loop_triggers: None,
-                    doom_loop_aborted_at_chunk: None,
-                };
+                let err = xai_grok_sampler::SamplingErrorInfo::new(
+                    xai_grok_sampler::SamplingErrorKind::Api,
+                    Some(400),
+                    "prompt is too long".to_string(),
+                    false,
+                );
                 assert!(!actor.should_compact_on_error(&err).await);
             })
             .await;

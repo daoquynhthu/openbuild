@@ -2375,6 +2375,7 @@ impl SessionActor {
                     });
                     self.send_thought_chunk(text, chunk_index).await;
                 }
+                _ => {}
             },
             SamplingEvent::ToolCallDelta {
                 tool_index,
@@ -2543,6 +2544,7 @@ impl SessionActor {
                 )
                 .await;
             }
+            _ => {}
         }
     }
     /// Model-facing rejection for a non-plan-file edit while plan mode is
