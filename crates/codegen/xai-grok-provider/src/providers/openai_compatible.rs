@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::auth::AuthPolicy;
+use crate::auth::{AuthPolicy, CredentialSource};
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
@@ -95,7 +95,7 @@ impl Provider for OpenAiCompatibleProvider {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            AuthPolicy::None,
+            AuthPolicy::Bearer(CredentialSource::Environment(self.defaults.env_key.clone())),
         );
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("openai-compatible-chat");

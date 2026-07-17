@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::auth::AuthPolicy;
+use crate::auth::{AuthPolicy, CredentialSource};
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
@@ -64,7 +64,7 @@ impl Provider for XaiProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        let route = Route::make(
+        let mut route = Route::make(
             "xai-responses",
             Some(self.defaults.id.clone()),
             "responses",
@@ -73,8 +73,12 @@ impl Provider for XaiProvider {
                 path: EndpointPart::Static("/responses".into()),
                 query: None,
             },
-            AuthPolicy::None,
+            AuthPolicy::Bearer(CredentialSource::Environment(vec!["XAI_API_KEY".into()])),
         );
+        // Preserve legacy x-grok-* headers for backward compatibility.
+        route
+            .static_headers
+            .insert("x-grok-auth-mode".into(), "api-key".into());
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("xai-responses");
         let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);
