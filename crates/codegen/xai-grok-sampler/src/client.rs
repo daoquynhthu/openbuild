@@ -317,6 +317,8 @@ struct ClientDefaults {
     auth_scheme: AuthScheme,
     stream_tool_calls: bool,
     doom_loop_recovery: Option<xai_grok_sampling_types::DoomLoopRecoveryPolicy>,
+    endpoint_path: Option<String>,
+    endpoint_query: Option<Vec<(String, String)>>,
 }
 
 // =============================================================================
@@ -542,6 +544,8 @@ impl SamplingClient {
             auth_scheme: config.auth_scheme,
             stream_tool_calls: config.stream_tool_calls,
             doom_loop_recovery: config.doom_loop_recovery,
+            endpoint_path: config.endpoint_path,
+            endpoint_query: config.endpoint_query,
         };
 
         Ok(Self {
@@ -791,10 +795,26 @@ impl SamplingClient {
         context_parts.join("\n")
     }
 
-    fn endpoint(&self, path: &str) -> String {
+    fn endpoint(&self, default_path: &str) -> String {
         let base = self.base_url.trim_end_matches('/');
-        let path = path.trim_start_matches('/');
-        format!("{base}/{path}")
+        let path = self
+            .defaults
+            .endpoint_path
+            .as_deref()
+            .unwrap_or(default_path)
+            .trim_start_matches('/');
+        let mut url = format!("{base}/{path}");
+        if let Some(ref query) = self.defaults.endpoint_query {
+            for (i, (k, v)) in query.iter().enumerate() {
+                let joiner = if i == 0 && !url.contains('?') {
+                    "?"
+                } else {
+                    "&"
+                };
+                url = format!("{url}{joiner}{k}={v}");
+            }
+        }
+        url
     }
 
     fn apply_defaults(&self, mut request: ChatCompletionRequest) -> Result<ChatCompletionRequest> {
@@ -2014,10 +2034,13 @@ impl SamplingClient {
                 crate::stream::collect_response(events).await
             }
             _ => {
-                let (raw, meta) = self.conversation_stream(request).await?;
-                let events =
-                    crate::stream::stream_chat_completions(raw, meta, request_id, idle_timeout);
-                crate::stream::collect_response(events).await
+                return Err(SamplingError::Api {
+                    status: reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+                    message: format!("unknown protocol_id: {}", self.protocol_id()),
+                    model_metadata: None,
+                    retry_after_secs: None,
+                    should_retry: Some(false),
+                });
             }
         };
         result
