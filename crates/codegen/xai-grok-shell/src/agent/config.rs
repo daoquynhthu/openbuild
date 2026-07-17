@@ -4707,6 +4707,8 @@ pub fn sampling_config_for_model(
         force_http1: false,
         max_retries: info.max_retries,
         stream_tool_calls: info.stream_tool_calls.unwrap_or(false),
+        endpoint_path: None,
+        endpoint_query: None,
         idle_timeout_secs: None,
         client_identifier: None,
         deployment_id,

@@ -43,6 +43,14 @@ pub struct SamplerConfig {
     pub api_key: Option<String>,
     pub base_url: String,
     pub model: String,
+    /// Route-selected endpoint path override (e.g. "/v1/chat/completions").
+    /// When set, the sampler uses this path instead of deriving it from
+    /// `api_backend`. Allows safe re-rendering across retries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint_path: Option<String>,
+    /// Route-selected query parameters preserved across retries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint_query: Option<Vec<(String, String)>>,
     pub max_completion_tokens: Option<u32>,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
@@ -131,6 +139,8 @@ impl Default for SamplerConfig {
             api_key: None,
             base_url: String::new(),
             model: String::new(),
+            endpoint_path: None,
+            endpoint_query: None,
             max_completion_tokens: None,
             temperature: None,
             top_p: None,
@@ -225,6 +235,35 @@ impl OriginClientInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn config_round_trip_endpoint_fields() {
+        let config = SamplerConfig {
+            endpoint_path: Some("/v1/chat/completions".into()),
+            endpoint_query: Some(vec![("limit".into(), "10".into())]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let back: SamplerConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.endpoint_path, Some("/v1/chat/completions".into()));
+        assert_eq!(
+            back.endpoint_query,
+            Some(vec![("limit".into(), "10".into())])
+        );
+    }
+
+    #[test]
+    fn config_without_endpoint_path_deserializes_to_none() {
+        let config = SamplerConfig {
+            endpoint_path: Some("/v1/chat".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let mut val: serde_json::Value = serde_json::from_str(&json).unwrap();
+        val.as_object_mut().unwrap().remove("endpoint_path");
+        let back: SamplerConfig = serde_json::from_value(val).unwrap();
+        assert!(back.endpoint_path.is_none());
+    }
 
     #[test]
     fn retry_policy_defaults() {
