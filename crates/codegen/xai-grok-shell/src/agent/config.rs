@@ -4675,12 +4675,20 @@ pub fn sampling_config_for_model(
     let api_backend = info.api_backend.clone();
 
     let (api_key, auth_scheme) = if let Some(route) = route {
-        if let Ok(auth_headers) = xai_grok_provider::auth::apply_auth_policy(
+        match xai_grok_provider::auth::apply_auth_policy(
             &route.auth,
             &std::collections::HashMap::new(),
         ) {
-            for (key, value) in auth_headers {
-                extra_headers.entry(key).or_insert(value);
+            Ok(auth_headers) => {
+                for (key, value) in auth_headers {
+                    extra_headers.entry(key).or_insert(value);
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "auth policy resolution failed for route {}: {e}",
+                    route.id.0
+                );
             }
         }
         (None, credentials.auth_scheme)
