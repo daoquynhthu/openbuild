@@ -69,6 +69,7 @@ pub struct ProviderView {
     pub last_error: Option<String>,
     pub registry_revision: u64,
     pub catalog_revision: u64,
+    pub env_key: Vec<String>,
 }
 
 /// Runtime-backed provider state container.
@@ -120,6 +121,7 @@ impl ProviderState {
                     last_error: None,
                     registry_revision: snapshot.revision,
                     catalog_revision: 0,
+                    env_key: configured.config.env_key.clone().unwrap_or_default(),
                 },
             );
         }
@@ -146,6 +148,7 @@ impl ProviderState {
                         last_error: None,
                         registry_revision: snapshot.revision,
                         catalog_revision: 0,
+                        env_key: vec![],
                     },
                 );
             }

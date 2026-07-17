@@ -15,6 +15,7 @@ pub enum ProvidersView {
     List,
     Detail {
         provider_idx: usize,
+        env_var_name: String,
         api_key: String,
         base_url: String,
         focused_field: usize,
@@ -28,6 +29,7 @@ impl std::fmt::Debug for ProvidersView {
             Self::List => f.debug_struct("List").finish(),
             Self::Detail {
                 provider_idx,
+                env_var_name,
                 api_key: _,
                 base_url,
                 focused_field,
@@ -35,6 +37,7 @@ impl std::fmt::Debug for ProvidersView {
             } => f
                 .debug_struct("Detail")
                 .field("provider_idx", provider_idx)
+                .field("env_var_name", env_var_name)
                 .field("api_key", &"[redacted]")
                 .field("base_url", base_url)
                 .field("focused_field", focused_field)
@@ -100,6 +103,7 @@ pub enum ProvidersKeyOutcome {
     Close,
     Save {
         provider_id: String,
+        env_var_name: String,
         api_key: String,
         base_url: String,
     },
@@ -111,8 +115,10 @@ fn open_detail(state: &mut ProvidersModalState) {
     let Some(provider) = state.selected_provider().cloned() else {
         return;
     };
+    let env_prefill = provider.env_key.first().cloned().unwrap_or_default();
     state.mode = ProvidersView::Detail {
         provider_idx: state.selected,
+        env_var_name: env_prefill,
         api_key: String::new(),
         base_url: provider.endpoint.clone(),
         focused_field: 0,
@@ -180,6 +186,7 @@ fn handle_detail_key(
 
     let ProvidersView::Detail {
         ref provider_idx,
+        ref mut env_var_name,
         ref mut api_key,
         ref mut base_url,
         ref mut focused_field,
@@ -209,8 +216,9 @@ fn handle_detail_key(
         }
         KeyCode::Char(c) if key.modifiers.is_empty() => {
             match *focused_field {
-                0 => api_key.push(c),
-                1 => base_url.push(c),
+                0 => env_var_name.push(c),
+                1 => api_key.push(c),
+                2 => base_url.push(c),
                 _ => {}
             }
             ProvidersKeyOutcome::Changed
@@ -218,9 +226,12 @@ fn handle_detail_key(
         KeyCode::Backspace => {
             match *focused_field {
                 0 => {
-                    api_key.pop();
+                    env_var_name.pop();
                 }
                 1 => {
+                    api_key.pop();
+                }
+                2 => {
                     base_url.pop();
                 }
                 _ => {}
@@ -240,13 +251,15 @@ fn handle_detail_key(
             let save_outcome = providers.get(*provider_idx).map(|view| {
                 (
                     view.id.0.clone(),
+                    env_var_name.clone(),
                     api_key.clone(),
                     base_url.clone(),
                 )
             });
             match save_outcome {
-                Some((provider_id, key, url)) => ProvidersKeyOutcome::Save {
+                Some((provider_id, env_name, key, url)) => ProvidersKeyOutcome::Save {
                     provider_id,
+                    env_var_name: env_name,
                     api_key: key,
                     base_url: url,
                 },
@@ -285,10 +298,21 @@ fn validate_base_url(url: &str) -> Result<(), String> {
 
 /// Persist a provider configuration to disk using the repository's atomic
 /// config editing facility. Validates provider ID and base URL before writing.
+/// If `env_var_name` is non-empty, writes `env_key` and omits `api_key`.
+/// Otherwise writes `api_key` as-is with an inline-key warning.
 /// Called by the SaveProviderConfig effect handler and modals handler.
-pub fn persist_provider_config(id: &str, api_key: &str, base_url: &str) -> Result<(), String> {
+pub fn persist_provider_config(
+    id: &str,
+    env_var_name: &str,
+    api_key: &str,
+    base_url: &str,
+) -> Result<(), String> {
     validate_provider_id(id)?;
     validate_base_url(base_url)?;
+
+    if env_var_name.is_empty() && api_key.is_empty() && base_url.is_empty() {
+        return Err("nothing to save".into());
+    }
 
     let config_path = xai_grok_config::grok_home().join("config.toml");
     if let Some(parent) = config_path.parent() {
@@ -307,7 +331,13 @@ pub fn persist_provider_config(id: &str, api_key: &str, base_url: &str) -> Resul
         .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
         .as_table_mut()
         .ok_or_else(|| format!("[provider.{id}] must be a table").to_string())?;
-    if !api_key.is_empty() {
+
+    if !env_var_name.is_empty() {
+        let mut arr = toml_edit::Array::new();
+        arr.push(env_var_name);
+        entry.insert("env_key", toml_edit::value(arr));
+        entry.remove("api_key");
+    } else if !api_key.is_empty() {
         entry["api_key"] = toml_edit::value(api_key);
     }
     if !base_url.is_empty() {
@@ -455,12 +485,14 @@ fn render_detail(
     let detail = match &state.mode {
         ProvidersView::Detail {
             provider_idx,
+            env_var_name,
             api_key,
             base_url,
             focused_field,
             show_api_key,
         } => (
             *provider_idx,
+            env_var_name.clone(),
             api_key.clone(),
             base_url.clone(),
             *focused_field,
@@ -468,7 +500,7 @@ fn render_detail(
         ),
         _ => return,
     };
-    let (provider_idx, api_key_str, base_url_str, focused_field, show_api_key) = detail;
+    let (provider_idx, env_var_name_str, api_key_str, base_url_str, focused_field, show_api_key) = detail;
 
     let providers = state.provider_state.ordered_views();
     let Some(view) = providers.get(provider_idx) else {
@@ -522,8 +554,25 @@ fn render_detail(
     };
 
     let mut render_y = content.content.y;
-    let field_label = "API Key:";
-    let display_val = if show_api_key {
+
+    let env_display = if env_var_name_str.is_empty() {
+        "(not set)".to_string()
+    } else {
+        env_var_name_str.clone()
+    };
+    render_field(
+        buf,
+        content.inner_x,
+        render_y,
+        content.inner_width,
+        "Env Var Name:",
+        &env_display,
+        focused_field == 0,
+        theme,
+    );
+    render_y += 1;
+
+    let key_display = if show_api_key {
         api_key_str.clone()
     } else if api_key_str.is_empty() {
         "(not set)".to_string()
@@ -535,32 +584,49 @@ fn render_detail(
         content.inner_x,
         render_y,
         content.inner_width,
-        field_label,
-        &display_val,
-        focused_field == 0,
-        theme,
-    );
-    render_y += 1;
-
-    let field_label = "Base URL:";
-    render_field(
-        buf,
-        content.inner_x,
-        render_y,
-        content.inner_width,
-        field_label,
-        &base_url_str,
+        "API Key:",
+        &key_display,
         focused_field == 1,
         theme,
     );
     render_y += 1;
 
+    render_field(
+        buf,
+        content.inner_x,
+        render_y,
+        content.inner_width,
+        "Base URL:",
+        &base_url_str,
+        focused_field == 2,
+        theme,
+    );
+    render_y += 1;
+
+    if focused_field == 1 && !api_key_str.is_empty() {
+        let warn_style = Style::default().fg(Color::Yellow);
+        let warn_line = Line::from(vec![
+            ratatui::text::Span::styled(
+                "  \u{26a0}  ",
+                warn_style,
+            ),
+            ratatui::text::Span::styled(
+                "Warning: key stored in plaintext config; prefer Env Var Name",
+                warn_style,
+            ),
+        ]);
+        warn_line.render(
+            Rect::new(content.inner_x, render_y, content.inner_width, 1),
+            buf,
+        );
+        render_y += 1;
+    }
+
     let (status, status_color) = credential_status(view);
-    let status_label = "Status:";
     let status_style = Style::default().fg(status_color);
     let status_line = Line::from(vec![
         ratatui::text::Span::styled(
-            format!("  {}  ", status_label),
+            "  Status:  ",
             Style::default().fg(theme.gray).add_modifier(Modifier::BOLD),
         ),
         ratatui::text::Span::styled(status, status_style),
@@ -589,7 +655,10 @@ fn render_detail(
     if let Some(ref error) = view.last_error {
         let error_style = Style::default().fg(Color::Red);
         let error_line = Line::from(vec![
-            ratatui::text::Span::styled("  Error:  ", Style::default().fg(theme.gray).add_modifier(Modifier::BOLD)),
+            ratatui::text::Span::styled(
+                "  Error:  ",
+                Style::default().fg(theme.gray).add_modifier(Modifier::BOLD),
+            ),
             ratatui::text::Span::styled(error, error_style),
         ]);
         error_line.render(

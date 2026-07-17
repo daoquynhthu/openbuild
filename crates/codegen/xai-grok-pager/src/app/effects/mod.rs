@@ -4095,12 +4095,13 @@ pub(crate) fn execute(
                     }
                 });
         }
-        Effect::SaveProviderConfig { provider_id, api_key, base_url } => {
+        Effect::SaveProviderConfig { provider_id, env_var_name, api_key, base_url } => {
             let result = crate::views::providers_modal::persist_provider_config(
-                &provider_id, &api_key, &base_url,
+                &provider_id, &env_var_name, &api_key, &base_url,
             );
             tracing::info!(
                 provider = %provider_id,
+                env_var = %env_var_name,
                 success = result.is_ok(),
                 "SaveProviderConfig effect completed"
             );

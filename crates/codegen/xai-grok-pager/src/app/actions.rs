@@ -2020,6 +2020,7 @@ pub enum Effect {
     /// Persist a provider configuration to disk and trigger runtime rebuild.
     SaveProviderConfig {
         provider_id: String,
+        env_var_name: String,
         api_key: String,
         base_url: String,
     },
