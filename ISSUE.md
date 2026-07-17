@@ -83,6 +83,37 @@
 - [ ] **C11+P2-C03+M40** — ❌ 跳过。`Protocol` 有 4 个泛型参数且 crate 边界阻止 sampler 的 stream 逻辑注入 provider 的 ProtocolTable；当前 match dispatch 是正确的实现
 - [ ] **P2-C02+M43+M44** — ❌ 跳过。与 C11 相同的原因；`match client.protocol_id()` 是固定 3 协议集的最优写法
 
+## 审计: 2026-07-17 — 最终生产路径审计
+
+**范围**: 全 crate — provider 注册 → 认证 → route → dispatch 生产路径贯通性
+**方法**: 并行 subagent 审计，追踪每条生产代码调链
+
+### 关键发现
+
+整个 `AuthFn` trait 及其 8 个实现 (`BearerAuth`, `HeaderAuth`, `NoopAuth`, `FailAuth`, `ChainAuth`, `ThenAuth`, `AuthManagerAsAuthFn`, `ShellAuthCredentialProvider`) 的 `apply()` 方法**从未在任何生产代码路径中被调用**。所有 `Box<dyn AuthFn>` 在 `configure()` 中被构造并存入 `route.auth`，但 `route.auth.apply()` 的唯一生产外观调用点在死函数 `resolve_model_to_sampling_config()` 中（零调用者）。
+
+### 严重
+
+- **C01** `providers/mod.rs:323` — `register_from_config()` 定义但从未被调用。死代码。`configure_providers()` 已取代其功能但未删除此函数。
+- **C02** `agent/config.rs:4713` — `resolve_model_to_sampling_config()` 定义但从未被调用。Batch 8 添加了 `route.auth.apply()` 调用但从未接入任何生产路径。所有生产调用者仍使用旧 `sampling_config_for_model()`。
+- **C03** `registry.rs:65` — `ProviderRegistry::get_route()` 仅在测试中被调用。`configure_providers()` 注册的路由被存储但从未被读取。整个 Route 分发路径在生产中是死胡同。
+
+### 中等
+
+- **M01** `auth.rs:19-129` — `AuthFn` trait + 8 个实现：所有 `apply()` 调用仅出现在 `#[cfg(test)]` 模块或死函数中。整个认证链（`Credential::optional → config → session → bearer`）在 provider 层实现并测试正确，但生产 shell 代码使用独立的 `resolve_credentials()` 完全绕过它。
+- **M02** `credential_provider.rs:54` — `impl AuthFn for ShellAuthCredentialProvider` 定义但从未用作 `Box<dyn AuthFn>`。该 impl 块是死代码（82 行，含 `apply()` 和 `clone_box()`）。
+- **M03** `provider_adapter.rs:26` — `AuthManagerAsAuthFn` 仅用于测试。`AuthManagerAsAuthFn::new()` 从未在生产中被调用。
+- **M04** `registry.rs:89-97` — `ProviderRegistry::model()` 方法存在但从未在生产中被调用。它所创建的 `Model` 对象（携带 `Arc<Route>`）从未被实例化。
+- **M05** 生产 config 路径(`reconstruct_full_config()`, `prepare_sampling_config_for_model()`, `sampling_config_for_model()`)完全从扁平的 `ModelEntry`/`SamplingConfig` 字段构建 `SamplerConfig`，完全绕过 `Route` 和 `route.auth.apply()`。
+
+### 建议
+
+- **S01** `providers/mod.rs:323` — `register_from_config` 可删除（死代码）；`configure_providers` 已覆盖其功能
+- **S02** `agent/config.rs:4713` — `resolve_model_to_sampling_config` 或者接入生产路径，或者删除
+- **S03** `main.rs:948` — `ProviderRegistry` 存入 `AgentConfig` 后仅用于模型目录构建；session 运行时从不访问。考虑 route 系统是否应只用于模型发现，或需要扩展至运行时
+
+---
+
 ### 不在计划中的项目
 
 | 条目 | 原因 |
