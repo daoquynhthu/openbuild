@@ -18,7 +18,12 @@ pub struct AuthInput {
 
 impl AuthInput {
     pub fn new(body: String, method: String, url: String, headers: HeaderMap) -> Self {
-        Self { body, method, url, headers }
+        Self {
+            body,
+            method,
+            url,
+            headers,
+        }
     }
 }
 

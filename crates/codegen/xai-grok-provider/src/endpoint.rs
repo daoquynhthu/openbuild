@@ -56,9 +56,8 @@ impl<Body> Endpoint<Body> {
             EndpointPart::Static(s) => s.clone(),
             EndpointPart::Dynamic(f) => f(input),
         };
-        let mut url = Url::parse(&format!("{base}{path}")).unwrap_or_else(|_| {
-            Url::parse("http://localhost/").unwrap_or_else(|_| unreachable!())
-        });
+        let mut url = Url::parse(&format!("{base}{path}"))
+            .unwrap_or_else(|_| Url::parse("http://localhost/").unwrap_or_else(|_| unreachable!()));
         if let Some(query) = &self.query {
             for (k, v) in query {
                 url.query_pairs_mut().append_pair(k, v);

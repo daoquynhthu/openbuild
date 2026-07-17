@@ -24,7 +24,10 @@ impl AuthManagerAsAuthFn {
 }
 
 impl AuthFn for AuthManagerAsAuthFn {
-    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, xai_grok_provider::error::ProviderError> {
+    fn apply(
+        &self,
+        input: &AuthInput,
+    ) -> Result<HeaderMap, xai_grok_provider::error::ProviderError> {
         match self.auth_manager.current_or_expired() {
             Some(auth) => {
                 let mut headers = input.headers.clone();

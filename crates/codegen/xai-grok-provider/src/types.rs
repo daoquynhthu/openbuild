@@ -3,6 +3,25 @@ use std::num::NonZeroU64;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+use crate::error::ProviderError;
+
+/// Validate that a string is a non-empty, trimmed, non-whitespace-only ID.
+/// Rejects empty, whitespace-only, and strings containing '/' (reserved separator).
+pub fn validate_id(id: &str, label: &str) -> Result<String, ProviderError> {
+    let trimmed = id.trim();
+    if trimmed.is_empty() {
+        return Err(ProviderError::InvalidProviderId(format!(
+            "{label} must not be empty or whitespace-only"
+        )));
+    }
+    if trimmed.contains('/') {
+        return Err(ProviderError::InvalidProviderId(format!(
+            "{label} must not contain '/'"
+        )));
+    }
+    Ok(trimmed.to_string())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ProviderId(pub String);
@@ -18,6 +37,12 @@ impl ProviderId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }
+
+    pub fn try_new(id: impl Into<String>) -> Result<Self, ProviderError> {
+        let s = id.into();
+        validate_id(&s, "provider ID")?;
+        Ok(Self(s))
+    }
 }
 
 /// Stable model identifier in the ACP protocol.
@@ -28,6 +53,29 @@ pub struct ModelId(pub String);
 impl ModelId {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
+    }
+
+    pub fn try_new(id: impl Into<String>) -> Result<Self, ProviderError> {
+        let s = id.into();
+        validate_id(&s, "model ID")?;
+        Ok(Self(s))
+    }
+}
+
+/// Route identifier within a provider.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct RouteId(pub String);
+
+impl RouteId {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    pub fn try_new(id: impl Into<String>) -> Result<Self, ProviderError> {
+        let s = id.into();
+        validate_id(&s, "route ID")?;
+        Ok(Self(s))
     }
 }
 
@@ -205,5 +253,96 @@ mod tests {
         let (provider, model) = parse_model_ref("anthropic/claude-sonnet-4-5");
         assert_eq!(provider.unwrap().0, "anthropic");
         assert_eq!(model, "claude-sonnet-4-5");
+    }
+
+    #[test]
+    fn provider_id_try_new_accepts_valid() {
+        let id = ProviderId::try_new("my-provider").unwrap();
+        assert_eq!(id.0, "my-provider");
+    }
+
+    #[test]
+    fn provider_id_try_new_rejects_empty() {
+        assert!(ProviderId::try_new("").is_err());
+    }
+
+    #[test]
+    fn provider_id_try_new_rejects_whitespace() {
+        assert!(ProviderId::try_new("   ").is_err());
+    }
+
+    #[test]
+    fn provider_id_try_new_rejects_slash() {
+        assert!(ProviderId::try_new("my/provider").is_err());
+    }
+
+    #[test]
+    fn model_id_try_new_accepts_valid() {
+        let id = ModelId::try_new("gpt-4o").unwrap();
+        assert_eq!(id.0, "gpt-4o");
+    }
+
+    #[test]
+    fn model_id_try_new_rejects_empty() {
+        assert!(ModelId::try_new("").is_err());
+    }
+
+    #[test]
+    fn model_id_try_new_rejects_whitespace() {
+        assert!(ModelId::try_new("  ").is_err());
+    }
+
+    #[test]
+    fn route_id_try_new_accepts_valid() {
+        let id = RouteId::try_new("chat-route").unwrap();
+        assert_eq!(id.0, "chat-route");
+    }
+
+    #[test]
+    fn route_id_try_new_rejects_empty() {
+        assert!(RouteId::try_new("").is_err());
+    }
+
+    #[test]
+    fn route_id_try_new_rejects_whitespace() {
+        assert!(RouteId::try_new("   ").is_err());
+    }
+
+    #[test]
+    fn route_id_try_new_rejects_slash() {
+        assert!(RouteId::try_new("a/b").is_err());
+    }
+
+    #[test]
+    fn route_id_serde_roundtrip() {
+        let id = RouteId::new("test-route");
+        let json = serde_json::to_string(&id).unwrap();
+        let back: RouteId = serde_json::from_str(&json).unwrap();
+        assert_eq!(id, back);
+    }
+
+    #[test]
+    fn validate_id_rejects_empty() {
+        assert!(validate_id("", "test").is_err());
+    }
+
+    #[test]
+    fn validate_id_rejects_whitespace() {
+        assert!(validate_id(" \t ", "test").is_err());
+    }
+
+    #[test]
+    fn validate_id_rejects_slash() {
+        assert!(validate_id("a/b", "test").is_err());
+    }
+
+    #[test]
+    fn validate_id_accepts_normal() {
+        assert_eq!(validate_id("hello-world", "test").unwrap(), "hello-world");
+    }
+
+    #[test]
+    fn validate_id_trims() {
+        assert_eq!(validate_id("  foo  ", "test").unwrap(), "foo");
     }
 }

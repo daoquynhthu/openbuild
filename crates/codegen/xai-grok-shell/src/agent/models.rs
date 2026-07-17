@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 use std::num::NonZeroU64;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use parking_lot::RwLock;
@@ -960,7 +960,9 @@ impl ModelsManager {
             .read()
             .provider_registry
             .as_ref()
-            .and_then(|reg| crate::agent::config::resolve_model_route(current_model, Some(reg.as_ref())));
+            .and_then(|reg| {
+                crate::agent::config::resolve_model_route(current_model, Some(reg.as_ref()))
+            });
 
         sampling_config_for_model(
             current_model,
@@ -1439,9 +1441,7 @@ fn resolve_provider_auth(
         xai_grok_provider::types::AuthScheme::Bearer => {
             Some(("Authorization".into(), format!("Bearer {}", key_value.1)))
         }
-        xai_grok_provider::types::AuthScheme::XApiKey => {
-            Some(("x-api-key".into(), key_value.1))
-        }
+        xai_grok_provider::types::AuthScheme::XApiKey => Some(("x-api-key".into(), key_value.1)),
         xai_grok_provider::types::AuthScheme::None => None,
         _ => None,
     }

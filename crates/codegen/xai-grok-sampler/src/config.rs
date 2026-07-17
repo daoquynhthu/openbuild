@@ -8,10 +8,10 @@
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+pub use xai_grok_sampling_types::AuthScheme;
 use xai_grok_sampling_types::{
     ApiBackend, CompactionAtTokens, CompactionsRemaining, DoomLoopRecoveryPolicy, ReasoningEffort,
 };
-pub use xai_grok_sampling_types::AuthScheme;
 
 use crate::attribution::SharedAttributionCallback;
 use crate::retry::{DEFAULT_MAX_RETRIES, RATE_LIMIT_RETRY_THRESHOLD};

@@ -7,9 +7,7 @@ use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
-use crate::types::{
-    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId,
-};
+use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 /// Known OpenAI-compatible profile configurations.
 pub(crate) fn profile_base_url(profile: &str) -> Option<&'static str> {
@@ -118,5 +116,4 @@ impl Provider for OpenAiCompatibleProvider {
             configure: Box::new(move |c| OpenAiCompatibleProvider::new().configure(c)),
         }
     }
-
 }

@@ -157,7 +157,11 @@ mod tests {
             },
             auth: Some(Credential::optional(Some("sk-test".into()), "api_key").bearer()),
             framing: Box::new(SseFraming),
-            defaults: Some(RouteDefaults { headers: None, generation: None, limits: None }),
+            defaults: Some(RouteDefaults {
+                headers: None,
+                generation: None,
+                limits: None,
+            }),
         })
     }
 

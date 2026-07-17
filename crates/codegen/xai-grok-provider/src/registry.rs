@@ -93,7 +93,6 @@ impl ProviderRegistry {
             .cloned()
             .collect()
     }
-
 }
 
 #[cfg(test)]
@@ -146,7 +145,11 @@ mod tests {
                 },
                 auth: None,
                 framing: Box::new(SseFraming),
-                defaults: Some(RouteDefaults { headers: None, generation: None, limits: None }),
+                defaults: Some(RouteDefaults {
+                    headers: None,
+                    generation: None,
+                    limits: None,
+                }),
             });
             let id = ProviderId::new("dummy");
             ConfiguredProvider {
@@ -163,7 +166,6 @@ mod tests {
                 configure: Box::new(move |c| DummyProvider::new().configure(c)),
             }
         }
-
     }
 
     fn dummy_provider() -> SharedProvider {

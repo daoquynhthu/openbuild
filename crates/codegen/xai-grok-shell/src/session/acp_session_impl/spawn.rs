@@ -1034,8 +1034,7 @@ pub(crate) async fn spawn_session_actor(
     let (event_tx, event_rx) = mpsc::unbounded_channel::<SessionEvent>();
     let mut sampler_config_initial = sampling_config.clone();
     sampler_config_initial.idle_timeout_secs = Some(inference_idle_timeout_secs);
-    let sampler_retry_policy =
-        xai_grok_sampler::RetryPolicy::new(max_retries.unwrap_or(5), 2);
+    let sampler_retry_policy = xai_grok_sampler::RetryPolicy::new(max_retries.unwrap_or(5), 2);
     let (sampler_event_tx, sampler_event_rx) =
         tokio::sync::mpsc::unbounded_channel::<xai_grok_sampler::SamplingEvent>();
     let sampler_handle = xai_grok_sampler::SamplerActor::spawn(

@@ -8,9 +8,7 @@ use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
-use crate::types::{
-    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId,
-};
+use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 pub fn openai_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -103,18 +101,20 @@ impl Provider for OpenAIProvider {
             id: pid,
             route: (*route_chat).clone(),
             model: Box::new(move |id, _| {
-                let r = if id.starts_with("o1")
-                    || id.starts_with("o3")
-                    || id.starts_with("gpt-4.1")
+                let r = if id.starts_with("o1") || id.starts_with("o3") || id.starts_with("gpt-4.1")
                 {
                     route_responses.clone()
                 } else {
                     route_chat.clone()
                 };
-                Model::make(ModelId::new(id), ProviderId::new(ProviderId::OPENAI), r, None)
+                Model::make(
+                    ModelId::new(id),
+                    ProviderId::new(ProviderId::OPENAI),
+                    r,
+                    None,
+                )
             }),
             configure: Box::new(move |c| OpenAIProvider::new().configure(c)),
         }
     }
-
 }

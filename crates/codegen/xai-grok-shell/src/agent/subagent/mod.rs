@@ -1025,11 +1025,11 @@ fn resolve_model_override_to_config(
         credentials,
         ctx.alpha_test_key.clone(),
         ctx.sampling_config.client_version.clone(),
-            ctx.sampling_config.deployment_id.clone(),
-            ctx.sampling_config.user_id.clone(),
-            None,
-        );
-        xai_grok_telemetry::unified_log::debug(
+        ctx.sampling_config.deployment_id.clone(),
+        ctx.sampling_config.user_id.clone(),
+        None,
+    );
+    xai_grok_telemetry::unified_log::debug(
         "subagent resolve_model_override_to_config",
         None,
         Some(serde_json::json!(

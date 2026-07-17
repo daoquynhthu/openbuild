@@ -87,7 +87,11 @@ fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
             } else {
                 "Not configured"
             },
-            status_color: if is_configured("xai", configured) { Color::Green } else { Color::Red },
+            status_color: if is_configured("xai", configured) {
+                Color::Green
+            } else {
+                Color::Red
+            },
             endpoint: "api.x.ai".into(),
             configured: is_configured("xai", configured),
             models: None,
@@ -100,7 +104,11 @@ fn builtin_providers(configured: &[&str]) -> Vec<ProviderEntry> {
             } else {
                 "Not configured"
             },
-            status_color: if is_configured("openai", configured) { Color::Green } else { Color::Red },
+            status_color: if is_configured("openai", configured) {
+                Color::Green
+            } else {
+                Color::Red
+            },
             endpoint: "api.openai.com".into(),
             configured: is_configured("openai", configured),
             models: None,
@@ -402,7 +410,10 @@ fn render_list(
 
     let header_style = Style::default().fg(theme.gray).add_modifier(Modifier::BOLD);
     let header = Line::styled(
-        format!("{:<14} {:>5} {:>10}  {}", "Provider", "Models", "Status", "Endpoint"),
+        format!(
+            "{:<14} {:>5} {:>10}  {}",
+            "Provider", "Models", "Status", "Endpoint"
+        ),
         header_style,
     );
     header.render(
@@ -440,7 +451,10 @@ fn render_list(
         let status_style = Style::default().fg(provider.status_color).bg(bg);
         let row_style = Style::default().fg(fg).bg(bg);
 
-        let models_label = provider.models.map(|n| n.to_string()).unwrap_or_else(|| "—".into());
+        let models_label = provider
+            .models
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "—".into());
         let line = Line::from(vec![
             ratatui::text::Span::styled(format!(" {:<14}", provider.name), row_style),
             ratatui::text::Span::styled(format!(" {:>5} ", models_label), row_style),

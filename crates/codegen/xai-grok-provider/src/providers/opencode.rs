@@ -7,9 +7,7 @@ use crate::framing::SseFraming;
 use crate::model::Model;
 use crate::provider::{ConfiguredProvider, Provider};
 use crate::route::{Route, RouteInput};
-use crate::types::{
-    ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId,
-};
+use crate::types::{ApiBackend, AuthScheme, ModelId, ProviderDefaults, ProviderId};
 
 fn opencode_defaults() -> ProviderDefaults {
     ProviderDefaults {
@@ -96,5 +94,4 @@ impl Provider for OpenCodeProvider {
             configure: Box::new(move |c| OpenCodeProvider::new().configure(c)),
         }
     }
-
 }

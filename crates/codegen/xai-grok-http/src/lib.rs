@@ -217,12 +217,10 @@ pub fn merge_origin_client_info(
     fallback: Option<OriginClientInfo>,
 ) -> Option<OriginClientInfo> {
     match (primary, fallback) {
-        (Some(primary), Some(fallback)) => {
-            Some(OriginClientInfo::new(
-                primary.product,
-                primary.version.or(fallback.version),
-            ))
-        }
+        (Some(primary), Some(fallback)) => Some(OriginClientInfo::new(
+            primary.product,
+            primary.version.or(fallback.version),
+        )),
         (Some(primary), None) => Some(primary),
         (None, Some(fallback)) => Some(fallback),
         (None, None) => None,
@@ -595,19 +593,15 @@ mod tests {
 
     #[test]
     fn session_user_agent_string_renders_expected_variants() {
-        let with_version =
-            session_user_agent_string(&OriginClientInfo::new(
-                "grok-desktop".to_string(),
-                Some("1.2.3".to_string()),
-            ));
+        let with_version = session_user_agent_string(&OriginClientInfo::new(
+            "grok-desktop".to_string(),
+            Some("1.2.3".to_string()),
+        ));
         assert!(with_version.starts_with("grok-desktop/1.2.3 grok-shell/"));
         assert!(with_version.contains(" ("));
 
         let without_version =
-            session_user_agent_string(&OriginClientInfo::new(
-                "grok-web".to_string(),
-                None,
-            ));
+            session_user_agent_string(&OriginClientInfo::new("grok-web".to_string(), None));
         assert!(without_version.starts_with("grok-web grok-shell/"));
         assert!(!without_version.starts_with("grok-web/"));
     }
@@ -615,10 +609,7 @@ mod tests {
     #[test]
     fn user_agent_render_collapses_duplicate_origin_and_agent_identity() {
         let ua = UserAgent {
-            origin: OriginClientInfo::new(
-                "grok-shell".to_string(),
-                Some("0.1.171".to_string()),
-            ),
+            origin: OriginClientInfo::new("grok-shell".to_string(), Some("0.1.171".to_string())),
             agent_product: "grok-shell",
             agent_version: "0.1.171".to_string(),
             platform: PlatformInfo {

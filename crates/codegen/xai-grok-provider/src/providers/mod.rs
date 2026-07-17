@@ -47,209 +47,209 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
     result
 }
 
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use crate::config::ProviderConfig;
-        use crate::registry::ProviderRegistry;
-        use crate::types::ProviderId;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ProviderConfig;
+    use crate::registry::ProviderRegistry;
+    use crate::types::ProviderId;
 
-        fn dummy_registry() -> ProviderRegistry {
-            let reg = ProviderRegistry::new();
-            let pid = ProviderId::new("test-provider");
-            let defaults = crate::types::ProviderDefaults {
-                id: pid.clone(),
-                name: "Test".into(),
-                base_url: "https://test.com/v1".into(),
-                api_backend: crate::types::ApiBackend::ChatCompletions,
-                auth_scheme: crate::types::AuthScheme::Bearer,
-                env_key: vec!["TEST_API_KEY".into()],
-                context_window: std::num::NonZeroU64::new(128_000).unwrap_or_else(|| unreachable!()),
-                ..Default::default()
-            };
-            let provider = std::sync::Arc::new(TestProvider { pid, defaults })
-                as crate::provider::SharedProvider;
-            reg.register(provider);
-            reg
+    fn dummy_registry() -> ProviderRegistry {
+        let reg = ProviderRegistry::new();
+        let pid = ProviderId::new("test-provider");
+        let defaults = crate::types::ProviderDefaults {
+            id: pid.clone(),
+            name: "Test".into(),
+            base_url: "https://test.com/v1".into(),
+            api_backend: crate::types::ApiBackend::ChatCompletions,
+            auth_scheme: crate::types::AuthScheme::Bearer,
+            env_key: vec!["TEST_API_KEY".into()],
+            context_window: std::num::NonZeroU64::new(128_000).unwrap_or_else(|| unreachable!()),
+            ..Default::default()
+        };
+        let provider =
+            std::sync::Arc::new(TestProvider { pid, defaults }) as crate::provider::SharedProvider;
+        reg.register(provider);
+        reg
+    }
+
+    #[derive(Debug)]
+    struct TestProvider {
+        pid: ProviderId,
+        defaults: crate::types::ProviderDefaults,
+    }
+
+    impl crate::provider::Provider for TestProvider {
+        fn id(&self) -> &ProviderId {
+            &self.pid
         }
-
-        #[derive(Debug)]
-        struct TestProvider {
-            pid: ProviderId,
-            defaults: crate::types::ProviderDefaults,
+        fn name(&self) -> &str {
+            "Test"
         }
-
-        impl crate::provider::Provider for TestProvider {
-            fn id(&self) -> &ProviderId {
-                &self.pid
+        fn defaults(&self) -> &crate::types::ProviderDefaults {
+            &self.defaults
+        }
+        fn configure(&self, overrides: ProviderConfig) -> crate::provider::ConfiguredProvider {
+            let route = crate::route::Route::make(crate::route::RouteInput {
+                id: "test-route".into(),
+                provider: Some(self.pid.clone()),
+                protocol: "chat_completions".into(),
+                endpoint: crate::endpoint::Endpoint {
+                    base_url: overrides
+                        .base_url
+                        .clone()
+                        .or(Some(self.defaults.base_url.clone())),
+                    path: crate::endpoint::EndpointPart::Static("/chat/completions".into()),
+                    query: None,
+                },
+                auth: None,
+                framing: Box::new(crate::framing::SseFraming),
+                defaults: None,
+            });
+            crate::provider::ConfiguredProvider {
+                id: self.pid.clone(),
+                route,
+                model: Box::new(|id, rt| {
+                    crate::model::Model::make(
+                        crate::types::ModelId::new(id),
+                        crate::types::ProviderId::new("test-provider"),
+                        std::sync::Arc::new(rt.clone()),
+                        None,
+                    )
+                }),
+                configure: Box::new(|c| {
+                    TestProvider {
+                        pid: crate::types::ProviderId::new("test-provider"),
+                        defaults: crate::types::ProviderDefaults::default(),
+                    }
+                    .configure(c)
+                }),
             }
-            fn name(&self) -> &str {
-                "Test"
-            }
-            fn defaults(&self) -> &crate::types::ProviderDefaults {
-                &self.defaults
-            }
-            fn configure(&self, overrides: ProviderConfig) -> crate::provider::ConfiguredProvider {
-                let route = crate::route::Route::make(crate::route::RouteInput {
-                    id: "test-route".into(),
-                    provider: Some(self.pid.clone()),
-                    protocol: "chat_completions".into(),
-                    endpoint: crate::endpoint::Endpoint {
-                        base_url: overrides
-                            .base_url
-                            .clone()
-                            .or(Some(self.defaults.base_url.clone())),
-                        path: crate::endpoint::EndpointPart::Static("/chat/completions".into()),
-                        query: None,
-                    },
-                    auth: None,
-                    framing: Box::new(crate::framing::SseFraming),
-                    defaults: None,
-                });
-                crate::provider::ConfiguredProvider {
-                    id: self.pid.clone(),
-                    route,
-                    model: Box::new(|id, rt| {
-                        crate::model::Model::make(
-                            crate::types::ModelId::new(id),
-                            crate::types::ProviderId::new("test-provider"),
-                            std::sync::Arc::new(rt.clone()),
-                            None,
-                        )
-                    }),
-                    configure: Box::new(|c| {
-                        TestProvider {
-                            pid: crate::types::ProviderId::new("test-provider"),
-                            defaults: crate::types::ProviderDefaults::default(),
-                        }
-                        .configure(c)
-                    }),
-                }
-            }
-        }
-
-        #[test]
-        fn build_provider_config_empty() {
-            let toml_configs = vec![];
-            let env_configs = IndexMap::new();
-            let merged = build_provider_config("test-provider", &toml_configs, &env_configs, None);
-            assert!(merged.api_key.is_none());
-            assert!(merged.base_url.is_none());
-        }
-
-        #[test]
-        fn build_provider_config_env_key() {
-            let toml_configs = vec![];
-            let mut env_configs = IndexMap::new();
-            env_configs.insert(
-                "test-provider".into(),
-                ProviderConfig {
-                    id: Some("test-provider".into()),
-                    api_key: Some("env-key".into()),
-                    ..Default::default()
-                },
-            );
-            let merged = build_provider_config("test-provider", &toml_configs, &env_configs, None);
-            assert_eq!(merged.api_key.as_deref(), Some("env-key"));
-        }
-
-        #[test]
-        fn build_provider_config_toml_overrides_env() {
-            let toml_configs = vec![(
-                "test-provider".into(),
-                ProviderConfig {
-                    id: Some("test-provider".into()),
-                    api_key: Some("toml-key".into()),
-                    ..Default::default()
-                },
-            )];
-            let mut env_configs = IndexMap::new();
-            env_configs.insert(
-                "test-provider".into(),
-                ProviderConfig {
-                    id: Some("test-provider".into()),
-                    api_key: Some("env-key".into()),
-                    ..Default::default()
-                },
-            );
-            let merged = build_provider_config("test-provider", &toml_configs, &env_configs, None);
-            assert_eq!(merged.api_key.as_deref(), Some("toml-key"));
-        }
-
-        #[test]
-        fn build_provider_config_cli_overrides_all() {
-            let toml_configs = vec![(
-                "test-provider".into(),
-                ProviderConfig {
-                    id: Some("test-provider".into()),
-                    api_key: Some("toml-key".into()),
-                    ..Default::default()
-                },
-            )];
-            let mut env_configs = IndexMap::new();
-            env_configs.insert(
-                "test-provider".into(),
-                ProviderConfig {
-                    id: Some("test-provider".into()),
-                    api_key: Some("env-key".into()),
-                    ..Default::default()
-                },
-            );
-            let cli = ProviderConfig {
-                id: Some("test-provider".into()),
-                api_key: Some("cli-key".into()),
-                ..Default::default()
-            };
-            let merged =
-                build_provider_config("test-provider", &toml_configs, &env_configs, Some(&cli));
-            assert_eq!(merged.api_key.as_deref(), Some("cli-key"));
-        }
-
-        #[test]
-        fn configure_providers_stores_config() {
-            let reg = dummy_registry();
-            let toml: toml::Value = toml::from_str(
-                r#"
-            [provider.test-provider]
-            api_key = "cfg-key"
-            "#,
-            )
-            .unwrap();
-            configure_providers(&reg, &toml, None, None);
-            let pid = ProviderId::new("test-provider");
-            let stored = reg.get_config(&pid);
-            assert!(stored.is_some());
-            assert_eq!(stored.unwrap().api_key.as_deref(), Some("cfg-key"));
-        }
-
-        #[test]
-        fn configure_providers_with_env_override() {
-            let reg = dummy_registry();
-            let toml: toml::Value = toml::from_str(
-                r#"
-            [provider.test-provider]
-            api_key = "cfg-key"
-            "#,
-            )
-            .unwrap();
-            let cli = ProviderConfig {
-                id: Some("test-provider".into()),
-                api_key: Some("cli-key".into()),
-                ..Default::default()
-            };
-            configure_providers(&reg, &toml, None, Some(cli));
-            let pid = ProviderId::new("test-provider");
-            let stored = reg.get_config(&pid);
-            assert_eq!(stored.unwrap().api_key.as_deref(), Some("cli-key"));
-        }
-
-        #[test]
-        fn detect_env_vars_empty_when_not_set() {
-            let reg = dummy_registry();
-            let env = detect_env_vars(&reg);
-            assert!(env.is_empty() || env.get("test-provider").is_none());
         }
     }
+
+    #[test]
+    fn build_provider_config_empty() {
+        let toml_configs = vec![];
+        let env_configs = IndexMap::new();
+        let merged = build_provider_config("test-provider", &toml_configs, &env_configs, None);
+        assert!(merged.api_key.is_none());
+        assert!(merged.base_url.is_none());
+    }
+
+    #[test]
+    fn build_provider_config_env_key() {
+        let toml_configs = vec![];
+        let mut env_configs = IndexMap::new();
+        env_configs.insert(
+            "test-provider".into(),
+            ProviderConfig {
+                id: Some("test-provider".into()),
+                api_key: Some("env-key".into()),
+                ..Default::default()
+            },
+        );
+        let merged = build_provider_config("test-provider", &toml_configs, &env_configs, None);
+        assert_eq!(merged.api_key.as_deref(), Some("env-key"));
+    }
+
+    #[test]
+    fn build_provider_config_toml_overrides_env() {
+        let toml_configs = vec![(
+            "test-provider".into(),
+            ProviderConfig {
+                id: Some("test-provider".into()),
+                api_key: Some("toml-key".into()),
+                ..Default::default()
+            },
+        )];
+        let mut env_configs = IndexMap::new();
+        env_configs.insert(
+            "test-provider".into(),
+            ProviderConfig {
+                id: Some("test-provider".into()),
+                api_key: Some("env-key".into()),
+                ..Default::default()
+            },
+        );
+        let merged = build_provider_config("test-provider", &toml_configs, &env_configs, None);
+        assert_eq!(merged.api_key.as_deref(), Some("toml-key"));
+    }
+
+    #[test]
+    fn build_provider_config_cli_overrides_all() {
+        let toml_configs = vec![(
+            "test-provider".into(),
+            ProviderConfig {
+                id: Some("test-provider".into()),
+                api_key: Some("toml-key".into()),
+                ..Default::default()
+            },
+        )];
+        let mut env_configs = IndexMap::new();
+        env_configs.insert(
+            "test-provider".into(),
+            ProviderConfig {
+                id: Some("test-provider".into()),
+                api_key: Some("env-key".into()),
+                ..Default::default()
+            },
+        );
+        let cli = ProviderConfig {
+            id: Some("test-provider".into()),
+            api_key: Some("cli-key".into()),
+            ..Default::default()
+        };
+        let merged =
+            build_provider_config("test-provider", &toml_configs, &env_configs, Some(&cli));
+        assert_eq!(merged.api_key.as_deref(), Some("cli-key"));
+    }
+
+    #[test]
+    fn configure_providers_stores_config() {
+        let reg = dummy_registry();
+        let toml: toml::Value = toml::from_str(
+            r#"
+            [provider.test-provider]
+            api_key = "cfg-key"
+            "#,
+        )
+        .unwrap();
+        configure_providers(&reg, &toml, None, None);
+        let pid = ProviderId::new("test-provider");
+        let stored = reg.get_config(&pid);
+        assert!(stored.is_some());
+        assert_eq!(stored.unwrap().api_key.as_deref(), Some("cfg-key"));
+    }
+
+    #[test]
+    fn configure_providers_with_env_override() {
+        let reg = dummy_registry();
+        let toml: toml::Value = toml::from_str(
+            r#"
+            [provider.test-provider]
+            api_key = "cfg-key"
+            "#,
+        )
+        .unwrap();
+        let cli = ProviderConfig {
+            id: Some("test-provider".into()),
+            api_key: Some("cli-key".into()),
+            ..Default::default()
+        };
+        configure_providers(&reg, &toml, None, Some(cli));
+        let pid = ProviderId::new("test-provider");
+        let stored = reg.get_config(&pid);
+        assert_eq!(stored.unwrap().api_key.as_deref(), Some("cli-key"));
+    }
+
+    #[test]
+    fn detect_env_vars_empty_when_not_set() {
+        let reg = dummy_registry();
+        let env = detect_env_vars(&reg);
+        assert!(env.is_empty() || env.get("test-provider").is_none());
+    }
+}
 
 /// Build the final `ProviderConfig` for a single provider by merging
 /// env vars → TOML config → CLI overrides (later overrides earlier).

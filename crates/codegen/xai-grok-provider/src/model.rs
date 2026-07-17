@@ -90,7 +90,11 @@ mod tests {
             },
             auth: None,
             framing: Box::new(SseFraming),
-            defaults: Some(RouteDefaults { headers: None, generation: None, limits: None }),
+            defaults: Some(RouteDefaults {
+                headers: None,
+                generation: None,
+                limits: None,
+            }),
         })
     }
 

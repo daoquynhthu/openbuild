@@ -14,7 +14,5 @@ pub use xai_grok_sampler::OriginClientInfo;
 pub fn origin_client_info_from_env() -> Option<OriginClientInfo> {
     std::env::var("GROK_CLIENT_NAME")
         .ok()
-        .map(|product| {
-            OriginClientInfo::new(product, std::env::var("GROK_CLIENT_VERSION").ok())
-        })
+        .map(|product| OriginClientInfo::new(product, std::env::var("GROK_CLIENT_VERSION").ok()))
 }
