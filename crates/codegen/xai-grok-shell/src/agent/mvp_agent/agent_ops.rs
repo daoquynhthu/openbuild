@@ -1147,6 +1147,10 @@ impl MvpAgent {
         let deployment_id = crate::managed_config::resolve_deployment_id(
             cfg.endpoints.deployment_key.as_deref(),
         );
+        let route = cfg
+            .provider_registry
+            .as_ref()
+            .and_then(|reg| crate::agent::config::resolve_model_route(model, Some(reg.as_ref())));
         drop(cfg);
         let user_id = self
             .auth_manager
@@ -1160,6 +1164,7 @@ impl MvpAgent {
             client_version,
             deployment_id,
             user_id,
+            route.as_ref(),
         );
         config.origin_client = origin_client;
         config

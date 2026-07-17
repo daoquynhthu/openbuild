@@ -83,6 +83,17 @@
 - [ ] **C11+P2-C03+M40** — ❌ 跳过。`Protocol` 有 4 个泛型参数且 crate 边界阻止 sampler 的 stream 逻辑注入 provider 的 ProtocolTable；当前 match dispatch 是正确的实现
 - [ ] **P2-C02+M43+M44** — ❌ 跳过。与 C11 相同的原因；`match client.protocol_id()` 是固定 3 协议集的最优写法
 
+### 生产路径贯通修复 — 2026-07-17 `[x]`
+
+- [x] **C01** `providers/mod.rs:321-346` — 删 `register_from_config()`（死代码，被 `configure_providers()` 取代）
+- [x] **C02** `config.rs:4734` — 删 `resolve_model_to_sampling_config()`（死代码）
+- [x] **C03** `registry.rs:65` — `get_route()` 首次获得生产调用者（通过 `resolve_model_route()` helper）
+- [x] **M01** `sampling_config_for_model()` — 新增 `route: Option<&Route>` 参数；有 route 时调用 `route.auth.apply()` 并将结果 headers 合并到 `extra_headers`，同时设 `api_key = None`
+- [x] **M02** `agent_ops.rs:1156` — `prepare_sampling_config_for_model()` 通过 `cfg.provider_registry.get_route()` 查 route 传入
+- [x] **M03** `models.rs:957` — `resolve_current_model_to_sampling_config()` 同上
+- [x] **M04** `config.rs:4798` — 新增 `resolve_model_route()` helper（根据 `model.provider_id` + `api_backend` 构造 route ID 查 registry）
+- [x] **M05** `ModelEntry` — 新增 `provider_id: Option<String>` 字段（用于 route 查找）
+
 ## 审计: 2026-07-17 — 最终生产路径审计
 
 **范围**: 全 crate — provider 注册 → 认证 → route → dispatch 生产路径贯通性
@@ -94,9 +105,9 @@
 
 ### 严重
 
-- **C01** `providers/mod.rs:323` — `register_from_config()` 定义但从未被调用。死代码。`configure_providers()` 已取代其功能但未删除此函数。
-- **C02** `agent/config.rs:4713` — `resolve_model_to_sampling_config()` 定义但从未被调用。Batch 8 添加了 `route.auth.apply()` 调用但从未接入任何生产路径。所有生产调用者仍使用旧 `sampling_config_for_model()`。
-- **C03** `registry.rs:65` — `ProviderRegistry::get_route()` 仅在测试中被调用。`configure_providers()` 注册的路由被存储但从未被读取。整个 Route 分发路径在生产中是死胡同。
+- **C01** `providers/mod.rs:323` — `register_from_config()` 已删除（死代码）。
+- **C02** `agent/config.rs:4713` — `resolve_model_to_sampling_config()` 已删除（死代码）。
+- **C03** `registry.rs:65` — `ProviderRegistry::get_route()` 已通过 `resolve_model_route()` 接入生产路径（`agent_ops.rs`、`models.rs`）。`-Closed`
 
 ### 中等
 

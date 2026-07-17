@@ -3900,6 +3900,8 @@ pub struct ModelEntry {
     pub env_key: Option<EnvKeys>,
     /// When set, `base_url` is used for session auth, `api_base_url` for API-key auth.
     pub api_base_url: Option<String>,
+    /// Provider ID for route lookup. Set during model catalog construction.
+    pub provider_id: Option<String>,
 }
 impl ModelEntry {
     /// Minimal fallback entry for an unknown model slug.
@@ -3911,6 +3913,7 @@ impl ModelEntry {
             api_key: None,
             env_key: None,
             api_base_url: None,
+            provider_id: None,
         }
     }
     pub fn info(&self) -> &ModelInfo {
@@ -3922,6 +3925,7 @@ impl ModelEntry {
             api_key: entry.api_key.clone(),
             env_key: entry.env_key.clone(),
             api_base_url: entry.api_base_url.clone(),
+            provider_id: None,
         }
     }
     /// The model's own (BYOK) credential: a non-empty `api_key`, else the first
@@ -4501,6 +4505,7 @@ pub fn resolve_aux_model_sampling_config(
             client_version.clone(),
             None,
             None,
+            None,
         );
         if sampler.api_key.is_some() {
             return Some(sampler);
@@ -4549,6 +4554,7 @@ pub fn resolve_aux_model_sampling_config(
             api_key: Some(bearer),
             env_key: None,
             api_base_url: None,
+            provider_id: None,
         };
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
         let sampler = sampling_config_for_model(
@@ -4556,6 +4562,7 @@ pub fn resolve_aux_model_sampling_config(
             credentials,
             alpha_test_key,
             client_version,
+            None,
             None,
             None,
         );
@@ -4632,6 +4639,7 @@ pub fn sampling_config_for_model(
     client_version: Option<String>,
     deployment_id: Option<String>,
     user_id: Option<String>,
+    route: Option<&xai_grok_provider::route::Route>,
 ) -> SamplerConfig {
     let info = model.info();
     let model_name = info.model.clone();
@@ -4645,8 +4653,26 @@ pub fn sampling_config_for_model(
         &credentials.base_url,
     );
     let api_backend = info.api_backend.clone();
+
+    let (api_key, auth_scheme) = if let Some(route) = route {
+        let input = xai_grok_provider::auth::AuthInput::new(
+            String::new(),
+            "POST".into(),
+            credentials.base_url.clone(),
+            xai_grok_provider::auth::HeaderMap::new(),
+        );
+        if let Ok(auth_headers) = route.auth.apply(&input) {
+            for (key, value) in auth_headers {
+                extra_headers.entry(key).or_insert(value);
+            }
+        }
+        (None, credentials.auth_scheme)
+    } else {
+        (credentials.api_key, credentials.auth_scheme)
+    };
+
     SamplerConfig {
-        api_key: credentials.api_key,
+        api_key,
         model: model_name,
         base_url: credentials.base_url,
         max_completion_tokens,
@@ -4656,7 +4682,7 @@ pub fn sampling_config_for_model(
             xai_grok_sampler::protocols::api_backend_to_protocol_id(&api_backend).into(),
         ),
         api_backend,
-        auth_scheme: credentials.auth_scheme,
+        auth_scheme,
         extra_headers,
         context_window: info.context_window.get(),
         client_version,
@@ -4710,42 +4736,6 @@ pub fn inject_url_derived_headers(
     }
     let _ = (alpha_test_key, base_url);
 }
-pub fn resolve_model_to_sampling_config(
-    model_id: &str,
-    models: &IndexMap<String, ModelEntry>,
-    session_key: Option<&str>,
-    alpha_test_key: Option<String>,
-    client_version: Option<String>,
-    fallback_entry: Option<ModelEntry>,
-    route: Option<&xai_grok_provider::route::Route>,
-) -> Option<SamplerConfig> {
-    let entry = find_model_by_id(models, model_id)
-        .cloned()
-        .or(fallback_entry)?;
-    let credentials = resolve_credentials(&entry, session_key);
-    let mut config = sampling_config_for_model(
-        &entry,
-        credentials,
-        alpha_test_key,
-        client_version,
-        None,
-        None,
-    );
-    if let Some(route) = route {
-        let input = xai_grok_provider::auth::AuthInput::new(
-            String::new(),
-            "POST".into(),
-            config.base_url.clone(),
-            xai_grok_provider::auth::HeaderMap::new(),
-        );
-        if let Ok(auth_headers) = route.auth.apply(&input) {
-            for (key, value) in auth_headers {
-                config.extra_headers.entry(key).or_insert(value);
-            }
-        }
-    }
-    Some(config)
-}
 fn resolve_hidden_default_web_search_sampling_config(
     model_id: &str,
     session_key: Option<&str>,
@@ -4790,6 +4780,7 @@ fn resolve_hidden_default_web_search_sampling_config(
         api_key: None,
         env_key: None,
         api_base_url: None,
+        provider_id: None,
     };
     let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
     sampling_config_for_model(
@@ -4799,8 +4790,25 @@ fn resolve_hidden_default_web_search_sampling_config(
         client_version,
         None,
         None,
+        None,
     )
 }
+
+/// Look up a provider route for the given model entry.
+pub(crate) fn resolve_model_route(
+    model: &ModelEntry,
+    registry: Option<&xai_grok_provider::registry::ProviderRegistry>,
+) -> Option<xai_grok_provider::route::Route> {
+    let pid = model.provider_id.as_deref()?;
+    let protocol = match model.info.api_backend {
+        xai_grok_sampling_types::ApiBackend::ChatCompletions => "chat",
+        xai_grok_sampling_types::ApiBackend::Responses => "responses",
+        xai_grok_sampling_types::ApiBackend::Messages => "messages",
+    };
+    let route_id = format!("{pid}-{protocol}");
+    registry?.get_route(&route_id).map(|r| (*r).clone())
+}
+
 pub fn resolve_web_search_sampling_config(
     model_id: &str,
     models: &IndexMap<String, ModelEntry>,
@@ -4817,6 +4825,7 @@ pub fn resolve_web_search_sampling_config(
             credentials,
             alpha_test_key,
             client_version,
+            None,
             None,
             None,
         ))
@@ -5905,7 +5914,7 @@ reasoning_effort = "low"
         assert_eq!(creds.auth_scheme, AuthScheme::XApiKey);
         assert_eq!(creds.auth_type, xai_chat_state::AuthType::ApiKey);
         assert_eq!(creds.api_key, Some("sk-ant-test-key".to_string()));
-        let config = sampling_config_for_model(&model, creds, None, None, None, None);
+        let config = sampling_config_for_model(&model, creds, None, None, None, None, None);
         assert_eq!(config.auth_scheme, AuthScheme::XApiKey);
         assert_eq!(config.api_backend, ApiBackend::Messages);
         let client = xai_grok_sampler::SamplingClient::new(config).expect("client should build");
@@ -5924,7 +5933,7 @@ reasoning_effort = "low"
         assert_eq!(model.info.auth_scheme, AuthScheme::Bearer);
         let creds = resolve_credentials(&model, None);
         assert_eq!(creds.auth_scheme, AuthScheme::Bearer);
-        let config = sampling_config_for_model(&model, creds, None, None, None, None);
+        let config = sampling_config_for_model(&model, creds, None, None, None, None, None);
         assert_eq!(config.auth_scheme, AuthScheme::Bearer);
         let client = xai_grok_sampler::SamplingClient::new(config).expect("client should build");
         let info = client.auth_info();
@@ -7266,7 +7275,7 @@ reasoning_effort = "low"
     }
     fn resolve_sampling(model: &ModelEntry, session_key: Option<&str>) -> SamplerConfig {
         let credentials = resolve_credentials(model, session_key);
-        sampling_config_for_model(model, credentials, None, None, None, None)
+        sampling_config_for_model(model, credentials, None, None, None, None, None)
     }
     #[test]
     #[serial]
@@ -11079,7 +11088,7 @@ default = "grok-4.5"
     #[serial]
     fn mcp_liveness_watchers_default_is_true() {
         unsafe { std::env::remove_var("GROK_MCP_LIVENESS_WATCHERS") };
-        let r = resolve_mcp_liveness_watchers(None, None, None, None, None);
+        let r = resolve_mcp_liveness_watchers(None, None, None, None, None, None);
         assert!(r.value, "default-on by spec");
         assert_eq!(r.source, ConfigSource::Default);
     }
@@ -11145,7 +11154,7 @@ default = "grok-4.5"
     #[serial]
     fn mcp_auto_restart_default_is_true() {
         unsafe { std::env::remove_var("GROK_MCP_AUTO_RESTART") };
-        let r = resolve_mcp_auto_restart(None, None, None, None, None);
+        let r = resolve_mcp_auto_restart(None, None, None, None, None, None);
         assert!(r.value, "recovery is on by default");
         assert_eq!(r.source, ConfigSource::Default);
     }
@@ -11177,7 +11186,7 @@ default = "grok-4.5"
     #[serial]
     fn mcp_push_server_status_default_is_true() {
         unsafe { std::env::remove_var("GROK_MCP_PUSH_SERVER_STATUS") };
-        let r = resolve_mcp_push_server_status(None, None, None, None, None);
+        let r = resolve_mcp_push_server_status(None, None, None, None, None, None);
         assert!(r.value, "default-on by spec");
         assert_eq!(r.source, ConfigSource::Default);
     }
@@ -11243,7 +11252,7 @@ default = "grok-4.5"
     #[serial]
     fn mcp_recursive_config_watch_default_is_true() {
         unsafe { std::env::remove_var("GROK_MCP_RECURSIVE_CONFIG_WATCH") };
-        let r = resolve_mcp_recursive_config_watch(None, None, None, None, None);
+        let r = resolve_mcp_recursive_config_watch(None, None, None, None, None, None);
         assert!(r.value, "default-on by spec");
         assert_eq!(r.source, ConfigSource::Default);
     }
