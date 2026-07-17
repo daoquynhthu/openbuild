@@ -1561,6 +1561,9 @@ struct ProviderModelCacheEntry {
 static PROVIDER_MODEL_CACHE: LazyLock<RwLock<HashMap<String, ProviderModelCacheEntry>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// Deprecated: use `crate::agent::provider_resolution::merge_model_catalog()` instead.
+/// This function performs synchronous network calls and bypasses the catalog cache.
+/// Kept for backward compatibility during migration to the async catalog service.
 pub fn fetch_provider_models_blocking(
     registry: &Arc<xai_grok_provider::registry::ProviderRegistry>,
 ) -> IndexMap<String, ModelEntry> {
