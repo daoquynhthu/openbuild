@@ -5,10 +5,11 @@ use xai_grok_provider::registry::ProviderRegistry;
 
 static PROVIDER_REGISTRY: OnceLock<Arc<ProviderRegistry>> = OnceLock::new();
 
-pub fn init(registry: Arc<ProviderRegistry>) {
-    if PROVIDER_REGISTRY.set(registry).is_err() {
-        tracing::warn!("provider_state::init called more than once — second call ignored");
-    }
+/// Initialize the global provider registry. Returns an error if already set.
+pub fn init(registry: Arc<ProviderRegistry>) -> Result<(), &'static str> {
+    PROVIDER_REGISTRY
+        .set(registry)
+        .map_err(|_| "provider_state::init called more than once")
 }
 
 pub fn registry() -> Option<&'static Arc<ProviderRegistry>> {
