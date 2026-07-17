@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use crate::error::ProviderError;
 use crate::events::LLMEvent;
 use crate::types::LLMRequest;
 
@@ -8,7 +9,7 @@ pub type ProtocolId = String;
 
 /// Schema for validating and decoding provider-native types.
 pub struct Schema<T> {
-    pub validate: fn(&T) -> Result<(), String>,
+    pub validate: fn(&T) -> Result<(), ProviderError>,
 }
 
 impl<T> core::fmt::Debug for Schema<T> {
@@ -29,14 +30,14 @@ impl<T> Clone for Schema<T> {
 #[non_exhaustive]
 pub struct ProtocolBody<Body> {
     pub schema: Schema<Body>,
-    pub from: fn(LLMRequest) -> Result<Body, String>,
+    pub from: fn(LLMRequest) -> Result<Body, ProviderError>,
 }
 
 #[non_exhaustive]
 pub struct ProtocolStream<Frame, Event, State> {
     pub event: Schema<Event>,
     pub initial: fn(LLMRequest) -> State,
-    pub step: fn(&mut State, Event) -> Result<Vec<LLMEvent>, String>,
+    pub step: fn(&mut State, Event) -> Result<Vec<LLMEvent>, ProviderError>,
     pub terminal: Option<fn(&Event) -> bool>,
     pub on_halt: Option<fn(&State) -> Vec<LLMEvent>>,
     _frame: PhantomData<Frame>,
@@ -139,7 +140,7 @@ mod tests {
         let s = Schema::<String> {
             validate: |v| {
                 if v.is_empty() {
-                    Err("empty".into())
+                    Err(ProviderError::Protocol("empty".to_string()))
                 } else {
                     Ok(())
                 }

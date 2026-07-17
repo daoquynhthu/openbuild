@@ -1,9 +1,14 @@
 pub use crate::types::HeaderMap;
 
+/// Type alias for auth header maps. Prefer this over `HeaderMap` to avoid
+/// confusion with `reqwest::HeaderMap`.
+pub type AuthHeaderMap = HeaderMap;
+
+use crate::error::ProviderError;
+
 /// Input to an AuthFn::apply call.
 #[non_exhaustive]
 pub struct AuthInput {
-    pub request: String,
     pub body: String,
     pub method: String,
     pub url: String,
@@ -11,13 +16,13 @@ pub struct AuthInput {
 }
 
 impl AuthInput {
-    pub fn new(request: String, body: String, method: String, url: String, headers: HeaderMap) -> Self {
-        Self { request, body, method, url, headers }
+    pub fn new(body: String, method: String, url: String, headers: HeaderMap) -> Self {
+        Self { body, method, url, headers }
     }
 }
 
-pub trait AuthFn: Send + Sync + core::fmt::Debug + 'static {
-    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String>;
+pub trait AuthFn: Send + Sync + core::fmt::Debug {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, ProviderError>;
     fn clone_box(&self) -> Box<dyn AuthFn>;
 }
 
@@ -35,7 +40,7 @@ impl dyn AuthFn {
 struct ChainAuth(Box<dyn AuthFn>, Box<dyn AuthFn>);
 
 impl AuthFn for ChainAuth {
-    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, ProviderError> {
         self.0.apply(input).or_else(|_| self.1.apply(input))
     }
 
@@ -48,11 +53,10 @@ impl AuthFn for ChainAuth {
 struct ThenAuth(Box<dyn AuthFn>, Box<dyn AuthFn>);
 
 impl AuthFn for ThenAuth {
-    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, ProviderError> {
         let headers = self.0.apply(input)?;
         let chained_input = AuthInput {
             headers,
-            request: input.request.clone(),
             body: input.body.clone(),
             method: input.method.clone(),
             url: input.url.clone(),
@@ -66,10 +70,10 @@ impl AuthFn for ThenAuth {
 }
 
 #[derive(Debug)]
-struct BearerAuth(String);
+pub struct BearerAuth(pub String);
 
 impl AuthFn for BearerAuth {
-    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, ProviderError> {
         let mut headers = input.headers.clone();
         headers.insert("Authorization".into(), format!("Bearer {}", self.0));
         Ok(headers)
@@ -81,13 +85,13 @@ impl AuthFn for BearerAuth {
 }
 
 #[derive(Debug)]
-struct HeaderAuth {
-    name: String,
-    value: String,
+pub struct HeaderAuth {
+    pub name: String,
+    pub value: String,
 }
 
 impl AuthFn for HeaderAuth {
-    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, ProviderError> {
         let mut headers = input.headers.clone();
         headers.insert(self.name.clone(), self.value.clone());
         Ok(headers)
@@ -105,7 +109,7 @@ impl AuthFn for HeaderAuth {
 pub struct NoopAuth;
 
 impl AuthFn for NoopAuth {
-    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, ProviderError> {
         Ok(input.headers.clone())
     }
 
@@ -115,11 +119,11 @@ impl AuthFn for NoopAuth {
 }
 
 #[derive(Debug)]
-struct FailAuth(String);
+pub struct FailAuth(pub String);
 
 impl AuthFn for FailAuth {
-    fn apply(&self, _input: &AuthInput) -> Result<HeaderMap, String> {
-        Err(self.0.clone())
+    fn apply(&self, _input: &AuthInput) -> Result<HeaderMap, ProviderError> {
+        Err(ProviderError::NoCredential(self.0.clone()))
     }
 
     fn clone_box(&self) -> Box<dyn AuthFn> {
@@ -143,8 +147,8 @@ impl Credential {
         Credential::Inline(key)
     }
 
-    pub fn config(name: &str) -> Self {
-        Credential::Config(name.to_owned())
+    pub fn config(name: impl Into<String>) -> Self {
+        Credential::Config(name.into())
     }
 
     pub fn session() -> Self {
@@ -156,8 +160,8 @@ impl Credential {
     }
 
     pub fn or_else(self, other: Credential) -> Credential {
-        if self.resolve().is_some() {
-            self
+        if let Some(val) = self.resolve() {
+            Credential::Inline(Some(val))
         } else {
             other
         }
@@ -200,7 +204,6 @@ mod tests {
 
     fn test_input() -> AuthInput {
         AuthInput {
-            request: String::new(),
             body: String::new(),
             method: "POST".into(),
             url: "http://localhost".into(),

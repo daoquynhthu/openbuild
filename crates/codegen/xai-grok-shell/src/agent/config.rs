@@ -4717,19 +4717,34 @@ pub fn resolve_model_to_sampling_config(
     alpha_test_key: Option<String>,
     client_version: Option<String>,
     fallback_entry: Option<ModelEntry>,
+    route: Option<&xai_grok_provider::route::Route>,
 ) -> Option<SamplerConfig> {
     let entry = find_model_by_id(models, model_id)
         .cloned()
         .or(fallback_entry)?;
     let credentials = resolve_credentials(&entry, session_key);
-    Some(sampling_config_for_model(
+    let mut config = sampling_config_for_model(
         &entry,
         credentials,
         alpha_test_key,
         client_version,
         None,
         None,
-    ))
+    );
+    if let Some(route) = route {
+        let input = xai_grok_provider::auth::AuthInput::new(
+            String::new(),
+            "POST".into(),
+            config.base_url.clone(),
+            xai_grok_provider::auth::HeaderMap::new(),
+        );
+        if let Ok(auth_headers) = route.auth.apply(&input) {
+            for (key, value) in auth_headers {
+                config.extra_headers.entry(key).or_insert(value);
+            }
+        }
+    }
+    Some(config)
 }
 fn resolve_hidden_default_web_search_sampling_config(
     model_id: &str,

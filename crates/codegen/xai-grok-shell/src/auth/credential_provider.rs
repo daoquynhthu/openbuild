@@ -50,6 +50,38 @@ impl HttpAuth for ShellAuthCredentialProvider {
         creds.apply(builder, base_url)
     }
 }
+
+impl xai_grok_provider::auth::AuthFn for ShellAuthCredentialProvider {
+    fn apply(
+        &self,
+        input: &xai_grok_provider::auth::AuthInput,
+    ) -> Result<xai_grok_provider::auth::HeaderMap, xai_grok_provider::error::ProviderError> {
+        let mut creds = self.static_credentials.clone();
+        if creds.deployment_key.is_none()
+            && let Some(auth) = self.auth_manager.current_or_expired()
+        {
+            creds.user_token = Some(auth.key);
+        }
+        let mut headers = input.headers.clone();
+        if let Some(ref key) = creds.deployment_key {
+            headers.insert("Authorization".into(), format!("Bearer {}", key));
+        } else if let Some(ref token) = creds.user_token {
+            headers.insert("Authorization".into(), format!("Bearer {}", token));
+        }
+        if let Some(ref alpha) = creds.alpha_test_key {
+            headers.insert("x-alpha-test-key".into(), alpha.clone());
+        }
+        Ok(headers)
+    }
+
+    fn clone_box(&self) -> Box<dyn xai_grok_provider::auth::AuthFn> {
+        Box::new(Self {
+            auth_manager: self.auth_manager.clone(),
+            static_credentials: self.static_credentials.clone(),
+        })
+    }
+}
+
 #[async_trait::async_trait]
 impl AuthCredentialProvider for ShellAuthCredentialProvider {
     fn snapshot(&self) -> CredentialSnapshot {

@@ -58,12 +58,14 @@
 - [x] **M63+S19** 5 文件 12 处 — 删除所有违反 AGENTS.md §3.1 的内联注释（config.rs、auth.rs、mod.rs、anthropic.rs、ollama.rs）
 - [ ] **S02+S14** 多文件 — 跳过（建议项，Batch 7 快速实施不包含）
 
-### Batch 8 — Auth 栈对齐（高风险，需深入理解）
+### Batch 8 — Auth 栈对齐（高风险）`[x]`
 
-- [ ] **C21** 跨 crate — 三套认证抽象栈统一（`AuthFn`/`HttpAuth`/`AuthManager`）
-- [ ] **C25** `auth.rs:14`, `framing.rs:8-9`, `protocol.rs` — 底层 trait 从 `String` 错误转为 `thiserror` 类型
-- [ ] **M36+M37+M45** — `AuthInput.request` 类型修正 + `Route::with` auth 透传 + `resolve_model_to_sampling_config()` 调用 `route.auth.apply()`
-- [ ] **P3-S01～S09** — 9 项 Auth 建议项逐步清理
+- [x] **C25** `auth.rs`, `protocol.rs` — `AuthFn::apply()`, `Schema::validate`, `ProtocolBody::from`, `ProtocolStream::step` 错误类型从 `String` 改为 `ProviderError`；`framing.rs` 保留（跨 crate 泛型流接口）
+- [x] **M36** `auth.rs` — 删除无用 `AuthInput.request` 字段
+- [x] **M37** `route.rs:102` — 已有 `patch.auth.unwrap_or(self.auth)`，✅ 已实现
+- [x] **M45** `resolve_model_to_sampling_config()` — 增加 `route` 参数，内部调用 `route.auth.apply()` 并将返回 headers 合并到 `extra_headers`
+- [x] **C21** — `ShellAuthCredentialProvider` 实现 `AuthFn`；`AuthManagerAsAuthFn` 已存在；`HttpAuth` 标记为独立接口
+- [x] **P3-S01** 随 C25 关闭、**S02** `or_else()` 缓存 resolved value、**S03** 随 M36、**S04** 加 `AuthHeaderMap` 别名、**S05** 移除 `'static` 约束、**S06** `ShellAuthCredentialProvider` 实现 AuthFn、**S07** 跳过（`impl dyn AuthFn` 是 Rust 惯用模式）、**S08** BearerAuth/HeaderAuth/FailAuth 改为 pub、**S09** `config()` 改 `impl Into<String>`
 
 ### Batch 9 — Protocol 分发架构（最高风险，依赖 Batch 8）
 

@@ -24,14 +24,16 @@ impl AuthManagerAsAuthFn {
 }
 
 impl AuthFn for AuthManagerAsAuthFn {
-    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, String> {
+    fn apply(&self, input: &AuthInput) -> Result<HeaderMap, xai_grok_provider::error::ProviderError> {
         match self.auth_manager.current_or_expired() {
             Some(auth) => {
                 let mut headers = input.headers.clone();
                 headers.insert("Authorization".into(), format!("Bearer {}", auth.key));
                 Ok(headers)
             }
-            None => Err("xAI auth: no session token available".into()),
+            None => Err(xai_grok_provider::error::ProviderError::Auth(
+                "xAI auth: no session token available".into(),
+            )),
         }
     }
 
@@ -64,7 +66,6 @@ mod tests {
         let manager = Arc::new(MockManager::new());
         let adapter = AuthManagerAsAuthFn::new(manager);
         let input = AuthInput::new(
-            String::new(),
             String::new(),
             "GET".into(),
             "http://localhost".into(),
