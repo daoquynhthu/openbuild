@@ -546,3 +546,36 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 - No unrelated files changed
 - No dependency added
 - No secret present in diff
+
+---
+
+## Provider Adapter V1 — Phase 3: Typed Config and Precedence — 2026-07-17 (in progress)
+
+### Base and result
+- Start commit: `d333d4e`
+- End commit: `1bb390f`
+- Tasks completed: `P3-01`, `P3-02`, `P3-03`
+
+### Files changed
+- `xai-grok-shell/src/agent/config.rs` — added `provider: Option<toml::Value>` field to Config, fixed `route.auth.apply()` → `apply_auth_policy()` (P3-01)
+- `xai-grok-provider/tests/config_precedence.rs` — created 5 test cases proving env/TOML/CLI precedence (P3-02)
+- `xai-grok-pager/src/app/mod.rs` — removed duplicate registry creation, accepts injected registry (P3-03)
+- `xai-grok-pager-bin/src/main.rs` — passes registry to pager `run()` (P3-03)
+- `xai-grok-pager/src/provider_state.rs` — warn on double init (P3-03)
+
+### Regression issues
+- `M-01`: eligible for `-Fixed` — `provider` field on Config absorbs `[provider.*]` sections, no unknown-key warning
+
+### Remaining scope
+- `P3-04`: legacy xAI compatibility preservation
+- `P3-05`: manual model provider binding fields (provider/route on ModelEntry)
+
+### Verification
+- `cargo check -p xai-grok-provider --all-targets` — 101 passed, 0 failed
+- `cargo test -p xai-grok-provider --all-targets` — 101 passed, 0 failed
+- `cargo check -p xai-grok-shell --lib` — clean
+- `cargo check -p xai-grok-pager --lib` — clean (test targets have pre-existing errors)
+
+### Scope review
+- No unrelated files changed
+- No dependency added
