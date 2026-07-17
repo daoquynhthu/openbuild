@@ -1,8 +1,52 @@
 use std::sync::Arc;
 
-use xai_grok_provider::auth::{AuthFn, AuthInput, HeaderMap};
+use xai_grok_provider::auth::{
+    AuthFn, AuthInput, CredentialSource, HeaderMap, resolve_credential_source,
+};
+use xai_grok_provider::error::ProviderError;
 
 use crate::auth::AuthManager;
+
+/// Resolve shell credentials from a `CredentialSource` at request time.
+///
+/// Blank credentials are absent. Inline key wins over env only according to
+/// resolved precedence. Environment is read at resolution time, not provider
+/// registration time. xAI session uses the live `AuthManager`.
+/// Public/no-auth is successful and sends no auth header.
+pub fn resolve_shell_credential(
+    source: &CredentialSource,
+    auth_manager: Option<&Arc<AuthManager>>,
+) -> Result<Option<String>, ProviderError> {
+    match source {
+        CredentialSource::Inline => Ok(None),
+        CredentialSource::Environment(keys) => {
+            for key in keys {
+                if let Ok(val) = std::env::var(key)
+                    && !val.is_empty()
+                {
+                    return Ok(Some(val));
+                }
+            }
+            Ok(None)
+        }
+        CredentialSource::Session => {
+            if let Some(am) = auth_manager {
+                match am.current_or_expired() {
+                    Some(auth) => Ok(Some(auth.key)),
+                    None => Err(ProviderError::MissingCredential(
+                        "xAI session token not available".into(),
+                    )),
+                }
+            } else {
+                Err(ProviderError::MissingCredential(
+                    "xAI session resolver not available".into(),
+                ))
+            }
+        }
+        CredentialSource::Public => Ok(None),
+        CredentialSource::None => Ok(None),
+    }
+}
 
 /// Wraps the shell's AuthManager as an xai-grok-provider AuthFn.
 /// This allows the uniform credential chain to resolve xAI OAuth tokens.

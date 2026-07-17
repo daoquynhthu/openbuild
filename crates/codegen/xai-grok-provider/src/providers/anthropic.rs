@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
+use crate::auth::{AuthPolicy, CredentialSource};
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
@@ -63,7 +64,7 @@ impl Provider for AnthropicProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        let route = Route::make(
+        let mut route = Route::make(
             "anthropic-messages",
             Some(self.defaults.id.clone()),
             "messages",
@@ -72,8 +73,14 @@ impl Provider for AnthropicProvider {
                 path: EndpointPart::Static("/messages".into()),
                 query: None,
             },
-            crate::auth::AuthPolicy::None,
+            AuthPolicy::Header {
+                name: "x-api-key".into(),
+                source: CredentialSource::Environment(vec!["ANTHROPIC_API_KEY".into()]),
+            },
         );
+        route
+            .static_headers
+            .insert("anthropic-version".into(), "2023-06-01".into());
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("anthropic-messages");
         let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);
