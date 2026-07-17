@@ -3583,6 +3583,8 @@ fn is_default_laziness_detector(cfg: &LazinessDetectorPerModelConfig) -> bool {
 #[serde(default)]
 pub struct ConfigModelOverride {
     pub model: Option<String>,
+    pub provider: Option<String>,
+    pub route: Option<String>,
     pub base_url: Option<String>,
     pub name: Option<String>,
     pub description: Option<String>,
@@ -3632,6 +3634,12 @@ impl ConfigModelOverride {
         let mut entry = base.unwrap_or_else(|| ModelEntry::fallback(key, endpoints));
         if let Some(ref v) = self.model {
             entry.info.model = v.clone();
+        }
+        if let Some(ref v) = self.provider {
+            entry.provider_id = Some(v.clone());
+        }
+        if let Some(ref v) = self.route {
+            entry.route_id = Some(v.clone());
         }
         if let Some(ref v) = self.base_url {
             entry.info.base_url = v.clone();
@@ -3908,6 +3916,9 @@ pub struct ModelEntry {
     pub api_base_url: Option<String>,
     /// Provider ID for route lookup. Set during model catalog construction.
     pub provider_id: Option<String>,
+    /// Route ID for explicit route binding. When set, route selection uses
+    /// this instead of the provider's route selector.
+    pub route_id: Option<String>,
 }
 impl ModelEntry {
     /// Minimal fallback entry for an unknown model slug.
@@ -3920,6 +3931,7 @@ impl ModelEntry {
             env_key: None,
             api_base_url: None,
             provider_id: None,
+            route_id: None,
         }
     }
     pub fn info(&self) -> &ModelInfo {
@@ -3932,6 +3944,7 @@ impl ModelEntry {
             env_key: entry.env_key.clone(),
             api_base_url: entry.api_base_url.clone(),
             provider_id: None,
+            route_id: None,
         }
     }
     /// The model's own (BYOK) credential: a non-empty `api_key`, else the first
@@ -4561,6 +4574,7 @@ pub fn resolve_aux_model_sampling_config(
             env_key: None,
             api_base_url: None,
             provider_id: None,
+            route_id: None,
         };
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
         let sampler = sampling_config_for_model(
@@ -4750,6 +4764,7 @@ fn resolve_hidden_default_web_search_sampling_config(
     let entry = ModelEntry {
         info: ModelInfo {
             id: None,
+            user_selectable: true,
             model: model_id.to_owned(),
             base_url: endpoints.resolve_inference_base_url(),
             name: None,
@@ -4768,7 +4783,6 @@ fn resolve_hidden_default_web_search_sampling_config(
             inference_idle_timeout_secs: None,
             max_retries: None,
             hidden: true,
-            user_selectable: true,
             supported_in_api: true,
             reasoning_effort: None,
             supports_reasoning_effort: false,
@@ -4784,6 +4798,7 @@ fn resolve_hidden_default_web_search_sampling_config(
         env_key: None,
         api_base_url: None,
         provider_id: None,
+        route_id: None,
     };
     let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
     sampling_config_for_model(

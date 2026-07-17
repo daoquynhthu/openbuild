@@ -1405,6 +1405,7 @@ fn build_prefetched_map(
             env_key: None,
             api_base_url: m.api_base_url.clone().or(api_base_url_override.clone()),
             provider_id: None,
+            route_id: None,
         };
         map.insert(key, entry);
     }
