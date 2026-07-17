@@ -7,9 +7,6 @@ description = "Actor-based sampling/inference layer for xAI grok (HTTP streaming
 
 [dependencies]
 # Internal
-# xai-grok-provider: declared here for Phase 4 Protocol integration,
-# currently used via xai-grok-sampling-types re-exports.
-xai-grok-provider = { path = "../xai-grok-provider" }
 xai-grok-sampling-types = { path = "../xai-grok-sampling-types" }
 xai-grok-version = { workspace = true }
 

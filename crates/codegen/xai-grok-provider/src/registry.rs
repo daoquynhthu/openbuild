@@ -105,27 +105,6 @@ impl ProviderRegistry {
             .collect()
     }
 
-    pub fn detect_from_url(&self, base_url: &str) -> ProviderId {
-        let host = url::Url::parse(base_url)
-            .ok()
-            .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
-            .unwrap_or_default();
-
-        match host.as_str() {
-            h if h == "api.x.ai" || h == "api.grok.com" || h.ends_with(".grok.com") => {
-                ProviderId::new(ProviderId::XAI)
-            }
-            "api.openai.com" => ProviderId::new(ProviderId::OPENAI),
-            "api.anthropic.com" => ProviderId::new(ProviderId::ANTHROPIC),
-            h if h == "opencode.ai" || h == "console.opencode.ai" => {
-                ProviderId::new(ProviderId::OPENCODE)
-            }
-            h if h == "localhost" || h.starts_with("localhost:") || h == "127.0.0.1" => {
-                ProviderId::new(ProviderId::OLLAMA)
-            }
-            _ => ProviderId::new(ProviderId::OPENAI_COMPATIBLE),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -266,49 +245,6 @@ mod tests {
         registry.register(dummy_provider());
         let ids = registry.all_ids();
         assert_eq!(ids.len(), 1);
-    }
-
-    #[test]
-    fn detect_from_url_xai() {
-        let registry = ProviderRegistry::new();
-        assert_eq!(registry.detect_from_url("https://api.x.ai/v1").0, "xai");
-        assert_eq!(registry.detect_from_url("https://api.grok.com/v1").0, "xai");
-    }
-
-    #[test]
-    fn detect_from_url_openai() {
-        let registry = ProviderRegistry::new();
-        assert_eq!(
-            registry.detect_from_url("https://api.openai.com/v1").0,
-            "openai"
-        );
-    }
-
-    #[test]
-    fn detect_from_url_anthropic() {
-        let registry = ProviderRegistry::new();
-        assert_eq!(
-            registry.detect_from_url("https://api.anthropic.com/v1").0,
-            "anthropic"
-        );
-    }
-
-    #[test]
-    fn detect_from_url_ollama() {
-        let registry = ProviderRegistry::new();
-        assert_eq!(
-            registry.detect_from_url("http://localhost:11434/v1").0,
-            "ollama"
-        );
-    }
-
-    #[test]
-    fn detect_from_url_fallback() {
-        let registry = ProviderRegistry::new();
-        assert_eq!(
-            registry.detect_from_url("https://api.groq.com/v1").0,
-            "openai-compatible"
-        );
     }
 
     #[test]

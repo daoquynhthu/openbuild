@@ -15,13 +15,13 @@
 - [x] **M61** `openai_compatible.rs:15` — `profile_base_url` 从未被调用，`configure()` 注释描述意图但未实现。已在 `configure()` 中接上 caller：当 `base_url` 未设置时，通过 `overrides.id` 查 `profile_base_url` 推得知名服务商 base URL
 - [x] **M62** `providers/mod.rs:49` — 移除内联测试上 `#[allow(dead_code)]`
 
-### Batch 2 — 死代码移除（低风险）
+### Batch 2 — 死代码移除（低风险）`[x]`
 
-- [ ] **C20** 跨 crate — 移除 Provider `Model` 死类型 (~80 行，被 `resolve_model_list()` 绕过)
-- [ ] **M48** `registry.rs:89-97` — 移除 `ProviderRegistry::model()` + `Route::model()`（仅测试可达）
-- [ ] **M49** `registry.rs:108-128` — 移除 `detect_from_url()` + `url` 依赖（仅测试可达 + 死依赖）
-- [ ] **P2-M02** `xai-grok-sampler/Cargo.toml:10` — 移除未使用的 `xai-grok-provider` 依赖
-- [ ] **P3-M04** `xai-grok-sampler/Cargo.toml:10` — 同 P2-M02，P3-M04 曾被误标 `-Closed`，一并关闭
+- [-] **C20** 跨 crate — **保留**（架构预留，等待 Batch 9 Protocol dispatch 接上）
+- [-] **M48** `registry.rs:89-97` — **保留**（同 C20，架构预留）
+- [x] **M49** `registry.rs:108-128` — 移除 `detect_from_url()` 方法 + 测试；`url` 依赖保留（`endpoint.rs` 另有生产者）
+- [x] **P2-M02** `xai-grok-sampler/Cargo.toml:10` — 移除未使用的 `xai-grok-provider` 依赖
+- [x] **P3-M04** `xai-grok-sampler/Cargo.toml:10` — 同 P2-M02，P3-M04 曾被误标 `-Closed`，一并关闭
 
 ### Batch 3 — `#[non_exhaustive]` 保护（低风险，机械操作）
 
