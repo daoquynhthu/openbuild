@@ -1,4 +1,5 @@
 use std::num::NonZeroU64;
+use std::sync::Arc;
 
 use crate::auth::Credential;
 use crate::config::ProviderConfig;
@@ -68,31 +69,50 @@ impl Provider for OpenAIProvider {
         let auth = Credential::optional(overrides.api_key, "api_key")
             .or_else(Credential::config("OPENAI_API_KEY"))
             .bearer();
-        let route = Route::make(RouteInput {
+        let auth_responses = auth.clone_box();
+
+        let route_chat = Arc::new(Route::make(RouteInput {
             id: "openai-chat".into(),
             provider: Some(self.defaults.id.clone()),
             protocol: "chat_completions".into(),
             endpoint: Endpoint {
-                base_url: Some(base_url),
+                base_url: Some(base_url.clone()),
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
             auth: Some(auth),
             framing: Box::new(SseFraming),
             defaults: None,
-        });
+        }));
+        let route_responses = Arc::new(Route::make(RouteInput {
+            id: "openai-responses".into(),
+            provider: Some(self.defaults.id.clone()),
+            protocol: "responses".into(),
+            endpoint: Endpoint {
+                base_url: Some(base_url),
+                path: EndpointPart::Static("/responses".into()),
+                query: None,
+            },
+            auth: Some(auth_responses),
+            framing: Box::new(SseFraming),
+            defaults: None,
+        }));
+
         let pid = self.defaults.id.clone();
         ConfiguredProvider {
             id: pid,
-            route,
-            model: |id, route| {
-                Model::make(
-                    ModelId::new(id),
-                    ProviderId::new(ProviderId::OPENAI),
-                    std::sync::Arc::new(route.clone()),
-                    None,
-                )
-            },
+            route: (*route_chat).clone(),
+            model: Box::new(move |id, _| {
+                let r = if id.starts_with("o1")
+                    || id.starts_with("o3")
+                    || id.starts_with("gpt-4.1")
+                {
+                    route_responses.clone()
+                } else {
+                    route_chat.clone()
+                };
+                Model::make(ModelId::new(id), ProviderId::new(ProviderId::OPENAI), r, None)
+            }),
             configure: move |c| OpenAIProvider::new().configure(c),
         }
     }

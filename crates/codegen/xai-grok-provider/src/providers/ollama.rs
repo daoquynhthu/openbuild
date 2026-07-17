@@ -82,14 +82,14 @@ impl Provider for OllamaProvider {
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| {
+            model: Box::new(|id, route| {
                 Model::make(
                     ModelId::new(id),
                     ProviderId::new(ProviderId::OLLAMA),
                     std::sync::Arc::new(route.clone()),
                     None,
                 )
-            },
+            }),
             configure: move |c| OllamaProvider::new().configure(c),
         }
     }

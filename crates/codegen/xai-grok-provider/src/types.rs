@@ -31,26 +31,7 @@ impl ModelId {
     }
 }
 
-/// Which API backend protocol to use for inference.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiBackend {
-    #[default]
-    ChatCompletions,
-    Responses,
-    Messages,
-}
-
-/// HTTP auth scheme for API requests.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-#[serde(rename_all = "snake_case")]
-pub enum AuthScheme {
-    #[default]
-    Bearer,
-    XApiKey,
-    None,
-}
+pub use xai_grok_sampling_types::{ApiBackend, AuthScheme};
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]

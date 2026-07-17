@@ -90,14 +90,14 @@ impl Provider for AnthropicProvider {
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| {
+            model: Box::new(|id, route| {
                 Model::make(
                     ModelId::new(id),
                     ProviderId::new(ProviderId::ANTHROPIC),
                     std::sync::Arc::new(route.clone()),
                     None,
                 )
-            },
+            }),
             configure: move |c| AnthropicProvider::new().configure(c),
         }
     }

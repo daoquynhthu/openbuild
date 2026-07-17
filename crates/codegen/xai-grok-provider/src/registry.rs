@@ -163,14 +163,14 @@ mod tests {
             ConfiguredProvider {
                 id: id.clone(),
                 route,
-                model: |id, rt| {
+                model: Box::new(|id: &str, rt: &Route| {
                     Model::make(
                         ModelId::new(id),
                         ProviderId::new("dummy"),
-                        Arc::new(rt.clone()),
+                        Arc::new((*rt).clone()),
                         None,
                     )
-                },
+                }),
                 configure: move |c| DummyProvider::new().configure(c),
             }
         }

@@ -65,9 +65,7 @@ impl Provider for OpenCodeProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        // No API key → public free-tier fallback (sends apiKey="public").
-        let auth = Credential::optional(overrides.api_key, "api_key")
-            .or_else(Credential::config("OPENCODE_API_KEY"))
+        let auth = Credential::config("OPENCODE_API_KEY")
             .or_else(Credential::public_key("public"))
             .bearer();
         let route = Route::make(RouteInput {
@@ -87,14 +85,14 @@ impl Provider for OpenCodeProvider {
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| {
+            model: Box::new(|id, route| {
                 Model::make(
                     ModelId::new(id),
                     ProviderId::new(ProviderId::OPENCODE),
                     std::sync::Arc::new(route.clone()),
                     None,
                 )
-            },
+            }),
             configure: move |c| OpenCodeProvider::new().configure(c),
         }
     }

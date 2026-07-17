@@ -1029,6 +1029,17 @@ impl ApiBackend {
     }
 }
 
+/// HTTP auth scheme for API requests.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+#[serde(rename_all = "snake_case")]
+pub enum AuthScheme {
+    #[default]
+    Bearer,
+    XApiKey,
+    None,
+}
+
 /// Sampling client configuration (API key excluded — that stays in the client).
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SamplingConfig {

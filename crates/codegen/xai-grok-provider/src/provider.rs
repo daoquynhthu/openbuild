@@ -9,7 +9,8 @@ use crate::types::{ProviderDefaults, ProviderId};
 pub struct ConfiguredProvider {
     pub id: ProviderId,
     pub route: Route,
-    pub model: fn(&str, &Route) -> Model,
+    #[allow(clippy::type_complexity)]
+    pub model: Box<dyn Fn(&str, &Route) -> Model>,
     pub configure: fn(ProviderConfig) -> ConfiguredProvider,
 }
 

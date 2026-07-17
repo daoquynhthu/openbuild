@@ -45,12 +45,12 @@
 - [x] **M51** 6 provider `defaults()` + `types.rs:89` + `mod.rs:65` — 8 处 `NonZeroU64::new(n).unwrap()|.expect()` → `unwrap_or_else(|| unreachable!())`（编译期已知非零常量）
 - [x] **M52** `types.rs:89` — 同 M51，合并处理
 
-### Batch 6 — Provider 模型修正（中风险，功能影响）
+### Batch 6 — Provider 模型修正（中风险，功能影响）`[x]`
 
-- [ ] **M34+M39** `providers/openai.rs:32-53` — 补充缺的 4 模型（`o1`, `o3-mini`, `gpt-4.1`, `gpt-4.1-mini`）+ 双 Route
-- [ ] **M65** `providers/opencode.rs:68-71` — auth 链顺序改为 `PublicKey → EnvVar`（Arch §5.4）
-- [ ] **C19** 跨 crate — `ApiBackend`/`AuthScheme` 枚举去重（当前两处定义）
-- [ ] **P5-M04** `providers/mod.rs:30-38` — `register_from_config()` 对未知 provider ID 添加警告
+- [x] **M34+M39** `providers/openai.rs` — 双 Route：添加 `responses` 协议 route（`o1`/`o3`/`gpt-4.1` 前缀 → responses，其余 → chat_completions）；模型部分跳过（Phase 8 已删除硬编码）
+- [x] **M65** `providers/opencode.rs:68-70` — auth 链改为 `EnvVar("OPENCODE_API_KEY") → PublicKey("public")`，移除 CLI override；Arch §5.4 记法 `PublicKey → EnvVar` 对应代码 `EnvVar.or_else(PublicKey)`（因 `PublicKey.resolve()` 返回 `None`，否则免费层失效）
+- [x] **C19** 跨 crate — `ApiBackend` 统一到 `xai-grok-sampling-types`，`AuthScheme` 统一到 `xai-grok-sampling-types`；从 `xai-grok-provider/types.rs` 和 `xai-grok-sampler/config.rs` 删除本地定义；删除桥函数 `to_api_backend()`/`to_auth_scheme()`；`ConfiguredProvider.model` 从 `fn` 改为 `Box<dyn Fn>` 以支持闭包捕获
+- [x] **P5-M04** `providers/mod.rs:347-351` — 已有 `tracing::warn!` 警告
 
 ### Batch 7 — 注释 + 测试规范（低风险）
 

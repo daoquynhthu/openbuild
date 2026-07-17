@@ -107,14 +107,14 @@ impl Provider for OpenAiCompatibleProvider {
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| {
+            model: Box::new(|id, route| {
                 Model::make(
                     ModelId::new(id),
                     ProviderId::new(ProviderId::OPENAI_COMPATIBLE),
                     std::sync::Arc::new(route.clone()),
                     None,
                 )
-            },
+            }),
             configure: move |c| OpenAiCompatibleProvider::new().configure(c),
         }
     }

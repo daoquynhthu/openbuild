@@ -1399,25 +1399,6 @@ fn build_prefetched_map(
     map
 }
 
-fn to_api_backend(b: xai_grok_provider::types::ApiBackend) -> crate::sampling::ApiBackend {
-    match b {
-        xai_grok_provider::types::ApiBackend::ChatCompletions => {
-            crate::sampling::ApiBackend::ChatCompletions
-        }
-        xai_grok_provider::types::ApiBackend::Responses => crate::sampling::ApiBackend::Responses,
-        xai_grok_provider::types::ApiBackend::Messages => crate::sampling::ApiBackend::Messages,
-    }
-}
-
-fn to_auth_scheme(s: xai_grok_provider::types::AuthScheme) -> xai_grok_sampler::AuthScheme {
-    match s {
-        xai_grok_provider::types::AuthScheme::Bearer => xai_grok_sampler::AuthScheme::Bearer,
-        xai_grok_provider::types::AuthScheme::XApiKey => xai_grok_sampler::AuthScheme::XApiKey,
-        xai_grok_provider::types::AuthScheme::None => xai_grok_sampler::AuthScheme::None,
-        _ => xai_grok_sampler::AuthScheme::default(),
-    }
-}
-
 fn resolve_provider_auth(
     defaults: &xai_grok_provider::types::ProviderDefaults,
     resolved_config: &Option<xai_grok_provider::config::ProviderConfig>,
@@ -1508,7 +1489,7 @@ fn parse_ollama_tags_models(
         }
     };
 
-    let provider_api_backend = to_api_backend(defaults.api_backend.clone());
+    let provider_api_backend = defaults.api_backend.clone();
 
     let mut entries = Vec::with_capacity(models.len());
     for model_value in models {
@@ -1533,7 +1514,7 @@ fn parse_ollama_tags_models(
             api_key: None,
             env_key: None,
             api_backend: provider_api_backend.clone(),
-            auth_scheme: Some(to_auth_scheme(defaults.auth_scheme.clone())),
+            auth_scheme: Some(defaults.auth_scheme),
             reasoning_effort: None,
             supports_reasoning_effort: defaults.supports_reasoning_effort,
             reasoning_efforts: vec![],

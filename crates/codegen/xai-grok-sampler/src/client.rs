@@ -432,6 +432,7 @@ impl SamplingClient {
                     headers.insert(AUTHORIZATION, header_value);
                 }
                 AuthScheme::None => {}
+                _ => {}
             }
         }
 
@@ -571,6 +572,7 @@ impl SamplingClient {
                     }
                 }
                 AuthScheme::None => {}
+                _ => {}
             }
         }
         {
@@ -630,6 +632,7 @@ impl SamplingClient {
                 .and_then(|s| s.strip_prefix("Bearer "))
                 .map(|s| s.to_string()),
             AuthScheme::None => None,
+            _ => None,
         };
         raw.map(|mut s| {
             // Truncate in-place so we never materialize a heap-resident
@@ -669,6 +672,7 @@ impl SamplingClient {
             (AuthScheme::Bearer, Some(_)) => "bearer",
             (AuthScheme::None, _) => "none",
             (_, None) => "none",
+            (_, Some(_)) => "other",
         };
         crate::sampling_log::AuthInfo {
             auth_type,

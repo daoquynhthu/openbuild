@@ -95,14 +95,14 @@ impl Provider for XaiProvider {
         ConfiguredProvider {
             id: pid,
             route,
-            model: |id, route| {
+            model: Box::new(|id, route| {
                 Model::make(
                     ModelId::new(id),
                     ProviderId::new(ProviderId::XAI),
                     std::sync::Arc::new(route.clone()),
                     None,
                 )
-            },
+            }),
             configure: move |c| XaiProvider::new().configure(c),
         }
     }

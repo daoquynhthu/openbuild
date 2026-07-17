@@ -107,14 +107,14 @@ pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, Provider
                 crate::provider::ConfiguredProvider {
                     id: self.pid.clone(),
                     route,
-                    model: |id, rt| {
+                    model: Box::new(|id, rt| {
                         crate::model::Model::make(
                             crate::types::ModelId::new(id),
                             crate::types::ProviderId::new("test-provider"),
                             std::sync::Arc::new(rt.clone()),
                             None,
                         )
-                    },
+                    }),
                     configure: |c| {
                         TestProvider {
                             pid: crate::types::ProviderId::new("test-provider"),
