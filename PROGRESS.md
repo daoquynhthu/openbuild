@@ -481,3 +481,68 @@ Rust 1.93+ 或 tracing 0.1.45+ 发布后，可移除 vendor 和 patch，恢复�
 - No dependency added.
 - No secret present in diff or logs.
 - Baseline manifest documents all known pre-existing failures.
+
+---
+
+## Provider Adapter V1 — Phase 1: Freeze V1 Architecture and Public Contracts — 2026-07-17
+
+### Base and result
+- Start commit: `c39d005`
+- End commit: `d9d0937`
+- Tasks completed: `P1-01`, `P1-02`, `P1-03`
+
+### Files changed
+- `docs/model-adapter-architecture.md` — reconciled with AD-02 through AD-09
+- `docs/implementation-plan.md` — added supersession banner
+- `docs/provider-adapter-v1/config-reference.md` — created
+- `docs/provider-adapter-v1/provider-matrix.md` — created
+- `docs/provider-adapter-v1/public-contracts.md` — created
+
+### Verification
+- Placeholder scan: zero TBD/TODO tokens in newly written docs
+- architecture doc renumbered (removed duplicate §11, rebalanced sections)
+
+### Scope review
+- No unrelated files changed
+- No dependency added
+- No source code modified
+
+---
+
+## Provider Adapter V1 — Phase 2: Provider Core and Transactional Registry — 2026-07-17
+
+### Base and result
+- Start commit: `d9d0937`
+- End commit: `d333d4e`
+- Tasks completed: `P2-01` through `P2-07`
+
+### Files changed
+- `src/types.rs` — added `RouteId`, `ModelSourceSpec`, `validate_id()`, validation tests (P2-01)
+- `src/error.rs` — added 11 ProviderError variants (P2-01)
+- `src/auth.rs` — added `CredentialSource`, `AuthPolicy`, `ResolvedCredential`, `resolve_credential_source()`, `apply_auth_policy()`, header validation (P2-02)
+- `src/config.rs` — redacted `Debug` for ProviderConfig, added `validate_headers()` (P2-02)
+- `src/endpoint.rs` — `render()` returns `Result<Url, ProviderError>`, URL safety validation (P2-03)
+- `src/route.rs` — redefined Route per AD-02 (cloneable, declarative, no framing), removed RouteInput/RoutePatch/RouteDefaults (P2-04)
+- `src/framing.rs` — marked as deprecated (P2-04)
+- `src/model.rs` — added Default for `ModelLimits`/`GenerationOptions` (P2-04)
+- `src/provider.rs` — redefined ConfiguredProvider with route set, RouteSelector trait, DefaultRouteSelector (P2-05)
+- `src/registry.rs` — transactional registry snapshots with rebuild/rollback, deterministic order (P2-06)
+- `src/providers/` — all 6 providers updated to new Route/ConfiguredProvider APIs
+- `src/lib.rs` — no changes needed
+- `tests/provider_e2e.rs` — updated for new Route fields
+
+### Regression issues
+- `C-01`: resolved — `ProviderRegistry::model()` replaced by `registry.snapshot()` + `registry.configured()`
+- `M-02` part: registry rebuild is now transactional with revision and rollback
+- `M-03` part: snapshot order is deterministic and tested
+
+### Verification
+- `cargo test -p xai-grok-provider --all-targets` — 101 passed, 0 failed
+- `cargo clippy -p xai-grok-provider --all-targets -- -D warnings` — zero warnings
+- `cargo doc -p xai-grok-provider --no-deps` — zero warnings
+- `cargo fmt --all -- --check` — zero diffs
+
+### Scope review
+- No unrelated files changed
+- No dependency added
+- No secret present in diff
