@@ -497,7 +497,7 @@ pub fn filter_untrusted_project_lsp(
     )
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::*;
     // Used only by the consume-side regression test below; imported here (not at

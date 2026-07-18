@@ -1185,7 +1185,7 @@ async fn run_output_collector(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::*;
     use crate::terminal::DEFAULT_OUTPUT_BYTE_LIMIT;

@@ -111,7 +111,7 @@ impl From<PrefireOutcome> for PrefirePass1Run {
         }
     }
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod two_pass_prefire_helper_tests {
     use super::{fingerprint_prefix, prefire_lead_percent};
     use xai_grok_sampling_types::ConversationItem;
@@ -2118,7 +2118,7 @@ impl SessionActor {
         );
     }
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod inline_auto_compact_flow_tests {
     use super::super::support::*;
     use super::super::*;

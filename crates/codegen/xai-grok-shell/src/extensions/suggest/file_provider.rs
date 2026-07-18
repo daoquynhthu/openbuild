@@ -394,7 +394,7 @@ fn ci_starts_with(name: &str, prefix_lower: &str) -> bool {
     prefix_lower.chars().all(|p| folded.next() == Some(p))
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::*;
 

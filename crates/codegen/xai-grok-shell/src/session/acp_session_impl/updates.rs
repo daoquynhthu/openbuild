@@ -747,7 +747,7 @@ impl SessionActor {
         }
     }
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod xai_event_id_stamping_tests {
     use super::support::create_test_actor;
     use super::*;

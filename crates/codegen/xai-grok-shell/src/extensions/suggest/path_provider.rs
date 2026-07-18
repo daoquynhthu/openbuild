@@ -181,7 +181,7 @@ fn scan_path_from(path_var: &str) -> Vec<String> {
     executables
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::*;
 

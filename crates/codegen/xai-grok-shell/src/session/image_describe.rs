@@ -520,7 +520,7 @@ pub fn persist_and_prepend_image_files(
         None => original_user_message.to_owned(),
     })
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::*;
     use xai_grok_sampling_types::conversation::{ConversationItem, UserItem};

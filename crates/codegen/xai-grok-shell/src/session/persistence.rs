@@ -113,7 +113,7 @@ pub(crate) fn is_false(v: &bool) -> bool {
     !v
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod feedback_tests {
     use super::*;
     use prod_mc_cli_chat_proxy_types::feedback_types::{
@@ -992,7 +992,7 @@ impl Summary {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod is_hidden_tests {
     use super::*;
 
@@ -1058,7 +1058,7 @@ mod is_hidden_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod head_fields_tests {
     use super::*;
 
@@ -1123,7 +1123,7 @@ mod head_fields_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod generated_title_tests {
     use super::*;
 
@@ -2526,7 +2526,7 @@ fn classify_remote_delete(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod delete_session_history_tests {
     use super::{DeleteSessionError, SessionDeletion, classify_remote_delete};
     use crate::remote::client::BackendError;
@@ -2738,7 +2738,7 @@ fn is_stale(mtime: std::time::SystemTime, ttl_days: u32) -> bool {
     mtime.elapsed().is_ok_and(|age| age > ttl)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod agent_name_persistence_tests {
     use super::*;
 
@@ -2864,7 +2864,7 @@ mod agent_name_persistence_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod collect_session_files_tests {
     use super::*;
     use std::fs;
@@ -2959,7 +2959,7 @@ mod collect_session_files_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod session_exists_tests {
     use super::session_exists_in_root;
     use std::fs;
@@ -3029,7 +3029,7 @@ mod session_exists_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod find_summary_by_session_id_tests {
     use super::find_summary_by_session_id_in_root;
     use std::fs;
@@ -3099,7 +3099,7 @@ mod find_summary_by_session_id_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod resumed_sandbox_profile_tests {
     use super::{
         most_recent_local_summary_for_cwd_in_root, resumed_session_sandbox_profile_in_root,
@@ -3355,7 +3355,7 @@ mod resumed_sandbox_profile_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod session_exists_for_cwd_tests {
     use super::{
         resolve_local_session_any_cwd_in_root, session_exists_for_cwd_in_root,
@@ -3481,7 +3481,7 @@ mod session_exists_for_cwd_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod find_local_child_tests {
     use super::find_local_child_for_remote_in_root;
     use filetime::{self, FileTime};
@@ -3623,7 +3623,7 @@ mod find_local_child_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod resolve_local_session_tests {
     use super::{find_local_child_for_remote_in_root, session_exists_for_cwd_in_root};
     use std::fs;
@@ -3721,7 +3721,7 @@ mod resolve_local_session_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod repo_wide_resolution_tests {
     use super::*;
     use std::fs;

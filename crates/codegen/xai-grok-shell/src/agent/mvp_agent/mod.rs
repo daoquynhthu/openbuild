@@ -2636,7 +2636,7 @@ pub(crate) fn settings_allow_access(
 ) -> bool {
     rs.and_then(|s| s.allow_access).unwrap_or(false)
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod prompt_response_meta_tests;

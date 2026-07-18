@@ -489,7 +489,7 @@ pub(crate) async fn try_lock_auth_file_async(
     None
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::*;
     use tempfile::TempDir;

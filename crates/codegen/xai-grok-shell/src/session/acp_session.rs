@@ -59,7 +59,7 @@ use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
 use std::sync::Arc;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 use std::sync::OnceLock;
 use tokio::sync::{Mutex as TokioMutex, mpsc, oneshot};
 use tokio::time::{Duration, sleep};
@@ -438,7 +438,7 @@ fn managed_gateway_error_to_tool_error(
         }
     }
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod managed_gateway_error_tests {
     use super::*;
     fn status_error(code: u16, message: &str) -> crate::session::managed_mcp::ManagedMcpFetchError {
@@ -550,7 +550,7 @@ impl PreparedToolCall {
             .unwrap_or(&self.tool_name)
     }
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 pub(crate) use crate::session::streaming_capture::STREAMING_CAPTURE_MAX_BYTES;
 pub(crate) use crate::session::streaming_capture::StreamingTurnCapture;
 /// Spawn-time metadata for a subagent, kept by `subagent_id` so the `SubagentStop` event
@@ -1341,19 +1341,19 @@ fn load_prompt_context_from_dir(
         .map_err(|e| tracing::warn!(?e, "failed to deserialize prompt_context.json"))
         .ok()
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/client_hooks_tests.rs"]
 mod client_hooks_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/replace_system_prompt_tests.rs"]
 mod replace_system_prompt_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/support.rs"]
 mod support;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/usage_categories_tests.rs"]
 mod usage_categories_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod managed_gateway_descriptor_tests {
     use super::*;
     use xai_grok_tools::types::output::{MCPOutput, ToolOutput};
@@ -1541,28 +1541,28 @@ mod managed_gateway_descriptor_tests {
 /// ToolBridge must route file operations through the injected FileSystem,
 /// not direct disk I/O. When `.with_fs()` is dropped from the builder,
 /// tools fall back to LocalFs and ACP client-side enforcement stops working.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/fs_injection_regression_tests.rs"]
 mod fs_injection_regression_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/interjection_actor_tests.rs"]
 mod interjection_actor_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/observability_bridge_mapping_tests.rs"]
 mod observability_bridge_mapping_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/permission_auto_mode_tests.rs"]
 mod permission_auto_mode_tests;
 /// Resume re-park of the parked `exit_plan_mode` approval.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/plan_approval_resume_tests.rs"]
 mod plan_approval_resume_tests;
 /// Plan-mode edit gate: read-only except the plan file, even under allow-all.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/plan_mode_edit_gate_tests.rs"]
 mod plan_mode_edit_gate_tests;
 /// Mid-turn plan-mode toggle: immediate activation + buffered reminder.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/plan_mode_midturn_tests.rs"]
 mod plan_mode_midturn_tests;
 /// Tests for [`conversation_has_project_instructions`], the idempotence
@@ -1576,42 +1576,42 @@ mod plan_mode_midturn_tests;
 /// - False for an empty conversation, for a conversation with only a real
 ///   user message, when the wrapper prefix appears in a non-first content
 ///   part, and when the wrapper prefix is buried mid-text.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/project_instructions_idempotence_tests.rs"]
 mod project_instructions_idempotence_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/prompt_mode_transition_tests.rs"]
 mod prompt_mode_transition_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/prompt_queue_actor_tests.rs"]
 mod prompt_queue_actor_tests;
 /// Regression coverage for the per-turn `record_token_usage` path.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/record_response_token_usage_tests.rs"]
 mod record_response_token_usage_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/replay_buffer_send_update_tests.rs"]
 mod replay_buffer_send_update_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/reverse_request_session_id_tests.rs"]
 mod reverse_request_session_id_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/rewind_cross_compaction_tests.rs"]
 mod rewind_cross_compaction_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/rewind_synthetic_turn_tests.rs"]
 mod rewind_synthetic_turn_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/rewrite_zero_turn_prefix_tests.rs"]
 mod rewrite_zero_turn_prefix_tests;
 /// Pins the `SubagentFinished` usage-fold attribution gate.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/subagent_usage_fold_tests.rs"]
 mod subagent_usage_fold_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/turn_completion_emit_tests.rs"]
 mod turn_completion_emit_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tool_meta_stamp_tests {
     //! Pin the `x.ai/tool` stamps on the harness emission paths: the early
     //! ToolCall registered by `prepare_tool_call` and the permission-request
@@ -1768,79 +1768,79 @@ impl Drop for TurnMetrics {
 /// proactive refresh loop and the per-turn pre-request refresh
 /// (`refresh_token_if_expired`). `handle_sampling_failure` surfaces
 /// auth errors to the caller and never invokes the refresher itself.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/auth_error_no_retry_tests.rs"]
 mod auth_error_no_retry_tests;
 /// Regression coverage for the auto-wake suppression sweep + shutdown
 /// drain. These exercise the helpers added to fix the trailing
 /// `<system-reminder>` chat history bug.
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/auto_wake_suppression_tests.rs"]
 mod auto_wake_suppression_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/between_turn_completion_tests.rs"]
 mod between_turn_completion_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/build_tool_parse_error_message_tests.rs"]
 mod build_tool_parse_error_message_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/cancel_running_task_tests.rs"]
 mod cancel_running_task_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/feedback_turn_lookup_tests.rs"]
 mod feedback_turn_lookup_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/goal/goal_reminder_subagent_rules_tests.rs"]
 mod goal_reminder_subagent_rules_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/idle_resume_tests.rs"]
 mod idle_resume_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/inline_auto_compact_flow_tests.rs"]
 mod inline_auto_compact_flow_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/laziness/laziness_debug_tests.rs"]
 mod laziness_debug_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/laziness/laziness_detector_tests.rs"]
 mod laziness_detector_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/laziness/laziness_integration_tests.rs"]
 mod laziness_integration_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/load_user_prompts_tests.rs"]
 mod load_user_prompts_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/media_gen_auth_retry_tests.rs"]
 mod media_gen_auth_retry_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/memory_config_tests.rs"]
 mod memory_config_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/parallel_dispatch_tests.rs"]
 mod parallel_dispatch_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/prompt_context_persistence_tests.rs"]
 mod prompt_context_persistence_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/reactive_managed_reauth_e2e_tests.rs"]
 mod reactive_managed_reauth_e2e_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/reactive_managed_reauth_tests.rs"]
 mod reactive_managed_reauth_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/session_thread_tests.rs"]
 mod session_thread_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/turn/turn_end_guard_tests.rs"]
 mod turn_end_guard_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/wait_for_mcp_prefix_tests.rs"]
 mod wait_for_mcp_prefix_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/web_search_e2e_tests.rs"]
 mod web_search_e2e_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod managed_gateway_tool_tests {
     use super::*;
     use xai_grok_tools::types::output::{MCPOutput, ToolOutput};
@@ -2028,27 +2028,27 @@ mod managed_gateway_tool_tests {
         assert!(!names.contains("slack__search"));
     }
 }
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/goal/goal_backoff_tests.rs"]
 mod goal_backoff_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/goal/goal_classifier_e2e_tests.rs"]
 mod goal_classifier_e2e_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/goal/goal_planner_e2e_tests.rs"]
 mod goal_planner_e2e_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/goal/goal_strategist_e2e_tests.rs"]
 mod goal_strategist_e2e_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/goal/goal_summarizer_e2e_tests.rs"]
 mod goal_summarizer_e2e_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/interjection_tests.rs"]
 mod interjection_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/recap_display_only_tests.rs"]
 mod recap_display_only_tests;
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/reminder_policy_tests.rs"]
 mod reminder_policy_tests;

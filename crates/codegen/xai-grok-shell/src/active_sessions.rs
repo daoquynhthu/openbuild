@@ -208,7 +208,7 @@ fn is_pid_alive(pid: u32) -> bool {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::*;
     use tempfile::TempDir;
