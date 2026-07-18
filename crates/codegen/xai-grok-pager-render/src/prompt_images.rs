@@ -703,7 +703,7 @@ impl PromptImagePreview {
         self.finish(PromptImagePreviewResult::Failed);
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "default-bazel"))]
     pub fn ready_for_test(bytes: Vec<u8>, dimensions: (u32, u32)) -> Self {
         let preview = Self::default();
         preview.finish(PromptImagePreviewResult::Ready {

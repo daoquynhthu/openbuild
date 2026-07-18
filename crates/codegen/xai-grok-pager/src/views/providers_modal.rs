@@ -962,7 +962,7 @@ mod tests {
         render_providers_modal(&mut buf, Rect::new(0, 0, 120, 30), &mut state, false, &theme);
 
         // The rendered buffer must not contain the plaintext secret
-        let rendered = String::from_utf8_lossy(&buf.data);
+        let rendered: String = buf.content().iter().map(|c| c.symbol()).collect();
         assert!(!rendered.contains(secret), "rendered buffer must not contain the raw secret");
     }
 
@@ -982,7 +982,7 @@ mod tests {
         let theme = crate::theme::Theme::default();
         render_providers_modal(&mut buf, Rect::new(0, 0, 120, 30), &mut state, false, &theme);
 
-        let rendered = String::from_utf8_lossy(&buf.data);
+        let rendered: String = buf.content().iter().map(|c| c.symbol()).collect();
         assert!(rendered.contains("my-test-endpoint.com"), "base_url should be visible in render");
     }
 }

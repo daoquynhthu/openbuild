@@ -152,7 +152,7 @@ mod tests {
     fn with_test_env(f: impl FnOnce()) {
         let _guard = theme_cache::test_lock()
             .lock()
-            .unwrap_or_else(|e| e.into_inner());
+            .unwrap_or_else(|e: std::sync::PoisonError<_>| e.into_inner());
         theme_cache::reset_for_test();
         theme_cache::seed_auto_theme_defaults_for_test();
         system_appearance::clear_mock();

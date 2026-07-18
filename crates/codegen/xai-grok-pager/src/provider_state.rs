@@ -258,7 +258,9 @@ mod tests {
         xai_grok_provider::providers::register_all(&registry);
         let mut configs: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
         for pid in registry.all_ids() {
-            configs.insert(pid, ProviderConfig::default());
+            let mut cfg = ProviderConfig::default();
+            cfg.id = Some(pid.0.clone());
+            configs.insert(pid, cfg);
         }
         registry.rebuild(&configs).unwrap();
         registry

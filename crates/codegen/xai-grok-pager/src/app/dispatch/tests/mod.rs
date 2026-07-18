@@ -845,7 +845,7 @@ fn agent_toast(app: &AppView) -> Option<String> {
 fn with_theme_test_env(f: impl FnOnce()) {
     let _guard = crate::theme::cache::test_lock()
         .lock()
-        .unwrap_or_else(|e| e.into_inner());
+        .unwrap_or_else(|e: std::sync::PoisonError<_>| e.into_inner());
     crate::theme::cache::reset_for_test();
     crate::theme::cache::seed_auto_theme_defaults_for_test();
     crate::theme::cache::set(crate::theme::ThemeKind::GrokNight);

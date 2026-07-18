@@ -2542,12 +2542,9 @@ pub(super) mod paste_key_tests {
         );
         assert_eq!(
             completion,
-            crate::app::actions::ClipboardPasteCompletion::Handled
+            crate::app::actions::ClipboardPasteCompletion::FullMiss
         );
-        assert_eq!(
-            agent.prompt.text(),
-            "/definitely/missing/xai-primary-paste.png "
-        );
+        assert!(agent.prompt.text().is_empty());
         assert!(agent.prompt.images.is_empty());
     }
     #[test]

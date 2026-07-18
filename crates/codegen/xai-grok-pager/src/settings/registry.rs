@@ -1105,6 +1105,8 @@ mod tests {
                         pager.plan_mode_active,
                     );
                 }
+                // providers: navigational group row with no scalar value.
+                ("providers", SettingKind::Group { .. }) => {}
                 _ => panic!(
                     "settings::defs::default_settings() contains PAGER entry `{}` with no \
                      matching arm in defaults_match_pager_state. Add an arm.",
