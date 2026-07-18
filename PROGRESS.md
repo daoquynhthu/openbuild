@@ -12,11 +12,45 @@
 - P10-07: PTY E2E test (providers_pty.rs) — open /providers, verify configured state, select model, send prompt, verify response; common.rs cross-platform fixes
 - P10-08: `grok providers` CLI command — list configured providers with endpoint/routes/auth
 
-### Current State
-- `cargo check --workspace`: passes (no errors or warnings)
-- `cargo clippy -p xai-grok-pager --lib`: passes
-- `cargo test -p xai-grok-pager --lib`: 41 new tests passing
-
 ### Phase 10 gate
-- Gate T3: pending (need to verify C-12 closure)
+- Gate T3: ✅
 - PTY E2E: ✅ (providers_pty.rs, ignored)
+- C-12: eligible for -Fixed (/providers now shows correct status, save persists and reloads)
+
+## Phase 11: Security, Resilience, and Observability
+
+### Completion
+- P11-01: Endpoint/SSRF audit — invalid scheme test, explicit redirect policy
+- P11-02: Timeouts — 10s connect timeout, streaming keep-alive (existing)
+- P11-03: Retry policy — classify_error covers auth/encrypted/payload/context errors
+- P11-04: Structured diagnostics — tracing fields in ProviderState::refresh and SaveProviderConfig
+- P11-06: Panic/unwrap audit — clean, all production unwrap_or_* have safe fallbacks
+
+## Phase 12: Cross-Surface E2E and Backward Compatibility
+
+### Completion
+- P12-01: Mock harness audit — MockInferenceServer supports all three SSE protocols
+- P12-02: Full-chain integration test — config → sampler → mock server → decoded events with real HTTP
+- P12-03: Config precedence E2E — 5 tests proving env < TOML < compat < CLI
+- P12-04: Hot reload E2E — atomic rebuild, invalid config preserves old snapshot
+- P12-05: Model switch/provider coexistence — independent routes, model resolution
+- P12-06: Legacy xAI regression suite — defaults, api_key sources, default model, provider count
+- P12-07: No-network enforcement — all tests bind only loopback
+- Total: 28 tests in provider_e2e.rs
+
+## Phase 13: CI, Cross-Platform, Packaging, and Release Engineering
+
+### Completion
+- P13-01: CI workflow — `.github/workflows/provider-adapter.yml` with 6 jobs (Linux, Windows, macOS, workspace, docs, E2E)
+- P13-03: Cross-platform audit — no `canonicalize` usage, path operations use cross-platform utilities
+- P13-06: Migration docs — `docs/provider-adapter-v1/migration.md`, `troubleshooting.md`, `rollback.md`
+
+### Current State
+- `cargo check --workspace`: passes
+- `cargo clippy -p xai-grok-pager -p xai-grok-pager-bin --all-targets -- -D warnings`: passes
+- `cargo test -p xai-grok-provider`: 104 passed, 0 failed
+
+### Remaining
+- P13-02: Fast PR vs full release gate separation (workflow-level)
+- P13-04: Packaging smoke test (CI-specific)
+- P13-05: Optional live smoke workflow (CI-specific, requires secrets)

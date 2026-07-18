@@ -1,0 +1,150 @@
+# Provider-adapter V1 CI workflow: Linux, Windows, and macOS gates.
+# Runs on every push/PR to feat/provider-adapter and on manual trigger.
+name: Provider Adapter V1
+
+on:
+  push:
+    branches: [feat/provider-adapter]
+  pull_request:
+    branches: [feat/provider-adapter]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ── Job 1: Linux targeted gate ──────────────────────────────────────────
+  linux-gate:
+    name: Linux gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+          targets: x86_64-unknown-linux-gnu
+          components: clippy, rustfmt
+      - name: Check
+        run: cargo check -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets
+      - name: Clippy
+        run: cargo clippy -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets -- -D warnings
+      - name: Test provider crate
+        run: cargo test -p xai-grok-provider --all-targets
+      - name: Test sampler crate
+        run: cargo test -p xai-grok-sampler --all-targets
+
+  # ── Job 2: Windows targeted gate ────────────────────────────────────────
+  windows-gate:
+    name: Windows gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+          components: clippy
+      - name: Check
+        run: cargo check -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets
+      - name: Test provider crate
+        run: cargo test -p xai-grok-provider --all-targets
+      - name: Test pager crate (lib)
+        run: cargo test -p xai-grok-pager --lib
+
+  # ── Job 3: macOS targeted gate ──────────────────────────────────────────
+  macos-gate:
+    name: macOS gate
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+          components: clippy
+      - name: Check
+        run: cargo check -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets
+      - name: Test provider crate
+        run: cargo test -p xai-grok-provider --all-targets
+
+  # ── Job 4: Full workspace gate ──────────────────────────────────────────
+  workspace-gate:
+    name: Workspace gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+          targets: x86_64-unknown-linux-gnu
+          components: clippy, rustfmt
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Workspace check
+        run: cargo check --workspace --all-targets
+      - name: Workspace clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Provider tests
+        run: cargo test -p xai-grok-provider --all-targets
+      - name: Sampler tests
+        run: cargo test -p xai-grok-sampler --all-targets
+
+  # ── Job 5: Documentation build ──────────────────────────────────────────
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+      - name: Build docs
+        run: cargo doc --workspace --no-deps 2>&1 | tee doc_output.txt
+      - name: Check for doc warnings
+        run: if grep -q "warning" doc_output.txt; then echo "Docs have warnings"; exit 1; fi
+
+  # ── Job 6: Mocked provider E2E ─────────────────────────────────────────
+  provider-e2e:
+    name: Provider E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+          components: clippy
+      - name: Build
+        run: cargo build -p xai-grok-pager-bin
+      - name: Full provider test suite
+        run: cargo test -p xai-grok-provider --test provider_e2e -- --test-threads=4
+      - name: PTY E2E (ignored)
+        run: cargo test -p xai-grok-pager --test pty_e2e -- --ignored providers_pty --test-threads=1
