@@ -5,6 +5,7 @@ use ratatui::text::Line;
 use ratatui::widgets::Widget;
 
 use crate::config_toml_edit::read_config_document_for_edit;
+use crate::config_validation::{validate_base_url, validate_provider_id};
 use crate::provider_state::{CredentialState, ProviderState, ProviderView};
 use crate::theme::Theme;
 use crate::views::modal_window::{self as mw, Shortcut};
@@ -275,32 +276,6 @@ fn handle_detail_key(
     }
 }
 
-/// Validate a provider identifier.
-fn validate_provider_id(id: &str) -> Result<(), String> {
-    if id.is_empty() {
-        return Err("provider ID cannot be empty".into());
-    }
-    if !id.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-        return Err("provider ID must contain only letters, numbers, underscores, and hyphens".into());
-    }
-    Ok(())
-}
-
-/// Validate a base URL.
-fn validate_base_url(url: &str) -> Result<(), String> {
-    if url.is_empty() {
-        return Ok(());
-    }
-    let parsed = url::Url::parse(url).map_err(|e| format!("invalid base URL: {e}"))?;
-    if parsed.scheme() != "http" && parsed.scheme() != "https" {
-        return Err("base URL must use http or https scheme".into());
-    }
-    if parsed.host_str().unwrap_or_default().is_empty() {
-        return Err("base URL must have a host".into());
-    }
-    Ok(())
-}
-
 /// Persist a provider configuration to disk using the repository's atomic
 /// config editing facility. Validates provider ID and base URL before writing.
 /// If `env_var_name` is non-empty, writes `env_key` and omits `api_key`.
@@ -312,8 +287,8 @@ pub fn persist_provider_config(
     api_key: &str,
     base_url: &str,
 ) -> Result<(), String> {
-    validate_provider_id(id)?;
-    validate_base_url(base_url)?;
+    validate_provider_id(id).map_err(|e| e.to_string())?;
+    validate_base_url(base_url).map_err(|e| e.to_string())?;
 
     if env_var_name.is_empty() && api_key.is_empty() && base_url.is_empty() {
         return Err("nothing to save".into());

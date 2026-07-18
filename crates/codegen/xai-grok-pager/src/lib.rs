@@ -8,6 +8,7 @@ pub mod app;
 pub mod client_identity;
 pub mod completions_cmd;
 mod config_toml_edit;
+mod config_validation;
 pub mod diagnostics;
 pub mod diff;
 pub mod docs;
