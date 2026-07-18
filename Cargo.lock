@@ -13523,16 +13523,19 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "futures",
+ "futures-util",
  "indexmap",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-stream",
  "toml",
  "tracing",
  "url",
  "xai-grok-sampler",
  "xai-grok-sampling-types",
+ "xai-grok-test-support",
 ]
 
 [[package]]

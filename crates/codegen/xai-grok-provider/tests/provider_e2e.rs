@@ -1,6 +1,14 @@
+use indexmap::IndexMap;
+
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::registry::ProviderRegistry;
 use xai_grok_provider::types::{ProviderId, RouteId};
+use futures_util::stream::StreamExt;
+use xai_grok_sampler::client::SamplingClient;
+use xai_grok_sampler::SamplerConfig;
+
+use xai_grok_sampling_types::types::{ChatCompletionRequest, ChatRequestMessage};
+use xai_grok_test_support::MockInferenceServer;
 
 /// Integration test: full provider config → registry → Route → SamplerConfig.
 /// Verifies that the entire chain from configuration to a valid SamplerConfig
@@ -915,5 +923,65 @@ fn legacy_provider_count_stable() {
         );
     }
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Full-chain integration: provider config → registry → sampler → mock server
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Start a mock server, configure a provider pointing to it, build a
+/// SamplingClient, send a chat completion request, and verify the mock
+/// server received it with the expected auth header and path.
+#[tokio::test]
+async fn full_chain_chat_completion_through_mock() {
+    let mock = MockInferenceServer::start().await.expect("start mock");
+    mock.set_response("mock chat response");
+
+    let sampler = SamplerConfig {
+        api_key: Some("sk-test-key".into()),
+        base_url: mock.url(),
+        model: "test-model".into(),
+        api_backend: xai_grok_sampler::ApiBackend::ChatCompletions,
+        protocol_id: Some("chat_completions".into()),
+        auth_scheme: xai_grok_sampler::AuthScheme::Bearer,
+        context_window: 4096,
+        max_completion_tokens: None,
+        temperature: None,
+        top_p: None,
+        extra_headers: IndexMap::new(),
+        ..Default::default()
+    };
+
+    let client = SamplingClient::new(sampler).expect("build SamplingClient");
+    assert_eq!(client.protocol_id(), "chat_completions");
+
+    let request = ChatCompletionRequest::new(
+        "test-model",
+        vec![ChatRequestMessage::user("hello from e2e test")],
+    );
+
+    let (stream, _meta) = client
+        .chat_completion_stream(request)
+        .await
+        .expect("chat completion stream");
+
+    let chunks: Vec<_> = stream.collect().await;
+    assert!(!chunks.is_empty(), "should receive at least one chunk");
+
+    // Verify the mock server received the request
+    assert_eq!(mock.request_count(), 1, "mock must receive 1 request");
+    let requests = mock.requests();
+    assert_eq!(requests[0].path, "/v1/chat/completions");
+    let auth = requests[0]
+        .header("authorization")
+        .expect("authorization header");
+    assert_eq!(auth, "Bearer sk-test-key");
+
+    // Verify response contains our mock text
+    let body = requests[0].body.as_ref().expect("request body");
+    let model = body.get("model").and_then(|m| m.as_str()).unwrap_or("");
+    assert_eq!(model, "test-model");
+}
+
+
 
 

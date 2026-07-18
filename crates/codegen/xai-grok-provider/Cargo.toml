@@ -18,8 +18,11 @@ url = { workspace = true }
 xai-grok-sampling-types = { path = "../xai-grok-sampling-types" }
 
 [dev-dependencies]
+futures-util = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
+tokio-stream = { workspace = true }
 xai-grok-sampler = { path = "../xai-grok-sampler" }
+xai-grok-test-support = { path = "../xai-grok-test-support" }
 
 [lints]
 workspace = true
