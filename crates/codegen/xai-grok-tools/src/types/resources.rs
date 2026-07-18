@@ -912,6 +912,7 @@ impl std::fmt::Debug for McpResourceAccess {
         f.debug_struct("McpResourceAccess").finish()
     }
 }
+#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;

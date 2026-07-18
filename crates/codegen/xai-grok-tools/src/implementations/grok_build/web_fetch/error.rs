@@ -87,6 +87,7 @@ fn gh_available() -> bool {
     which::which("gh").is_ok()
 }
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;

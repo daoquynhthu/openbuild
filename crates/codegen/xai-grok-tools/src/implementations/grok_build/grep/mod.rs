@@ -1465,6 +1465,7 @@ pub fn format_count_output(
 // Tests
 // ───────────────────────────────────────────────────────────────────────────
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;

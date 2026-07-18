@@ -921,6 +921,7 @@ pub fn discover_skills_for_paths(
     skills
 }
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;

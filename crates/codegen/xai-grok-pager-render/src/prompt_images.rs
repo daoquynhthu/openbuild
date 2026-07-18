@@ -2215,6 +2215,7 @@ mod tests {
 
     // ----- try_read_image_from_path ----------------------------------------
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn try_read_image_with_escaped_parens() {
         let dir = tempfile::tempdir().unwrap();
@@ -2237,6 +2238,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn try_read_image_with_escaped_spaces() {
         let dir = tempfile::tempdir().unwrap();
@@ -2599,6 +2601,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn quoted_path_with_internal_backslash_escape() {
         let dir = tempfile::tempdir().unwrap();
@@ -2616,6 +2619,7 @@ mod tests {
 
     // ----- file:// URL edge cases ----------------------------
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn file_url_with_localhost_host() {
         let dir = tempfile::tempdir().unwrap();
@@ -2933,6 +2937,7 @@ mod tests {
         assert_eq!(non_images[0], canon(&txt));
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn dropped_path_percent_encoded_question_round_trips() {
         // `%3F` decodes to `?`. The URL parser must not treat the

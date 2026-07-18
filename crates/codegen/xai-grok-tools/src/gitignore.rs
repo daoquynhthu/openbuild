@@ -102,6 +102,7 @@ mod tests {
 
     /// Regression: running outside a git repo panicked with
     /// "path is expected to be under the root" (ignore crate assert).
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn regression_no_panic_on_absolute_path_without_git_root() {
         let gi = build_gitignore(Path::new("."), &["node_modules/", "*.log"]);

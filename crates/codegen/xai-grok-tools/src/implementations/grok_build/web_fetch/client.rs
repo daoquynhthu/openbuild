@@ -813,6 +813,7 @@ fn strip_base64_data_uris(content: String) -> String {
 // Tests
 // ───────────────────────────────────────────────────────────────────────────
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;

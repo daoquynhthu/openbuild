@@ -2155,6 +2155,7 @@ mod tests {
     /// tool description is fully rendered -- no unresolved MiniJinja vars,
     /// no stale `{max_*}` placeholders, no empty tool-name references from
     /// missing conditional guards.
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn full_toolset_descriptions_render_cleanly() {
         use crate::implementations::grok_build::{

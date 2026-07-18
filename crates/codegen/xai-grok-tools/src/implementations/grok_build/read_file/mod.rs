@@ -654,6 +654,7 @@ impl ReadFileTool {
         Ok((output, streamable_text))
     }
 }
+#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;

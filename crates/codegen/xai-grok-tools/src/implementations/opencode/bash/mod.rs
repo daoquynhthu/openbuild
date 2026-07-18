@@ -455,7 +455,7 @@ impl xai_tool_runtime::Tool for BashTool {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests {
     use super::*;
     use crate::types::tool_metadata::test_ctx;

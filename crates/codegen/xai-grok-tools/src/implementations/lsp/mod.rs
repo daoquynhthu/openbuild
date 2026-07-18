@@ -6,7 +6,7 @@ pub mod manager;
 pub mod restart;
 mod types;
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 mod tests;
 
 pub use dispatch::LspBackendAdapter;

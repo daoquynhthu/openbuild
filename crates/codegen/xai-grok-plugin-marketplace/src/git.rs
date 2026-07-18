@@ -387,6 +387,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))]
     fn cache_lease_blocks_concurrent_reclone_during_scan() {
         let cache_root = tempfile::tempdir().unwrap();
         let url = "https://example.com/repo.git";

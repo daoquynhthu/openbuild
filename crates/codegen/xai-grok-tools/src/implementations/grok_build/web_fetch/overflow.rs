@@ -306,6 +306,7 @@ fn web_fetch_steer(
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;

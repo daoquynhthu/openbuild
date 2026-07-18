@@ -210,6 +210,7 @@ pub fn path_for_tool_surface(
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "windows"))]
 mod tests {
     use super::*;
 

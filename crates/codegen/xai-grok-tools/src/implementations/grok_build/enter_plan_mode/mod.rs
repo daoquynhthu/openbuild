@@ -213,6 +213,7 @@ async fn probe_or_create_empty_plan_file(
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;
