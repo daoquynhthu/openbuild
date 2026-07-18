@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Per-test-case module for the `pty_e2e` integration test crate.
 #[allow(unused_imports)]
 use super::common::*;
@@ -169,3 +170,4 @@ async fn bash_mode_file_completion_shell_like() {
 
     harness.quit().expect("clean quit");
 }
+

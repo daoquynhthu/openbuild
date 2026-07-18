@@ -1,3 +1,4 @@
+#![allow(clippy::single_range_in_vec_init)]
 //! Tests for prompt and bash submission, queueing, and interject shims.
 
 use super::*;
@@ -3518,3 +3519,4 @@ fn suggestion_debounce_routes_by_agent_id_not_active_view() {
         "expiry must fetch for the arming agent even off-screen: {effects:?}"
     );
 }
+

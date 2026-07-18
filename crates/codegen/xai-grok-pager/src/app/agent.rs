@@ -976,6 +976,7 @@ impl AgentSession {
 }
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::single_range_in_vec_init)]
     use super::*;
     fn test_session() -> AgentSession {
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();

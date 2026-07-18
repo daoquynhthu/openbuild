@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Per-test-case module for the `pty_e2e` integration test crate.
 #[allow(unused_imports)]
 use super::common::*;
@@ -134,3 +135,4 @@ async fn bash_mode_tab_accepts_dropdown_item_in_place() {
 
     harness.quit().expect("clean quit");
 }
+

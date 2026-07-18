@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 // Per-test-case module for the `pty_e2e` integration test crate.
 #[allow(unused_imports)]
 use super::common::*;
@@ -268,3 +269,4 @@ async fn word_select_tip_skipped_when_contextual_hint_disabled() {
 
     harness.quit().expect("clean quit");
 }
+

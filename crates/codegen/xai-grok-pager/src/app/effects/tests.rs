@@ -1,3 +1,4 @@
+#![allow(clippy::single_range_in_vec_init)]
 #![cfg_attr(rustfmt, rustfmt::skip)]
 use super::*;
 use xai_grok_shell::extensions::billing::{BillingConfig, Cent, UsagePeriod};
@@ -2019,3 +2020,4 @@ fn session_picker_entry_maps_to_dormant_roster_row() {
     assert_eq!(roster.origin.kind, "local");
     assert_eq!(roster.origin.host.as_deref(), Some("box"));
 }
+

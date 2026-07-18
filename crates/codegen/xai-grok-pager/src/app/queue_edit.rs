@@ -1,3 +1,4 @@
+#![allow(clippy::single_range_in_vec_init)]
 //! Queued-prompt editing (`PromptMode::EditingQueued`) state machine.
 //!
 //! Extracted from `agent_view.rs` as a sibling `impl AgentView` block (same
@@ -1579,3 +1580,4 @@ mod tests {
         assert!(matches!(agent.prompt_mode, PromptMode::Normal));
     }
 }
+

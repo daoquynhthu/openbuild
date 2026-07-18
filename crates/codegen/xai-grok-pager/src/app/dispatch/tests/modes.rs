@@ -1,3 +1,4 @@
+#![allow(clippy::single_range_in_vec_init)]
 //! Tests for plan, yolo, auto, and permission mode transitions.
 
 use super::*;
@@ -2322,3 +2323,4 @@ fn set_plan_mode_idempotency_uses_pending_over_active() {
         "OFF transition must set optimistic pending to Some(false)"
     );
 }
+

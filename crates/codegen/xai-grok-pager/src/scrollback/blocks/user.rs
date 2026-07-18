@@ -535,6 +535,7 @@ impl BlockContent for UserPromptBlock {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::single_range_in_vec_init)]
     use super::*;
 
     /// Helper to get line text content (excluding styles)
@@ -826,7 +827,8 @@ mod tests {
         // Expanded (no max_lines): the 12-wide token cannot fit at width 8, so
         // the wrapper splits it mid-token; every piece must stay teal.
         let text = "aa /pr-workflow zz";
-        let block = UserPromptBlock::with_skill_tokens(text, vec![3..15]);
+        let range = 3..15;
+        let block = UserPromptBlock::with_skill_tokens(text, vec![range]);
         let lines = block.wrap_prompt_lines(8, None, false, false);
         assert!(lines.len() >= 2);
 

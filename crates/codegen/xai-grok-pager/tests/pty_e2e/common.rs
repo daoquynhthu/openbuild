@@ -1,6 +1,7 @@
 //! Shared constants and helpers for PTY e2e tests.
 //!
 //! Individual test modules import via `use super::common::*`.
+#![allow(dead_code)]
 
 pub(crate) use serde_json::json;
 pub(crate) use std::path::Path;
