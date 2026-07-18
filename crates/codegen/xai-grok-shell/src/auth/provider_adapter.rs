@@ -101,6 +101,7 @@ mod tests {
     struct MockManager;
 
     impl MockManager {
+        #[allow(clippy::new_ret_no_self)]
         fn new() -> AuthManager {
             // Create AuthManager with test paths
             let home = tempfile::tempdir().unwrap();

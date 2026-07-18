@@ -233,7 +233,9 @@ mod tests {
 
     #[test]
     fn marketplace_relative_path_join_under_rejects_symlink_escape() {
+        #[cfg(unix)]
         let dir = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
         let outside = tempfile::tempdir().unwrap();
         #[cfg(unix)]
         {
@@ -248,7 +250,9 @@ mod tests {
 
     #[test]
     fn marketplace_relative_path_join_under_rejects_symlink_ancestor_escape() {
+        #[cfg(unix)]
         let dir = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
         let outside = tempfile::tempdir().unwrap();
         #[cfg(unix)]
         {
