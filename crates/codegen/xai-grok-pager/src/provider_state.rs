@@ -248,6 +248,21 @@ fn redact_endpoint(raw: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+
+    use xai_grok_provider::config::ProviderConfig;
+    use xai_grok_provider::registry::ProviderRegistry;
+
+    fn real_registry() -> Arc<ProviderRegistry> {
+        let registry = Arc::new(ProviderRegistry::new());
+        xai_grok_provider::providers::register_all(&registry);
+        let mut configs: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        for pid in registry.all_ids() {
+            configs.insert(pid, ProviderConfig::default());
+        }
+        registry.rebuild(&configs).unwrap();
+        registry
+    }
 
     #[test]
     fn redact_endpoint_removes_userinfo() {
@@ -273,5 +288,81 @@ mod tests {
     fn redact_endpoint_handles_ollama_localhost() {
         let result = redact_endpoint("http://localhost:11434");
         assert_eq!(result, "http://localhost:11434/");
+    }
+
+    #[test]
+    fn provider_state_empty_registry_has_no_views() {
+        let registry = Arc::new(ProviderRegistry::new());
+        let state = ProviderState::new(registry);
+        assert_eq!(state.ordered_views().len(), 0);
+    }
+
+    #[test]
+    fn provider_state_real_providers_have_views() {
+        let registry = real_registry();
+        let state = ProviderState::new(registry);
+        assert!(state.ordered_views().len() >= 5, "expected at least 5 providers (xai, openai, anthropic, opencode, ollama)");
+    }
+
+    #[test]
+    fn provider_state_ordering_deterministic() {
+        let registry = real_registry();
+        let s1 = ProviderState::new(registry.clone());
+        let s2 = ProviderState::new(registry);
+        let ids1: Vec<&str> = s1.ordered_views().iter().map(|v| v.id.0.as_str()).collect();
+        let ids2: Vec<&str> = s2.ordered_views().iter().map(|v| v.id.0.as_str()).collect();
+        assert_eq!(ids1, ids2, "provider order must be deterministic");
+    }
+
+    #[test]
+    fn provider_state_update_error_persists() {
+        let registry = real_registry();
+        let mut state = ProviderState::new(registry);
+        let pid = ProviderId::new("xai");
+        state.update_error(&pid, Some("something went wrong".into()));
+        let view = state.view_for(&pid).expect("xai view should exist");
+        assert_eq!(view.last_error.as_deref(), Some("something went wrong"));
+    }
+
+    #[test]
+    fn provider_state_update_error_resets_to_none() {
+        let registry = real_registry();
+        let mut state = ProviderState::new(registry);
+        let pid = ProviderId::new("xai");
+        state.update_error(&pid, Some("old error".into()));
+        state.update_error(&pid, None);
+        let view = state.view_for(&pid).expect("xai view should exist");
+        assert_eq!(view.last_error, None);
+    }
+
+    #[test]
+    fn provider_state_update_error_unknown_id_noop() {
+        let registry = real_registry();
+        let mut state = ProviderState::new(registry);
+        state.update_error(&ProviderId::new("unknown"), Some("error".into()));
+        assert!(state.view_for(&ProviderId::new("unknown")).is_none());
+    }
+
+    #[test]
+    fn provider_state_refresh_does_not_panic() {
+        let registry = real_registry();
+        let mut state = ProviderState::new(registry);
+        state.refresh();
+        assert!(!state.ordered_views().is_empty());
+    }
+
+    #[test]
+    fn provider_view_credential_state_missing_by_default() {
+        let registry = real_registry();
+        let state = ProviderState::new(registry);
+        for view in state.ordered_views() {
+            match view.id.0.as_str() {
+                "opencode" => assert_eq!(view.credential, CredentialState::Public, "opencode is public"),
+                "ollama" => assert_eq!(view.credential, CredentialState::NotRequired, "ollama is not-required"),
+                _ => {
+                    assert_eq!(view.credential, CredentialState::Missing, "{} should be Missing", view.id.0);
+                }
+            }
+        }
     }
 }

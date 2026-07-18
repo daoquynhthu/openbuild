@@ -99,6 +99,7 @@ fn credential_status(view: &ProviderView) -> (&'static str, Color) {
 }
 
 /// Outcome from handling a key press on the Providers modal.
+#[derive(Debug, PartialEq, Eq)]
 pub enum ProvidersKeyOutcome {
     Close,
     Save {
@@ -720,4 +721,226 @@ fn render_field(
         ratatui::text::Span::styled(value, value_style),
     ]);
     line.render(Rect::new(x, y, width, 1), buf);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use std::sync::Arc;
+
+    fn test_state() -> ProvidersModalState {
+        let registry =
+            Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
+        xai_grok_provider::providers::register_all(&registry);
+        let configs: indexmap::IndexMap<_, _> = registry
+            .all_ids()
+            .into_iter()
+            .map(|pid| (pid, xai_grok_provider::config::ProviderConfig::default()))
+            .collect();
+        registry.rebuild(&configs).unwrap();
+        let provider_state = ProviderState::new(registry);
+        ProvidersModalState::new(provider_state)
+    }
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::empty())
+    }
+
+    #[test]
+    fn debug_detail_redacts_api_key() {
+        let view = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: "MY_VAR".into(),
+            api_key: "sk-secret-key-12345".into(),
+            base_url: "https://test.com".into(),
+            focused_field: 0,
+            show_api_key: false,
+        };
+        let debug = format!("{:?}", view);
+        assert!(!debug.contains("sk-secret-key-12345"), "api_key must not appear in debug");
+        assert!(debug.contains("MY_VAR"), "env_var_name should appear");
+        assert!(debug.contains("https://test.com"), "base_url should appear");
+    }
+
+    #[test]
+    fn detail_esc_returns_to_list() {
+        let mut state = test_state();
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: String::new(),
+            api_key: String::new(),
+            base_url: String::new(),
+            focused_field: 0,
+            show_api_key: false,
+        };
+        let outcome = handle_providers_key(&mut state, &key(KeyCode::Esc));
+        assert_eq!(outcome, ProvidersKeyOutcome::Changed);
+        assert_eq!(state.mode, ProvidersView::List);
+    }
+
+    #[test]
+    fn list_esc_returns_close() {
+        let mut state = test_state();
+        let outcome = handle_providers_key(&mut state, &key(KeyCode::Esc));
+        assert_eq!(outcome, ProvidersKeyOutcome::Close);
+    }
+
+    #[test]
+    fn detail_tab_cycles_focus() {
+        let mut state = test_state();
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: String::new(),
+            api_key: String::new(),
+            base_url: String::new(),
+            focused_field: 0,
+            show_api_key: false,
+        };
+
+        // Tab from 0 -> 1
+        let _ = handle_providers_key(&mut state, &key(KeyCode::Tab));
+        let ProvidersView::Detail { focused_field, .. } = &state.mode else {
+            panic!("should still be in detail");
+        };
+        assert_eq!(*focused_field, 1);
+
+        // Tab from 1 -> 2
+        let _ = handle_providers_key(&mut state, &key(KeyCode::Tab));
+        let ProvidersView::Detail { focused_field, .. } = &state.mode else {
+            panic!("should still be in detail");
+        };
+        assert_eq!(*focused_field, 2);
+
+        // Tab from 2 -> 0 (wrap)
+        let _ = handle_providers_key(&mut state, &key(KeyCode::Tab));
+        let ProvidersView::Detail { focused_field, .. } = &state.mode else {
+            panic!("should still be in detail");
+        };
+        assert_eq!(*focused_field, 0);
+    }
+
+    #[test]
+    fn detail_enter_returns_save() {
+        let mut state = test_state();
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: "MY_VAR".into(),
+            api_key: "sk-test".into(),
+            base_url: "https://test.com/v1".into(),
+            focused_field: 0,
+            show_api_key: false,
+        };
+        let outcome = handle_providers_key(&mut state, &key(KeyCode::Enter));
+        assert!(
+            matches!(outcome, ProvidersKeyOutcome::Save { .. }),
+            "expected Save, got {:?}",
+            outcome
+        );
+        if let ProvidersKeyOutcome::Save { env_var_name, api_key, base_url, .. } = outcome {
+            assert_eq!(env_var_name, "MY_VAR");
+            assert_eq!(api_key, "sk-test");
+            assert_eq!(base_url, "https://test.com/v1");
+        }
+    }
+
+    #[test]
+    fn detail_char_edits_env_var_field() {
+        let mut state = test_state();
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: String::new(),
+            api_key: String::new(),
+            base_url: String::new(),
+            focused_field: 0,
+            show_api_key: false,
+        };
+
+        let _ = handle_providers_key(&mut state, &key(KeyCode::Char('X')));
+        let ProvidersView::Detail { env_var_name, .. } = &state.mode else {
+            panic!("should be in detail");
+        };
+        assert_eq!(env_var_name, "X");
+    }
+
+    #[test]
+    fn detail_char_edits_api_key_field() {
+        let mut state = test_state();
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: String::new(),
+            api_key: String::new(),
+            base_url: String::new(),
+            focused_field: 1,
+            show_api_key: false,
+        };
+
+        let _ = handle_providers_key(&mut state, &key(KeyCode::Char('a')));
+        let ProvidersView::Detail { api_key, .. } = &state.mode else {
+            panic!("should be in detail");
+        };
+        assert_eq!(api_key, "a");
+    }
+
+    #[test]
+    fn detail_backspace_removes_char() {
+        let mut state = test_state();
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: "AB".into(),
+            api_key: String::new(),
+            base_url: String::new(),
+            focused_field: 0,
+            show_api_key: false,
+        };
+
+        let _ = handle_providers_key(&mut state, &key(KeyCode::Backspace));
+        let ProvidersView::Detail { env_var_name, .. } = &state.mode else {
+            panic!("should be in detail");
+        };
+        assert_eq!(env_var_name, "A");
+
+        let _ = handle_providers_key(&mut state, &key(KeyCode::Backspace));
+        let ProvidersView::Detail { env_var_name, .. } = &state.mode else {
+            panic!("should be in detail");
+        };
+        assert_eq!(env_var_name, "");
+    }
+
+    #[test]
+    fn detail_ctrl_r_toggles_show_api_key() {
+        let mut state = test_state();
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: String::new(),
+            api_key: String::new(),
+            base_url: String::new(),
+            focused_field: 1,
+            show_api_key: false,
+        };
+
+        let ctrl_r = KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL);
+        let _ = handle_providers_key(&mut state, &ctrl_r);
+        let ProvidersView::Detail { show_api_key, .. } = &state.mode else {
+            panic!("should be in detail");
+        };
+        assert!(show_api_key);
+    }
+
+    #[test]
+    fn list_enter_opens_detail() {
+        let mut state = test_state();
+        let outcome = handle_providers_key(&mut state, &key(KeyCode::Enter));
+        assert_eq!(outcome, ProvidersKeyOutcome::Changed);
+        assert!(
+            matches!(state.mode, ProvidersView::Detail { .. }),
+            "expected Detail mode, got {:?}",
+            state.mode
+        );
+        if let ProvidersView::Detail { env_var_name, api_key, base_url, .. } = &state.mode {
+            assert_eq!(env_var_name.as_str(), "", "env_var_name should start empty");
+            assert_eq!(api_key.as_str(), "", "api_key should start empty");
+            assert!(!base_url.is_empty(), "base_url should be pre-filled");
+        }
+    }
 }
