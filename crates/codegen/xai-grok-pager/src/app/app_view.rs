@@ -10299,7 +10299,7 @@ pub(crate) mod tests {
         let mut app = test_app();
         app.project_picker_shown = false;
         app.project_picker_disabled = false;
-        app.cwd = std::path::PathBuf::from("/tmp");
+        app.cwd = std::env::temp_dir();
         assert!(app.needs_project_picker());
     }
     /// Chat mode hides the welcome picker's source filter, so `f` must not

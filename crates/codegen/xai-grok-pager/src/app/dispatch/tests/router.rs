@@ -1612,6 +1612,7 @@ fn pager_registry_default_matches_agent_view_new_initializer() {
                          the registry is the contract surface.",
                 );
             }
+            ("providers", SettingKind::Group { .. }) => {}
             ("respect_manual_folds", SettingKind::Bool { default }) => {
                 let live = agent
                     .scrollback

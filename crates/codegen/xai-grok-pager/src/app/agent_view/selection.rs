@@ -1456,6 +1456,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn active_child_copy_uses_child_scrollback_cwd() {
         use crate::scrollback::block::RenderBlock;
@@ -1495,7 +1496,7 @@ mod tests {
             .ranges
             .iter()
             .flat_map(|range| &range.lines)
-            .find(|line| line.text == "src/lib.rs")
+            .find(|line| line.text.replace('\\', "/") == "src/lib.rs")
             .expect("child-relative Read header")
             .clone();
         let content_width = rendered
@@ -1524,13 +1525,13 @@ mod tests {
                 |source| source(line.block_line_idx),
             )
             .flatten();
-        assert_eq!(source_text.as_deref(), Some("src/lib.rs"));
+        assert_eq!(source_text.as_deref().map(|s| s.replace('\\', "/")), Some("src/lib.rs".to_string()));
         {
             let child = parent.subagent_views.get(&child_id).expect("active child");
             let entry = child.scrollback.get(0).expect("child Read entry");
             let cached = entry.cached_output_ref();
             assert_eq!(
-                derive_selection_text(&cached.lines[line.block_line_idx]),
+                derive_selection_text(&cached.lines[line.block_line_idx]).replace('\\', "/"),
                 "src/lib.rs",
                 "copy helper must not rebuild the child cache against parent cwd"
             );

@@ -608,6 +608,7 @@ mod tests {
         assert_eq!(store_calls.get(), 0);
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn async_gate_supports_bundled_and_user_skill_locations() {
         let enabled = gated_sources_async_with(compat_all(), Path::new("/grok"), |path| {

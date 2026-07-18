@@ -692,7 +692,7 @@ fn two_agent_app_with_bg_task() -> AppView {
 }
 fn project_picker_app() -> AppView {
     let mut app = test_app();
-    app.cwd = PathBuf::from("/tmp");
+    app.cwd = std::env::temp_dir();
     app.project_picker_shown = false;
     app
 }

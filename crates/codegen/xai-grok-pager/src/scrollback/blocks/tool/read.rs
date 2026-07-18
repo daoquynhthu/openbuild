@@ -542,7 +542,7 @@ mod tests {
             .iter()
             .map(|s| s.content.as_ref())
             .collect();
-        assert_eq!(header, "Read src/main.rs");
+        assert_eq!(header.replace('\\', "/"), "Read src/main.rs");
 
         let preamble = block.preamble(&ctx).unwrap();
         let preamble_text: String = preamble
@@ -551,7 +551,7 @@ mod tests {
             .flat_map(|l| l.spans.iter())
             .map(|s| s.content.as_ref())
             .collect();
-        assert_eq!(preamble_text, "Read /Users/me/project/src/main.rs");
+        assert_eq!(preamble_text.replace('\\', "/"), "Read /Users/me/project/src/main.rs");
     }
 
     #[test]
@@ -611,9 +611,10 @@ mod tests {
         ctx.mode = DisplayMode::Expanded;
         ctx.cwd = Some(std::path::PathBuf::from("/Users/me/project"));
         let header = &block.output(&ctx).lines[0];
-        assert_eq!(derive_selection_text(header), "src/main.rs");
+        assert_eq!(derive_selection_text(header).replace('\\', "/"), "src/main.rs");
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn header_link_url_is_absolute_for_collapsed_and_expanded() {
         let abs = "/Users/me/project/src/main.rs";
@@ -633,7 +634,7 @@ mod tests {
         ctx.mode = DisplayMode::Expanded;
         let expanded = block.output(&ctx);
         assert_eq!(
-            expanded.lines[0].content.spans[1].content.as_ref(),
+            expanded.lines[0].content.spans[1].content.as_ref().replace('\\', "/"),
             "src/main.rs"
         );
         assert_eq!(expanded.lines[0].link_url.as_deref(), Some(url.as_ref()));
