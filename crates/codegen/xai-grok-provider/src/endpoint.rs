@@ -287,6 +287,26 @@ mod tests {
     }
 
     #[test]
+    fn endpoint_rejects_invalid_scheme() {
+        let ep = Endpoint {
+            base_url: Some("ftp://files.example.com/resource".into()),
+            path: EndpointPart::Static("/chat".into()),
+            query: None,
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let result = ep.render(&input);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn endpoint_rejects_fragment() {
         let ep = Endpoint {
             base_url: Some("https://api.example.com/v1#frag".into()),

@@ -95,6 +95,14 @@ impl ProviderState {
     pub fn refresh(&mut self) {
         let snapshot = self.registry.snapshot();
         self.revision = snapshot.revision;
+        let provider_count = snapshot.providers.len();
+        let route_count: usize = snapshot.routes.len();
+        tracing::debug!(
+            revision = self.revision,
+            provider_count,
+            route_count,
+            "ProviderState::refresh"
+        );
         let mut views: IndexMap<ProviderId, ProviderView> = IndexMap::new();
 
         for (pid, configured) in &snapshot.providers {
