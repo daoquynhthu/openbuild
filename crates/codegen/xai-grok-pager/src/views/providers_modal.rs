@@ -943,4 +943,46 @@ mod tests {
             assert!(!base_url.is_empty(), "base_url should be pre-filled");
         }
     }
+
+    #[test]
+    fn rendered_detail_does_not_contain_secret() {
+        let mut state = test_state();
+        let secret = "sk-my-secret-key-99999";
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: String::new(),
+            api_key: secret.into(),
+            base_url: String::new(),
+            focused_field: 1,
+            show_api_key: false,
+        };
+
+        let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 120, 30));
+        let theme = crate::theme::Theme::default();
+        render_providers_modal(&mut buf, Rect::new(0, 0, 120, 30), &mut state, false, &theme);
+
+        // The rendered buffer must not contain the plaintext secret
+        let rendered = String::from_utf8_lossy(&buf.data);
+        assert!(!rendered.contains(secret), "rendered buffer must not contain the raw secret");
+    }
+
+    #[test]
+    fn rendered_detail_shows_prefilled_base_url() {
+        let mut state = test_state();
+        state.mode = ProvidersView::Detail {
+            provider_idx: 0,
+            env_var_name: String::new(),
+            api_key: String::new(),
+            base_url: "https://my-test-endpoint.com/v1".into(),
+            focused_field: 2,
+            show_api_key: false,
+        };
+
+        let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 120, 30));
+        let theme = crate::theme::Theme::default();
+        render_providers_modal(&mut buf, Rect::new(0, 0, 120, 30), &mut state, false, &theme);
+
+        let rendered = String::from_utf8_lossy(&buf.data);
+        assert!(rendered.contains("my-test-endpoint.com"), "base_url should be visible in render");
+    }
 }

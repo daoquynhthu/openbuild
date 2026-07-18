@@ -344,6 +344,41 @@ mod tests {
     }
 
     #[test]
+    fn provider_state_update_catalog_transitions() {
+        let registry = real_registry();
+        let mut state = ProviderState::new(registry);
+        let pid = ProviderId::new("xai");
+
+        // Initially Idle
+        let view = state.view_for(&pid).expect("xai view");
+        assert_eq!(view.catalog, CatalogState::Idle);
+
+        // Fetching
+        state.update_catalog(&pid, CatalogState::Fetching, 1);
+        let view = state.view_for(&pid).expect("xai view");
+        assert_eq!(view.catalog, CatalogState::Fetching);
+        assert_eq!(view.catalog_revision, 1);
+
+        // Stale
+        state.update_catalog(&pid, CatalogState::Stale, 2);
+        let view = state.view_for(&pid).expect("xai view");
+        assert_eq!(view.catalog, CatalogState::Stale);
+        assert_eq!(view.catalog_revision, 2);
+
+        // Failed with error
+        state.update_catalog(&pid, CatalogState::Failed("timeout".into()), 3);
+        let view = state.view_for(&pid).expect("xai view");
+        assert_eq!(view.catalog, CatalogState::Failed("timeout".into()));
+        assert_eq!(view.catalog_revision, 3);
+
+        // Back to Idle
+        state.update_catalog(&pid, CatalogState::Idle, 4);
+        let view = state.view_for(&pid).expect("xai view");
+        assert_eq!(view.catalog, CatalogState::Idle);
+        assert_eq!(view.catalog_revision, 4);
+    }
+
+    #[test]
     fn provider_state_refresh_does_not_panic() {
         let registry = real_registry();
         let mut state = ProviderState::new(registry);
