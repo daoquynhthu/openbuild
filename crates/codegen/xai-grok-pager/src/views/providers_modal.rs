@@ -174,6 +174,10 @@ fn handle_list_key(
             state.selected = providers.len().saturating_sub(1);
             ProvidersKeyOutcome::Changed
         }
+        KeyCode::Char('r') if key.modifiers.is_empty() => {
+            state.provider_state.refresh();
+            ProvidersKeyOutcome::Changed
+        }
         _ => ProvidersKeyOutcome::Unchanged,
     }
 }
@@ -388,9 +392,14 @@ fn render_list(
             id: 1,
         },
         Shortcut {
-            label: "Esc close",
+            label: "r refresh",
             clickable: false,
             id: 2,
+        },
+        Shortcut {
+            label: "Esc close",
+            clickable: false,
+            id: 3,
         },
     ];
 
