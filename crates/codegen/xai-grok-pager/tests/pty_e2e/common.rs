@@ -1037,7 +1037,6 @@ pub(crate) fn fake_argv_echo_shell() -> (tempfile::TempDir, String) {
 // ── Shared polling / failure-dump / cast helpers ────────────────────────
 
 /// Poll `probe` every 100ms until it yields `Some` or `timeout` elapses.
-#[cfg(unix)]
 pub(crate) fn poll_for<T>(timeout: Duration, mut probe: impl FnMut() -> Option<T>) -> Option<T> {
     let deadline = Instant::now() + timeout;
     loop {
@@ -1052,7 +1051,6 @@ pub(crate) fn poll_for<T>(timeout: Duration, mut probe: impl FnMut() -> Option<T
 }
 
 /// Poll `cond` every 100ms until it returns true or `timeout` elapses.
-#[cfg(unix)]
 pub(crate) fn wait_until(timeout: Duration, mut cond: impl FnMut() -> bool) -> bool {
     poll_for(timeout, || cond().then_some(())).is_some()
 }
@@ -1063,7 +1061,6 @@ pub(crate) fn wait_until(timeout: Duration, mut cond: impl FnMut() -> bool) -> b
 /// server-side state lands (e.g. a Ctrl+C rewind clears the scrollback block
 /// optimistically before the shell finishes trimming the rewound copy from
 /// session history). Returns false if no stable window fits inside `timeout`.
-#[cfg(unix)]
 pub(crate) fn wait_until_stable(
     timeout: Duration,
     hold: Duration,
@@ -1095,7 +1092,6 @@ pub(crate) fn wait_until_stable(
 /// Dump assistant/tool/user messages (skipping the huge system prompt) from
 /// every request body, to inspect tool args / tool results / user queries in
 /// a failure message without printing megabytes of `{:#?}` bodies.
-#[cfg(unix)]
 pub(crate) fn dump_non_system_messages(bodies: &[serde_json::Value]) -> String {
     let mut out = String::new();
     for (i, b) in bodies.iter().enumerate() {

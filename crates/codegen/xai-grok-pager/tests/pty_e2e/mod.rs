@@ -111,6 +111,7 @@ mod paste_ctrl_v_image_keeps_ui_responsive_windows;
 mod paste_ctrl_v_text_echoes_fast_macos;
 mod paste_ctrl_v_text_echoes_fast_windows;
 mod prompt_suggestion_ghost_tab_accepts;
+mod providers_pty;
 mod queue_and_interjection_lifecycle;
 mod queued_bash_promotion_renders_output_pty;
 mod queued_message_renders_once_not_twice;
