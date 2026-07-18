@@ -1,28 +1,34 @@
 #[allow(unused_imports)]
 use super::common::*;
 
-/// Open `/providers`, verify a mock provider configured via config.toml
-/// with an env-key reference shows as ready, select its model, send a
-/// prompt to the local mock server, and verify the streamed response.
+/// Open `/providers`, verify a built-in provider configured with a local
+/// mock base URL and env-key reference shows as ready, select its model,
+/// send a prompt to the local mock server, and verify the response.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore]
 async fn providers_pty() {
     let content = ContentController::start_with_models(vec![
-        MockModel::new("mock-model-1")
-            .with_api_backend("chat_completions"),
+        // Use the default api_backend (chat_completions) — this is the
+        // same wire protocol the openai-compatible provider uses.
+        MockModel::new("mock-model-1"),
     ])
     .await
     .expect("start content");
     content
         .set_response(format!("{MOCK_RESPONSE_SENTINEL} hello from mock provider."));
 
+    // Prewrite config.toml: point the built-in openai-compatible provider
+    // at the local mock server and prefer a custom env var for the API key
+    // (non-secret reference — the value lives in the environment, not TOML).
+    // env_for_pager() already sets XAI_API_KEY, which the openai-compatible
+    // provider's auth policy reads by default.
     let grok_home = content.home().join(".grok");
     std::fs::create_dir_all(&grok_home).expect("create .grok");
     std::fs::write(
         grok_home.join("config.toml"),
         format!(
-            r#"[provider."mock-test"]
-env_key = ["MOCK_TEST_API_KEY"]
+            r#"[provider."openai-compatible"]
+env_key = ["MOCK_PROVIDER_KEY"]
 base_url = "{}"
 "#,
             content.url()
@@ -31,12 +37,11 @@ base_url = "{}"
     .expect("write config.toml");
 
     let binary = pager_binary().expect("resolve pager binary");
-    let env: Vec<(String, String)> = content
-        .env_for_pager()
-        .into_iter()
-        .chain([("MOCK_TEST_API_KEY".into(), "test-key".into())])
+    let env = content.env_for_pager();
+    let env_refs: Vec<(&str, &str)> = env
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    let env_refs: Vec<(&str, &str)> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
     let mut harness = PtyHarness::new(
         &binary,
         DEFAULT_ROWS,
@@ -50,28 +55,32 @@ base_url = "{}"
         .wait_for_text(WELCOME_SCREEN_SENTINEL, WELCOME_TIMEOUT)
         .expect("welcome text");
 
-    // Open /providers modal
+    // 1. Open /providers modal
     inject_keys_paced(&mut harness, b"/providers");
     harness.inject_keys(b"\r").expect("submit /providers");
     harness
         .wait_for_text("Providers", Duration::from_secs(10))
         .expect("providers modal title");
 
-    // Verify mock-test provider is listed and shows as configured.
+    // 2. Verify the openai-compatible provider is listed, shows as
+    //    Configured (env_key + XAI_API_KEY set), and has a model count > 0.
     harness
-        .wait_for_text("mock-test", Duration::from_secs(5))
-        .expect("mock-test provider row");
+        .wait_for_text("OpenAI-Compatible", Duration::from_secs(5))
+        .expect("OpenAI-Compatible provider row");
     harness
         .wait_for_text("Configured", Duration::from_secs(5))
-        .expect("mock-test should show Configured");
+        .expect("provider should show Configured");
+    harness
+        .wait_for_text("1", Duration::from_secs(5))
+        .expect("model count should be 1");
 
-    // Dismiss providers modal.
+    // 3. Dismiss providers modal.
     harness.inject_keys(keys::ESC).expect("close providers");
     harness
         .wait_for_text(WELCOME_SCREEN_SENTINEL, Duration::from_secs(5))
         .expect("back to welcome");
 
-    // Select the mock provider's model and send a prompt.
+    // 4. Select the mock model and send a prompt.
     harness
         .inject_keys(b"/model mock-model-1\r")
         .expect("select mock model");

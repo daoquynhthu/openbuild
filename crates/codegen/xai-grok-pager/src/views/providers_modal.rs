@@ -276,6 +276,44 @@ fn handle_detail_key(
     }
 }
 
+/// Apply provider config fields to a TOML document in memory.
+/// Returns the modified TOML string. Used by `persist_provider_config`
+/// and testable without filesystem access.
+pub fn apply_provider_config(
+    toml_content: &str,
+    id: &str,
+    env_var_name: &str,
+    api_key: &str,
+    base_url: &str,
+) -> Result<String, String> {
+    let mut doc: toml_edit::DocumentMut = toml_content
+        .parse()
+        .map_err(|e| format!("not valid TOML: {e}"))?;
+    let provider = doc
+        .entry("provider")
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_mut()
+        .ok_or_else(|| "[provider] must be a table".to_string())?;
+    let entry = provider
+        .entry(id)
+        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_mut()
+        .ok_or_else(|| format!("[provider.{id}] must be a table").to_string())?;
+
+    if !env_var_name.is_empty() {
+        let mut arr = toml_edit::Array::new();
+        arr.push(env_var_name);
+        entry.insert("env_key", toml_edit::value(arr));
+        entry.remove("api_key");
+    } else if !api_key.is_empty() {
+        entry["api_key"] = toml_edit::value(api_key);
+    }
+    if !base_url.is_empty() {
+        entry["base_url"] = toml_edit::value(base_url);
+    }
+    Ok(doc.to_string())
+}
+
 /// Persist a provider configuration to disk using the repository's atomic
 /// config editing facility. Validates provider ID and base URL before writing.
 /// If `env_var_name` is non-empty, writes `env_key` and omits `api_key`.
@@ -299,31 +337,11 @@ pub fn persist_provider_config(
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("cannot create config directory: {e}"))?;
     }
-    let mut doc = read_config_document_for_edit(&config_path)
+    let doc = read_config_document_for_edit(&config_path)
         .ok_or_else(|| "config.toml is not valid TOML; refusing to overwrite".to_string())?;
-    let provider = doc
-        .entry("provider")
-        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
-        .as_table_mut()
-        .ok_or_else(|| "[provider] must be a table".to_string())?;
-    let entry = provider
-        .entry(id)
-        .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
-        .as_table_mut()
-        .ok_or_else(|| format!("[provider.{id}] must be a table").to_string())?;
-
-    if !env_var_name.is_empty() {
-        let mut arr = toml_edit::Array::new();
-        arr.push(env_var_name);
-        entry.insert("env_key", toml_edit::value(arr));
-        entry.remove("api_key");
-    } else if !api_key.is_empty() {
-        entry["api_key"] = toml_edit::value(api_key);
-    }
-    if !base_url.is_empty() {
-        entry["base_url"] = toml_edit::value(base_url);
-    }
-    std::fs::write(&config_path, doc.to_string())
+    let toml_string = doc.to_string();
+    let updated = apply_provider_config(&toml_string, id, env_var_name, api_key, base_url)?;
+    std::fs::write(&config_path, updated)
         .map_err(|e| format!("cannot write config: {e}"))
 }
 
@@ -959,5 +977,56 @@ mod tests {
 
         let rendered: String = buf.content().iter().map(|c| c.symbol()).collect();
         assert!(rendered.contains("my-test-endpoint.com"), "base_url should be visible in render");
+    }
+
+    #[test]
+    fn apply_provider_config_writes_env_key() {
+        let result = apply_provider_config("[provider]\n", "test-id", "MY_KEY", "", "https://t.tv");
+        assert!(result.is_ok());
+        let out = result.unwrap();
+        assert!(out.contains(r#"env_key = ["MY_KEY"]"#), "out: {out}");
+        assert!(out.contains(r#"base_url = "https://t.tv""#), "out: {out}");
+        assert!(!out.contains("api_key"));
+    }
+
+    #[test]
+    fn apply_provider_config_writes_api_key() {
+        let result = apply_provider_config("[provider]\n", "test", "", "sk-key", "https://t.tv");
+        assert!(result.is_ok());
+        let out = result.unwrap();
+        assert!(out.contains(r#"api_key = "sk-key""#), "out: {out}");
+        assert!(!out.contains("env_key"));
+    }
+
+    #[test]
+    fn apply_provider_config_env_key_removes_api_key() {
+        let input = r#"[provider]
+[provider."test"]
+api_key = "old"
+"#;
+        let result = apply_provider_config(input, "test", "NEW_ENV", "", "https://t.tv");
+        assert!(result.is_ok());
+        let out = result.unwrap();
+        assert!(out.contains(r#"env_key = ["NEW_ENV"]"#), "out: {out}");
+        assert!(!out.contains("api_key"), "env_key should remove api_key: {out}");
+    }
+
+    #[test]
+    fn apply_provider_config_updates_existing_entry() {
+        let input = r#"[provider]
+[provider."my-prov"]
+base_url = "https://old.tv"
+"#;
+        let result = apply_provider_config(input, "my-prov", "", "new-key", "https://new.tv");
+        assert!(result.is_ok());
+        let out = result.unwrap();
+        assert!(out.contains(r#"base_url = "https://new.tv""#), "out: {out}");
+        assert!(out.contains(r#"api_key = "new-key""#), "out: {out}");
+    }
+
+    #[test]
+    fn apply_provider_config_rejects_invalid_toml() {
+        let result = apply_provider_config("not = valid toml [[[", "id", "", "k", "https://t.tv");
+        assert!(result.is_err());
     }
 }
