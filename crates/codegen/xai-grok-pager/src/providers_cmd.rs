@@ -37,7 +37,12 @@ pub async fn list_providers() -> Result<()> {
         let route_count = configured.routes.len();
         let key_status = if configured.config.api_key.is_some() {
             "api_key set"
-        } else if configured.config.env_key.as_ref().is_some_and(|e| !e.is_empty()) {
+        } else if configured
+            .config
+            .env_key
+            .as_ref()
+            .is_some_and(|e| !e.is_empty())
+        {
             "env_key configured"
         } else {
             "no credentials"

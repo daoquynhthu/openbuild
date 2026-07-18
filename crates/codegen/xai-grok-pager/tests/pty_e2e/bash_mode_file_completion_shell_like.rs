@@ -170,4 +170,3 @@ async fn bash_mode_file_completion_shell_like() {
 
     harness.quit().expect("clean quit");
 }
-

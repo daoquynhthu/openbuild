@@ -277,14 +277,20 @@ mod tests {
     #[test]
     fn redact_endpoint_removes_userinfo() {
         let result = redact_endpoint("https://user:pass@api.x.ai/v1");
-        assert!(!result.contains("user:pass"), "should remove userinfo: {result}");
+        assert!(
+            !result.contains("user:pass"),
+            "should remove userinfo: {result}"
+        );
         assert!(result.contains("api.x.ai"), "should keep host");
     }
 
     #[test]
     fn redact_endpoint_removes_query_params() {
         let result = redact_endpoint("https://api.x.ai/v1?api_key=sk-test&model=grok");
-        assert!(!result.contains("api_key=sk-test"), "should remove api_key: {result}");
+        assert!(
+            !result.contains("api_key=sk-test"),
+            "should remove api_key: {result}"
+        );
         assert!(!result.contains("?api_key"), "no leftover query");
     }
 
@@ -311,7 +317,10 @@ mod tests {
     fn provider_state_real_providers_have_views() {
         let registry = real_registry();
         let state = ProviderState::new(registry);
-        assert!(state.ordered_views().len() >= 5, "expected at least 5 providers (xai, openai, anthropic, opencode, ollama)");
+        assert!(
+            state.ordered_views().len() >= 5,
+            "expected at least 5 providers (xai, openai, anthropic, opencode, ollama)"
+        );
     }
 
     #[test]
@@ -402,10 +411,23 @@ mod tests {
         let state = ProviderState::new(registry);
         for view in state.ordered_views() {
             match view.id.0.as_str() {
-                "opencode" => assert_eq!(view.credential, CredentialState::Public, "opencode is public"),
-                "ollama" => assert_eq!(view.credential, CredentialState::NotRequired, "ollama is not-required"),
+                "opencode" => assert_eq!(
+                    view.credential,
+                    CredentialState::Public,
+                    "opencode is public"
+                ),
+                "ollama" => assert_eq!(
+                    view.credential,
+                    CredentialState::NotRequired,
+                    "ollama is not-required"
+                ),
                 _ => {
-                    assert_eq!(view.credential, CredentialState::Missing, "{} should be Missing", view.id.0);
+                    assert_eq!(
+                        view.credential,
+                        CredentialState::Missing,
+                        "{} should be Missing",
+                        view.id.0
+                    );
                 }
             }
         }

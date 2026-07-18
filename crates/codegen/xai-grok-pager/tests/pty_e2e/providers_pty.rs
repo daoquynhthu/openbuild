@@ -14,8 +14,9 @@ async fn providers_pty() {
     ])
     .await
     .expect("start content");
-    content
-        .set_response(format!("{MOCK_RESPONSE_SENTINEL} hello from mock provider."));
+    content.set_response(format!(
+        "{MOCK_RESPONSE_SENTINEL} hello from mock provider."
+    ));
 
     // Prewrite config.toml: point the built-in openai-compatible provider
     // at the local mock server and prefer a custom env var for the API key
@@ -38,18 +39,9 @@ base_url = "{}"
 
     let binary = pager_binary().expect("resolve pager binary");
     let env = content.env_for_pager();
-    let env_refs: Vec<(&str, &str)> = env
-        .iter()
-        .map(|(k, v)| (k.as_str(), v.as_str()))
-        .collect();
-    let mut harness = PtyHarness::new(
-        &binary,
-        DEFAULT_ROWS,
-        DEFAULT_COLS,
-        &[],
-        &env_refs,
-    )
-    .expect("spawn pager");
+    let env_refs: Vec<(&str, &str)> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let mut harness =
+        PtyHarness::new(&binary, DEFAULT_ROWS, DEFAULT_COLS, &[], &env_refs).expect("spawn pager");
 
     harness
         .wait_for_text(WELCOME_SCREEN_SENTINEL, WELCOME_TIMEOUT)

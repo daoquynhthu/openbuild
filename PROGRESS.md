@@ -54,3 +54,49 @@
 - P13-02: Fast PR vs full release gate separation (workflow-level)
 - P13-04: Packaging smoke test (CI-specific)
 - P13-05: Optional live smoke workflow (CI-specific, requires secrets)
+
+## Provider Adapter V1 — Phase 14: Cleanup, Final Static Audit, and Release Candidate Cut — 2026-07-18
+
+### Base and result
+- Start commit: `e284cc1`
+- End commit: `pending`
+- Tasks completed: `P14-01`, `P14-02`, `P14-03`, `P14-04`, `P14-05`
+
+### Files changed
+- `xai-grok-provider/src/framing.rs`: **removed** (dead code, deprecated)
+- `xai-grok-provider/src/lib.rs`: removed `pub mod framing`
+- `docs/provider-adapter-v1/final-audit.md`: **new** (P14-01/P14-02 audit)
+- `docs/provider-adapter-v1/baseline.md`: current baseline for diff
+- Various `cargo fmt` formatting changes across 50+ files
+- `ISSUE.md`: `-Fixed` → `-Closed` for all audit items
+
+### P14-01: Dead path removal
+- Searched 9 patterns; only actionable item was `framing.rs` (deprecated, unused)
+- All other patterns: clean (no matches or intended API)
+
+### P14-02: SamplerConfig constructor audit
+- All production constructors use route compiler ✅
+- No unacceptable bypass constructors found
+- `final-audit.md` contains full classification table
+
+### P14-03: Issue closure
+- C01, C02, M01-M03, S01-S03 all → `-Closed`
+- Each with test evidence in `final-audit.md`
+
+### P14-04: Verification
+- `cargo fmt --all -- --check` — ✅ after fix
+- `cargo check -p` 11 target crates — ✅
+- `cargo clippy -p` 11 target crates — ✅ (only pre-existing complex type in xai-grok-config)
+- `cargo test -p xai-grok-provider` — ✅ 129 passed, 0 failed
+- `cargo test -p xai-grok-sampler --lib` — ✅ 161 passed, 0 failed
+- `cargo test -p xai-grok-pager --lib` — ✅ 7053 passed, ⚠️ 43 failed (pre-existing, documented)
+- `cargo doc --workspace --no-deps` — ⏭ disk space limit
+
+### P14-05: Scope review
+- No unrelated changes: all formatting churn is from `cargo fmt` compliance
+- No secrets in diff
+- No unapproved dependencies (only `futures-util`, `tokio-stream` for provider tests)
+- No disabled tests/lints introduced (only `#[allow(clippy::new_ret_no_self)]` for mock)
+
+### P14-06: Release candidate
+- Tag pending (requires owner approval)

@@ -2323,4 +2323,3 @@ fn set_plan_mode_idempotency_uses_pending_over_active() {
         "OFF transition must set optimistic pending to Some(false)"
     );
 }
-

@@ -1163,10 +1163,7 @@ base_url = "https://api.example.com/v1"
         )
         .unwrap();
         let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
-        config_map.insert(
-            ProviderId::new("xai"),
-            ProviderConfig::default(),
-        );
+        config_map.insert(ProviderId::new("xai"), ProviderConfig::default());
         assert!(validate_provider_model_refs(&config, &config_map).is_ok());
     }
 
@@ -1182,10 +1179,7 @@ provider = "openai"
         )
         .unwrap();
         let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
-        config_map.insert(
-            ProviderId::new("openai"),
-            ProviderConfig::default(),
-        );
+        config_map.insert(ProviderId::new("openai"), ProviderConfig::default());
         assert!(validate_provider_model_refs(&config, &config_map).is_ok());
     }
 
@@ -1223,10 +1217,7 @@ provider = "nonexistent"
         )
         .unwrap();
         let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
-        config_map.insert(
-            ProviderId::new("openai"),
-            ProviderConfig::default(),
-        );
+        config_map.insert(ProviderId::new("openai"), ProviderConfig::default());
         let result = validate_provider_model_refs(&config, &config_map);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("bad"));
@@ -1273,7 +1264,10 @@ provider = "nonexistent"
         .unwrap();
         let bad_config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
         let validation = validate_provider_model_refs(&bad_config, &bad_config_map);
-        assert!(validation.is_err(), "step 4 validation must reject unknown provider");
+        assert!(
+            validation.is_err(),
+            "step 4 validation must reject unknown provider"
+        );
 
         // Verify the snapshot is unchanged after the validation rejection
         let snap_after = rt.snapshot();

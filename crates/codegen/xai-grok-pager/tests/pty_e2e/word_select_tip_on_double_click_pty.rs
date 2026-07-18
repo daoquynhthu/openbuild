@@ -269,4 +269,3 @@ async fn word_select_tip_skipped_when_contextual_hint_disabled() {
 
     harness.quit().expect("clean quit");
 }
-

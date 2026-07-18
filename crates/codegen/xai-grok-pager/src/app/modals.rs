@@ -404,8 +404,8 @@ impl AgentView {
                     return InputOutcome::Changed;
                 }
                 ModalWindowOutcome::Unhandled => {
-                    use crate::views::providers_modal::persist_provider_config;
                     use crate::views::providers_modal::ProvidersKeyOutcome;
+                    use crate::views::providers_modal::persist_provider_config;
                     return match crate::views::providers_modal::handle_providers_key(
                         prov_state, key,
                     ) {
@@ -413,15 +413,26 @@ impl AgentView {
                             self.active_modal = None;
                             InputOutcome::Changed
                         }
-                        ProvidersKeyOutcome::Save { provider_id, env_var_name, api_key, base_url } => {
+                        ProvidersKeyOutcome::Save {
+                            provider_id,
+                            env_var_name,
+                            api_key,
+                            base_url,
+                        } => {
                             let provider_state = &mut prov_state.provider_state;
-                            match persist_provider_config(&provider_id, &env_var_name, &api_key, &base_url) {
+                            match persist_provider_config(
+                                &provider_id,
+                                &env_var_name,
+                                &api_key,
+                                &base_url,
+                            ) {
                                 Ok(()) => {
                                     provider_state.refresh();
                                     prov_state.reset_to_list();
                                 }
                                 Err(e) => {
-                                    let pid = xai_grok_provider::types::ProviderId::new(&provider_id);
+                                    let pid =
+                                        xai_grok_provider::types::ProviderId::new(&provider_id);
                                     provider_state.update_error(&pid, Some(e));
                                 }
                             }

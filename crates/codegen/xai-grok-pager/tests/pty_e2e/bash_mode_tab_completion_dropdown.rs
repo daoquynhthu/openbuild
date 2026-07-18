@@ -135,4 +135,3 @@ async fn bash_mode_tab_accepts_dropdown_item_in_place() {
 
     harness.quit().expect("clean quit");
 }
-

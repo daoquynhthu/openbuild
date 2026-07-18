@@ -211,12 +211,7 @@ impl ProviderCatalogService {
             let current = self.snapshot.read().await;
             provider_ids
                 .iter()
-                .filter(|pid| {
-                    current
-                        .providers
-                        .get(*pid)
-                        .is_none_or(|e| e.is_stale(ttl))
-                })
+                .filter(|pid| current.providers.get(*pid).is_none_or(|e| e.is_stale(ttl)))
                 .cloned()
                 .collect()
         };

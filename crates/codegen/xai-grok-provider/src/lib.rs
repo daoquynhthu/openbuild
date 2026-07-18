@@ -3,7 +3,6 @@ pub mod config;
 pub mod endpoint;
 pub mod error;
 pub mod events;
-pub mod framing;
 pub mod model;
 pub mod protocol;
 pub mod provider;

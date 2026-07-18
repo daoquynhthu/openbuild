@@ -1580,4 +1580,3 @@ mod tests {
         assert!(matches!(agent.prompt_mode, PromptMode::Normal));
     }
 }
-

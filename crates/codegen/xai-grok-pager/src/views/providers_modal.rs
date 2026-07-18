@@ -72,9 +72,7 @@ impl ProvidersModalState {
 
     fn visible_range(&self, height: usize) -> std::ops::Range<usize> {
         let providers = self.provider_state.ordered_views();
-        let start = self
-            .scroll_offset
-            .min(providers.len().saturating_sub(1));
+        let start = self.scroll_offset.min(providers.len().saturating_sub(1));
         let end = (start + height).min(providers.len());
         start..end
     }
@@ -341,8 +339,7 @@ pub fn persist_provider_config(
         .ok_or_else(|| "config.toml is not valid TOML; refusing to overwrite".to_string())?;
     let toml_string = doc.to_string();
     let updated = apply_provider_config(&toml_string, id, env_var_name, api_key, base_url)?;
-    std::fs::write(&config_path, updated)
-        .map_err(|e| format!("cannot write config: {e}"))
+    std::fs::write(&config_path, updated).map_err(|e| format!("cannot write config: {e}"))
 }
 
 fn adjust_scroll(state: &mut ProvidersModalState) {
@@ -503,7 +500,8 @@ fn render_detail(
         ),
         _ => return,
     };
-    let (provider_idx, env_var_name_str, api_key_str, base_url_str, focused_field, show_api_key) = detail;
+    let (provider_idx, env_var_name_str, api_key_str, base_url_str, focused_field, show_api_key) =
+        detail;
 
     let providers = state.provider_state.ordered_views();
     let Some(view) = providers.get(provider_idx) else {
@@ -609,10 +607,7 @@ fn render_detail(
     if focused_field == 1 && !api_key_str.is_empty() {
         let warn_style = Style::default().fg(Color::Yellow);
         let warn_line = Line::from(vec![
-            ratatui::text::Span::styled(
-                "  \u{26a0}  ",
-                warn_style,
-            ),
+            ratatui::text::Span::styled("  \u{26a0}  ", warn_style),
             ratatui::text::Span::styled(
                 "Warning: key stored in plaintext config; prefer Env Var Name",
                 warn_style,
@@ -723,8 +718,7 @@ mod tests {
     use std::sync::Arc;
 
     fn test_state() -> ProvidersModalState {
-        let registry =
-            Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
+        let registry = Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
         xai_grok_provider::providers::register_all(&registry);
         let configs: indexmap::IndexMap<_, _> = registry
             .all_ids()
@@ -751,7 +745,10 @@ mod tests {
             show_api_key: false,
         };
         let debug = format!("{:?}", view);
-        assert!(!debug.contains("sk-secret-key-12345"), "api_key must not appear in debug");
+        assert!(
+            !debug.contains("sk-secret-key-12345"),
+            "api_key must not appear in debug"
+        );
         assert!(debug.contains("MY_VAR"), "env_var_name should appear");
         assert!(debug.contains("https://test.com"), "base_url should appear");
     }
@@ -830,7 +827,13 @@ mod tests {
             "expected Save, got {:?}",
             outcome
         );
-        if let ProvidersKeyOutcome::Save { env_var_name, api_key, base_url, .. } = outcome {
+        if let ProvidersKeyOutcome::Save {
+            env_var_name,
+            api_key,
+            base_url,
+            ..
+        } = outcome
+        {
             assert_eq!(env_var_name, "MY_VAR");
             assert_eq!(api_key, "sk-test");
             assert_eq!(base_url, "https://test.com/v1");
@@ -930,7 +933,13 @@ mod tests {
             "expected Detail mode, got {:?}",
             state.mode
         );
-        if let ProvidersView::Detail { env_var_name, api_key, base_url, .. } = &state.mode {
+        if let ProvidersView::Detail {
+            env_var_name,
+            api_key,
+            base_url,
+            ..
+        } = &state.mode
+        {
             assert_eq!(env_var_name.as_str(), "", "env_var_name should start empty");
             assert_eq!(api_key.as_str(), "", "api_key should start empty");
             assert!(!base_url.is_empty(), "base_url should be pre-filled");
@@ -952,11 +961,20 @@ mod tests {
 
         let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 120, 30));
         let theme = crate::theme::Theme::default();
-        render_providers_modal(&mut buf, Rect::new(0, 0, 120, 30), &mut state, false, &theme);
+        render_providers_modal(
+            &mut buf,
+            Rect::new(0, 0, 120, 30),
+            &mut state,
+            false,
+            &theme,
+        );
 
         // The rendered buffer must not contain the plaintext secret
         let rendered: String = buf.content().iter().map(|c| c.symbol()).collect();
-        assert!(!rendered.contains(secret), "rendered buffer must not contain the raw secret");
+        assert!(
+            !rendered.contains(secret),
+            "rendered buffer must not contain the raw secret"
+        );
     }
 
     #[test]
@@ -973,10 +991,19 @@ mod tests {
 
         let mut buf = ratatui::buffer::Buffer::empty(Rect::new(0, 0, 120, 30));
         let theme = crate::theme::Theme::default();
-        render_providers_modal(&mut buf, Rect::new(0, 0, 120, 30), &mut state, false, &theme);
+        render_providers_modal(
+            &mut buf,
+            Rect::new(0, 0, 120, 30),
+            &mut state,
+            false,
+            &theme,
+        );
 
         let rendered: String = buf.content().iter().map(|c| c.symbol()).collect();
-        assert!(rendered.contains("my-test-endpoint.com"), "base_url should be visible in render");
+        assert!(
+            rendered.contains("my-test-endpoint.com"),
+            "base_url should be visible in render"
+        );
     }
 
     #[test]
@@ -1008,7 +1035,10 @@ api_key = "old"
         assert!(result.is_ok());
         let out = result.unwrap();
         assert!(out.contains(r#"env_key = ["NEW_ENV"]"#), "out: {out}");
-        assert!(!out.contains("api_key"), "env_key should remove api_key: {out}");
+        assert!(
+            !out.contains("api_key"),
+            "env_key should remove api_key: {out}"
+        );
     }
 
     #[test]

@@ -31,7 +31,10 @@ pub fn validate_provider_id(id: &str) -> Result<(), ValidationError> {
     if id.is_empty() {
         return Err(ValidationError::EmptyProviderId);
     }
-    if !id.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
         return Err(ValidationError::InvalidProviderId(id.to_owned()));
     }
     Ok(())

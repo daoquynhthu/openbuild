@@ -11610,7 +11610,10 @@ default = "grok-4.5"
 
         let rev1 = jh1.join().expect("thread1").expect("rebuild1");
         let rev2 = jh2.join().expect("thread2").expect("rebuild2");
-        assert_ne!(rev1, rev2, "concurrent rebuilds produce different revisions");
+        assert_ne!(
+            rev1, rev2,
+            "concurrent rebuilds produce different revisions"
+        );
 
         let final_rev = rt.snapshot().revision;
         assert!(

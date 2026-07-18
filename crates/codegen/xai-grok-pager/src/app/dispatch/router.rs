@@ -603,9 +603,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             };
             let provider_state = crate::provider_state::registry()
                 .map(|reg| ProviderState::new(reg.clone()))
-                .unwrap_or_else(|| ProviderState::new(std::sync::Arc::new(
-                    xai_grok_provider::registry::ProviderRegistry::new(),
-                )));
+                .unwrap_or_else(|| {
+                    ProviderState::new(std::sync::Arc::new(
+                        xai_grok_provider::registry::ProviderRegistry::new(),
+                    ))
+                });
             let modal = ActiveModal::Providers {
                 state: Box::new(ProvidersModalState::new(provider_state)),
             };

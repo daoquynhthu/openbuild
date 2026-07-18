@@ -1,11 +1,11 @@
 use indexmap::IndexMap;
 
+use futures_util::stream::StreamExt;
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::registry::ProviderRegistry;
 use xai_grok_provider::types::{ProviderId, RouteId};
-use futures_util::stream::StreamExt;
-use xai_grok_sampler::client::SamplingClient;
 use xai_grok_sampler::SamplerConfig;
+use xai_grok_sampler::client::SamplingClient;
 
 use xai_grok_sampling_types::types::{ChatCompletionRequest, ChatRequestMessage};
 use xai_grok_test_support::MockInferenceServer;
@@ -257,13 +257,15 @@ fn anthropic_provider_full_pipeline() {
     );
 
     assert_eq!(
-        configured.default_route_id.0,
-        "anthropic-messages",
+        configured.default_route_id.0, "anthropic-messages",
         "default route should be messages"
     );
 
     let provider = reg.get(&pid).expect("provider");
-    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::Messages);
+    assert_eq!(
+        provider.defaults().api_backend,
+        xai_grok_provider::types::ApiBackend::Messages
+    );
 }
 
 /// OpenCode: Chat protocol with public/no auth (free tier).
@@ -284,7 +286,10 @@ fn opencode_provider_full_pipeline() {
 
     let provider = reg.get(&pid).expect("provider");
     assert_eq!(provider.name(), "OpenCode Zen");
-    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::ChatCompletions);
+    assert_eq!(
+        provider.defaults().api_backend,
+        xai_grok_provider::types::ApiBackend::ChatCompletions
+    );
 }
 
 /// Ollama: local provider with no auth.
@@ -309,8 +314,14 @@ fn ollama_provider_full_pipeline() {
     );
 
     let provider = reg.get(&pid).expect("provider");
-    assert!(provider.defaults().env_key.is_empty(), "ollama has no default env_key");
-    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::ChatCompletions);
+    assert!(
+        provider.defaults().env_key.is_empty(),
+        "ollama has no default env_key"
+    );
+    assert_eq!(
+        provider.defaults().api_backend,
+        xai_grok_provider::types::ApiBackend::ChatCompletions
+    );
 }
 
 /// xAI with Responses API backend.
@@ -338,7 +349,10 @@ fn xai_responses_api_pipeline() {
     // single route for the Responses API backend.
 
     let provider = reg.get(&pid).expect("provider");
-    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::Responses);
+    assert_eq!(
+        provider.defaults().api_backend,
+        xai_grok_provider::types::ApiBackend::Responses
+    );
 }
 
 /// OpenAI with Responses API backend (configured via override).
@@ -362,7 +376,10 @@ fn openai_responses_api_pipeline() {
     assert_eq!(chat_route.protocol_id, "chat_completions");
 
     let provider = reg.get(&pid).expect("provider");
-    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::ChatCompletions);
+    assert_eq!(
+        provider.defaults().api_backend,
+        xai_grok_provider::types::ApiBackend::ChatCompletions
+    );
 }
 
 /// openai-compatible provider with custom base_url and env_key.
@@ -377,7 +394,9 @@ fn openai_compatible_custom_pipeline() {
         Some("sk-custom".into()),
         Some("https://custom-proxy.local/v1".into()),
     );
-    let configured = reg.configure(&pid, overrides).expect("configure openai-compatible");
+    let configured = reg
+        .configure(&pid, overrides)
+        .expect("configure openai-compatible");
 
     let chat_route = configured
         .routes
@@ -391,7 +410,10 @@ fn openai_compatible_custom_pipeline() {
 
     let provider = reg.get(&pid).expect("provider");
     assert_eq!(provider.defaults().env_key, vec!["XAI_API_KEY"]);
-    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::ChatCompletions);
+    assert_eq!(
+        provider.defaults().api_backend,
+        xai_grok_provider::types::ApiBackend::ChatCompletions
+    );
 }
 
 /// Provider with env_key config via configure_providers (env var detection path).
@@ -426,13 +448,17 @@ fn provider_config_with_env_key() {
 /// Env var detection sets api_key via default env key.
 #[test]
 fn precedence_env_var_sets_api_key() {
-    unsafe { std::env::set_var("XAI_API_KEY", "from-env"); }
+    unsafe {
+        std::env::set_var("XAI_API_KEY", "from-env");
+    }
 
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
     let env_configs = xai_grok_provider::providers::detect_env_vars(&reg);
 
-    unsafe { std::env::remove_var("XAI_API_KEY"); }
+    unsafe {
+        std::env::remove_var("XAI_API_KEY");
+    }
 
     let xai_cfg = env_configs.get("xai").expect("xai env config");
     assert_eq!(
@@ -445,7 +471,9 @@ fn precedence_env_var_sets_api_key() {
 /// TOML config overrides env-detected api_key.
 #[test]
 fn precedence_toml_overrides_env() {
-    unsafe { std::env::set_var("XAI_API_KEY", "from-env"); }
+    unsafe {
+        std::env::set_var("XAI_API_KEY", "from-env");
+    }
 
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
@@ -458,7 +486,9 @@ api_key = "from-toml"
     .unwrap();
     xai_grok_provider::providers::configure_providers(&reg, &toml, None, None);
 
-    unsafe { std::env::remove_var("XAI_API_KEY"); }
+    unsafe {
+        std::env::remove_var("XAI_API_KEY");
+    }
 
     let pid = ProviderId::new("xai");
     let stored = reg.get_config(&pid).expect("xai config");
@@ -675,7 +705,10 @@ fn hot_reload_invalid_config_preserves_snapshot() {
 
     // The new snapshot must contain both providers
     let snap = reg.snapshot();
-    assert!(snap.providers.contains_key(&pid), "original provider must persist");
+    assert!(
+        snap.providers.contains_key(&pid),
+        "original provider must persist"
+    );
     assert!(
         snap.providers.contains_key(&bad_pid),
         "new provider must appear"
@@ -715,7 +748,8 @@ fn model_switch_providers_coexist() {
         ProviderConfig::new(Some("ollama".into()), None, None),
     );
 
-    reg.rebuild(&configs).expect("rebuild with 3 providers overrides");
+    reg.rebuild(&configs)
+        .expect("rebuild with 3 providers overrides");
 
     let snap = reg.snapshot();
 
@@ -728,7 +762,10 @@ fn model_switch_providers_coexist() {
     assert!(snap.providers.contains_key(&ProviderId::new("anthropic")));
     assert!(snap.providers.contains_key(&ProviderId::new("opencode")));
     assert!(snap.providers.contains_key(&ProviderId::new("ollama")));
-    assert!(snap.providers.contains_key(&ProviderId::new("openai-compatible")));
+    assert!(
+        snap.providers
+            .contains_key(&ProviderId::new("openai-compatible"))
+    );
 
     // Each provider has its own routes with no cross-contamination
     let openai = snap.providers.get(&ProviderId::new("openai")).unwrap();
@@ -736,8 +773,16 @@ fn model_switch_providers_coexist() {
     let ollama = snap.providers.get(&ProviderId::new("ollama")).unwrap();
 
     assert!(openai.routes.contains_key(&RouteId::new("openai-chat")));
-    assert!(openai.routes.contains_key(&RouteId::new("openai-responses")));
-    assert!(anthropic.routes.contains_key(&RouteId::new("anthropic-messages")));
+    assert!(
+        openai
+            .routes
+            .contains_key(&RouteId::new("openai-responses"))
+    );
+    assert!(
+        anthropic
+            .routes
+            .contains_key(&RouteId::new("anthropic-messages"))
+    );
     assert!(ollama.routes.contains_key(&RouteId::new("ollama-chat")));
 
     // Different protocols per provider
@@ -804,7 +849,8 @@ fn model_switch_no_stale_route_leak() {
             Some("https://anthropic-custom.local/v1".into()),
         ),
     );
-    reg.rebuild(&configs).expect("rebuild with anthropic override");
+    reg.rebuild(&configs)
+        .expect("rebuild with anthropic override");
 
     let snap2 = reg.snapshot();
 
@@ -820,7 +866,10 @@ fn model_switch_no_stale_route_leak() {
     );
 
     // Anthropic routes must reflect the new override
-    let anthropic_route = snap2.routes.get(&RouteId::new("anthropic-messages")).unwrap();
+    let anthropic_route = snap2
+        .routes
+        .get(&RouteId::new("anthropic-messages"))
+        .unwrap();
     assert_eq!(
         anthropic_route.endpoint.base_url.as_deref(),
         Some("https://anthropic-custom.local/v1"),
@@ -834,15 +883,24 @@ fn model_switch_no_stale_route_leak() {
 fn model_switch_model_resolution_routes_correctly() {
     // Verify that parse_model_ref correctly routes provider/model pairs
     let (provider_opt, model) = xai_grok_provider::types::parse_model_ref("openai/gpt-4o");
-    assert_eq!(provider_opt, Some(xai_grok_provider::types::ProviderId::new("openai")));
+    assert_eq!(
+        provider_opt,
+        Some(xai_grok_provider::types::ProviderId::new("openai"))
+    );
     assert_eq!(model, "gpt-4o");
 
     let (provider_opt, model) = xai_grok_provider::types::parse_model_ref("anthropic/claude-3");
-    assert_eq!(provider_opt, Some(xai_grok_provider::types::ProviderId::new("anthropic")));
+    assert_eq!(
+        provider_opt,
+        Some(xai_grok_provider::types::ProviderId::new("anthropic"))
+    );
     assert_eq!(model, "claude-3");
 
     let (provider_opt, model) = xai_grok_provider::types::parse_model_ref("ollama/llama3");
-    assert_eq!(provider_opt, Some(xai_grok_provider::types::ProviderId::new("ollama")));
+    assert_eq!(
+        provider_opt,
+        Some(xai_grok_provider::types::ProviderId::new("ollama"))
+    );
     assert_eq!(model, "llama3");
 
     // Bare model (no /provider prefix) — provider is None
@@ -864,8 +922,14 @@ fn legacy_xai_provider_defaults() {
     let pid = ProviderId::new("xai");
     let provider = reg.get(&pid).expect("xAI must be registered");
     assert_eq!(provider.name(), "xAI");
-    assert!(!provider.defaults().base_url.is_empty(), "xAI must have a base_url");
-    assert!(!provider.defaults().env_key.is_empty(), "xAI must have env_key configured");
+    assert!(
+        !provider.defaults().base_url.is_empty(),
+        "xAI must have a base_url"
+    );
+    assert!(
+        !provider.defaults().env_key.is_empty(),
+        "xAI must have env_key configured"
+    );
 
     // Default API backend must be Responses
     assert_eq!(
@@ -900,7 +964,10 @@ api_key = "toml-key"
 #[test]
 fn legacy_xai_default_model_resolves() {
     let (provider, model) = xai_grok_provider::types::parse_model_ref("grok-build");
-    assert!(provider.is_none(), "default model should have no provider prefix");
+    assert!(
+        provider.is_none(),
+        "default model should have no provider prefix"
+    );
     assert_eq!(model, "grok-build");
 
     let (provider, model) = xai_grok_provider::types::parse_model_ref("grok-3");
@@ -914,9 +981,20 @@ fn legacy_provider_count_stable() {
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
     let ids = reg.all_ids();
-    assert_eq!(ids.len(), 6, "6 built-in providers: xai, openai, anthropic, opencode, ollama, openai-compatible");
+    assert_eq!(
+        ids.len(),
+        6,
+        "6 built-in providers: xai, openai, anthropic, opencode, ollama, openai-compatible"
+    );
 
-    for name in ["xai", "openai", "anthropic", "opencode", "ollama", "openai-compatible"] {
+    for name in [
+        "xai",
+        "openai",
+        "anthropic",
+        "opencode",
+        "ollama",
+        "openai-compatible",
+    ] {
         assert!(
             ids.contains(&ProviderId::new(name)),
             "missing provider: {name}"
@@ -981,7 +1059,3 @@ async fn full_chain_chat_completion_through_mock() {
     let model = body.get("model").and_then(|m| m.as_str()).unwrap_or("");
     assert_eq!(model, "test-model");
 }
-
-
-
-
