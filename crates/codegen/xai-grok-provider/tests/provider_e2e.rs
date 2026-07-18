@@ -222,3 +222,191 @@ fn legacy_xai_api_key_env_detected() {
         "XAI_API_KEY must be detected for xAI provider"
     );
 }
+
+/// Anthropic: Messages protocol with x-api-key auth header.
+#[test]
+fn anthropic_provider_full_pipeline() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let pid = ProviderId::new("anthropic");
+    let overrides = ProviderConfig::new(
+        Some("anthropic".into()),
+        Some("sk-ant-test".into()),
+        Some("https://mock.anthropic.local/v1".into()),
+    );
+    reg.store_config(&pid, overrides.clone());
+    let configured = reg.configure(&pid, overrides).expect("configure anthropic");
+
+    let messages_route = configured
+        .routes
+        .get(&RouteId::new("anthropic-messages"))
+        .expect("anthropic-messages route");
+    assert_eq!(messages_route.protocol_id, "messages");
+    assert_eq!(
+        messages_route.endpoint.base_url.as_deref(),
+        Some("https://mock.anthropic.local/v1")
+    );
+
+    assert_eq!(
+        configured.default_route_id.0,
+        "anthropic-messages",
+        "default route should be messages"
+    );
+
+    let provider = reg.get(&pid).expect("provider");
+    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::Messages);
+}
+
+/// OpenCode: Chat protocol with public/no auth (free tier).
+#[test]
+fn opencode_provider_full_pipeline() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let pid = ProviderId::new("opencode");
+    let overrides = ProviderConfig::new(Some("opencode".into()), None, None);
+    let configured = reg.configure(&pid, overrides).expect("configure opencode");
+
+    let chat_route = configured
+        .routes
+        .get(&RouteId::new("opencode-chat"))
+        .expect("opencode-chat route");
+    assert_eq!(chat_route.protocol_id, "chat_completions");
+
+    let provider = reg.get(&pid).expect("provider");
+    assert_eq!(provider.name(), "OpenCode Zen");
+    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::ChatCompletions);
+}
+
+/// Ollama: local provider with no auth.
+#[test]
+fn ollama_provider_full_pipeline() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let pid = ProviderId::new("ollama");
+    let overrides = ProviderConfig::new(Some("ollama".into()), None, None);
+    let configured = reg.configure(&pid, overrides).expect("configure ollama");
+
+    let chat_route = configured
+        .routes
+        .get(&RouteId::new("ollama-chat"))
+        .expect("ollama-chat route");
+    assert_eq!(chat_route.protocol_id, "chat_completions");
+    let base_url = chat_route.endpoint.base_url.as_deref().unwrap_or_default();
+    assert!(
+        base_url.contains("localhost:11434"),
+        "ollama endpoint should point to localhost: {base_url}"
+    );
+
+    let provider = reg.get(&pid).expect("provider");
+    assert!(provider.defaults().env_key.is_empty(), "ollama has no default env_key");
+    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::ChatCompletions);
+}
+
+/// xAI with Responses API backend.
+#[test]
+fn xai_responses_api_pipeline() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let pid = ProviderId::new("xai");
+    let overrides = ProviderConfig::new(
+        Some("xai".into()),
+        Some("sk-xai-test".into()),
+        Some("https://api.x.ai/v1".into()),
+    );
+    let configured = reg.configure(&pid, overrides).expect("configure xai");
+
+    // xAI provider has a responses route as its default
+    let responses_route = configured
+        .routes
+        .get(&RouteId::new("xai-responses"))
+        .expect("xai-responses route");
+    assert_eq!(responses_route.protocol_id, "responses");
+
+    // xAI does NOT have a separate chat route — it uses responses as the
+    // single route for the Responses API backend.
+
+    let provider = reg.get(&pid).expect("provider");
+    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::Responses);
+}
+
+/// OpenAI with Responses API backend (configured via override).
+#[test]
+fn openai_responses_api_pipeline() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let pid = ProviderId::new("openai");
+    let overrides = ProviderConfig::new(
+        Some("openai".into()),
+        Some("sk-openai-test".into()),
+        Some("https://mock.openai.local/v1".into()),
+    );
+    let configured = reg.configure(&pid, overrides).expect("configure openai");
+
+    let chat_route = configured
+        .routes
+        .get(&RouteId::new("openai-chat"))
+        .expect("openai-chat route");
+    assert_eq!(chat_route.protocol_id, "chat_completions");
+
+    let provider = reg.get(&pid).expect("provider");
+    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::ChatCompletions);
+}
+
+/// openai-compatible provider with custom base_url and env_key.
+#[test]
+fn openai_compatible_custom_pipeline() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let pid = ProviderId::new("openai-compatible");
+    let overrides = ProviderConfig::new(
+        Some("openai-compatible".into()),
+        Some("sk-custom".into()),
+        Some("https://custom-proxy.local/v1".into()),
+    );
+    let configured = reg.configure(&pid, overrides).expect("configure openai-compatible");
+
+    let chat_route = configured
+        .routes
+        .get(&RouteId::new("openai-compatible-chat"))
+        .expect("openai-compatible-chat route");
+    assert_eq!(chat_route.protocol_id, "chat_completions");
+    assert_eq!(
+        chat_route.endpoint.base_url.as_deref(),
+        Some("https://custom-proxy.local/v1")
+    );
+
+    let provider = reg.get(&pid).expect("provider");
+    assert_eq!(provider.defaults().env_key, vec!["XAI_API_KEY"]);
+    assert_eq!(provider.defaults().api_backend, xai_grok_provider::types::ApiBackend::ChatCompletions);
+}
+
+/// Provider with env_key config via configure_providers (env var detection path).
+#[test]
+fn provider_config_with_env_key() {
+    let reg = ProviderRegistry::new();
+    xai_grok_provider::providers::register_all(&reg);
+
+    let toml: toml::Value = toml::from_str(
+        r#"
+        [provider."openai-compatible"]
+        env_key = ["CUSTOM_API_KEY"]
+        base_url = "https://custom-proxy.local/v1"
+        "#,
+    )
+    .unwrap();
+    xai_grok_provider::providers::configure_providers(&reg, &toml, None, None);
+
+    let pid = ProviderId::new("openai-compatible");
+    let stored = reg.get_config(&pid).expect("openai-compatible config");
+    assert_eq!(stored.env_key, Some(vec!["CUSTOM_API_KEY".to_string()]));
+    assert_eq!(
+        stored.base_url.as_deref(),
+        Some("https://custom-proxy.local/v1")
+    );
+}
