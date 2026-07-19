@@ -12,3 +12,18 @@ artifacts/provider-v1/**
 cargo_meta.json
 meta.json
 shell_failures.txt
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Debug/scratch scripts in the v1 toolchain
+scripts/provider-v1/_scan_driver.py
+scripts/provider-v1/debug_scan.py
+scripts/provider-v1/run-scan.py
+scripts/provider-v1/scan-exclusions.py
+scripts/provider-v1/scan_platform_exclusions.py
+scripts/provider-v1/tests/debug_*.py
+scripts/provider-v1/tests/quick_test*.py
+scripts/provider-v1/tests/test_check_ps1.ps1
+scripts/provider-v1/tests/test_scan_platform_exclusions.py
