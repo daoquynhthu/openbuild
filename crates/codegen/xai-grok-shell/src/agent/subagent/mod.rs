@@ -925,6 +925,7 @@ async fn read_parent_sampling_config(
                 model: cfg.model.clone(),
                 endpoint_path: ctx.sampling_config.endpoint_path.clone(),
                 endpoint_query: ctx.sampling_config.endpoint_query.clone(),
+                request_url: ctx.sampling_config.request_url.clone(),
                 max_completion_tokens: cfg.max_completion_tokens,
                 temperature: cfg.temperature,
                 top_p: cfg.top_p,

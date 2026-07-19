@@ -313,6 +313,7 @@ impl SessionActor {
             model: cfg.model,
             endpoint_path: None,
             endpoint_query: None,
+            request_url: None,
             max_completion_tokens: cfg.max_completion_tokens,
             temperature: cfg.temperature,
             top_p: cfg.top_p,

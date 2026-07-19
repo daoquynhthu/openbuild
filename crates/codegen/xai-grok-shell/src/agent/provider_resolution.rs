@@ -121,15 +121,22 @@ pub fn resolve_model_execution(
         _ => xai_grok_sampler::AuthScheme::Bearer,
     };
 
+    // P7-006: protocol ID must be registered. Unknown is a typed error.
+    // api_backend is derived for legacy migration only, not as primary dispatch.
+    let protocol_id_known = matches!(
+        protocol_id.as_str(),
+        "chat_completions" | "responses" | "messages"
+    );
+    if !protocol_id_known {
+        return Err(ProviderResolutionError::Protocol(format!(
+            "unknown protocol_id: {protocol_id}"
+        )));
+    }
     let api_backend = match protocol_id.as_str() {
         "chat_completions" => ApiBackend::ChatCompletions,
         "responses" => ApiBackend::Responses,
         "messages" => ApiBackend::Messages,
-        _ => {
-            return Err(ProviderResolutionError::Protocol(format!(
-                "unknown protocol_id: {protocol_id}"
-            )));
-        }
+        _ => unreachable!("checked above"),
     };
 
     Ok(SamplerConfig {
