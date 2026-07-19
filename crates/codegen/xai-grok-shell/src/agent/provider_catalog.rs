@@ -328,6 +328,10 @@ impl ProviderCatalogService {
                 let mut snap = self.snapshot.write().await;
                 let mut new_snapshot = (**snap).clone();
                 let source = build_url(&pid).map(|(u, _)| u).unwrap_or_default();
+                // P9-005: on error, preserve old models (don't overwrite with empty list)
+                let existing_models = new_snapshot.providers.get(&pid)
+                    .map(|e| e.models.clone())
+                    .unwrap_or_default();
                 let entry = ProviderCatalogEntry {
                     provider_id: pid.clone(),
                     state: if error.is_some() {
@@ -341,13 +345,25 @@ impl ProviderCatalogService {
                         Some(SystemTime::now())
                     },
                     source_url: source,
-                    models: models_opt.unwrap_or_default(),
+                    models: models_opt.unwrap_or(existing_models),
                     error_summary: error,
                 };
                 new_snapshot.providers.insert(pid, entry);
                 new_snapshot.catalog_revision += 1;
                 *snap = Arc::new(new_snapshot);
             }
+        }
+    }
+
+    /// Classify an HTTP status into a typed error string (P9-005).
+    fn classify_http_status(status: reqwest::StatusCode) -> String {
+        match status.as_u16() {
+            401 => format!("auth required (HTTP 401)"),
+            403 => format!("forbidden (HTTP 403)"),
+            404 => format!("endpoint not found (HTTP 404)"),
+            429 => format!("rate limited (HTTP 429)"),
+            500..=599 => format!("server error (HTTP {})", status.as_u16()),
+            code => format!("unexpected HTTP status {code}"),
         }
     }
 
@@ -363,10 +379,15 @@ impl ProviderCatalogService {
             .send()
             .await
             .map_err(|e| format!("HTTP request failed: {e}"))?;
+        // P9-005: only parse 2xx responses
+        let status = response.status();
+        if !status.is_success() {
+            return Err(Self::classify_http_status(status));
+        }
         let body: serde_json::Value = response
             .json()
             .await
-            .map_err(|e| format!("JSON parse failed: {e}"))?;
+            .map_err(|e| format!("invalid JSON response: {e}"))?;
         Ok(parse(&body, defaults))
     }
 }
