@@ -16,6 +16,10 @@ impl SecretValue {
     pub fn new(value: String) -> Self {
         Self { inner: value }
     }
+
+    pub fn inner(&self) -> &str {
+        &self.inner
+    }
 }
 
 impl std::fmt::Debug for SecretValue {
@@ -510,4 +514,39 @@ mod tests {
     // SecretValue intentionally does not implement Serialize/Deserialize.
     // The compiler enforces this — any attempt to add serde derives would
     // cause a compile error at the derive site.
+
+    // P8-001: Inline/Public semantics tests
+    //
+    // These tests assert the EXPECTED behavior under the P8 auth model.
+    // They are RED on the current implementation because `resolve_credential_source`
+    // returns `None` for both `Inline` and `Public` — it has no way to carry
+    // a concrete value. After P8-002 the new `CredentialCandidate` types and
+    // `RequestCredentialContext` will make these assertions pass.
+    //
+    // The current test assertions intentionally fail (RED):
+    //   line 1: Inline with value should resolve, but current code returns None
+    //   line 2: Public should produce no auth (correct), but the type distinction matters
+
+    #[test]
+    fn inline_with_value_should_resolve() {
+        // Current: CredentialSource::Inline carries no value → always None.
+        // Expected: CredentialCandidate + context carries value → resolves.
+        let result = resolve_credential_source(&CredentialSource::Inline).unwrap();
+        assert!(
+            result.value.is_some(),
+            "P8-001 RED: Inline with value must resolve, got None — \
+             current CredentialSource::Inline has no value slot"
+        );
+    }
+
+    #[test]
+    fn public_is_distinct_from_none_for_auth() {
+        // Current: Public and None both produce None.
+        // Expected: Public must be explicitly non-auth; None means unconfigured.
+        assert_ne!(
+            CredentialSource::Public,
+            CredentialSource::None,
+            "Public must be distinct from None"
+        );
+    }
 }
