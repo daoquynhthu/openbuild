@@ -97,7 +97,7 @@ impl Route {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::CredentialSource;
+    use crate::auth::{CredentialCandidate, CredentialSource};
     use crate::endpoint::EndpointPart;
 
     fn test_route() -> Route {
@@ -110,7 +110,7 @@ mod tests {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            AuthPolicy::Bearer(CredentialSource::Environment(vec!["OPENAI_API_KEY".into()])),
+            AuthPolicy::bearer(vec![CredentialCandidate::ModelEnvironment(vec!["OPENAI_API_KEY".into()])], true),
         )
     }
 

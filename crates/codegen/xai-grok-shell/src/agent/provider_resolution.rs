@@ -174,7 +174,7 @@ pub fn resolve_model_execution(
     // Derive auth_scheme from the auth policy
     let auth_scheme = match &route.auth {
         AuthPolicy::None => xai_grok_sampler::AuthScheme::None,
-        AuthPolicy::Bearer(_) => xai_grok_sampler::AuthScheme::Bearer,
+        AuthPolicy::Bearer { .. } => xai_grok_sampler::AuthScheme::Bearer,
         AuthPolicy::Header { name, .. } if name == "x-api-key" => {
             xai_grok_sampler::AuthScheme::XApiKey
         }

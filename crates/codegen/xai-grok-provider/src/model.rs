@@ -93,7 +93,7 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::{AuthPolicy, CredentialSource};
+    use crate::auth::{AuthPolicy, CredentialCandidate, CredentialSource};
     use crate::endpoint::{Endpoint, EndpointPart};
     use crate::route::Route;
 
@@ -107,7 +107,7 @@ mod tests {
                 path: EndpointPart::Static("/chat".into()),
                 query: None,
             },
-            AuthPolicy::Bearer(CredentialSource::None),
+            AuthPolicy::bearer(vec![], false),
         )
     }
 

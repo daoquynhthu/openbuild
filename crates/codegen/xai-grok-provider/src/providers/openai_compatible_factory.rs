@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::auth::{AuthPolicy, CredentialSource};
+use crate::auth::{AuthPolicy, CredentialCandidate};
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider, SharedProvider};
 use crate::resolution::{ProviderImplementation, ResolvedProviderSpec};
@@ -61,7 +61,7 @@ impl Provider for FactoryProvider {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            AuthPolicy::Bearer(CredentialSource::Environment(self.env_key.clone())),
+            AuthPolicy::bearer(vec![CredentialCandidate::ProviderEnvironment(self.env_key.clone())], false),
         );
         let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);
         let selector = Arc::new(DefaultRouteSelector {

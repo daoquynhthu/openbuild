@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::auth::{AuthPolicy, CredentialSource};
+use crate::auth::{AuthPolicy, CredentialCandidate};
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
@@ -75,10 +75,11 @@ impl Provider for AnthropicProvider {
                 path: EndpointPart::Static("/messages".into()),
                 query: None,
             },
-            AuthPolicy::Header {
-                name: "x-api-key".into(),
-                source: CredentialSource::Environment(vec!["ANTHROPIC_API_KEY".into()]),
-            },
+            AuthPolicy::header(
+                "x-api-key",
+                vec![CredentialCandidate::ProviderEnvironment(vec!["ANTHROPIC_API_KEY".into()])],
+                true,
+            ),
         );
         route
             .static_headers

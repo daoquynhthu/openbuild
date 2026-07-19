@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::auth::{AuthPolicy, CredentialSource};
+use crate::auth::{AuthPolicy, CredentialCandidate};
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
@@ -75,7 +75,7 @@ impl Provider for XaiProvider {
                 path: EndpointPart::Static("/responses".into()),
                 query: None,
             },
-            AuthPolicy::Bearer(CredentialSource::Environment(vec!["XAI_API_KEY".into()])),
+            AuthPolicy::bearer(vec![CredentialCandidate::ProviderEnvironment(vec!["XAI_API_KEY".into()])], true),
         );
         // Preserve legacy x-grok-* headers for backward compatibility.
         route

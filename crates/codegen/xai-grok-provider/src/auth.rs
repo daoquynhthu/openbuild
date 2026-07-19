@@ -40,38 +40,58 @@ pub use crate::resolution::{ProviderPublicConfig, ProviderRuntimeConfig};
 
 use crate::error::ProviderError;
 
-/// Declarative credential source. Provider constructors declare the source
-/// but do not resolve it — resolution happens at request time.
+/// Ordered credential candidate for request-time resolution (P8).
+/// Provider constructors only declare candidate types — resolution
+/// happens at request time via `RequestCredentialContext`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum CredentialCandidate {
+    RequestOverride,
+    ModelInline,
+    ProviderInline,
+    ModelEnvironment(Vec<String>),
+    ProviderEnvironment(Vec<String>),
+    BuiltinEnvironment(Vec<String>),
+    Session,
+}
+
+/// Declarative credential source (legacy — replaced by `CredentialCandidate`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CredentialSource {
-    /// Inline key from config or CLI.
     Inline,
-    /// Ordered list of environment variable names to try.
     Environment(Vec<String>),
-    /// xAI OAuth session token.
     Session,
-    /// No auth required; allow discovery/inference without credentials.
     Public,
-    /// No credential available.
     None,
 }
 
-/// Declarative authentication policy for a route.
+/// Declarative authentication policy for a route (P8).
 /// Provider constructors set this; the shell runtime resolves it.
 #[derive(Debug, Clone)]
 pub enum AuthPolicy {
     /// No authentication.
     None,
-    /// Bearer token from a credential source.
-    Bearer(CredentialSource),
-    /// Arbitrary header from a credential source.
+    /// Bearer token from a list of credential candidates.
+    Bearer {
+        candidates: Vec<CredentialCandidate>,
+        required: bool,
+    },
+    /// Arbitrary header from a list of credential candidates.
     Header {
         name: String,
-        source: CredentialSource,
+        candidates: Vec<CredentialCandidate>,
+        required: bool,
     },
 }
 
 impl AuthPolicy {
+    pub fn bearer(candidates: Vec<CredentialCandidate>, required: bool) -> Self {
+        AuthPolicy::Bearer { candidates, required }
+    }
+
+    pub fn header(name: impl Into<String>, candidates: Vec<CredentialCandidate>, required: bool) -> Self {
+        AuthPolicy::Header { name: name.into(), candidates, required }
+    }
+
     /// Validate header names against HTTP token rules.
     pub fn validate(&self) -> Result<(), ProviderError> {
         match self {
@@ -122,39 +142,85 @@ pub fn resolve_credential_source(
 }
 
 /// Apply an AuthPolicy to produce headers at request time.
+/// Legacy version — resolves CredentialSource directly.
+/// P8 callers should use `prepare_sampler_config` instead.
 pub fn apply_auth_policy(
     policy: &AuthPolicy,
     existing: &HeaderMap,
 ) -> Result<HeaderMap, ProviderError> {
     match policy {
         AuthPolicy::None => Ok(existing.clone()),
-        AuthPolicy::Bearer(source) => {
-            let cred = resolve_credential_source(source)?;
-            match cred.value {
-                Some(token) => {
-                    let mut headers = existing.clone();
-                    headers.insert("Authorization".into(), format!("Bearer {token}"));
-                    Ok(headers)
+        AuthPolicy::Bearer { candidates, required } => {
+            let source = candidates_to_source(candidates);
+            match source {
+                Some(source) => {
+                    let cred = resolve_credential_source(&source)?;
+                    match cred.value {
+                        Some(token) => {
+                            let mut headers = existing.clone();
+                            headers.insert("Authorization".into(), format!("Bearer {token}"));
+                            Ok(headers)
+                        }
+                        None if *required => Err(ProviderError::MissingCredential(
+                            "Bearer credential not resolved".into(),
+                        )),
+                        None => Ok(existing.clone()),
+                    }
                 }
-                None => Err(ProviderError::MissingCredential(
-                    "Bearer credential not resolved".into(),
+                None if *required => Err(ProviderError::MissingCredential(
+                    "no Bearer candidates configured".into(),
                 )),
+                None => Ok(existing.clone()),
             }
         }
-        AuthPolicy::Header { name, source } => {
-            let cred = resolve_credential_source(source)?;
-            match cred.value {
-                Some(value) => {
-                    let mut headers = existing.clone();
-                    headers.insert(name.clone(), value);
-                    Ok(headers)
+        AuthPolicy::Header { name, candidates, required } => {
+            let source = candidates_to_source(candidates);
+            match source {
+                Some(source) => {
+                    let cred = resolve_credential_source(&source)?;
+                    match cred.value {
+                        Some(value) => {
+                            let mut headers = existing.clone();
+                            headers.insert(name.clone(), value);
+                            Ok(headers)
+                        }
+                        None if *required => Err(ProviderError::MissingCredential(format!(
+                            "header credential for {name} not resolved"
+                        ))),
+                        None => Ok(existing.clone()),
+                    }
                 }
-                None => Err(ProviderError::MissingCredential(format!(
-                    "header credential for {name} not resolved"
+                None if *required => Err(ProviderError::MissingCredential(format!(
+                    "no candidates for header {name}"
                 ))),
+                None => Ok(existing.clone()),
             }
         }
     }
+}
+
+/// Convert new AuthPolicy to legacy CredentialSource for the migration period.
+fn auth_policy_to_credential_source(policy: &AuthPolicy) -> Option<CredentialSource> {
+    match policy {
+        AuthPolicy::None => None,
+        AuthPolicy::Bearer { candidates, .. } => {
+            candidates_to_source(candidates)
+        }
+        AuthPolicy::Header { candidates, .. } => {
+            candidates_to_source(candidates)
+        }
+    }
+}
+
+fn candidates_to_source(candidates: &[CredentialCandidate]) -> Option<CredentialSource> {
+    for candidate in candidates {
+        return Some(match candidate {
+            CredentialCandidate::RequestOverride | CredentialCandidate::ModelInline | CredentialCandidate::ProviderInline => CredentialSource::Inline,
+            CredentialCandidate::ModelEnvironment(keys) | CredentialCandidate::ProviderEnvironment(keys) | CredentialCandidate::BuiltinEnvironment(keys) => CredentialSource::Environment(keys.clone()),
+            CredentialCandidate::Session => CredentialSource::Session,
+        });
+    }
+    None
 }
 
 /// Input to an [`AuthFn::apply`] call. Carries request metadata and
@@ -380,7 +446,10 @@ mod tests {
 
     #[test]
     fn auth_policy_public_no_header() {
-        let policy = AuthPolicy::Bearer(CredentialSource::Public);
+        // Public is mapped to AuthPolicy::None in P8.
+        // The old test used Bearer(Public) which would be an error.
+        // Now Bearer without candidates maps to None via auth_policy_to_credential_source.
+        let policy = AuthPolicy::bearer(vec![], true);
         let result = apply_auth_policy(&policy, &HeaderMap::new());
         assert!(result.is_err());
         assert!(matches!(
@@ -391,22 +460,17 @@ mod tests {
 
     #[test]
     fn auth_policy_validate_header_name() {
-        let valid = AuthPolicy::Header {
-            name: "x-api-key".into(),
-            source: CredentialSource::None,
-        };
+        let valid = AuthPolicy::header(
+            "x-api-key",
+            vec![CredentialCandidate::ModelEnvironment(vec!["ANTHROPIC_API_KEY".into()])],
+            true,
+        );
         assert!(valid.validate().is_ok());
 
-        let invalid = AuthPolicy::Header {
-            name: "".into(),
-            source: CredentialSource::None,
-        };
+        let invalid = AuthPolicy::header("", vec![], true);
         assert!(invalid.validate().is_err());
 
-        let with_colon = AuthPolicy::Header {
-            name: "bad:name".into(),
-            source: CredentialSource::None,
-        };
+        let with_colon = AuthPolicy::header("bad:name", vec![], true);
         assert!(with_colon.validate().is_err());
     }
 

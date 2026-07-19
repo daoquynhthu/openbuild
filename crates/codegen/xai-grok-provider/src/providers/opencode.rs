@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::auth::{AuthPolicy, CredentialSource};
+use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
@@ -75,7 +75,7 @@ impl Provider for OpenCodeProvider {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            AuthPolicy::Bearer(CredentialSource::Public),
+            AuthPolicy::None,
         );
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("opencode-chat");
