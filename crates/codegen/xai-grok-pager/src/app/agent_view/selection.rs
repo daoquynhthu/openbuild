@@ -1525,7 +1525,10 @@ mod tests {
                 |source| source(line.block_line_idx),
             )
             .flatten();
-        assert_eq!(source_text.as_deref().map(|s| s.replace('\\', "/")), Some("src/lib.rs".to_string()));
+        assert_eq!(
+            source_text.as_deref().map(|s| s.replace('\\', "/")),
+            Some("src/lib.rs".to_string())
+        );
         {
             let child = parent.subagent_views.get(&child_id).expect("active child");
             let entry = child.scrollback.get(0).expect("child Read entry");

@@ -304,7 +304,10 @@ fn shorten_path(path: &str) -> &str {
     let memory_root = xai_grok_config::grok_home().join("memory");
     let memory_prefix = memory_root.display().to_string();
     if let Some(rest) = path.strip_prefix(&memory_prefix) {
-        let rest = rest.strip_prefix('/').or_else(|| rest.strip_prefix('\\')).unwrap_or(rest);
+        let rest = rest
+            .strip_prefix('/')
+            .or_else(|| rest.strip_prefix('\\'))
+            .unwrap_or(rest);
         if let Some(after_slash) = rest.find(&['/', '\\'][..]) {
             return &rest[after_slash + 1..];
         }
@@ -455,7 +458,10 @@ session content
             shorten_path(session.to_str().expect("utf8 path")),
             "sessions/2026-05-01.md"
         );
-        assert_eq!(shorten_path(top.to_str().expect("utf8 path")).replace('\\', "/"), "MEMORY.md");
+        assert_eq!(
+            shorten_path(top.to_str().expect("utf8 path")).replace('\\', "/"),
+            "MEMORY.md"
+        );
         // Outside the memory root falls back to the filename.
         assert_eq!(shorten_path("/some/other/path.md"), "path.md");
     }

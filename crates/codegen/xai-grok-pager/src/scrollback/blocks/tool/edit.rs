@@ -1617,7 +1617,10 @@ mod tests {
             .flat_map(|l| l.spans.iter())
             .map(|s| s.content.as_ref())
             .collect();
-        assert_eq!(preamble_text.replace('\\', "/"), "Edit /Users/me/project/src/foo.rs");
+        assert_eq!(
+            preamble_text.replace('\\', "/"),
+            "Edit /Users/me/project/src/foo.rs"
+        );
     }
 
     #[test]
@@ -1657,7 +1660,10 @@ mod tests {
         ctx.mode = DisplayMode::Expanded;
         let expanded = block.output(&ctx);
         assert_eq!(
-            expanded.lines[0].content.spans[1].content.as_ref().replace('\\', "/"),
+            expanded.lines[0].content.spans[1]
+                .content
+                .as_ref()
+                .replace('\\', "/"),
             "src/foo.rs"
         );
         assert_eq!(expanded.lines[0].link_url.as_deref(), Some(url.as_ref()));

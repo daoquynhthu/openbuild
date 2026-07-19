@@ -7,21 +7,42 @@ use std::sync::Mutex;
 #[derive(Debug, thiserror::Error)]
 pub enum AtomicWriteError {
     #[error("failed to create temp file at {target}")]
-    CreateTemp { target: PathBuf, source: std::io::Error },
+    CreateTemp {
+        target: PathBuf,
+        source: std::io::Error,
+    },
     #[error("failed to write to temp file for {target}")]
-    Write { target: PathBuf, source: std::io::Error },
+    Write {
+        target: PathBuf,
+        source: std::io::Error,
+    },
     #[error("failed to flush temp file for {target}")]
-    Flush { target: PathBuf, source: std::io::Error },
+    Flush {
+        target: PathBuf,
+        source: std::io::Error,
+    },
     #[error("failed to sync temp file for {target}")]
-    SyncFile { target: PathBuf, source: std::io::Error },
+    SyncFile {
+        target: PathBuf,
+        source: std::io::Error,
+    },
     #[error("failed to replace {target}")]
-    Replace { target: PathBuf, source: std::io::Error },
+    Replace {
+        target: PathBuf,
+        source: std::io::Error,
+    },
     #[error("sharing violation: {target} is locked by another process")]
     SharingViolation { target: PathBuf },
     #[error("failed to sync parent directory of {target}")]
-    SyncParent { target: PathBuf, source: std::io::Error },
+    SyncParent {
+        target: PathBuf,
+        source: std::io::Error,
+    },
     #[error("failed to clean up temp file for {target}")]
-    Cleanup { target: PathBuf, source: std::io::Error },
+    Cleanup {
+        target: PathBuf,
+        source: std::io::Error,
+    },
 }
 
 pub(crate) trait AtomicReplaceBackend: Send + Sync {
@@ -31,7 +52,11 @@ pub(crate) trait AtomicReplaceBackend: Send + Sync {
     fn cleanup_temp(&self, temp: &Path);
 }
 
-fn do_atomic_replace(path: &Path, bytes: &[u8], backend: &dyn AtomicReplaceBackend) -> Result<(), AtomicWriteError> {
+fn do_atomic_replace(
+    path: &Path,
+    bytes: &[u8],
+    backend: &dyn AtomicReplaceBackend,
+) -> Result<(), AtomicWriteError> {
     let (temp_path, mut file) = backend.create_unique_temp(path)?;
     let result = (|| -> Result<(), AtomicWriteError> {
         file.write_all(bytes).map_err(|e| AtomicWriteError::Write {
@@ -89,7 +114,11 @@ impl AtomicReplaceBackend for UnixBackend {
         let mut err = None;
         for _ in 0..10 {
             let temp = dir.join(format!(".tmp_{}", std::process::id()));
-            match std::fs::OpenOptions::new().create_new(true).write(true).open(&temp) {
+            match std::fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&temp)
+            {
                 Ok(f) => return Ok((temp, f)),
                 Err(e) => err = Some(e),
             }
@@ -130,11 +159,14 @@ mod platform {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     use std::path::Path;
-    use windows::Win32::Storage::FileSystem::MoveFileExW;
     use windows::Win32::Storage::FileSystem::MOVEFILE_REPLACE_EXISTING;
     use windows::Win32::Storage::FileSystem::MOVEFILE_WRITE_THROUGH;
+    use windows::Win32::Storage::FileSystem::MoveFileExW;
 
-    pub(crate) fn win32_move_file_replace(temp: &Path, target: &Path) -> Result<(), super::AtomicWriteError> {
+    pub(crate) fn win32_move_file_replace(
+        temp: &Path,
+        target: &Path,
+    ) -> Result<(), super::AtomicWriteError> {
         let temp_wide: Vec<u16> = OsStr::new(temp)
             .encode_wide()
             .chain(std::iter::once(0))
@@ -166,12 +198,18 @@ mod platform {
         Ok(())
     }
 
-    pub(crate) fn win32_create_unique_temp(target: &Path) -> Result<(std::path::PathBuf, std::fs::File), super::AtomicWriteError> {
+    pub(crate) fn win32_create_unique_temp(
+        target: &Path,
+    ) -> Result<(std::path::PathBuf, std::fs::File), super::AtomicWriteError> {
         let dir = target.parent().unwrap_or(Path::new("."));
         let mut err = None;
         for _ in 0..10 {
             let temp = dir.join(format!(".tmp_{}", std::process::id()));
-            match std::fs::OpenOptions::new().create_new(true).write(true).open(&temp) {
+            match std::fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&temp)
+            {
                 Ok(f) => return Ok((temp, f)),
                 Err(e) => err = Some(e),
             }
@@ -242,10 +280,12 @@ impl AtomicReplaceBackend for FakeBackend {
         *count += 1;
         let dir = target.parent().unwrap_or(Path::new("."));
         let temp = dir.join(format!("__test_{}_{}", std::process::id(), count));
-        File::create_new(&temp).map(|f| (temp, f)).map_err(|e| AtomicWriteError::CreateTemp {
-            target: target.to_path_buf(),
-            source: e,
-        })
+        File::create_new(&temp)
+            .map(|f| (temp, f))
+            .map_err(|e| AtomicWriteError::CreateTemp {
+                target: target.to_path_buf(),
+                source: e,
+            })
     }
 
     fn replace_existing(&self, temp: &Path, target: &Path) -> Result<(), AtomicWriteError> {
@@ -301,10 +341,7 @@ mod tests {
         let backend = test_backend();
 
         atomic_replace_test(&target, "héllo wörld 🌍".as_bytes(), &backend).unwrap();
-        assert_eq!(
-            std::fs::read_to_string(&target).unwrap(),
-            "héllo wörld 🌍"
-        );
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "héllo wörld 🌍");
     }
 
     #[test]

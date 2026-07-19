@@ -551,7 +551,10 @@ mod tests {
             .flat_map(|l| l.spans.iter())
             .map(|s| s.content.as_ref())
             .collect();
-        assert_eq!(preamble_text.replace('\\', "/"), "Read /Users/me/project/src/main.rs");
+        assert_eq!(
+            preamble_text.replace('\\', "/"),
+            "Read /Users/me/project/src/main.rs"
+        );
     }
 
     #[test]
@@ -611,7 +614,10 @@ mod tests {
         ctx.mode = DisplayMode::Expanded;
         ctx.cwd = Some(std::path::PathBuf::from("/Users/me/project"));
         let header = &block.output(&ctx).lines[0];
-        assert_eq!(derive_selection_text(header).replace('\\', "/"), "src/main.rs");
+        assert_eq!(
+            derive_selection_text(header).replace('\\', "/"),
+            "src/main.rs"
+        );
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -634,7 +640,10 @@ mod tests {
         ctx.mode = DisplayMode::Expanded;
         let expanded = block.output(&ctx);
         assert_eq!(
-            expanded.lines[0].content.spans[1].content.as_ref().replace('\\', "/"),
+            expanded.lines[0].content.spans[1]
+                .content
+                .as_ref()
+                .replace('\\', "/"),
             "src/main.rs"
         );
         assert_eq!(expanded.lines[0].link_url.as_deref(), Some(url.as_ref()));

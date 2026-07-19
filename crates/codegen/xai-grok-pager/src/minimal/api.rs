@@ -583,41 +583,33 @@ pub fn test_agent_view(session_id: Option<&str>, cwd: std::path::PathBuf) -> Age
     crate::app::agent_view::test_agent_view(session_id, cwd)
 }
 
-
 pub fn set_extensions_modal(v: &mut AgentView, val: Option<ExtensionsModalState>) {
     v.extensions_modal = val;
 }
-
 
 pub fn set_question_view(v: &mut AgentView, val: Option<QuestionViewState>) {
     v.question_view = val;
 }
 
-
 pub fn set_plan_mode_active(v: &mut AgentView, on: bool) {
     v.plan_mode_active = on;
 }
-
 
 pub fn set_plan_mode_pending(v: &mut AgentView, val: Option<bool>) {
     v.plan_mode_pending = val;
 }
 
-
 pub fn prompt_suggestions_mut(pw: &mut PromptWidget) -> &mut SuggestionController {
     &mut pw.suggestions
 }
-
 
 pub fn set_yolo_mode_for_test(session: &mut AgentSession, on: bool) {
     session.set_yolo_mode_for_test(on);
 }
 
-
 pub fn set_auto_mode_for_test(session: &mut AgentSession, on: bool) {
     session.set_auto_mode_for_test(on);
 }
-
 
 pub fn set_show_thinking_blocks(enabled: bool) {
     crate::appearance::cache::set_show_thinking_blocks(enabled);

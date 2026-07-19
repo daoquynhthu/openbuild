@@ -17,6 +17,9 @@ shell_failures.txt
 __pycache__/
 *.pyc
 
+# V2 plan document — tracked separately
+docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md
+
 # Debug/scratch scripts in the v1 toolchain
 scripts/provider-v1/_scan_driver.py
 scripts/provider-v1/debug_scan.py
