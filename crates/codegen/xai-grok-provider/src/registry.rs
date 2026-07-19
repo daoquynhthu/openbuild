@@ -139,8 +139,9 @@ impl ProviderRegistry {
         self.state.read().snapshot.providers.get(id).cloned()
     }
 
-    // ── Legacy config storage (transitional — will be removed by P5-007) ──
+    // ── Legacy API — will be removed in P6 after prepare/commit migration ──
 
+    #[doc(hidden)]
     pub fn store_config(&self, id: &ProviderId, config: ProviderConfig) {
         self.state.write().legacy_configs.insert(id.clone(), config);
     }

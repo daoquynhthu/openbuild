@@ -130,6 +130,7 @@ pub fn configure_providers(
             merged = merged.merge(cli.clone());
         }
 
+        // Legacy path — will be replaced by prepare/commit in P6
         registry.store_config(&pid, merged.clone());
         if let Some(cp) = registry.configure(&pid, merged) {
             for (route_id, route_arc) in &cp.routes {
