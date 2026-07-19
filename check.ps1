@@ -15,13 +15,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PROTOC = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Google.Protobuf_Microsoft.Winget.Source_8wekyb3d8bbwe\bin\protoc.exe"
-
-if (-not (Test-Path $PROTOC)) {
-    Write-Warning "protoc not found at $PROTOC — trying PATH"
-    $PROTOC = (Get-Command protoc -ErrorAction SilentlyContinue).Source
-    if (-not $PROTOC) {
-        Write-Error "protoc not installed. Run: winget install Google.Protobuf"
+$PROTOC = (Get-Command protoc -ErrorAction SilentlyContinue).Source
+if (-not $PROTOC) {
+    $PROTOC = "${env:LOCALAPPDATA}\Microsoft\WinGet\Packages\Google.Protobuf_Microsoft.Winget.Source_8wekyb3d8bbwe\bin\protoc.exe"
+    if (-not (Test-Path $PROTOC)) {
+        Write-Error "protoc not found on PATH or WinGet. Install: winget install Google.Protobuf"
         exit 1
     }
 }
@@ -38,8 +36,10 @@ foreach ($crate in $Targets) {
     }
     cargo clippy -p $crate -- -D warnings 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "clippy warnings in $crate (non-fatal)"
+        Write-Error "clippy failed: $crate"
+        exit $LASTEXITCODE
     }
 }
 
-Write-Host "`nAll checks passed." -ForegroundColor Green
+Write-Host "`n=== All checks passed ===" -ForegroundColor Green
+Write-Host "Checked crates: $($Targets -join ', ')" -ForegroundColor Cyan
