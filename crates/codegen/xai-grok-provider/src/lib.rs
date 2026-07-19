@@ -8,5 +8,6 @@ pub mod protocol;
 pub mod provider;
 pub mod providers;
 pub mod registry;
+pub mod resolution;
 pub mod route;
 pub mod types;
