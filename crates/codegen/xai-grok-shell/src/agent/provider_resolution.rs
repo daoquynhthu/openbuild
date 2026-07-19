@@ -368,7 +368,7 @@ pub fn merge_model_catalog(
 
     // Layer 2: dynamic provider-discovered models from catalog
     for (_pid, catalog_entry) in &catalog_snapshot.providers {
-        if catalog_entry.state != super::provider_catalog::ProviderCatalogState::Ready {
+        if catalog_entry.state != super::provider_catalog::ProviderCatalogState::Fresh {
             continue;
         }
         for model_cfg in &catalog_entry.models {

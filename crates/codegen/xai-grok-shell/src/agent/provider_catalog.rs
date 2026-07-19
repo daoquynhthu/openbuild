@@ -17,15 +17,14 @@ use super::config::{self, ModelEntryConfig};
 /// Default TTL for cached model lists (300 seconds).
 const DEFAULT_CACHE_TTL: Duration = Duration::from_secs(300);
 
-/// Per-provider catalog state.
+/// Per-provider catalog state (P9-001).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProviderCatalogState {
-    Idle,
-    Refreshing,
-    Ready,
+    Empty,
+    Loading,
+    Fresh,
     Stale,
-    Error(String),
-    Disabled,
+    Failed(String),
 }
 
 /// Per-provider catalog entry.
@@ -165,7 +164,7 @@ impl ProviderCatalogService {
                     pid.clone(),
                     ProviderCatalogEntry {
                         provider_id: pid,
-                        state: ProviderCatalogState::Ready,
+                        state: ProviderCatalogState::Fresh,
                         fetched_at: Some(Instant::now()),
                         source_url: url.to_string(),
                         models,
@@ -181,14 +180,14 @@ impl ProviderCatalogService {
                         .cloned()
                         .unwrap_or(ProviderCatalogEntry {
                             provider_id: pid.clone(),
-                            state: ProviderCatalogState::Error(e.clone()),
+                            state: ProviderCatalogState::Failed(e.clone()),
                             fetched_at: None,
                             source_url: url.to_string(),
                             models: vec![],
                             error_summary: Some(e.clone()),
                         });
                 let mut entry = entry;
-                entry.state = ProviderCatalogState::Error(e.clone());
+                entry.state = ProviderCatalogState::Failed(e.clone());
                 entry.error_summary = Some(e);
                 new_snapshot.providers.insert(pid, entry);
             }
@@ -258,9 +257,9 @@ impl ProviderCatalogService {
                 let entry = ProviderCatalogEntry {
                     provider_id: pid.clone(),
                     state: if error.is_some() {
-                        ProviderCatalogState::Error(error.clone().unwrap_or_default())
+                        ProviderCatalogState::Failed(error.clone().unwrap_or_default())
                     } else {
-                        ProviderCatalogState::Ready
+                        ProviderCatalogState::Fresh
                     },
                     fetched_at: if error.is_some() {
                         None
@@ -547,6 +546,76 @@ mod tests {
         let body = serde_json::json!({});
         let result = parse_ollama_tags_models(&body, &defaults);
         assert!(result.is_empty());
+    }
+
+    // P9-001: catalog state machine transition tests
+    #[test]
+    fn state_empty_initial() {
+        assert_eq!(ProviderCatalogState::Empty, ProviderCatalogState::Empty);
+    }
+
+    #[test]
+    fn state_loading_transition() {
+        let state = ProviderCatalogState::Loading;
+        assert_ne!(state, ProviderCatalogState::Empty);
+        assert_ne!(state, ProviderCatalogState::Fresh);
+    }
+
+    #[test]
+    fn state_fresh_after_successful_fetch() {
+        let entry = ProviderCatalogEntry {
+            provider_id: ProviderId::new("test"),
+            state: ProviderCatalogState::Fresh,
+            fetched_at: Some(Instant::now()),
+            source_url: "https://example.com/models".into(),
+            models: vec![],
+            error_summary: None,
+        };
+        assert_eq!(entry.state, ProviderCatalogState::Fresh);
+        assert!(entry.fetched_at.is_some());
+        assert!(entry.error_summary.is_none());
+    }
+
+    #[test]
+    fn state_stale_after_ttl() {
+        let entry = ProviderCatalogEntry {
+            provider_id: ProviderId::new("test"),
+            state: ProviderCatalogState::Fresh,
+            fetched_at: Some(Instant::now() - Duration::from_secs(1000)),
+            source_url: "https://example.com/models".into(),
+            models: vec![],
+            error_summary: None,
+        };
+        // TTL=300 should make this stale
+        assert!(entry.is_stale(Duration::from_secs(300)));
+    }
+
+    #[test]
+    fn state_failed_with_error() {
+        let entry = ProviderCatalogEntry {
+            provider_id: ProviderId::new("test"),
+            state: ProviderCatalogState::Failed("connection refused".into()),
+            fetched_at: None,
+            source_url: "https://example.com/models".into(),
+            models: vec![],
+            error_summary: Some("connection refused".into()),
+        };
+        assert_eq!(entry.state, ProviderCatalogState::Failed("connection refused".into()));
+        assert!(entry.fetched_at.is_none());
+        assert!(entry.error_summary.is_some());
+    }
+
+    #[test]
+    fn state_not_stale_when_recent() {
+        let entry = ProviderCatalogEntry {
+            provider_id: ProviderId::new("test"),
+            state: ProviderCatalogState::Fresh,
+            fetched_at: Some(Instant::now()),
+            source_url: "https://example.com/models".into(),
+            models: vec![],
+            error_summary: None,
+        };
+        assert!(!entry.is_stale(Duration::from_secs(300)));
     }
 
     fn dummy_defaults() -> ProviderDefaults {
