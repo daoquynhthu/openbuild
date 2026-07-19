@@ -11,6 +11,7 @@ mod anthropic;
 mod ollama;
 mod openai;
 mod openai_compatible;
+pub(crate) mod openai_compatible_factory;
 mod opencode;
 mod xai;
 

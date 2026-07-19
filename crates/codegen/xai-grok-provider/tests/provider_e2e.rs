@@ -409,7 +409,7 @@ fn openai_compatible_custom_pipeline() {
     );
 
     let provider = reg.get(&pid).expect("provider");
-    assert_eq!(provider.defaults().env_key, vec!["XAI_API_KEY"]);
+    assert_eq!(provider.defaults().env_key, Vec::<String>::new(), "openai-compatible must not default to XAI_API_KEY");
     assert_eq!(
         provider.defaults().api_backend,
         xai_grok_provider::types::ApiBackend::ChatCompletions

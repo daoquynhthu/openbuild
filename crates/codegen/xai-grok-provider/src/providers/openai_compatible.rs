@@ -12,7 +12,6 @@ use crate::types::{
     ApiBackend, AuthScheme, ModelSourceSpec, ProviderDefaults, ProviderId, RouteId,
 };
 
-/// Known OpenAI-compatible profile configurations.
 pub(crate) fn profile_base_url(profile: &str) -> Option<&'static str> {
     match profile {
         "groq" => Some("https://api.groq.com/openai/v1"),
@@ -34,7 +33,7 @@ fn compatible_defaults() -> ProviderDefaults {
         base_url: String::new(),
         api_backend: ApiBackend::ChatCompletions,
         auth_scheme: AuthScheme::Bearer,
-        env_key: vec!["XAI_API_KEY".into()],
+        env_key: vec![],  // No default env key — user must configure explicitly
         context_window: NonZeroU64::new(128_000).unwrap_or_else(|| unreachable!()),
         temperature: Some(0.7),
         top_p: Some(0.95),
