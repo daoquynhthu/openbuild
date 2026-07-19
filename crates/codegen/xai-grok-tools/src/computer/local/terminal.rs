@@ -2036,7 +2036,7 @@ impl LocalTerminalBackend {
     /// Test-only: a spawn_local backend that enrolls spawned children into
     /// `scope` instead of the process-global one, so a test can `kill_all()` in
     /// isolation without latching the global scope shared by other tests.
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "windows")))]
     pub(crate) fn new_local_with_scope(
         search_shadows: SearchShadowConfig,
         scope: crate::util::ProcessScope,
@@ -2054,7 +2054,7 @@ impl LocalTerminalBackend {
     }
 
     /// Create a backend with a custom completed-task TTL (for testing).
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "windows")))]
     pub(crate) fn new_with_completed_task_ttl(ttl: Duration) -> Self {
         Self::new_with_ttl(
             None,
@@ -2069,7 +2069,7 @@ impl LocalTerminalBackend {
     }
 
     /// Backend with a custom foreground budget (test-only).
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "windows")))]
     pub(crate) fn new_with_foreground_budget(budget: Duration) -> Self {
         Self::new_with_ttl(
             None,
@@ -2084,7 +2084,7 @@ impl LocalTerminalBackend {
     }
 
     /// Backend with a custom output-file size cap (test-only).
-    #[cfg(test)]
+    #[cfg(all(test, not(target_os = "windows")))]
     pub(crate) fn new_with_output_cap(output_file_cap: u64) -> Self {
         Self::new_with_ttl(
             None,

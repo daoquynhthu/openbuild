@@ -166,7 +166,7 @@ fn file_path_to_url(path: &Path) -> Option<Arc<str>> {
         .map(|u| Arc::from(u.as_str()))
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_os = "windows")))]
 fn tool_path_file_url_with_home(
     path: &str,
     cwd: Option<&Path>,
