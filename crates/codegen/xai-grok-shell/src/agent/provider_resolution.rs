@@ -40,6 +40,22 @@ pub enum ProviderResolutionError {
     ModelNotFound(String),
 }
 
+/// Temporary migration function: converts a `RegistrySnapshot` + model + overrides
+/// into a `SamplerConfig`. New code should call `resolve_model_execution` which
+/// returns `ResolvedModelExecution` directly.
+///
+/// This function does NOT send requests or fill auth headers.
+/// It will be removed in P8-011 (Phase 8).
+#[deprecated(note = "removed in P8-011 — use resolve_model_execution directly")]
+pub fn execution_to_unprepared_sampler_config_for_migration(
+    model: &ModelEntry,
+    registry: &RegistrySnapshot,
+    api_key: Option<&str>,
+    base_url_override: Option<&str>,
+) -> Result<SamplerConfig, ProviderResolutionError> {
+    resolve_model_execution(model, registry, api_key, base_url_override)
+}
+
 /// Merge generation parameters with fixed precedence: route defaults < model info < request overrides.
 /// Limits are capped by route limits — request cannot exceed provider/model caps.
 pub fn merge_generation_params(

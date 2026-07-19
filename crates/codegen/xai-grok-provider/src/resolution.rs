@@ -1,13 +1,30 @@
 use indexmap::IndexMap;
 
-use crate::auth::SecretValue;
+use crate::auth::{AuthPolicy, SecretValue};
 use crate::config::{ConfigDiagnostic, ProviderConfig};
-use crate::types::{CompatibleProfileId, ModelListFormat, ProviderId};
+use crate::model::{GenerationOptions, ModelLimits};
+use crate::types::{CompatibleProfileId, ModelId, ModelListFormat, ProviderId, RouteId};
 
 /// Result of resolving configuration precedence into a provider set.
 #[derive(Clone, Debug)]
 pub struct ResolvedProviderSet {
     pub providers: IndexMap<ProviderId, ResolvedProviderSpec>,
+}
+
+/// Fully-resolved model execution, the output of the route compiler.
+/// Contains everything needed to execute a request except auth headers
+/// (resolved in Phase 8). No plaintext secrets.
+#[derive(Clone, Debug)]
+pub struct ResolvedModelExecution {
+    pub provider_id: ProviderId,
+    pub route_id: RouteId,
+    pub protocol_id: String,
+    pub request_url: url::Url,
+    pub static_headers: indexmap::IndexMap<String, String>,
+    pub auth_policy: AuthPolicy,
+    pub model_id: ModelId,
+    pub generation: GenerationOptions,
+    pub limits: ModelLimits,
 }
 
 /// A single fully-resolved provider specification, ready for registry preparation.
