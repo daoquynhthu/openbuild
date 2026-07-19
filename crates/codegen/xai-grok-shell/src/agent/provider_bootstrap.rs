@@ -18,6 +18,8 @@ pub struct ProviderBootstrapInput {
 pub enum ProviderBootstrapError {
     #[error("registry rebuild failed: {0}")]
     RebuildFailed(String),
+    #[error("config diagnostic: {0}")]
+    ConfigDiagnostic(String),
 }
 
 /// Construct the single process-wide [`ProviderRuntime`].
@@ -70,7 +72,16 @@ pub async fn bootstrap_from_config(
             diags.into_iter().map(|d| d.to_string()).collect::<Vec<_>>().join("; ")
         ))?;
 
-    let (resolved, _diags) = resolve_with_precedence(parsed, legacy_migration, cli_overrides);
+    let (resolved, diags) = resolve_with_precedence(parsed, legacy_migration, cli_overrides);
+
+    if !diags.is_empty() {
+        let msg = diags
+            .into_iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(ProviderBootstrapError::ConfigDiagnostic(msg));
+    }
 
     let input = ProviderBootstrapInput { resolved };
     bootstrap_provider_runtime(input).await
