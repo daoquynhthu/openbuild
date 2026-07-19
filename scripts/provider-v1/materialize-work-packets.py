@@ -46,17 +46,14 @@ def parse_table(lines: list[str], header: str) -> list[dict[str, str]]:
         if in_table:
             if not stripped.startswith("|") or "---" in stripped:
                 continue
-            if stripped.startswith("|"):
-                cells = [c.strip() for c in stripped.strip("|").split("|")]
-                cells = [c for c in cells if c]
-                if len(cells) == len(col_names):
-                    row = dict(zip(col_names, cells))
-                    row_id = row.get("ID", "")
-                    if row_id:
-                        results.append(row)
-                else:
-                    # table ended
-                    in_table = False
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            if len(cells) >= len(col_names):
+                row = dict(zip(col_names, cells[:len(col_names)]))
+                row_id = row.get("ID", "")
+                if row_id:
+                    results.append(row)
+            else:
+                in_table = False
     return results
 
 

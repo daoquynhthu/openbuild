@@ -183,6 +183,7 @@ mod shell_suggestion_key_tests {
     }
 
     /// Whole-line history item (insert_text doubles as the span replacement).
+    #[cfg(all(test, not(target_os = "windows")))]
     fn history_item(line: &str, range: std::ops::Range<usize>) -> CompletionItemParsed {
         CompletionItemParsed {
             display: line.to_owned(),
