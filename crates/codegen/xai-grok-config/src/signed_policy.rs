@@ -72,7 +72,8 @@ fn with_embedded_keys<R>(f: impl FnOnce(&[(&str, &[u8])]) -> R) -> R {
 pub mod test_seam {
     use std::sync::Mutex;
 
-    static OVERRIDE_KEYS: Mutex<Option<Vec<(String, Vec<u8>)>>> = Mutex::new(None);
+    type OverrideKeys = Vec<(String, Vec<u8>)>;
+    static OVERRIDE_KEYS: Mutex<Option<OverrideKeys>> = Mutex::new(None);
 
     pub fn set_embedded_keys(keys: &[(&str, &[u8])]) {
         let mut guard = OVERRIDE_KEYS.lock().unwrap();
