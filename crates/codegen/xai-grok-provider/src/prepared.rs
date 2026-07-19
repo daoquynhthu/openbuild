@@ -70,12 +70,13 @@ pub async fn prepare_sampler_config(
 
     // Merge all headers
     let merged = merge_headers(
-        &[],  // transport-required
+        &[], // transport-required
         &execution.static_headers,
-        &execution.static_headers,  // route static = provider extra in current model
+        &execution.static_headers, // route static = provider extra in current model
         auth_header.as_ref().map(|(n, v)| (n.as_str(), v.as_str())),
         &override_map,
-    ).map_err(|e| RequestPreparationError::HeaderConflict(e.to_string()))?;
+    )
+    .map_err(|e| RequestPreparationError::HeaderConflict(e.to_string()))?;
 
     Ok(PreparedSamplerConfig {
         provider_id: execution.provider_id.clone(),
@@ -96,7 +97,10 @@ pub(crate) fn resolve_auth_from_policy(
 ) -> Result<Option<(String, String)>, RequestPreparationError> {
     match policy {
         AuthPolicy::None => Ok(None),
-        AuthPolicy::Bearer { candidates, required } => {
+        AuthPolicy::Bearer {
+            candidates,
+            required,
+        } => {
             let value = resolve_candidates_system_order(candidates, ctx);
             match value {
                 Some(v) => Ok(Some(("Authorization".to_string(), format!("Bearer {v}")))),
@@ -106,13 +110,17 @@ pub(crate) fn resolve_auth_from_policy(
                 None => Ok(None),
             }
         }
-        AuthPolicy::Header { name, candidates, required } => {
+        AuthPolicy::Header {
+            name,
+            candidates,
+            required,
+        } => {
             let value = resolve_candidates_system_order(candidates, ctx);
             match value {
                 Some(v) => Ok(Some((name.clone(), v))),
-                None if *required => Err(RequestPreparationError::Credential(
-                    format!("required header credential for {name} not resolved"),
-                )),
+                None if *required => Err(RequestPreparationError::Credential(format!(
+                    "required header credential for {name} not resolved"
+                ))),
                 None => Ok(None),
             }
         }
@@ -125,30 +133,51 @@ fn resolve_candidates_system_order(
     candidates: &[CredentialCandidate],
     ctx: &RequestCredential<'_>,
 ) -> Option<String> {
-    let has_req = candidates.iter().any(|c| matches!(c, CredentialCandidate::RequestOverride));
-    let has_model = candidates.iter().any(|c| matches!(c, CredentialCandidate::ModelInline));
-    let has_prov = candidates.iter().any(|c| matches!(c, CredentialCandidate::ProviderInline));
-    let env_keys: Vec<String> = candidates.iter().filter_map(|c| match c {
-        CredentialCandidate::ModelEnvironment(k) | CredentialCandidate::ProviderEnvironment(k) | CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
-        _ => None,
-    }).flatten().collect();
-    let has_sess = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session(_)));
+    let has_req = candidates
+        .iter()
+        .any(|c| matches!(c, CredentialCandidate::RequestOverride));
+    let has_model = candidates
+        .iter()
+        .any(|c| matches!(c, CredentialCandidate::ModelInline));
+    let has_prov = candidates
+        .iter()
+        .any(|c| matches!(c, CredentialCandidate::ProviderInline));
+    let env_keys: Vec<String> = candidates
+        .iter()
+        .filter_map(|c| match c {
+            CredentialCandidate::ModelEnvironment(k)
+            | CredentialCandidate::ProviderEnvironment(k)
+            | CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    let has_sess = candidates
+        .iter()
+        .any(|c| matches!(c, CredentialCandidate::Session(_)));
 
-    if let Some(v) = ctx.request_override.filter(|_| has_req) { return Some(v.inner().to_string()); }
-    if let Some(v) = ctx.model_inline.filter(|_| has_model) { return Some(v.inner().to_string()); }
-    if let Some(v) = ctx.provider_inline.filter(|_| has_prov) { return Some(v.inner().to_string()); }
-    for key in &env_keys {
-        if let Ok(Some(v)) = (ctx.env_reader)(key) { return Some(v.inner().to_string()); }
+    if let Some(v) = ctx.request_override.filter(|_| has_req) {
+        return Some(v.inner().to_string());
     }
-    if let Some(v) = (ctx.session_resolver)().filter(|_| has_sess) { return Some(v.inner().to_string()); }
+    if let Some(v) = ctx.model_inline.filter(|_| has_model) {
+        return Some(v.inner().to_string());
+    }
+    if let Some(v) = ctx.provider_inline.filter(|_| has_prov) {
+        return Some(v.inner().to_string());
+    }
+    for key in &env_keys {
+        if let Ok(Some(v)) = (ctx.env_reader)(key) {
+            return Some(v.inner().to_string());
+        }
+    }
+    if let Some(v) = (ctx.session_resolver)().filter(|_| has_sess) {
+        return Some(v.inner().to_string());
+    }
     None
 }
 
 /// Test helper: create a `PreparedSamplerConfig` for direct sampler tests.
-pub fn test_prepared_config(
-    model_id: &str,
-    base_url: &str,
-) -> PreparedSamplerConfig {
+pub fn test_prepared_config(model_id: &str, base_url: &str) -> PreparedSamplerConfig {
     PreparedSamplerConfig {
         provider_id: ProviderId::new("test"),
         route_id: crate::types::RouteId::new("test-chat"),

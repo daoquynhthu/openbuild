@@ -4,7 +4,7 @@ use thiserror::Error;
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::providers::openai_compatible_factory::OpenAiCompatibleProviderFactory;
 use xai_grok_provider::registry::{ProviderFactoryKind, ProviderRegistry};
-use xai_grok_provider::resolution::{resolve_with_precedence, ResolvedProviderSet};
+use xai_grok_provider::resolution::{ResolvedProviderSet, resolve_with_precedence};
 
 use super::provider_runtime::ProviderRuntime;
 
@@ -67,10 +67,15 @@ pub async fn bootstrap_from_config(
     legacy_migration: Option<ProviderConfig>,
     cli_overrides: Option<ProviderConfig>,
 ) -> Result<Arc<ProviderRuntime>, ProviderBootstrapError> {
-    let parsed = xai_grok_provider::config::parse_provider_toml(raw_toml)
-        .map_err(|diags| ProviderBootstrapError::RebuildFailed(
-            diags.into_iter().map(|d| d.to_string()).collect::<Vec<_>>().join("; ")
-        ))?;
+    let parsed = xai_grok_provider::config::parse_provider_toml(raw_toml).map_err(|diags| {
+        ProviderBootstrapError::RebuildFailed(
+            diags
+                .into_iter()
+                .map(|d| d.to_string())
+                .collect::<Vec<_>>()
+                .join("; "),
+        )
+    })?;
 
     let (resolved, diags) = resolve_with_precedence(parsed, legacy_migration, cli_overrides);
 

@@ -66,7 +66,12 @@ impl Provider for OpenAIProvider {
             .base_url
             .clone()
             .unwrap_or_else(|| self.defaults.base_url.clone());
-        let auth = AuthPolicy::bearer(vec![CredentialCandidate::ProviderEnvironment(vec!["OPENAI_API_KEY".into()])], true);
+        let auth = AuthPolicy::bearer(
+            vec![CredentialCandidate::ProviderEnvironment(vec![
+                "OPENAI_API_KEY".into(),
+            ])],
+            true,
+        );
         let route_chat = Arc::new(Route::make(
             "openai-chat",
             Some(self.defaults.id.clone()),

@@ -25,8 +25,9 @@ impl RedirectMockServer {
 
         use axum::response::IntoResponse;
 
-        let app = axum::Router::new()
-            .route("/v1/models", axum::routing::get(move || {
+        let app = axum::Router::new().route(
+            "/v1/models",
+            axum::routing::get(move || {
                 let cnt = Arc::clone(&count_clone);
                 async move {
                     let hits = cnt.fetch_add(1, Ordering::SeqCst);
@@ -39,17 +40,21 @@ impl RedirectMockServer {
                             .unwrap()
                     } else {
                         // Return 200 with model list
-                        axum::Json(serde_json::json!({"data": [{"id": "test-model"}]})).into_response()
+                        axum::Json(serde_json::json!({"data": [{"id": "test-model"}]}))
+                            .into_response()
                     }
                 }
-            }));
+            }),
+        );
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
         tokio::spawn(async move {
             let _ = axum::serve(listener, app)
-                .with_graceful_shutdown(async { shutdown_rx.await.ok(); })
+                .with_graceful_shutdown(async {
+                    shutdown_rx.await.ok();
+                })
                 .await;
         });
 
@@ -105,20 +110,23 @@ impl SlowServer {
             let total = Arc::clone(&total);
             let delay_clone = delay;
 
-            axum::Router::new().route("/v1/models", axum::routing::get(move || {
-                let in_flight = Arc::clone(&in_flight);
-                let peak = Arc::clone(&peak);
-                let total = Arc::clone(&total);
-                let d = delay_clone;
-                async move {
-                    total.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    let cur = in_flight.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-                    peak.fetch_max(cur, std::sync::atomic::Ordering::SeqCst);
-                    tokio::time::sleep(d).await;
-                    in_flight.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-                    axum::Json(serde_json::json!({"data": [{"id": "m1"}]})).into_response()
-                }
-            }))
+            axum::Router::new().route(
+                "/v1/models",
+                axum::routing::get(move || {
+                    let in_flight = Arc::clone(&in_flight);
+                    let peak = Arc::clone(&peak);
+                    let total = Arc::clone(&total);
+                    let d = delay_clone;
+                    async move {
+                        total.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        let cur = in_flight.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
+                        peak.fetch_max(cur, std::sync::atomic::Ordering::SeqCst);
+                        tokio::time::sleep(d).await;
+                        in_flight.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+                        axum::Json(serde_json::json!({"data": [{"id": "m1"}]})).into_response()
+                    }
+                }),
+            )
         };
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -126,7 +134,9 @@ impl SlowServer {
 
         tokio::spawn(async move {
             let _ = axum::serve(listener, app)
-                .with_graceful_shutdown(async { shutdown_rx.await.ok(); })
+                .with_graceful_shutdown(async {
+                    shutdown_rx.await.ok();
+                })
                 .await;
         });
 

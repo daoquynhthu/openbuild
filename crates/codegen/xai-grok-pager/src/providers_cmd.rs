@@ -1,18 +1,13 @@
 //! `grok providers` subcommand — list configured providers and their status.
 
-
 use anyhow::Result;
 
 /// Load provider state from disk config and print a summary.
 pub async fn list_providers() -> Result<()> {
     let toml = xai_grok_shell::config::load_effective_config_disk_only()?;
 
-    let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-        &toml,
-        None,
-        None,
-    )
-    .await?;
+    let runtime =
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None).await?;
 
     let snapshot = runtime.snapshot();
     println!("Configured providers (rev {}):", snapshot.revision);

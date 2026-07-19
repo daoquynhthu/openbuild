@@ -110,7 +110,12 @@ mod tests {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            AuthPolicy::bearer(vec![CredentialCandidate::ModelEnvironment(vec!["OPENAI_API_KEY".into()])], true),
+            AuthPolicy::bearer(
+                vec![CredentialCandidate::ModelEnvironment(vec![
+                    "OPENAI_API_KEY".into(),
+                ])],
+                true,
+            ),
         )
     }
 

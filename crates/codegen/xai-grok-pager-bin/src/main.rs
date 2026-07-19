@@ -918,17 +918,16 @@ async fn run_agent_command(
     // and CLI in priority (CLI always wins).
     let endpoints = &agent_config.endpoints;
     let default_xai_url = "https://api.x.ai/v1";
-    let compat_override = if endpoints.xai_api_base_url != default_xai_url
-        || endpoints.alpha_test_key.is_some()
-    {
-        Some(xai_grok_provider::config::ProviderConfig::new(
-            Some("xai".into()),
-            endpoints.alpha_test_key.clone(),
-            Some(endpoints.xai_api_base_url.clone()),
-        ))
-    } else {
-        None
-    };
+    let compat_override =
+        if endpoints.xai_api_base_url != default_xai_url || endpoints.alpha_test_key.is_some() {
+            Some(xai_grok_provider::config::ProviderConfig::new(
+                Some("xai".into()),
+                endpoints.alpha_test_key.clone(),
+                Some(endpoints.xai_api_base_url.clone()),
+            ))
+        } else {
+            None
+        };
 
     // Bootstrap single ProviderRuntime via the unique precedence resolver.
     // Registers built-in definitions, registers generic factory, then

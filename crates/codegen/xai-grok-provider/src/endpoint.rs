@@ -440,10 +440,7 @@ mod tests {
             body: (),
         };
         let result = ep.render(&input);
-        assert!(
-            result.is_err(),
-            "endpoint with no base_url must error"
-        );
+        assert!(result.is_err(), "endpoint with no base_url must error");
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("base_url"),

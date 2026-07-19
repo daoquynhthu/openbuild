@@ -91,11 +91,22 @@ pub enum AuthPolicy {
 
 impl AuthPolicy {
     pub fn bearer(candidates: Vec<CredentialCandidate>, required: bool) -> Self {
-        AuthPolicy::Bearer { candidates, required }
+        AuthPolicy::Bearer {
+            candidates,
+            required,
+        }
     }
 
-    pub fn header(name: impl Into<String>, candidates: Vec<CredentialCandidate>, required: bool) -> Self {
-        AuthPolicy::Header { name: name.into(), candidates, required }
+    pub fn header(
+        name: impl Into<String>,
+        candidates: Vec<CredentialCandidate>,
+        required: bool,
+    ) -> Self {
+        AuthPolicy::Header {
+            name: name.into(),
+            candidates,
+            required,
+        }
     }
 
     /// Validate header names against HTTP token rules.
@@ -156,7 +167,10 @@ pub fn apply_auth_policy(
 ) -> Result<HeaderMap, ProviderError> {
     match policy {
         AuthPolicy::None => Ok(existing.clone()),
-        AuthPolicy::Bearer { candidates, required } => {
+        AuthPolicy::Bearer {
+            candidates,
+            required,
+        } => {
             let source = candidates_to_source(candidates);
             match source {
                 Some(source) => {
@@ -179,7 +193,11 @@ pub fn apply_auth_policy(
                 None => Ok(existing.clone()),
             }
         }
-        AuthPolicy::Header { name, candidates, required } => {
+        AuthPolicy::Header {
+            name,
+            candidates,
+            required,
+        } => {
             let source = candidates_to_source(candidates);
             match source {
                 Some(source) => {
@@ -207,8 +225,14 @@ pub fn apply_auth_policy(
 
 fn candidates_to_source(candidates: &[CredentialCandidate]) -> Option<CredentialSource> {
     candidates.first().map(|candidate| match candidate {
-        CredentialCandidate::RequestOverride | CredentialCandidate::ModelInline | CredentialCandidate::ProviderInline => CredentialSource::Inline,
-        CredentialCandidate::ModelEnvironment(keys) | CredentialCandidate::ProviderEnvironment(keys) | CredentialCandidate::BuiltinEnvironment(keys) => CredentialSource::Environment(keys.clone()),
+        CredentialCandidate::RequestOverride
+        | CredentialCandidate::ModelInline
+        | CredentialCandidate::ProviderInline => CredentialSource::Inline,
+        CredentialCandidate::ModelEnvironment(keys)
+        | CredentialCandidate::ProviderEnvironment(keys)
+        | CredentialCandidate::BuiltinEnvironment(keys) => {
+            CredentialSource::Environment(keys.clone())
+        }
         CredentialCandidate::Session(_) => CredentialSource::Session,
     })
 }
@@ -452,7 +476,9 @@ mod tests {
     fn auth_policy_validate_header_name() {
         let valid = AuthPolicy::header(
             "x-api-key",
-            vec![CredentialCandidate::ModelEnvironment(vec!["ANTHROPIC_API_KEY".into()])],
+            vec![CredentialCandidate::ModelEnvironment(vec![
+                "ANTHROPIC_API_KEY".into(),
+            ])],
             true,
         );
         assert!(valid.validate().is_ok());
@@ -553,11 +579,11 @@ mod tests {
     // P8-001: required/optional semantics tests
     #[test]
     fn bearer_required_without_candidates_errors() {
-        let result = apply_auth_policy(
-            &AuthPolicy::bearer(vec![], true),
-            &HeaderMap::new(),
+        let result = apply_auth_policy(&AuthPolicy::bearer(vec![], true), &HeaderMap::new());
+        assert!(
+            result.is_err(),
+            "required bearer without candidates must error"
         );
-        assert!(result.is_err(), "required bearer without candidates must error");
         assert!(matches!(
             result.unwrap_err(),
             ProviderError::MissingCredential(_)
@@ -566,10 +592,7 @@ mod tests {
 
     #[test]
     fn bearer_optional_without_candidates_succeeds() {
-        let result = apply_auth_policy(
-            &AuthPolicy::bearer(vec![], false),
-            &HeaderMap::new(),
-        );
+        let result = apply_auth_policy(&AuthPolicy::bearer(vec![], false), &HeaderMap::new());
         assert!(result.is_ok(), "optional bearer without candidates is ok");
     }
 
@@ -579,7 +602,10 @@ mod tests {
             &AuthPolicy::header("x-api-key", vec![], true),
             &HeaderMap::new(),
         );
-        assert!(result.is_err(), "required header without candidates must error");
+        assert!(
+            result.is_err(),
+            "required header without candidates must error"
+        );
     }
 
     #[test]
@@ -629,10 +655,7 @@ mod tests {
             env_reader: &|_| Ok(None),
             session_resolver: &|| None,
         };
-        let policy = AuthPolicy::bearer(
-            vec![CredentialCandidate::RequestOverride],
-            true,
-        );
+        let policy = AuthPolicy::bearer(vec![CredentialCandidate::RequestOverride], true);
         let result = resolve_auth_from_policy(&policy, &ctx);
         assert!(result.is_ok());
         let (name, value) = result.unwrap().expect("must resolve");

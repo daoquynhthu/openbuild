@@ -77,7 +77,9 @@ impl Provider for AnthropicProvider {
             },
             AuthPolicy::header(
                 "x-api-key",
-                vec![CredentialCandidate::ProviderEnvironment(vec!["ANTHROPIC_API_KEY".into()])],
+                vec![CredentialCandidate::ProviderEnvironment(vec![
+                    "ANTHROPIC_API_KEY".into(),
+                ])],
                 true,
             ),
         );

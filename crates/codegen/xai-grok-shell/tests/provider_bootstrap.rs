@@ -51,9 +51,9 @@ fn custom_deepseek_spec() -> ResolvedProviderSpec {
     ResolvedProviderSpec {
         id: ProviderId::new("deepseek"),
         implementation: ProviderImplementation::OpenAiCompatible {
-            profile: Some(
-                xai_grok_provider::types::CompatibleProfileId::new("deepseek"),
-            ),
+            profile: Some(xai_grok_provider::types::CompatibleProfileId::new(
+                "deepseek",
+            )),
         },
         config: ProviderRuntimeConfig {
             public: ProviderPublicConfig {
@@ -80,13 +80,12 @@ fn bootstrap_precedence_applied_once() {
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     let result = rt.block_on(
-        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-            &toml,
-            None,
-            None,
-        ),
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None),
     );
-    assert!(result.is_ok(), "bootstrap_from_config with valid config must succeed");
+    assert!(
+        result.is_ok(),
+        "bootstrap_from_config with valid config must succeed"
+    );
 
     let rt = result.unwrap();
     let snap = rt.snapshot();
@@ -105,11 +104,7 @@ fn bootstrap_fails_on_config_diagnostics() {
     // A TOML value with no [provider] section produces no diagnostics.
     let toml: toml::Value = toml::from_str(r#"other_key = 1"#).unwrap();
     let result = tokio::runtime::Runtime::new().unwrap().block_on(
-        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-            &toml,
-            None,
-            None,
-        ),
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None),
     );
     // No provider section → empty set → bootstrap succeeds with providers from built-ins.
     assert!(result.is_ok(), "empty provider config must succeed");
@@ -120,17 +115,13 @@ fn bootstrap_fails_on_config_diagnostics() {
 fn bootstrap_provider_runtime_produces_full_snapshot() {
     let input = xai_grok_shell::agent::provider_bootstrap::ProviderBootstrapInput {
         resolved: ResolvedProviderSet {
-            providers: IndexMap::from([(
-                ProviderId::new("xai"),
-                xai_spec(),
-            )]),
+            providers: IndexMap::from([(ProviderId::new("xai"), xai_spec())]),
         },
     };
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let rt = runtime.block_on(
-        xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input),
-    );
+    let rt = runtime
+        .block_on(xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input));
     assert!(rt.is_ok(), "bootstrap must succeed: {:?}", rt.err());
 
     let rt = rt.unwrap();
@@ -141,10 +132,7 @@ fn bootstrap_provider_runtime_produces_full_snapshot() {
 
     // Verify seal: a second rebuild must NOT require re-registration.
     let resolved2 = ResolvedProviderSet {
-        providers: IndexMap::from([(
-            ProviderId::new("xai"),
-            xai_spec(),
-        )]),
+        providers: IndexMap::from([(ProviderId::new("xai"), xai_spec())]),
     };
     let r2 = rt.registry.rebuild_from_resolved(&resolved2);
     assert!(r2.is_ok(), "second rebuild must succeed: {:?}", r2.err());
@@ -158,18 +146,14 @@ fn bootstrap_runtime_identity_reaches_config_reloader() {
 
     let input = xai_grok_shell::agent::provider_bootstrap::ProviderBootstrapInput {
         resolved: ResolvedProviderSet {
-            providers: IndexMap::from([(
-                ProviderId::new("xai"),
-                xai_spec(),
-            )]),
+            providers: IndexMap::from([(ProviderId::new("xai"), xai_spec())]),
         },
     };
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let rt = runtime.block_on(
-        xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input),
-    )
-    .expect("bootstrap");
+    let rt = runtime
+        .block_on(xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input))
+        .expect("bootstrap");
 
     // Construct a ConfigReloader with Some(runtime) — verifies the
     // constructor accepts the Arc without type mismatch.
@@ -196,27 +180,29 @@ fn bootstrap_runtime_identity_reaches_config_reloader() {
 fn bootstrap_runtime_identity_is_unique_across_clones() {
     let input = xai_grok_shell::agent::provider_bootstrap::ProviderBootstrapInput {
         resolved: ResolvedProviderSet {
-            providers: IndexMap::from([(
-                ProviderId::new("xai"),
-                xai_spec(),
-            )]),
+            providers: IndexMap::from([(ProviderId::new("xai"), xai_spec())]),
         },
     };
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let rt = runtime.block_on(
-        xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input),
-    )
-    .expect("bootstrap");
+    let rt = runtime
+        .block_on(xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input))
+        .expect("bootstrap");
 
     // Clone the Arc — must point to the same heap allocation.
     let rt_clone = rt.clone();
-    assert!(Arc::ptr_eq(&rt, &rt_clone), "cloned Arc must point to same ProviderRuntime");
+    assert!(
+        Arc::ptr_eq(&rt, &rt_clone),
+        "cloned Arc must point to same ProviderRuntime"
+    );
 
     // Registry and catalog inside the runtime must also be the same across clones.
     let snap1 = rt.snapshot();
     let snap2 = rt_clone.snapshot();
-    assert!(Arc::ptr_eq(&snap1, &snap2), "snapshot from cloned runtime must be same Arc");
+    assert!(
+        Arc::ptr_eq(&snap1, &snap2),
+        "snapshot from cloned runtime must be same Arc"
+    );
 
     // AgentConfig deriving registry/catalog from runtime must return the same Arc.
     let config = xai_grok_shell::agent::config::Config {
@@ -250,15 +236,18 @@ fn bootstrap_with_builtin_and_custom_identities() {
     };
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let rt = runtime.block_on(
-        xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input),
-    );
+    let rt = runtime
+        .block_on(xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input));
     assert!(rt.is_ok(), "bootstrap must succeed");
 
     let rt = rt.unwrap();
     let snap = rt.snapshot();
     assert_eq!(snap.revision, 1);
-    assert_eq!(snap.providers.len(), 3, "all three identities must be present");
+    assert_eq!(
+        snap.providers.len(),
+        3,
+        "all three identities must be present"
+    );
     assert!(snap.providers.contains_key(&ProviderId::new("xai")));
     assert!(snap.providers.contains_key(&ProviderId::new("openai")));
     assert!(snap.providers.contains_key(&ProviderId::new("deepseek")));

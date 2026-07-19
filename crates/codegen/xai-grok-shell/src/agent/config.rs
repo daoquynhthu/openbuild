@@ -1812,12 +1812,16 @@ impl Default for Config {
 }
 impl Config {
     /// Access the provider registry through the runtime.
-    pub fn provider_registry(&self) -> Option<std::sync::Arc<xai_grok_provider::registry::ProviderRegistry>> {
+    pub fn provider_registry(
+        &self,
+    ) -> Option<std::sync::Arc<xai_grok_provider::registry::ProviderRegistry>> {
         self.provider_runtime.as_ref().map(|rt| rt.registry.clone())
     }
 
     /// Access the provider catalog through the runtime.
-    pub fn provider_catalog(&self) -> Option<std::sync::Arc<crate::agent::provider_catalog::ProviderCatalogService>> {
+    pub fn provider_catalog(
+        &self,
+    ) -> Option<std::sync::Arc<crate::agent::provider_catalog::ProviderCatalogService>> {
         self.provider_runtime.as_ref().map(|rt| rt.catalog.clone())
     }
 
@@ -4781,10 +4785,10 @@ pub fn sampling_config_for_model(
         force_http1: false,
         max_retries: info.max_retries,
         stream_tool_calls: info.stream_tool_calls.unwrap_or(false),
-            endpoint_path: None,
-            endpoint_query: None,
-            request_url: None,
-            idle_timeout_secs: None,
+        endpoint_path: None,
+        endpoint_query: None,
+        request_url: None,
+        idle_timeout_secs: None,
         client_identifier: None,
         deployment_id,
         user_id,

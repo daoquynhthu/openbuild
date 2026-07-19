@@ -26,8 +26,8 @@ pub mod headless;
 #[cfg(unix)]
 pub mod leader;
 pub mod mock_server;
-pub mod redirect_mock;
 mod process;
+pub mod redirect_mock;
 pub mod scripted;
 pub mod sse;
 #[cfg(unix)]

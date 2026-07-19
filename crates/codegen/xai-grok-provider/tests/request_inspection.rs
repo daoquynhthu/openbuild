@@ -63,7 +63,6 @@ fn mock_server_url() -> String {
 
 #[tokio::test]
 async fn openai_bearer_has_correct_url_and_protocol() {
-    
     use xai_grok_provider::types::RouteId;
 
     let reg = bootstrap_registry(ResolvedProviderSet {
@@ -80,13 +79,18 @@ async fn openai_bearer_has_correct_url_and_protocol() {
         )]),
     });
     let snap = reg.snapshot();
-    let route = snap.routes.get(&xai_grok_provider::registry::ProviderRouteKey {
-        provider_id: ProviderId::new("openai"),
-        local_route_id: RouteId::new("openai-chat"),
-    });
+    let route = snap
+        .routes
+        .get(&xai_grok_provider::registry::ProviderRouteKey {
+            provider_id: ProviderId::new("openai"),
+            local_route_id: RouteId::new("openai-chat"),
+        });
     assert!(route.is_some(), "openai must have a chat route");
     let r = route.unwrap();
-    assert_eq!(r.protocol_id, "chat_completions", "openai uses chat_completions protocol");
+    assert_eq!(
+        r.protocol_id, "chat_completions",
+        "openai uses chat_completions protocol"
+    );
     let auth_str = format!("{:?}", r.auth);
     assert!(auth_str.contains("Bearer"), "openai must use Bearer auth");
 }
@@ -95,7 +99,6 @@ async fn openai_bearer_has_correct_url_and_protocol() {
 
 #[tokio::test]
 async fn anthropic_uses_x_api_key_header() {
-    
     use xai_grok_provider::types::RouteId;
 
     let reg = bootstrap_registry(ResolvedProviderSet {
@@ -112,13 +115,18 @@ async fn anthropic_uses_x_api_key_header() {
         )]),
     });
     let snap = reg.snapshot();
-    let route = snap.routes.get(&xai_grok_provider::registry::ProviderRouteKey {
-        provider_id: ProviderId::new("anthropic"),
-        local_route_id: RouteId::new("anthropic-messages"),
-    });
+    let route = snap
+        .routes
+        .get(&xai_grok_provider::registry::ProviderRouteKey {
+            provider_id: ProviderId::new("anthropic"),
+            local_route_id: RouteId::new("anthropic-messages"),
+        });
     assert!(route.is_some(), "anthropic must have a messages route");
     let r = route.unwrap();
-    assert_eq!(r.protocol_id, "messages", "anthropic uses messages protocol");
+    assert_eq!(
+        r.protocol_id, "messages",
+        "anthropic uses messages protocol"
+    );
     // Verify static headers include anthropic-version
     assert!(
         r.static_headers.contains_key("anthropic-version"),
@@ -130,7 +138,6 @@ async fn anthropic_uses_x_api_key_header() {
 
 #[tokio::test]
 async fn xai_uses_responses_protocol() {
-    
     use xai_grok_provider::types::RouteId;
 
     let reg = bootstrap_registry(ResolvedProviderSet {
@@ -149,10 +156,12 @@ async fn xai_uses_responses_protocol() {
     let snap = reg.snapshot();
 
     // xAI uses responses protocol as its default route
-    let responses_route = snap.routes.get(&xai_grok_provider::registry::ProviderRouteKey {
-        provider_id: ProviderId::new("xai"),
-        local_route_id: RouteId::new("xai-responses"),
-    });
+    let responses_route = snap
+        .routes
+        .get(&xai_grok_provider::registry::ProviderRouteKey {
+            provider_id: ProviderId::new("xai"),
+            local_route_id: RouteId::new("xai-responses"),
+        });
     assert!(responses_route.is_some(), "xAI must have a responses route");
     assert_eq!(responses_route.unwrap().protocol_id, "responses");
 }
@@ -161,7 +170,6 @@ async fn xai_uses_responses_protocol() {
 
 #[tokio::test]
 async fn opencode_has_no_auth_route() {
-    
     use xai_grok_provider::types::RouteId;
 
     let reg = bootstrap_registry(ResolvedProviderSet {
@@ -178,20 +186,24 @@ async fn opencode_has_no_auth_route() {
         )]),
     });
     let snap = reg.snapshot();
-    let route = snap.routes.get(&xai_grok_provider::registry::ProviderRouteKey {
-        provider_id: ProviderId::new("opencode"),
-        local_route_id: RouteId::new("opencode-chat"),
-    });
+    let route = snap
+        .routes
+        .get(&xai_grok_provider::registry::ProviderRouteKey {
+            provider_id: ProviderId::new("opencode"),
+            local_route_id: RouteId::new("opencode-chat"),
+        });
     assert!(route.is_some(), "opencode must have a chat route");
     let r = route.unwrap();
     // OpenCode uses AuthPolicy::None (P8-006)
     let auth_str = format!("{:?}", r.auth);
-    assert!(!auth_str.contains("Bearer"), "opencode must not use Bearer auth");
+    assert!(
+        !auth_str.contains("Bearer"),
+        "opencode must not use Bearer auth"
+    );
 }
 
 #[tokio::test]
 async fn ollama_has_chat_route() {
-    
     use xai_grok_provider::types::RouteId;
 
     let reg = bootstrap_registry(ResolvedProviderSet {
@@ -208,10 +220,12 @@ async fn ollama_has_chat_route() {
         )]),
     });
     let snap = reg.snapshot();
-    let route = snap.routes.get(&xai_grok_provider::registry::ProviderRouteKey {
-        provider_id: ProviderId::new("ollama"),
-        local_route_id: RouteId::new("ollama-chat"),
-    });
+    let route = snap
+        .routes
+        .get(&xai_grok_provider::registry::ProviderRouteKey {
+            provider_id: ProviderId::new("ollama"),
+            local_route_id: RouteId::new("ollama-chat"),
+        });
     assert!(route.is_some(), "ollama must have a chat route");
     let r = route.unwrap();
     assert_eq!(r.protocol_id, "chat_completions");
@@ -238,9 +252,7 @@ async fn custom_providers_have_independent_routes() {
                 ProviderId::new("internal"),
                 spec(
                     "internal",
-                    ProviderImplementation::OpenAiCompatible {
-                        profile: None,
-                    },
+                    ProviderImplementation::OpenAiCompatible { profile: None },
                     Some(mock_server_url()),
                     Some("sk-internal"),
                 ),
@@ -251,14 +263,26 @@ async fn custom_providers_have_independent_routes() {
     assert_eq!(snap.providers.len(), 2);
 
     // Verify routes are keyed by provider identity, not shared
-    let ds_routes: Vec<_> = snap.routes.keys().filter(|k| k.provider_id.0 == "deepseek").collect();
-    let int_routes: Vec<_> = snap.routes.keys().filter(|k| k.provider_id.0 == "internal").collect();
+    let ds_routes: Vec<_> = snap
+        .routes
+        .keys()
+        .filter(|k| k.provider_id.0 == "deepseek")
+        .collect();
+    let int_routes: Vec<_> = snap
+        .routes
+        .keys()
+        .filter(|k| k.provider_id.0 == "internal")
+        .collect();
     assert!(!ds_routes.is_empty(), "deepseek must have routes");
     assert!(!int_routes.is_empty(), "internal must have routes");
     // Route keys must differ
     for dk in &ds_routes {
-        assert!(!int_routes.iter().any(|ik| ik.local_route_id == dk.local_route_id),
-                "deepseek and internal must not share route IDs");
+        assert!(
+            !int_routes
+                .iter()
+                .any(|ik| ik.local_route_id == dk.local_route_id),
+            "deepseek and internal must not share route IDs"
+        );
     }
 }
 
@@ -283,8 +307,15 @@ async fn missing_definition_errors_before_http_send() {
             ),
         )]),
     });
-    assert!(result.is_err(), "missing definition must error before HTTP send");
-    assert_eq!(mock.request_count(), 0, "no HTTP requests must have been sent");
+    assert!(
+        result.is_err(),
+        "missing definition must error before HTTP send"
+    );
+    assert_eq!(
+        mock.request_count(),
+        0,
+        "no HTTP requests must have been sent"
+    );
     let err = result.unwrap_err().to_string();
     assert!(
         !err.contains(CANARY),
@@ -308,5 +339,9 @@ async fn missing_provider_id_errors_before_http_send() {
         ..Default::default()
     };
     // No request is made — just constructing the config.
-    assert_eq!(mock.request_count(), 0, "no HTTP requests before sampler invocation");
+    assert_eq!(
+        mock.request_count(),
+        0,
+        "no HTTP requests before sampler invocation"
+    );
 }

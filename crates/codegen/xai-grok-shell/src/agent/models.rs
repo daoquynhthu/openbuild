@@ -954,14 +954,9 @@ impl ModelsManager {
         let credentials =
             resolve_credentials(current_model, session_auth.as_ref().map(|a| a.key.as_str()));
 
-        let route = self
-            .inner
-            .cfg
-            .read()
-            .provider_registry()
-            .and_then(|reg| {
-                crate::agent::config::resolve_model_route(current_model, Some(reg.as_ref()))
-            });
+        let route = self.inner.cfg.read().provider_registry().and_then(|reg| {
+            crate::agent::config::resolve_model_route(current_model, Some(reg.as_ref()))
+        });
 
         sampling_config_for_model(
             current_model,

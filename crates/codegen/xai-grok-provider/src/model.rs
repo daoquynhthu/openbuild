@@ -47,11 +47,7 @@ pub struct GenerationOptions {
 }
 
 impl GenerationOptions {
-    pub fn new(
-        max_tokens: Option<u32>,
-        temperature: Option<f32>,
-        top_p: Option<f32>,
-    ) -> Self {
+    pub fn new(max_tokens: Option<u32>, temperature: Option<f32>, top_p: Option<f32>) -> Self {
         Self {
             max_tokens,
             temperature,

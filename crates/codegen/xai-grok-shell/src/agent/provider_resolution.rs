@@ -70,18 +70,11 @@ pub fn merge_generation_params(
     let max_tokens = request_max_tokens
         .or(model_max_tokens)
         .or(route_gen.max_tokens)
-        .map(|v| {
-            route_limits
-                .output
-                .map(|cap| v.min(cap))
-                .unwrap_or(v)
-        });
+        .map(|v| route_limits.output.map(|cap| v.min(cap)).unwrap_or(v));
     let temperature = request_temperature
         .or(model_temperature)
         .or(route_gen.temperature);
-    let top_p = request_top_p
-        .or(model_top_p)
-        .or(route_gen.top_p);
+    let top_p = request_top_p.or(model_top_p).or(route_gen.top_p);
     (max_tokens, temperature, top_p)
 }
 
@@ -92,8 +85,14 @@ pub fn merge_generation_options(
     request_gen: &GenerationOptions,
 ) -> GenerationOptions {
     GenerationOptions::new(
-        request_gen.max_tokens.or(model_gen.max_tokens).or(route_gen.max_tokens),
-        request_gen.temperature.or(model_gen.temperature).or(route_gen.temperature),
+        request_gen
+            .max_tokens
+            .or(model_gen.max_tokens)
+            .or(route_gen.max_tokens),
+        request_gen
+            .temperature
+            .or(model_gen.temperature)
+            .or(route_gen.temperature),
         request_gen.top_p.or(model_gen.top_p).or(route_gen.top_p),
     )
 }
@@ -496,7 +495,12 @@ mod tests {
         let (max_tokens, temperature, top_p) = merge_generation_params(
             &GenerationOptions::default(),
             &ModelLimits::default(),
-            None, None, None, None, None, None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         );
         // All defaults are None, so result should be None
         assert_eq!(max_tokens, None);
@@ -509,10 +513,25 @@ mod tests {
         let route_gen = GenerationOptions::default();
         let route_limits = ModelLimits::default();
         let (max_tokens, temperature, _) = merge_generation_params(
-            &route_gen, &route_limits, Some(200), Some(0.7), None, None, None, None,
+            &route_gen,
+            &route_limits,
+            Some(200),
+            Some(0.7),
+            None,
+            None,
+            None,
+            None,
         );
-        assert_eq!(max_tokens, Some(200), "model max_tokens when route has none");
-        assert_eq!(temperature, Some(0.7), "model temperature when route has none");
+        assert_eq!(
+            max_tokens,
+            Some(200),
+            "model max_tokens when route has none"
+        );
+        assert_eq!(
+            temperature,
+            Some(0.7),
+            "model temperature when route has none"
+        );
     }
 
     #[test]
@@ -520,11 +539,21 @@ mod tests {
         let route_gen = GenerationOptions::default();
         let route_limits = ModelLimits::default();
         let (max_tokens, temperature, _) = merge_generation_params(
-            &route_gen, &route_limits, Some(200), Some(0.7), None,
-            Some(300), Some(0.9), None,
+            &route_gen,
+            &route_limits,
+            Some(200),
+            Some(0.7),
+            None,
+            Some(300),
+            Some(0.9),
+            None,
         );
         assert_eq!(max_tokens, Some(300), "request max_tokens overrides model");
-        assert_eq!(temperature, Some(0.9), "request temperature overrides model");
+        assert_eq!(
+            temperature,
+            Some(0.9),
+            "request temperature overrides model"
+        );
     }
 
     #[test]
@@ -532,7 +561,14 @@ mod tests {
         let route_gen = GenerationOptions::default();
         let route_limits = ModelLimits::default();
         let (max_tokens, _, _) = merge_generation_params(
-            &route_gen, &route_limits, Some(1000), None, None, None, None, None,
+            &route_gen,
+            &route_limits,
+            Some(1000),
+            None,
+            None,
+            None,
+            None,
+            None,
         );
         // default limits have output=None, so no cap
         assert_eq!(max_tokens, Some(1000), "no cap when route limit is None");
@@ -543,7 +579,14 @@ mod tests {
         let route_gen = GenerationOptions::default();
         let route_limits = ModelLimits::default();
         let (max_tokens, _, _) = merge_generation_params(
-            &route_gen, &route_limits, Some(1000), None, None, None, None, None,
+            &route_gen,
+            &route_limits,
+            Some(1000),
+            None,
+            None,
+            None,
+            None,
+            None,
         );
         assert_eq!(max_tokens, Some(1000), "no cap when route limit is None");
     }

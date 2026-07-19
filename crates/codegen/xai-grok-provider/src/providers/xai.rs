@@ -75,7 +75,12 @@ impl Provider for XaiProvider {
                 path: EndpointPart::Static("/responses".into()),
                 query: None,
             },
-            AuthPolicy::bearer(vec![CredentialCandidate::ProviderEnvironment(vec!["XAI_API_KEY".into()])], true),
+            AuthPolicy::bearer(
+                vec![CredentialCandidate::ProviderEnvironment(vec![
+                    "XAI_API_KEY".into(),
+                ])],
+                true,
+            ),
         );
         // Preserve legacy x-grok-* headers for backward compatibility.
         route

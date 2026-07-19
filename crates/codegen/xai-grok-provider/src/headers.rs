@@ -124,9 +124,9 @@ pub fn merge_headers(
 
     // Layer 5: request overrides (highest priority — override without conflict check)
     for (name, value) in request_overrides.iter() {
-        let value_str = value.to_str().map_err(|_| {
-            ProviderError::InvalidHeader("non-utf8 header value".into())
-        })?;
+        let value_str = value
+            .to_str()
+            .map_err(|_| ProviderError::InvalidHeader("non-utf8 header value".into()))?;
         validate_header_name(name.as_str())?;
         validate_header_value(value_str)?;
         merged.insert(name.clone(), value.clone());
@@ -174,10 +174,7 @@ mod tests {
             &http::HeaderMap::new(),
         );
         let merged = result.unwrap();
-        assert_eq!(
-            merged.inner().get("x-custom").unwrap(),
-            "value1"
-        );
+        assert_eq!(merged.inner().get("x-custom").unwrap(), "value1");
     }
 
     #[test]
@@ -186,9 +183,7 @@ mod tests {
         static_headers.insert("x-id".into(), "abc".into());
         let mut extra = IndexMap::new();
         extra.insert("x-id".into(), "abc".into());
-        let result = merge_headers(
-            &[], &static_headers, &extra, None, &http::HeaderMap::new(),
-        );
+        let result = merge_headers(&[], &static_headers, &extra, None, &http::HeaderMap::new());
         assert!(result.is_ok(), "same value dedup should be ok");
     }
 
@@ -198,9 +193,7 @@ mod tests {
         static_headers.insert("x-id".into(), "abc".into());
         let mut extra = IndexMap::new();
         extra.insert("x-id".into(), "def".into());
-        let result = merge_headers(
-            &[], &static_headers, &extra, None, &http::HeaderMap::new(),
-        );
+        let result = merge_headers(&[], &static_headers, &extra, None, &http::HeaderMap::new());
         assert!(result.is_err(), "conflicting values must error");
         assert!(result.unwrap_err().to_string().contains("conflict"));
     }
@@ -215,15 +208,14 @@ mod tests {
     #[test]
     fn auth_header_merges_correctly() {
         let result = merge_headers(
-            &[], &IndexMap::new(), &IndexMap::new(),
+            &[],
+            &IndexMap::new(),
+            &IndexMap::new(),
             Some(("authorization", "Bearer tok")),
             &http::HeaderMap::new(),
         );
         let merged = result.unwrap();
-        assert_eq!(
-            merged.inner().get("authorization").unwrap(),
-            "Bearer tok"
-        );
+        assert_eq!(merged.inner().get("authorization").unwrap(), "Bearer tok");
     }
 
     #[test]
@@ -232,15 +224,10 @@ mod tests {
         static_headers.insert("x-id".into(), "original".into());
         let mut overrides = http::HeaderMap::new();
         overrides.insert("x-id", "override".parse().unwrap());
-        let result = merge_headers(
-            &[], &static_headers, &IndexMap::new(), None, &overrides,
-        );
+        let result = merge_headers(&[], &static_headers, &IndexMap::new(), None, &overrides);
         assert!(result.is_ok());
         let merged = result.unwrap();
         // Request override is highest priority — replaces without conflict
-        assert_eq!(
-            merged.inner().get("x-id").unwrap(),
-            "override"
-        );
+        assert_eq!(merged.inner().get("x-id").unwrap(), "override");
     }
 }

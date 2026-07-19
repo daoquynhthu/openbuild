@@ -1,5 +1,5 @@
-use std::pin::Pin;
 use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use xai_grok_provider::auth::{CredentialCandidate, SecretValue};
@@ -56,12 +56,10 @@ impl SessionCredentialResolver for XaiSessionResolver {
         Box::pin(async move {
             match auth {
                 Some(a) => Ok(Some(SecretValue::new(a.key.clone()))),
-                None => {
-                    match std::env::var("XAI_SESSION_TOKEN") {
-                        Ok(val) if !val.is_empty() => Ok(Some(SecretValue::new(val))),
-                        _ => Ok(None),
-                    }
-                }
+                None => match std::env::var("XAI_SESSION_TOKEN") {
+                    Ok(val) if !val.is_empty() => Ok(Some(SecretValue::new(val))),
+                    _ => Ok(None),
+                },
             }
         })
     }
@@ -107,25 +105,38 @@ impl<'a> RequestCredentialContext<'a> {
     ///
     /// The provider declares ONLY which candidates exist; the ORDER is fixed by the system.
     /// Provider-declared order is ignored — only the SET of candidate types matters.
-    pub async fn resolve_candidates(
-        &self,
-        candidates: &[CredentialCandidate],
-    ) -> Option<String> {
+    pub async fn resolve_candidates(&self, candidates: &[CredentialCandidate]) -> Option<String> {
         // Build a set of candidate types declared by the provider.
-        let provider_has_request_override = candidates.iter().any(|c| matches!(c, CredentialCandidate::RequestOverride));
-        let provider_has_model_inline = candidates.iter().any(|c| matches!(c, CredentialCandidate::ModelInline));
-        let provider_has_provider_inline = candidates.iter().any(|c| matches!(c, CredentialCandidate::ProviderInline));
-        let provider_env_keys: Vec<&Vec<String>> = candidates.iter().filter_map(|c| match c {
-            CredentialCandidate::ModelEnvironment(k) => Some(k),
-            _ => None,
-        }).collect();
-        let provider_env_keys: Vec<&String> = provider_env_keys.iter().flat_map(|v| v.iter()).collect();
+        let provider_has_request_override = candidates
+            .iter()
+            .any(|c| matches!(c, CredentialCandidate::RequestOverride));
+        let provider_has_model_inline = candidates
+            .iter()
+            .any(|c| matches!(c, CredentialCandidate::ModelInline));
+        let provider_has_provider_inline = candidates
+            .iter()
+            .any(|c| matches!(c, CredentialCandidate::ProviderInline));
+        let provider_env_keys: Vec<&Vec<String>> = candidates
+            .iter()
+            .filter_map(|c| match c {
+                CredentialCandidate::ModelEnvironment(k) => Some(k),
+                _ => None,
+            })
+            .collect();
+        let provider_env_keys: Vec<&String> =
+            provider_env_keys.iter().flat_map(|v| v.iter()).collect();
         let provider_env_keys: Vec<String> = provider_env_keys.into_iter().cloned().collect();
-        let builtin_env_keys: Vec<String> = candidates.iter().filter_map(|c| match c {
-            CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
-            _ => None,
-        }).flatten().collect();
-        let has_session = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session(_)));
+        let builtin_env_keys: Vec<String> = candidates
+            .iter()
+            .filter_map(|c| match c {
+                CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        let has_session = candidates
+            .iter()
+            .any(|c| matches!(c, CredentialCandidate::Session(_)));
 
         // System-fixed priority order — provider order is ignored.
         // 1. RequestOverride
@@ -172,7 +183,9 @@ mod tests {
     use super::*;
 
     impl SessionCredentialResolver for () {
-        fn resolve(&self) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
+        fn resolve(
+            &self,
+        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
             Box::pin(async { Ok(None) })
         }
     }
@@ -181,7 +194,9 @@ mod tests {
     struct FixedSession(&'static str);
 
     impl SessionCredentialResolver for FixedSession {
-        fn resolve(&self) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
+        fn resolve(
+            &self,
+        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
             let val = self.0.to_string();
             Box::pin(async move { Ok(Some(SecretValue::new(val))) })
         }
@@ -218,15 +233,15 @@ mod tests {
         let model = SecretValue::new("model".to_string());
         let env = TestEnvironment::default().set("ENV_KEY", "env-val");
         let session = FixedSession("sess");
-        let ctx = RequestCredentialContext::new(
-            Some(&request), Some(&model), None, &env, &session,
-        );
-        let result = ctx.resolve_candidates(&[
-            CredentialCandidate::RequestOverride,
-            CredentialCandidate::ModelInline,
-            CredentialCandidate::ModelEnvironment(vec!["ENV_KEY".into()]),
-            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
-        ]).await;
+        let ctx = RequestCredentialContext::new(Some(&request), Some(&model), None, &env, &session);
+        let result = ctx
+            .resolve_candidates(&[
+                CredentialCandidate::RequestOverride,
+                CredentialCandidate::ModelInline,
+                CredentialCandidate::ModelEnvironment(vec!["ENV_KEY".into()]),
+                CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
+            ])
+            .await;
         assert_eq!(result.as_deref(), Some("req"));
     }
 
@@ -235,15 +250,15 @@ mod tests {
         let model = SecretValue::new("model-inline".to_string());
         let env = TestEnvironment::default().set("PROV_KEY", "prov-val");
         let session = FixedSession("sess");
-        let ctx = RequestCredentialContext::new(
-            None, Some(&model), None, &env, &session,
-        );
-        let result = ctx.resolve_candidates(&[
-            CredentialCandidate::RequestOverride,
-            CredentialCandidate::ModelInline,
-            CredentialCandidate::ProviderEnvironment(vec!["PROV_KEY".into()]),
-            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
-        ]).await;
+        let ctx = RequestCredentialContext::new(None, Some(&model), None, &env, &session);
+        let result = ctx
+            .resolve_candidates(&[
+                CredentialCandidate::RequestOverride,
+                CredentialCandidate::ModelInline,
+                CredentialCandidate::ProviderEnvironment(vec!["PROV_KEY".into()]),
+                CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
+            ])
+            .await;
         assert_eq!(result.as_deref(), Some("model-inline"));
     }
 
@@ -251,13 +266,13 @@ mod tests {
     async fn priority_env_over_session() {
         let env = TestEnvironment::default().set("XAI_API_KEY", "from-env");
         let session = FixedSession("from-session");
-        let ctx = RequestCredentialContext::new(
-            None, None, None, &env, &session,
-        );
-        let result = ctx.resolve_candidates(&[
-            CredentialCandidate::BuiltinEnvironment(vec!["XAI_API_KEY".into()]),
-            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
-        ]).await;
+        let ctx = RequestCredentialContext::new(None, None, None, &env, &session);
+        let result = ctx
+            .resolve_candidates(&[
+                CredentialCandidate::BuiltinEnvironment(vec!["XAI_API_KEY".into()]),
+                CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
+            ])
+            .await;
         assert_eq!(result.as_deref(), Some("from-env"));
     }
 
@@ -265,16 +280,16 @@ mod tests {
     async fn priority_session_fallback_when_none_above() {
         let env = TestEnvironment::default();
         let session = FixedSession("sess-token");
-        let ctx = RequestCredentialContext::new(
-            None, None, None, &env, &session,
-        );
-        let result = ctx.resolve_candidates(&[
-            CredentialCandidate::RequestOverride,
-            CredentialCandidate::ModelInline,
-            CredentialCandidate::ProviderInline,
-            CredentialCandidate::BuiltinEnvironment(vec!["MISSING_KEY".into()]),
-            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
-        ]).await;
+        let ctx = RequestCredentialContext::new(None, None, None, &env, &session);
+        let result = ctx
+            .resolve_candidates(&[
+                CredentialCandidate::RequestOverride,
+                CredentialCandidate::ModelInline,
+                CredentialCandidate::ProviderInline,
+                CredentialCandidate::BuiltinEnvironment(vec!["MISSING_KEY".into()]),
+                CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
+            ])
+            .await;
         assert_eq!(result.as_deref(), Some("sess-token"));
     }
 
@@ -283,14 +298,14 @@ mod tests {
         let env = TestEnvironment::default();
         // Session resolver returns None rather than empty string
         let session = ();
-        let ctx = RequestCredentialContext::new(
-            None, None, None, &env, &session,
-        );
-        let result = ctx.resolve_candidates(&[
-            CredentialCandidate::RequestOverride,
-            CredentialCandidate::ModelInline,
-            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
-        ]).await;
+        let ctx = RequestCredentialContext::new(None, None, None, &env, &session);
+        let result = ctx
+            .resolve_candidates(&[
+                CredentialCandidate::RequestOverride,
+                CredentialCandidate::ModelInline,
+                CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
+            ])
+            .await;
         assert!(result.is_none());
     }
 
@@ -299,16 +314,7 @@ mod tests {
         let val = SecretValue::new("tok".to_string());
         let env = TestEnvironment::default().set("ENV_KEY", "env-val");
         let resolver = ();
-        let ctx = RequestCredentialContext::new(
-            Some(&val),
-            None,
-            None,
-            &env,
-            &resolver,
-        );
-        assert_eq!(
-            ctx.request_override.unwrap().inner(),
-            "tok"
-        );
+        let ctx = RequestCredentialContext::new(Some(&val), None, None, &env, &resolver);
+        assert_eq!(ctx.request_override.unwrap().inner(), "tok");
     }
 }

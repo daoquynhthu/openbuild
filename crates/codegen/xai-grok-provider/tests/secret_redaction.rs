@@ -46,7 +46,10 @@ fn config_diagnostic_display_redacts() {
     let d = ConfigDiagnostic::new("test", "api_key", "validation error");
     let msg = d.to_string();
     assert!(!msg.contains(CANARY));
-    assert!(msg.contains("test"), "Diagnostic should contain provider ID");
+    assert!(
+        msg.contains("test"),
+        "Diagnostic should contain provider ID"
+    );
 }
 
 /// RegistrySnapshot Debug must not contain canary api_key.
@@ -54,9 +57,9 @@ fn config_diagnostic_display_redacts() {
 fn snapshot_debug_redacts_canary() {
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
+    use std::sync::Arc;
     use xai_grok_provider::providers::openai_compatible_factory::OpenAiCompatibleProviderFactory;
     use xai_grok_provider::registry::ProviderFactoryKind;
-    use std::sync::Arc;
 
     reg.register_factory(
         ProviderFactoryKind::OpenAiCompatible,
@@ -103,7 +106,10 @@ fn tracing_field_redacts_canary() {
     // Tracing macros use Debug formatting for fields.
     // Verify that the Debug output (which tracing would use) is redacted.
     let debug = format!("{s:?}");
-    assert!(!debug.contains(CANARY), "tracing Debug field must not contain canary");
+    assert!(
+        !debug.contains(CANARY),
+        "tracing Debug field must not contain canary"
+    );
     assert!(debug.contains("[REDACTED]"));
 }
 

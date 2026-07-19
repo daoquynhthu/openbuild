@@ -96,7 +96,12 @@ impl Provider for OpenAiCompatibleProvider {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            AuthPolicy::bearer(vec![CredentialCandidate::BuiltinEnvironment(self.defaults.env_key.clone())], false),
+            AuthPolicy::bearer(
+                vec![CredentialCandidate::BuiltinEnvironment(
+                    self.defaults.env_key.clone(),
+                )],
+                false,
+            ),
         );
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("openai-compatible-chat");

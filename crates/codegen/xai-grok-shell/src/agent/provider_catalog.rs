@@ -213,7 +213,9 @@ impl ProviderCatalogService {
         if !(Self::MIN_CONCURRENCY..=Self::MAX_CONCURRENCY).contains(&v) {
             return Err(format!(
                 "concurrency must be between {} and {}, got {}",
-                Self::MIN_CONCURRENCY, Self::MAX_CONCURRENCY, v
+                Self::MIN_CONCURRENCY,
+                Self::MAX_CONCURRENCY,
+                v
             ));
         }
         Ok(())
@@ -404,9 +406,10 @@ impl ProviderCatalogService {
                     for (k, v) in &defaults.extra_headers {
                         req = req.header(k.as_str(), v.as_str());
                     }
-                    let auth_value = defaults.env_key.iter().find_map(|key| {
-                        std::env::var(key).ok().filter(|v| !v.is_empty())
-                    });
+                    let auth_value = defaults
+                        .env_key
+                        .iter()
+                        .find_map(|key| std::env::var(key).ok().filter(|v| !v.is_empty()));
                     if let Some(token) = auth_value {
                         req = req.header("Authorization", format!("Bearer {token}"));
                     }
@@ -431,8 +434,7 @@ impl ProviderCatalogService {
                     let models = match defaults.model_list_format {
                         xai_grok_provider::types::ModelListFormat::OllamaTags => {
                             crate::agent::provider_catalog::parse_ollama_tags_models(
-                                &body,
-                                &defaults,
+                                &body, &defaults,
                             )
                         }
                         xai_grok_provider::types::ModelListFormat::OpenAiCompatible => {
@@ -457,7 +459,9 @@ impl ProviderCatalogService {
                     }
                     let mut new_snapshot = (**snap).clone();
                     let source = url_for_pid(&tasks, &pid);
-                    let existing_models = new_snapshot.providers.get(&pid)
+                    let existing_models = new_snapshot
+                        .providers
+                        .get(&pid)
                         .map(|e| e.models.clone())
                         .unwrap_or_default();
                     let entry = ProviderCatalogEntry {
@@ -674,9 +678,11 @@ pub fn save_catalog_snapshot(snapshot: &ModelCatalogSnapshot) -> Result<(), Stri
         .map(|entry| SerializableEntry {
             provider_id: entry.provider_id.0.clone(),
             state: format!("{:?}", entry.state),
-            fetched_at_unix: entry.fetched_at.and_then(|t|
-                t.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs())
-            ),
+            fetched_at_unix: entry.fetched_at.and_then(|t| {
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .ok()
+                    .map(|d| d.as_secs())
+            }),
             source_url: entry.source_url.clone(),
             model_ids: entry.models.iter().map(|m| m.model.clone()).collect(),
             model_names: entry.models.iter().filter_map(|m| m.name.clone()).collect(),
@@ -731,9 +737,9 @@ pub fn load_catalog_snapshot() -> ModelCatalogSnapshot {
             ProviderCatalogEntry {
                 provider_id: pid,
                 state: ProviderCatalogState::Stale,
-                fetched_at: entry.fetched_at_unix.map(|unix_secs|
-                    std::time::UNIX_EPOCH + Duration::from_secs(unix_secs)
-                ),
+                fetched_at: entry
+                    .fetched_at_unix
+                    .map(|unix_secs| std::time::UNIX_EPOCH + Duration::from_secs(unix_secs)),
                 source_url: entry.source_url,
                 models: vec![],
                 error_summary: entry.error_summary,
@@ -870,7 +876,10 @@ mod tests {
             models: vec![],
             error_summary: Some("connection refused".into()),
         };
-        assert_eq!(entry.state, ProviderCatalogState::Failed("connection refused".into()));
+        assert_eq!(
+            entry.state,
+            ProviderCatalogState::Failed("connection refused".into())
+        );
         assert!(entry.fetched_at.is_none());
         assert!(entry.error_summary.is_some());
     }
@@ -999,19 +1008,18 @@ mod tests {
 
     #[tokio::test]
     async fn concurrency_limits_parallel_in_flight() {
-        use xai_grok_provider::types::ProviderId;
         use std::sync::Arc;
+        use xai_grok_provider::types::ProviderId;
 
         // Start a slow server (200ms per request)
         let server = xai_grok_test_support::redirect_mock::SlowServer::start(
             std::time::Duration::from_millis(200),
-        ).await;
+        )
+        .await;
         let url = server.url();
 
         // Create catalog service with concurrency=2 and the slow server's client
-        let svc = ProviderCatalogService::with_client_and_concurrency(
-            reqwest::Client::new(), 2,
-        );
+        let svc = ProviderCatalogService::with_client_and_concurrency(reqwest::Client::new(), 2);
 
         // Use 6 known built-in provider IDs so refresh_all can build URLs for them
         let pids = vec![
@@ -1028,7 +1036,8 @@ mod tests {
             &pids,
             |_pid| Some((url.clone(), defaults.clone())),
             std::time::Duration::from_secs(0), // TTL=0 → all stale
-        ).await;
+        )
+        .await;
         svc.join_active_refresh().await;
 
         let peak = server.in_flight_peak();
@@ -1048,22 +1057,28 @@ mod tests {
     async fn cancel_releases_semaphore_waiters() {
         let server = xai_grok_test_support::redirect_mock::SlowServer::start(
             std::time::Duration::from_millis(500),
-        ).await;
+        )
+        .await;
         let url = server.url();
-        let svc = ProviderCatalogService::with_client_and_concurrency(
-            reqwest::Client::new(), 1,
-        );
+        let svc = ProviderCatalogService::with_client_and_concurrency(reqwest::Client::new(), 1);
         let defaults = ProviderDefaults::default();
         let pids = vec![ProviderId::new("a"), ProviderId::new("b")];
 
-        svc.refresh_all(&pids, |_| Some((url.clone(), defaults.clone())), Duration::from_secs(0)).await;
+        svc.refresh_all(
+            &pids,
+            |_| Some((url.clone(), defaults.clone())),
+            Duration::from_secs(0),
+        )
+        .await;
 
         // Wait for first request to start (semaphore acquired, request in-flight)
         tokio::time::timeout(Duration::from_millis(200), async {
             while server.in_flight_peak() == 0 {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
-        }).await.expect("request should start within 200ms");
+        })
+        .await
+        .expect("request should start within 200ms");
 
         // The second task is now waiting on the semaphore. Cancel releases it.
         let shutdown_result = tokio::time::timeout(Duration::from_secs(2), svc.shutdown()).await;
@@ -1071,27 +1086,39 @@ mod tests {
 
         // Only 1 request should have been made (the one that got the semaphore).
         // The second task was released by cancellation before acquiring the permit.
-        assert_eq!(server.request_count(), 1, "second waiter must be released by cancellation");
+        assert_eq!(
+            server.request_count(),
+            1,
+            "second waiter must be released by cancellation"
+        );
     }
 
     #[tokio::test]
     async fn cancel_terminates_in_flight_request() {
         let server = xai_grok_test_support::redirect_mock::SlowServer::start(
             std::time::Duration::from_secs(10), // very slow — would timeout test
-        ).await;
+        )
+        .await;
         let url = server.url();
         let svc = ProviderCatalogService::new();
         let defaults = ProviderDefaults::default();
         let pids = vec![ProviderId::new("a")];
 
-        svc.refresh_all(&pids, |_| Some((url.clone(), defaults.clone())), Duration::from_secs(0)).await;
+        svc.refresh_all(
+            &pids,
+            |_| Some((url.clone(), defaults.clone())),
+            Duration::from_secs(0),
+        )
+        .await;
 
         // Wait for in-flight request
         tokio::time::timeout(Duration::from_millis(500), async {
             while server.in_flight_peak() == 0 {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
-        }).await.expect("request should start within 500ms");
+        })
+        .await
+        .expect("request should start within 500ms");
 
         // Cancel the in-flight request — shutdown should complete within 2s,
         // NOT wait for the 10s server delay.
@@ -1103,11 +1130,10 @@ mod tests {
     async fn cancel_prevents_half_complete_snapshot() {
         let server = xai_grok_test_support::redirect_mock::SlowServer::start(
             std::time::Duration::from_secs(10),
-        ).await;
+        )
+        .await;
         let url = server.url();
-        let svc = ProviderCatalogService::with_client_and_concurrency(
-            reqwest::Client::new(), 2,
-        );
+        let svc = ProviderCatalogService::with_client_and_concurrency(reqwest::Client::new(), 2);
         let defaults = ProviderDefaults::default();
         let pids = vec![
             ProviderId::new("a"),
@@ -1115,21 +1141,31 @@ mod tests {
             ProviderId::new("c"),
         ];
 
-        svc.refresh_all(&pids, |_| Some((url.clone(), defaults.clone())), Duration::from_secs(0)).await;
+        svc.refresh_all(
+            &pids,
+            |_| Some((url.clone(), defaults.clone())),
+            Duration::from_secs(0),
+        )
+        .await;
 
         // Wait for 2 in-flight requests (both permits taken)
         tokio::time::timeout(Duration::from_millis(500), async {
             while server.in_flight_peak() < 2 {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
-        }).await.expect("2 requests should be in-flight within 500ms");
+        })
+        .await
+        .expect("2 requests should be in-flight within 500ms");
 
         svc.shutdown().await.unwrap();
 
         // No request should have completed before cancellation (10s delay),
         // so the snapshot must be pristine.
         let snap = svc.snapshot().await;
-        assert_eq!(snap.catalog_revision, 0, "no revision bump after cancellation");
+        assert_eq!(
+            snap.catalog_revision, 0,
+            "no revision bump after cancellation"
+        );
         assert!(snap.providers.is_empty(), "no providers after cancellation");
     }
 
@@ -1164,9 +1200,7 @@ mod tests {
 
     #[tokio::test]
     async fn concurrency_limit_creates_correct_permits() {
-        let svc = ProviderCatalogService::with_client_and_concurrency(
-            reqwest::Client::new(), 1,
-        );
+        let svc = ProviderCatalogService::with_client_and_concurrency(reqwest::Client::new(), 1);
         assert_eq!(svc.concurrency.available_permits(), 1);
     }
     #[tokio::test]

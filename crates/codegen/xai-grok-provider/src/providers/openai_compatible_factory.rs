@@ -61,7 +61,12 @@ impl Provider for FactoryProvider {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            AuthPolicy::bearer(vec![CredentialCandidate::ProviderEnvironment(self.env_key.clone())], false),
+            AuthPolicy::bearer(
+                vec![CredentialCandidate::ProviderEnvironment(
+                    self.env_key.clone(),
+                )],
+                false,
+            ),
         );
         let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);
         let selector = Arc::new(DefaultRouteSelector {
