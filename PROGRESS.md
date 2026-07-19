@@ -203,3 +203,42 @@
 
 ### P14-06: Release candidate
 - Tag pending (requires owner approval)
+
+## Phase 9: Async Catalog replaces blocking model discovery — 2026-07-20
+
+### Sub-tasks completed
+- **P9-001**: State machine (`Empty | Loading | Fresh | Stale | Failed`) with `SystemTime`, 6 state tests
+- **P9-002**: reqwest client policy (5s connect, 30s total, max 3 same-origin redirects, fixed UA), Axum `RedirectMockServer`, 4 redirect tests
+- **P9-003**: `Semaphore` concurrency (default 4, range 1..=16), `SlowServer` peak-in-flight test
+- **P9-004**: Model list parsed by declared `model_list_format`, not URL inference
+- **P9-005**: HTTP status classification (2xx only, typed errors, error preserves old models)
+- **P9-006**: Discovery applies endpoint/auth/extra_headers from `ProviderDefaults` at request time
+- **P9-007**: Stale-while-revalidate — preserves old models on failure, revision increments on both
+- **P9-008**: TTL config (30..=86400 seconds, default 300), boundary tests, clock rewind test
+- **P9-009**: Cancellation via shared `CancellationToken` between `ProviderRuntime` and catalog; `select!` in spawned tasks, 2s shutdown deadline, 3 tests
+- **P9-010**: Snapshot serde roundtrip (`Serialize`/`Deserialize` with `SystemTime` as epoch seconds), 2 tests
+- **P9-011**: Persist/load via `atomic_replace`; failure preserves old disk snapshot, 2 tests
+- **P9-012**: Remove `fetch_provider_models_blocking()` call from `resolve_model_list` in config.rs; startup uses persisted/in-memory snapshot only
+- **P9-013**: Delete old blocking code from models.rs — `resolve_provider_auth`, `parse_openai_compatible_provider_models`, `parse_ollama_tags_models`, `PROVIDER_MODEL_CACHE` et al; clean unused imports
+- **P9-014**: Catalog revision watch channel (`watch::Sender<u64>`), `subscribe_catalog_revision()` on `ProviderCatalogService` and `ProviderRuntime`; `ModelsManager::rebuild_from_catalog_snapshot()`; app-level watcher task
+
+### Files changed
+- `provider_catalog.rs` — watch infrastructure, revision send, subscribe method
+- `provider_runtime.rs` — `subscribe_catalog_revision()` delegation
+- `models.rs` — `rebuild_from_catalog_snapshot()`, `build_prefetched_from_catalog()`, deleted old blocking code
+- `app.rs` — spawn catalog revision watcher after bootstrap
+- `config.rs` — removed `fetch_provider_models_blocking()` call from `resolve_model_list`
+
+### Key results
+- `cargo check -p xai-grok-shell` — clean
+- `cargo clippy -p xai-grok-shell -- -D warnings` — clean
+- `cargo test -p xai-grok-shell --lib` — 3546 passed, 0 failed, 3 ignored
+- `cargo check/clippy/test -p xai-grok-provider` — clean (149 passed)
+- `rg fetch_provider_models_blocking` — zero production references
+
+### Phase 9 Gate
+- A-03: `fetch_provider_models_blocking` 不再出现在生产路径 ✅
+- A-07: catalog 异步刷新、timeout、status、auth、stale、persist、cancel 全部实现 ✅
+- startup no-network test: 启动现在只使用 persisted/in-memory snapshot ✅
+- `rg fetch_provider_models_blocking` 生产引用为 0 ✅
+- catalog mock matrix、TTL、stale、cancel、persistence roundtrip 全绿 ✅
