@@ -65,10 +65,9 @@ fn with_embedded_keys<R>(f: impl FnOnce(&[(&str, &[u8])]) -> R) -> R {
 }
 
 /// Test seam for injecting trusted keys in integration tests (external crates).
-/// Not exported in production — `#[doc(hidden)]` and named clearly to avoid
-/// accidental use.
+/// Only compiled under `#[cfg(test)]` or with feature `integration-test-seams`.
 #[doc(hidden)]
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(any(test, feature = "integration-test-seams"))]
 pub mod test_seam {
     use std::sync::Mutex;
 

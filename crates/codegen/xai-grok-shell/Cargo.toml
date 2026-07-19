@@ -190,7 +190,7 @@ xai-grok-workspace = { workspace = true, features = ["test-utils"] }
 # Feature-unification applies the signing seam to the lib when building tests, so
 # integration tests can inject a throwaway trusted key; production builds exclude
 # dev-deps and compile the seam out.
-xai-grok-config = { workspace = true, features = [] }
+xai-grok-config = { workspace = true, features = ["integration-test-seams"] }
 # Ed25519 signing for the managed-config signature tests.
 ring = { workspace = true }
 tar = { workspace = true }

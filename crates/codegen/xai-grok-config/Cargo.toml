@@ -33,6 +33,7 @@ core-foundation = { workspace = true }
 tempfile = { workspace = true }
 
 [features]
+integration-test-seams = []
 
 [lints]
 workspace = true
