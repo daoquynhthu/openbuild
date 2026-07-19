@@ -6,3 +6,9 @@ NUL
 
 **/*.rs.bk
 .DS_Store
+
+# Provider V1 execution artifacts
+artifacts/provider-v1/**
+cargo_meta.json
+meta.json
+shell_failures.txt
