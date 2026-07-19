@@ -61,7 +61,11 @@ fn do_atomic_replace(path: &Path, bytes: &[u8], backend: &dyn AtomicReplaceBacke
 
 /// Atomically replace file contents.
 pub fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), AtomicWriteError> {
-    do_atomic_replace(path, bytes, &UnixBackend)
+    #[cfg(windows)]
+    let backend = WindowsBackend;
+    #[cfg(not(windows))]
+    let backend = UnixBackend;
+    do_atomic_replace(path, bytes, &backend)
 }
 
 #[cfg(test)]
@@ -75,8 +79,10 @@ pub(crate) fn atomic_replace_test(
 
 // ── Unix backend (P3-007) ──
 
+#[cfg(not(windows))]
 struct UnixBackend;
 
+#[cfg(not(windows))]
 impl AtomicReplaceBackend for UnixBackend {
     fn create_unique_temp(&self, target: &Path) -> Result<(PathBuf, File), AtomicWriteError> {
         let dir = target.parent().unwrap_or(Path::new("."));
@@ -118,6 +124,88 @@ impl AtomicReplaceBackend for UnixBackend {
 }
 
 // ── Windows backend (P3-008) ──
+
+#[cfg(windows)]
+mod platform {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::Path;
+    use windows::Win32::Storage::FileSystem::MoveFileExW;
+    use windows::Win32::Storage::FileSystem::MOVEFILE_REPLACE_EXISTING;
+    use windows::Win32::Storage::FileSystem::MOVEFILE_WRITE_THROUGH;
+
+    pub(crate) fn win32_move_file_replace(temp: &Path, target: &Path) -> Result<(), super::AtomicWriteError> {
+        let temp_wide: Vec<u16> = OsStr::new(temp)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let target_wide: Vec<u16> = OsStr::new(target)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        let result = unsafe {
+            MoveFileExW(
+                windows::core::PCWSTR(temp_wide.as_ptr()),
+                windows::core::PCWSTR(target_wide.as_ptr()),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+        };
+
+        if let Err(err) = result {
+            if err.code() == windows::core::HRESULT::from_win32(32) {
+                return Err(super::AtomicWriteError::SharingViolation {
+                    target: target.to_path_buf(),
+                });
+            }
+            return Err(super::AtomicWriteError::Replace {
+                target: target.to_path_buf(),
+                source: std::io::Error::last_os_error(),
+            });
+        }
+        Ok(())
+    }
+
+    pub(crate) fn win32_create_unique_temp(target: &Path) -> Result<(std::path::PathBuf, std::fs::File), super::AtomicWriteError> {
+        let dir = target.parent().unwrap_or(Path::new("."));
+        let mut err = None;
+        for _ in 0..10 {
+            let temp = dir.join(format!(".tmp_{}", std::process::id()));
+            match std::fs::OpenOptions::new().create_new(true).write(true).open(&temp) {
+                Ok(f) => return Ok((temp, f)),
+                Err(e) => err = Some(e),
+            }
+        }
+        Err(super::AtomicWriteError::CreateTemp {
+            target: target.to_path_buf(),
+            source: err.unwrap_or_else(|| std::io::Error::other("too many collisions")),
+        })
+    }
+}
+
+#[cfg(windows)]
+struct WindowsBackend;
+
+#[cfg(windows)]
+impl AtomicReplaceBackend for WindowsBackend {
+    fn create_unique_temp(&self, target: &Path) -> Result<(PathBuf, File), AtomicWriteError> {
+        platform::win32_create_unique_temp(target)
+    }
+
+    fn replace_existing(&self, temp: &Path, target: &Path) -> Result<(), AtomicWriteError> {
+        platform::win32_move_file_replace(temp, target)
+    }
+
+    fn sync_parent(&self, _parent: &Path) -> Result<(), AtomicWriteError> {
+        // Windows does not require parent directory sync for durable atomic write.
+        // MoveFileExW with MOVEFILE_WRITE_THROUGH ensures the metadata is flushed.
+        Ok(())
+    }
+
+    fn cleanup_temp(&self, temp: &Path) {
+        let _ = std::fs::remove_file(temp);
+    }
+}
 
 // ── Deterministic fake backend for contract tests ──
 
