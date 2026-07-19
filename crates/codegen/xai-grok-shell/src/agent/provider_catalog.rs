@@ -547,6 +547,23 @@ impl ProviderCatalogService {
         }
     }
 
+    /// Atomically persist the current snapshot to disk using Phase 3's `atomic_replace`.
+    pub async fn persist_snapshot(&self, path: &std::path::Path) -> Result<(), String> {
+        let snap = self.snapshot.read().await;
+        let json = serde_json::to_string_pretty(&*snap)
+            .map_err(|e| format!("serialization error: {e}"))?;
+        drop(snap);
+        xai_grok_paths::atomic_write::atomic_replace(path, json.as_bytes())
+            .map_err(|e| format!("persist error: {e}"))
+    }
+
+    /// Load a snapshot from a JSON file written by `persist_snapshot`.
+    /// Returns `None` if the file doesn't exist or is unreadable.
+    pub async fn load_snapshot(path: &std::path::Path) -> Option<ModelCatalogSnapshot> {
+        let bytes = std::fs::read(path).ok()?;
+        serde_json::from_slice(&bytes).ok()
+    }
+
     /// Classify an HTTP status into a typed error string (P9-005).
     fn classify_http_status(status: reqwest::StatusCode) -> String {
         match status.as_u16() {
@@ -1168,6 +1185,118 @@ mod tests {
             Some(old_stamp),
             "old timestamp must be preserved exactly, not replaced with now()"
         );
+    }
+
+    // P9-011: persist snapshot using atomic writer
+    #[tokio::test]
+    async fn persist_roundtrip_preserves_snapshot() {
+        use std::time::UNIX_EPOCH;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("catalog.json");
+
+        let svc = ProviderCatalogService::new();
+        {
+            let mut snap = svc.snapshot.write().await;
+            let mut providers = IndexMap::new();
+            providers.insert(
+                ProviderId::new("test"),
+                ProviderCatalogEntry {
+                    provider_id: ProviderId::new("test"),
+                    state: ProviderCatalogState::Fresh,
+                    fetched_at: Some(UNIX_EPOCH + Duration::from_secs(999)),
+                    source_url: "https://example.com/models".into(),
+                    models: vec![],
+                    error_summary: None,
+                },
+            );
+            *snap = Arc::new(ModelCatalogSnapshot {
+                catalog_revision: 7,
+                providers,
+            });
+        }
+
+        svc.persist_snapshot(&path).await.unwrap();
+        assert!(path.exists(), "file must exist after persist");
+
+        let loaded = ProviderCatalogService::load_snapshot(&path).await.unwrap();
+        assert_eq!(loaded.catalog_revision, 7);
+        let entry = loaded.providers.get(&ProviderId::new("test")).unwrap();
+        assert_eq!(entry.state, ProviderCatalogState::Fresh);
+        assert_eq!(entry.fetched_at, Some(UNIX_EPOCH + Duration::from_secs(999)));
+    }
+
+    #[tokio::test]
+    async fn persist_failure_preserves_old_disk_snapshot() {
+        use std::time::UNIX_EPOCH;
+
+        let dir = tempfile::tempdir().unwrap();
+        // Use a path inside a non-existent subdirectory to trigger write failure
+        let path = dir.path().join("nonexistent_subdir").join("catalog.json");
+
+        // Write initial snapshot to a valid location
+        let svc = ProviderCatalogService::new();
+        {
+            let mut snap = svc.snapshot.write().await;
+            let mut providers = IndexMap::new();
+            providers.insert(
+                ProviderId::new("original"),
+                ProviderCatalogEntry {
+                    provider_id: ProviderId::new("original"),
+                    state: ProviderCatalogState::Fresh,
+                    fetched_at: Some(UNIX_EPOCH + Duration::from_secs(100)),
+                    source_url: "https://original.com/models".into(),
+                    models: vec![],
+                    error_summary: None,
+                },
+            );
+            *snap = Arc::new(ModelCatalogSnapshot {
+                catalog_revision: 1,
+                providers,
+            });
+        }
+
+        // First persist to the real valid path
+        let valid_path = dir.path().join("catalog.json");
+        svc.persist_snapshot(&valid_path).await.unwrap();
+        let old_bytes = std::fs::read(&valid_path).unwrap();
+
+        // Update in-memory snapshot
+        {
+            let mut snap = svc.snapshot.write().await;
+            let mut providers = IndexMap::new();
+            providers.insert(
+                ProviderId::new("new"),
+                ProviderCatalogEntry {
+                    provider_id: ProviderId::new("new"),
+                    state: ProviderCatalogState::Fresh,
+                    fetched_at: Some(UNIX_EPOCH + Duration::from_secs(200)),
+                    source_url: "https://new.com/models".into(),
+                    models: vec![],
+                    error_summary: None,
+                },
+            );
+            *snap = Arc::new(ModelCatalogSnapshot {
+                catalog_revision: 2,
+                providers,
+            });
+        }
+
+        // Attempt persist to a non-existent directory — must fail
+        let result = svc.persist_snapshot(&path).await;
+        assert!(result.is_err(), "persist to non-existent dir must fail");
+
+        // Old disk snapshot at the valid path must be unchanged
+        let new_bytes = std::fs::read(&valid_path).unwrap();
+        assert_eq!(
+            old_bytes, new_bytes,
+            "old disk snapshot must be preserved after failed persist"
+        );
+
+        // Old disk content must still reflect revision 1
+        let loaded = ProviderCatalogService::load_snapshot(&valid_path).await.unwrap();
+        assert_eq!(loaded.catalog_revision, 1, "disk revision must stay at 1");
+        assert!(loaded.providers.contains_key(&ProviderId::new("original")));
     }
 
     // P9-009: cancellation tests
