@@ -761,12 +761,41 @@ mod tests {
         );
     }
 
-    #[test]
-    fn catalog_redirect_limit_is_3() {
-        // Verify the policy is configured (not default infinite).
+    // P9-002: redirect policy tests with mock server
+    #[tokio::test]
+    async fn catalog_0_redirects_ok() {
+        let server = xai_grok_test_support::redirect_mock::RedirectMockServer::start(0).await;
         let svc = ProviderCatalogService::new();
-        // We can't directly inspect the policy, but the builder was called.
-        _ = svc.http_client;
+        let resp = svc.http_client.get(&server.url()).send().await;
+        assert!(resp.is_ok(), "0 redirects must succeed: {resp:?}");
+        assert_eq!(server.request_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn catalog_1_redirect_ok() {
+        let server = xai_grok_test_support::redirect_mock::RedirectMockServer::start(1).await;
+        let svc = ProviderCatalogService::new();
+        let resp = svc.http_client.get(&server.url()).send().await;
+        assert!(resp.is_ok(), "1 redirect must succeed: {resp:?}");
+        assert_eq!(server.request_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn catalog_3_redirects_ok() {
+        let server = xai_grok_test_support::redirect_mock::RedirectMockServer::start(3).await;
+        let svc = ProviderCatalogService::new();
+        let resp = svc.http_client.get(&server.url()).send().await;
+        assert!(resp.is_ok(), "3 redirects must succeed: {resp:?}");
+        assert_eq!(server.request_count(), 4);
+    }
+
+    #[tokio::test]
+    async fn catalog_4_redirects_fail() {
+        let server = xai_grok_test_support::redirect_mock::RedirectMockServer::start(4).await;
+        let svc = ProviderCatalogService::new();
+        let resp = svc.http_client.get(&server.url()).send().await;
+        assert!(resp.is_err(), "4 redirects must fail");
+        // Server might see 3 or 4 requests depending on timing, but must not succeed
     }
 
     // P9-003: bounded concurrency tests
