@@ -1216,7 +1216,14 @@ pub async fn run_leader(
     )
     .unwrap_or_else(exit_on_config_error);
     let models_manager_for_agent = shared_models_manager.clone();
+    let models_manager_for_catalog = shared_models_manager.clone();
     let models_manager_for_config = shared_models_manager;
+
+    let catalog_revision_rx = agent_config_for_spawn
+        .provider_runtime
+        .as_ref()
+        .map(|rt| rt.subscribe_catalog_revision());
+    let provider_runtime_for_catalog = agent_config_for_spawn.provider_runtime.clone();
 
     // Resolve `mcp.recursive_config_watch`
     // ONCE here, before the channel is created, so a kill-switch
@@ -1482,6 +1489,24 @@ pub async fn run_leader(
 
             let ipc_tx_for_config = agent_to_ipc_tx.clone();
             let acp_tx_for_config = acp_incoming_tx.clone();
+
+            // P9-014: catalog revision watcher — rebuilds model view on async refresh
+            let models_for_catalog = models_manager_for_catalog;
+            if let Some(mut rx) = catalog_revision_rx {
+                let rt_for_catalog = provider_runtime_for_catalog;
+                tokio::task::spawn_local(async move {
+                    let _ = rx.borrow_and_update();
+                    while rx.changed().await.is_ok() {
+                        let rev = *rx.borrow_and_update();
+                        tracing::info!(revision = rev, "catalog revision changed — rebuilding model view");
+                        if let Some(ref rt) = rt_for_catalog {
+                            let snap = rt.catalog.snapshot().await;
+                            models_for_catalog.rebuild_from_catalog_snapshot(&snap);
+                        }
+                    }
+                });
+            }
+
             tokio::task::spawn_local(async move {
                 use crate::config::reloader::ConfigUpdate;
                 while let Some(update) = config_update_rx.recv().await {

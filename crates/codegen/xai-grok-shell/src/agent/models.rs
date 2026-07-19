@@ -11,6 +11,7 @@ use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use indexmap::IndexMap;
 
 use crate::agent::config::{self, ModelEntry, resolve_credentials, sampling_config_for_model};
+use crate::agent::provider_catalog::{ModelCatalogSnapshot, ProviderCatalogState};
 use crate::auth::{AuthManager, GrokAuth, GrokComConfig};
 use crate::remote::{FetchModelsResult, fetch_models_blocking};
 use crate::sampling::SamplerConfig as SamplingConfig;
@@ -558,6 +559,18 @@ impl ModelsManager {
 
     fn rebuild(&self, cfg: &config::Config, prefetched: Option<IndexMap<String, ModelEntry>>) {
         *self.inner.models.write() = resolve_model_catalog(cfg, prefetched);
+    }
+
+    /// Rebuild the model view from a catalog snapshot (P9-014).
+    ///
+    /// Called when the async catalog signals a revision change. Does not
+    /// make direct network requests — uses the catalog's in-memory data.
+    pub fn rebuild_from_catalog_snapshot(&self, catalog_snapshot: &ModelCatalogSnapshot) {
+        let cfg = self.inner.cfg.read().clone();
+        let prefetched = build_prefetched_from_catalog(catalog_snapshot);
+        *self.inner.models.write() = resolve_model_catalog(&cfg, Some(prefetched));
+        self.reselect_current_model_if_missing(&cfg);
+        self.notify_models_updated();
     }
 
     /// Refresh models when the etag changes.
@@ -1394,6 +1407,26 @@ impl ModelsCacheManager {
 /// when `id` is absent). This lets A/B experiments that share the same
 /// routing slug (e.g. "Auto" and "Grok Build" both route to `grok-build`)
 /// coexist in the catalog without collision.
+/// Build a prefetched model map from a catalog snapshot (P9-014).
+///
+/// Only includes providers in `Fresh` state. Uses `provider/model` keys
+/// matching the convention expected by `resolve_model_catalog`.
+fn build_prefetched_from_catalog(snapshot: &ModelCatalogSnapshot) -> IndexMap<String, ModelEntry> {
+    let mut map = IndexMap::new();
+    for (pid, entry) in &snapshot.providers {
+        if entry.state != ProviderCatalogState::Fresh {
+            continue;
+        }
+        for model_cfg in &entry.models {
+            let key = format!("{}/{}", pid.0, model_cfg.model);
+            let mut me = ModelEntry::from_config_entry(model_cfg);
+            me.provider_id = Some(pid.0.clone());
+            map.insert(key, me);
+        }
+    }
+    map
+}
+
 fn build_prefetched_map(
     models: Vec<config::ModelEntryConfig>,
     api_base_url_override: Option<String>,

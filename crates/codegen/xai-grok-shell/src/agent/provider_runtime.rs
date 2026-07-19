@@ -15,6 +15,7 @@ use super::provider_catalog::{self, CatalogShutdownError, ProviderCatalogService
 /// The launcher creates one instance and injects it into shell and pager.
 /// Provides transactional rebuild and explicit refresh.
 /// Shares a CancellationToken with the catalog for coordinated shutdown (P9-009).
+/// Exposes catalog revision events for model view rebuild (P9-014).
 #[derive(Debug)]
 pub struct ProviderRuntime {
     pub registry: Arc<ProviderRegistry>,
@@ -80,6 +81,15 @@ impl ProviderRuntime {
     /// Current config revision.
     pub async fn config_revision(&self) -> u64 {
         *self.config_revision.read().await
+    }
+
+    /// Subscribe to catalog revision changes (P9-014).
+    ///
+    /// Each catalog refresh that increments the revision sends the new value
+    /// through this watch. Consumers should rebuild the model view on change
+    /// without making direct network requests.
+    pub fn subscribe_catalog_revision(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.catalog.subscribe_catalog_revision()
     }
 }
 

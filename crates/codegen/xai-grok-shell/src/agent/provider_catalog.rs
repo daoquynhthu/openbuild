@@ -154,13 +154,14 @@ pub enum RefreshStrategy {
 }
 
 /// Asynchronous provider catalog service with bounded concurrent refresh,
-/// TTL cache, cancellation, and stale fallback.
+/// TTL cache, cancellation, stale fallback, and revision events (P9-014).
 pub struct ProviderCatalogService {
     snapshot: Arc<RwLock<Arc<ModelCatalogSnapshot>>>,
     http_client: reqwest::Client,
     cancel_token: CancellationToken,
     concurrency: Arc<tokio::sync::Semaphore>,
     active_refresh: tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
+    revision_tx: tokio::sync::watch::Sender<u64>,
 }
 
 impl std::fmt::Debug for ProviderCatalogService {
@@ -248,6 +249,7 @@ impl ProviderCatalogService {
             (Self::MIN_CONCURRENCY..=Self::MAX_CONCURRENCY).contains(&max_concurrency),
             "concurrency out of range"
         );
+        let (revision_tx, _) = tokio::sync::watch::channel(0);
         Self {
             snapshot: Arc::new(RwLock::new(Arc::new(ModelCatalogSnapshot {
                 catalog_revision: 0,
@@ -257,6 +259,7 @@ impl ProviderCatalogService {
             cancel_token: CancellationToken::new(),
             concurrency: Arc::new(tokio::sync::Semaphore::new(max_concurrency as usize)),
             active_refresh: tokio::sync::Mutex::new(None),
+            revision_tx,
         }
     }
 
@@ -270,6 +273,7 @@ impl ProviderCatalogService {
             (Self::MIN_CONCURRENCY..=Self::MAX_CONCURRENCY).contains(&max_concurrency),
             "concurrency out of range"
         );
+        let (revision_tx, _) = tokio::sync::watch::channel(0);
         Self {
             snapshot: Arc::new(RwLock::new(Arc::new(ModelCatalogSnapshot {
                 catalog_revision: 0,
@@ -279,6 +283,7 @@ impl ProviderCatalogService {
             cancel_token,
             concurrency: Arc::new(tokio::sync::Semaphore::new(max_concurrency as usize)),
             active_refresh: tokio::sync::Mutex::new(None),
+            revision_tx,
         }
     }
 
@@ -290,6 +295,15 @@ impl ProviderCatalogService {
     /// Return the current immutable snapshot.
     pub async fn snapshot(&self) -> Arc<ModelCatalogSnapshot> {
         self.snapshot.read().await.clone()
+    }
+
+    /// Subscribe to catalog revision changes (P9-014).
+    ///
+    /// Each time the catalog revision is incremented (after a successful or failed refresh)
+    /// the new revision number is sent through this watch. Consumers rebuild the model view
+    /// on change instead of making direct network requests.
+    pub fn subscribe_catalog_revision(&self) -> tokio::sync::watch::Receiver<u64> {
+        self.revision_tx.subscribe()
     }
 
     /// Refresh a single provider with TTL-aware strategy.
@@ -362,7 +376,9 @@ impl ProviderCatalogService {
             }
         }
         new_snapshot.catalog_revision += 1;
+        let rev = new_snapshot.catalog_revision;
         *snap = Arc::new(new_snapshot);
+        let _ = self.revision_tx.send(rev);
     }
 
     /// Refresh all providers with bounded concurrency and TTL-awareness.
@@ -401,6 +417,7 @@ impl ProviderCatalogService {
         let cancel_token = self.cancel_token.clone();
         let client = self.http_client.clone();
         let snapshot = Arc::clone(&self.snapshot);
+        let revision_tx = self.revision_tx.clone();
 
         let handle = tokio::spawn(async move {
             let mut spawned = Vec::new();
@@ -500,7 +517,9 @@ impl ProviderCatalogService {
                     };
                     new_snapshot.providers.insert(pid, entry);
                     new_snapshot.catalog_revision += 1;
+                    let rev = new_snapshot.catalog_revision;
                     *snap = Arc::new(new_snapshot);
+                    let _ = revision_tx.send(rev);
                 }
             }
         });
