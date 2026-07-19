@@ -62,6 +62,9 @@ impl core::fmt::Debug for ConfiguredProvider {
 /// All providers must test their selector.
 pub trait RouteSelector: Send + Sync + core::fmt::Debug {
     fn select(&self, model_id: &str) -> Result<RouteId, ProviderError>;
+    /// Returns all route IDs this selector may return from `select()`.
+    /// Used by registry validation to verify all referenced routes exist.
+    fn referenced_route_ids(&self) -> Vec<RouteId>;
 }
 
 /// Route selector that always returns the default route.
@@ -73,6 +76,10 @@ pub struct DefaultRouteSelector {
 impl RouteSelector for DefaultRouteSelector {
     fn select(&self, _model_id: &str) -> Result<RouteId, ProviderError> {
         Ok(self.default_route_id.clone())
+    }
+
+    fn referenced_route_ids(&self) -> Vec<RouteId> {
+        vec![self.default_route_id.clone()]
     }
 }
 
