@@ -199,19 +199,6 @@ pub fn apply_auth_policy(
     }
 }
 
-/// Convert new AuthPolicy to legacy CredentialSource for the migration period.
-fn auth_policy_to_credential_source(policy: &AuthPolicy) -> Option<CredentialSource> {
-    match policy {
-        AuthPolicy::None => None,
-        AuthPolicy::Bearer { candidates, .. } => {
-            candidates_to_source(candidates)
-        }
-        AuthPolicy::Header { candidates, .. } => {
-            candidates_to_source(candidates)
-        }
-    }
-}
-
 fn candidates_to_source(candidates: &[CredentialCandidate]) -> Option<CredentialSource> {
     for candidate in candidates {
         return Some(match candidate {
