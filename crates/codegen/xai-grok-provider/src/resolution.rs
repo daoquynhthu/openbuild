@@ -3,6 +3,7 @@ use indexmap::IndexMap;
 use crate::auth::{AuthPolicy, SecretValue};
 use crate::config::{ConfigDiagnostic, ProviderConfig};
 use crate::model::{GenerationOptions, ModelLimits};
+use crate::protocol::ProtocolId;
 use crate::types::{CompatibleProfileId, ModelId, ModelListFormat, ProviderId, RouteId};
 
 /// Result of resolving configuration precedence into a provider set.
@@ -18,7 +19,7 @@ pub struct ResolvedProviderSet {
 pub struct ResolvedModelExecution {
     pub provider_id: ProviderId,
     pub route_id: RouteId,
-    pub protocol_id: String,
+    pub protocol_id: ProtocolId,
     pub request_url: url::Url,
     pub static_headers: indexmap::IndexMap<String, String>,
     pub auth_policy: AuthPolicy,

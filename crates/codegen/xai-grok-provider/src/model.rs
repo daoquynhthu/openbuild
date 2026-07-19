@@ -46,6 +46,25 @@ pub struct GenerationOptions {
     pub stop: Option<Vec<String>>,
 }
 
+impl GenerationOptions {
+    pub fn new(
+        max_tokens: Option<u32>,
+        temperature: Option<f32>,
+        top_p: Option<f32>,
+    ) -> Self {
+        Self {
+            max_tokens,
+            temperature,
+            top_p,
+            top_k: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            seed: None,
+            stop: None,
+        }
+    }
+}
+
 /// Raw HTTP-level overrides for a request.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]

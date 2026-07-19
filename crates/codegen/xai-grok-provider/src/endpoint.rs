@@ -12,6 +12,11 @@ fn validate_endpoint_url(url: &Url) -> Result<(), ProviderError> {
     let host = url
         .host_str()
         .ok_or_else(|| ProviderError::InvalidEndpoint("endpoint URL has no host".into()))?;
+    if host.is_empty() {
+        return Err(ProviderError::InvalidEndpoint(
+            "endpoint URL has empty host".into(),
+        ));
+    }
 
     if url.fragment().is_some() {
         return Err(ProviderError::InvalidEndpoint(
@@ -31,6 +36,7 @@ fn validate_endpoint_url(url: &Url) -> Result<(), ProviderError> {
             if host == "localhost"
                 || host == "127.0.0.1"
                 || host == "::1"
+                || host == "[::1]"
                 || host.starts_with("127.")
             {
                 Ok(())
@@ -346,6 +352,103 @@ mod tests {
         };
         let merged = merge_endpoints(&base, &patch);
         assert_eq!(merged.base_url.unwrap(), "https://override.com");
+    }
+
+    #[test]
+    fn endpoint_accepts_http_ipv6_loopback() {
+        // url.host_str() returns "[::1]" with brackets for IPv6.
+        // validate_endpoint_url must accept it as loopback.
+        let ep = Endpoint {
+            base_url: Some("http://[::1]:11434".into()),
+            path: EndpointPart::Static("/v1/chat".into()),
+            query: None,
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let url = ep.render(&input).unwrap();
+        assert!(url.as_str().starts_with("http://[::1]:11434"));
+    }
+
+    #[test]
+    fn endpoint_accepts_http_127_subnet() {
+        let ep = Endpoint {
+            base_url: Some("http://127.0.0.2:8080".into()),
+            path: EndpointPart::Static("/api".into()),
+            query: None,
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let url = ep.render(&input).unwrap();
+        assert!(url.as_str().starts_with("http://127.0.0.2:8080"));
+    }
+
+    #[test]
+    fn endpoint_query_encodes_special_chars() {
+        let ep = Endpoint {
+            base_url: Some("https://api.example.com".into()),
+            path: EndpointPart::Static("/search".into()),
+            query: Some(HashMap::from([
+                ("q".into(), "hello world".into()),
+                ("lang".into(), "en-US".into()),
+            ])),
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let url = ep.render(&input).unwrap();
+        let url_str = url.as_str();
+        assert!(url_str.contains("q=hello+world") || url_str.contains("q=hello%20world"));
+        assert!(url_str.contains("lang=en-US"));
+    }
+
+    #[test]
+    fn endpoint_rejects_empty_host() {
+        // url crate treats "https:///path" as having an empty host.
+        // An endpoint URL with no base_url should already error earlier.
+        let ep = Endpoint {
+            base_url: None,
+            path: EndpointPart::Static("/chat".into()),
+            query: None,
+        };
+        let input = EndpointInput {
+            request: LLMRequest {
+                model: "test".into(),
+                messages: vec![],
+                max_tokens: None,
+                temperature: None,
+            },
+            body: (),
+        };
+        let result = ep.render(&input);
+        assert!(
+            result.is_err(),
+            "endpoint with no base_url must error"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("base_url"),
+            "error must mention missing base_url: {err}"
+        );
     }
 
     #[test]

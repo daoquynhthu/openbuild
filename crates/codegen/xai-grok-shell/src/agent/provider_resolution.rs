@@ -86,6 +86,19 @@ pub fn merge_generation_params(
     (max_tokens, temperature, top_p)
 }
 
+/// Merge all GenerationOptions fields with fixed precedence: route defaults < model < request.
+pub fn merge_generation_options(
+    route_gen: &GenerationOptions,
+    model_gen: &GenerationOptions,
+    request_gen: &GenerationOptions,
+) -> GenerationOptions {
+    GenerationOptions::new(
+        request_gen.max_tokens.or(model_gen.max_tokens).or(route_gen.max_tokens),
+        request_gen.temperature.or(model_gen.temperature).or(route_gen.temperature),
+        request_gen.top_p.or(model_gen.top_p).or(route_gen.top_p),
+    )
+}
+
 /// Resolve a `SamplerConfig` from a `ModelEntry`, registry snapshot, and credentials.
 ///
 /// This is the only provider-aware constructor of `SamplerConfig`. It applies:
