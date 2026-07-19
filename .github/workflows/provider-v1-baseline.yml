@@ -1,0 +1,164 @@
+name: Provider V1 Baseline
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  baseline-linux:
+    name: Baseline Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.92.0"
+          components: clippy, rustfmt
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Capture environment
+        run: |
+          uname -a
+          rustc -Vv
+          cargo -V
+          rustup show active-toolchain
+          protoc --version
+          git --version
+          df -h .
+          locale
+      - name: Workspace check
+        run: |
+          cargo check --workspace --all-targets --locked --keep-going 2>&1 | tee artifacts/provider-v1/linux/check.log
+        continue-on-error: true
+      - name: Workspace clippy
+        run: |
+          cargo clippy --workspace --all-targets --locked --keep-going -- -D warnings 2>&1 | tee artifacts/provider-v1/linux/clippy.log
+        continue-on-error: true
+      - name: Test compilation
+        run: |
+          cargo test --workspace --all-targets --locked --no-run --keep-going 2>&1 | tee artifacts/provider-v1/linux/test-build.log
+        continue-on-error: true
+      - name: Test list
+        run: |
+          cargo test --workspace --all-targets --locked -- --list 2>&1 | tee artifacts/provider-v1/linux/test-list.log
+        continue-on-error: true
+      - name: Docs
+        run: |
+          cargo doc --workspace --no-deps --locked 2>&1 | tee artifacts/provider-v1/linux/docs.log
+        continue-on-error: true
+      - name: Disk before/after
+        run: df -h . >> artifacts/provider-v1/linux/disk.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baseline-linux
+          path: artifacts/provider-v1/linux/
+
+  baseline-windows:
+    name: Baseline Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.92.0"
+          components: clippy, rustfmt
+      - name: Install protoc
+        run: choco install protoc --version 3.21.12 -y
+      - name: Capture environment
+        shell: pwsh
+        run: |
+          Get-ComputerInfo | Select-Object WindowsProductName,WindowsVersion,OsBuildNumber,OsArchitecture
+          rustc -Vv
+          cargo -V
+          rustup show active-toolchain
+          protoc --version
+          git --version
+          Get-Volume | Select-Object DriveLetter,SizeRemaining,Size
+          [System.Globalization.CultureInfo]::CurrentCulture.Name
+      - name: Workspace check
+        shell: pwsh
+        run: |
+          cargo check --workspace --all-targets --locked --keep-going 2>&1 | Tee-Object -FilePath artifacts/provider-v1/windows/check.log
+        continue-on-error: true
+      - name: Workspace clippy
+        shell: pwsh
+        run: |
+          cargo clippy --workspace --all-targets --locked --keep-going -- -D warnings 2>&1 | Tee-Object -FilePath artifacts/provider-v1/windows/clippy.log
+        continue-on-error: true
+      - name: Test compilation
+        shell: pwsh
+        run: |
+          cargo test --workspace --all-targets --locked --no-run --keep-going 2>&1 | Tee-Object -FilePath artifacts/provider-v1/windows/test-build.log
+        continue-on-error: true
+      - name: Test list
+        shell: pwsh
+        run: |
+          cargo test --workspace --all-targets --locked -- --list 2>&1 | Tee-Object -FilePath artifacts/provider-v1/windows/test-list.log
+        continue-on-error: true
+      - name: Docs
+        shell: pwsh
+        run: |
+          cargo doc --workspace --no-deps --locked 2>&1 | Tee-Object -FilePath artifacts/provider-v1/windows/docs.log
+        continue-on-error: true
+      - name: Disk before/after
+        shell: pwsh
+        run: Get-Volume | Select-Object DriveLetter,SizeRemaining,Size >> artifacts/provider-v1/windows/disk.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baseline-windows
+          path: artifacts/provider-v1/windows/
+
+  baseline-macos:
+    name: Baseline macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: "1.92.0"
+          components: clippy, rustfmt
+      - name: Install protoc
+        run: brew install protobuf
+      - name: Capture environment
+        run: |
+          uname -a
+          rustc -Vv
+          cargo -V
+          rustup show active-toolchain
+          protoc --version
+          git --version
+          df -h .
+          locale
+      - name: Workspace check
+        run: |
+          cargo check --workspace --all-targets --locked --keep-going 2>&1 | tee artifacts/provider-v1/macos/check.log
+        continue-on-error: true
+      - name: Workspace clippy
+        run: |
+          cargo clippy --workspace --all-targets --locked --keep-going -- -D warnings 2>&1 | tee artifacts/provider-v1/macos/clippy.log
+        continue-on-error: true
+      - name: Test compilation
+        run: |
+          cargo test --workspace --all-targets --locked --no-run --keep-going 2>&1 | tee artifacts/provider-v1/macos/test-build.log
+        continue-on-error: true
+      - name: Test list
+        run: |
+          cargo test --workspace --all-targets --locked -- --list 2>&1 | tee artifacts/provider-v1/macos/test-list.log
+        continue-on-error: true
+      - name: Docs
+        run: |
+          cargo doc --workspace --no-deps --locked 2>&1 | tee artifacts/provider-v1/macos/docs.log
+        continue-on-error: true
+      - name: Disk before/after
+        run: df -h . >> artifacts/provider-v1/macos/disk.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baseline-macos
+          path: artifacts/provider-v1/macos/
