@@ -1162,16 +1162,36 @@ impl MvpAgent {
             .current_or_expired()
             .filter(|a| a.is_xai_auth())
             .map(|a| a.user_id);
+        let cred_api_key = credentials.api_key.clone();
+        let cred_base_url = credentials.base_url.clone();
+        let auth_type = credentials.auth_type;
+        let auth_scheme = credentials.auth_scheme;
         let mut config = crate::agent::config::sampling_config_for_model_with_registry(
             model,
             credentials,
-            alpha_test_key,
-            client_version,
-            deployment_id,
-            user_id,
+            alpha_test_key.clone(),
+            client_version.clone(),
+            deployment_id.clone(),
+            user_id.clone(),
             None,
             registry_snapshot.as_deref(),
-        );
+        )
+        .unwrap_or_else(|_| {
+            crate::agent::config::sampling_config_for_model(
+                model,
+                crate::agent::config::ResolvedCredentials {
+                    api_key: cred_api_key,
+                    base_url: cred_base_url,
+                    auth_type,
+                    auth_scheme,
+                },
+                alpha_test_key,
+                client_version,
+                deployment_id,
+                user_id,
+                None,
+            )
+        });
         config.origin_client = origin_client;
         config
     }

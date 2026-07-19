@@ -4528,7 +4528,7 @@ pub fn resolve_aux_model_sampling_config(
     let catalog_entry = find_model_by_id(models, model_id).cloned();
     if let Some(entry) = &catalog_entry {
         let credentials = resolve_credentials_enforced(entry, session_key, disable_api_key_auth);
-        let sampler = sampling_config_for_model_with_registry(
+        if let Ok(sampler) = sampling_config_for_model_with_registry(
             entry,
             credentials,
             alpha_test_key.clone(),
@@ -4537,9 +4537,10 @@ pub fn resolve_aux_model_sampling_config(
             None,
             None,
             registry,
-        );
-        if sampler.api_key.is_some() {
-            return Some(sampler);
+        ) {
+            if sampler.api_key.is_some() {
+                return Some(sampler);
+            }
         }
     }
     let xai_bearer = session_key
@@ -4668,11 +4669,8 @@ pub fn resolve_chat_state_auth_type(
 ///
 /// Classification: PROVIDER-AWARE PRODUCTION PATH.
 /// Delegates to `resolve_model_execution` when a registry snapshot is
-/// provided via `registry_override`. Falls back to legacy path for
-/// backward compatibility when no registry is available.
-/// Same as `sampling_config_for_model` but delegates to the route compiler
-/// when a registry snapshot is available. This is the primary entry point
-/// for production inference paths.
+/// provided via `registry_override`. Returns an error when resolution fails.
+/// This is the primary entry point for production inference paths.
 pub fn sampling_config_for_model_with_registry(
     model: &ModelEntry,
     credentials: ResolvedCredentials,
@@ -4682,22 +4680,20 @@ pub fn sampling_config_for_model_with_registry(
     user_id: Option<String>,
     route: Option<&xai_grok_provider::route::Route>,
     registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
-) -> SamplerConfig {
+) -> Result<SamplerConfig, crate::agent::provider_resolution::ProviderResolutionError> {
     // When registry is available and model has a provider_id, delegate
     // to the route compiler for full provider-aware resolution.
-    if let (Some(snapshot), Some(pid)) = (registry, model.provider_id.as_deref()) {
+    if let (Some(snapshot), Some(_pid)) = (registry, model.provider_id.as_deref()) {
         let base_url = credentials.base_url.clone();
-        if let Ok(sampler_config) = crate::agent::provider_resolution::resolve_model_execution(
+        return crate::agent::provider_resolution::resolve_model_execution(
             model,
             snapshot,
             credentials.api_key.as_deref(),
             Some(&base_url),
-        ) {
-            return sampler_config;
-        }
+        );
     }
-    // Fallback to legacy path
-    sampling_config_for_model(
+    // No registry or no provider_id — use legacy path (P7-003: remove this).
+    Ok(sampling_config_for_model(
         model,
         credentials,
         alpha_test_key,
@@ -4705,7 +4701,7 @@ pub fn sampling_config_for_model_with_registry(
         deployment_id,
         user_id,
         route,
-    )
+    ))
 }
 
 /// Primary SamplerConfig constructor.
@@ -4917,7 +4913,7 @@ pub fn resolve_web_search_sampling_config(
 ) -> Option<SamplerConfig> {
     let resolved = if let Some(entry) = find_model_by_id(models, model_id).cloned() {
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
-        Some(sampling_config_for_model_with_registry(
+        sampling_config_for_model_with_registry(
             &entry,
             credentials,
             alpha_test_key,
@@ -4926,7 +4922,7 @@ pub fn resolve_web_search_sampling_config(
             None,
             None,
             registry,
-        ))
+        ).ok()
     } else if model_id == crate::models::default_web_search_model() {
         Some(resolve_hidden_default_web_search_sampling_config(
             model_id,
@@ -11467,7 +11463,8 @@ default = "grok-4.5"
             None,
             None,
             Some(&snapshot),
-        );
+        )
+        .expect("route compiler with valid registry must succeed");
         // Route compiler was invoked: protocol_id reflects the route, not fallback
         assert_eq!(
             config.protocol_id.as_deref(),
