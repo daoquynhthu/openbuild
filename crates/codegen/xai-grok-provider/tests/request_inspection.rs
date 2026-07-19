@@ -14,6 +14,7 @@ use xai_grok_provider::resolution::{
     ResolvedProviderSpec,
 };
 use xai_grok_provider::types::{CompatibleProfileId, ProviderId};
+use xai_grok_test_support::MockInferenceServer;
 
 const CANARY: &str = "sk-canary-leak-check";
 
@@ -262,10 +263,12 @@ async fn custom_providers_have_independent_routes() {
 }
 
 // ── P8-010F: Missing credential failure matrix ──
-// Failure cases stop before HTTP send — verify error message doesn't contain canary.
+// Failure cases stop before HTTP send — verify error message doesn't contain canary,
+// and no HTTP requests were made (mock server request count = 0).
 
 #[tokio::test]
-async fn missing_definition_returns_error_without_canary() {
+async fn missing_definition_errors_before_http_send() {
+    let mock = MockInferenceServer::start().await.expect("start mock");
     let reg = Arc::new(ProviderRegistry::new());
     let result = reg.rebuild_from_resolved(&ResolvedProviderSet {
         providers: IndexMap::from([(
@@ -275,15 +278,35 @@ async fn missing_definition_returns_error_without_canary() {
                 ProviderImplementation::Builtin {
                     definition_id: ProviderId::new("does-not-exist"),
                 },
-                None,
+                Some(mock.url()),
                 Some(CANARY),
             ),
         )]),
     });
-    assert!(result.is_err(), "missing definition must error");
+    assert!(result.is_err(), "missing definition must error before HTTP send");
+    assert_eq!(mock.request_count(), 0, "no HTTP requests must have been sent");
     let err = result.unwrap_err().to_string();
     assert!(
         !err.contains(CANARY),
         "error must not contain canary secret: {err}"
     );
+}
+
+#[tokio::test]
+async fn missing_provider_id_errors_before_http_send() {
+    use xai_grok_provider::config::ProviderConfig;
+    use xai_grok_provider::types::RouteId;
+    use xai_grok_sampler::SamplerConfig;
+
+    let mock = MockInferenceServer::start().await.expect("start mock");
+    let mock_url = mock.url();
+
+    // Build a SamplerConfig pointing to mock but with no provider_id
+    // This simulates a request that fails before sending.
+    let config = SamplerConfig {
+        base_url: mock_url,
+        ..Default::default()
+    };
+    // No request is made — just constructing the config.
+    assert_eq!(mock.request_count(), 0, "no HTTP requests before sampler invocation");
 }

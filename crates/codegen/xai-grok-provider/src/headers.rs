@@ -97,8 +97,8 @@ pub fn merge_headers(
             .map_err(|_| ProviderError::InvalidHeader(value.to_string()))?;
         if let Some(existing) = merged.get(&n) {
             if existing != &v {
-                return Err(ProviderError::InvalidHeader(format!(
-                    "header conflict for `{name}`: existing differs from new value"
+                return Err(ProviderError::HeaderConflict(format!(
+                    "`{name}`: existing value differs from new value"
                 )));
             }
         } else {

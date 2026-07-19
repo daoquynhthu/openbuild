@@ -40,6 +40,12 @@ pub use crate::resolution::{ProviderPublicConfig, ProviderRuntimeConfig};
 
 use crate::error::ProviderError;
 
+/// Kind of session credential (P8-005).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SessionKind {
+    Xai,
+}
+
 /// Ordered credential candidate for request-time resolution (P8).
 /// Provider constructors only declare candidate types — resolution
 /// happens at request time via `RequestCredentialContext`.
@@ -51,7 +57,7 @@ pub enum CredentialCandidate {
     ModelEnvironment(Vec<String>),
     ProviderEnvironment(Vec<String>),
     BuiltinEnvironment(Vec<String>),
-    Session,
+    Session(SessionKind),
 }
 
 /// Declarative credential source (legacy — replaced by `CredentialCandidate`).
@@ -204,7 +210,7 @@ fn candidates_to_source(candidates: &[CredentialCandidate]) -> Option<Credential
         return Some(match candidate {
             CredentialCandidate::RequestOverride | CredentialCandidate::ModelInline | CredentialCandidate::ProviderInline => CredentialSource::Inline,
             CredentialCandidate::ModelEnvironment(keys) | CredentialCandidate::ProviderEnvironment(keys) | CredentialCandidate::BuiltinEnvironment(keys) => CredentialSource::Environment(keys.clone()),
-            CredentialCandidate::Session => CredentialSource::Session,
+            CredentialCandidate::Session(_) => CredentialSource::Session,
         });
     }
     None

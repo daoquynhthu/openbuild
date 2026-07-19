@@ -96,6 +96,17 @@ fn snapshot_debug_redacts_canary() {
     );
 }
 
+/// SecretValue Debug via tracing field must not leak canary.
+#[test]
+fn tracing_field_redacts_canary() {
+    let s = canary_secret();
+    // Tracing macros use Debug formatting for fields.
+    // Verify that the Debug output (which tracing would use) is redacted.
+    let debug = format!("{s:?}");
+    assert!(!debug.contains(CANARY), "tracing Debug field must not contain canary");
+    assert!(debug.contains("[REDACTED]"));
+}
+
 /// SecretValue must not implement Serialize.
 /// This is verified at compile time — any attempt to serialize will fail.
 #[test]

@@ -132,7 +132,7 @@ fn resolve_candidates_system_order(
         CredentialCandidate::ModelEnvironment(k) | CredentialCandidate::ProviderEnvironment(k) | CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
         _ => None,
     }).flatten().collect();
-    let has_sess = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session));
+    let has_sess = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session(_)));
 
     if has_req { if let Some(v) = ctx.request_override { return Some(v.inner().to_string()); } }
     if has_model { if let Some(v) = ctx.model_inline { return Some(v.inner().to_string()); } }

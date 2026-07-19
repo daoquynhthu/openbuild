@@ -1,3 +1,5 @@
+use std::pin::Pin;
+use std::future::Future;
 use std::sync::Arc;
 
 use xai_grok_provider::auth::{CredentialCandidate, SecretValue};
@@ -27,9 +29,9 @@ impl EnvironmentReader for TestEnvironment {
 }
 
 /// Session credential resolver — async, no block_on.
-#[async_trait::async_trait]
+/// Uses boxed-future pattern as required by P8-003.
 pub trait SessionCredentialResolver: Send + Sync {
-    async fn resolve(&self) -> Result<Option<SecretValue>, String>;
+    fn resolve(&self) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>>;
 }
 
 /// Concrete environment reader that reads from process env at request time.
@@ -48,20 +50,20 @@ impl XaiSessionResolver {
     }
 }
 
-#[async_trait::async_trait]
 impl SessionCredentialResolver for XaiSessionResolver {
-    async fn resolve(&self) -> Result<Option<SecretValue>, String> {
+    fn resolve(&self) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
         let auth = self.manager.current_or_expired();
-        match auth {
-            Some(a) => Ok(Some(SecretValue::new(a.key.clone()))),
-            None => {
-                // Try env fallback for CLI-only scenarios
-                match std::env::var("XAI_SESSION_TOKEN") {
-                    Ok(val) if !val.is_empty() => Ok(Some(SecretValue::new(val))),
-                    _ => Ok(None),
+        Box::pin(async move {
+            match auth {
+                Some(a) => Ok(Some(SecretValue::new(a.key.clone()))),
+                None => {
+                    match std::env::var("XAI_SESSION_TOKEN") {
+                        Ok(val) if !val.is_empty() => Ok(Some(SecretValue::new(val))),
+                        _ => Ok(None),
+                    }
                 }
             }
-        }
+        })
     }
 }
 
@@ -123,7 +125,7 @@ impl<'a> RequestCredentialContext<'a> {
             CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
             _ => None,
         }).flatten().collect();
-        let has_session = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session));
+        let has_session = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session(_)));
 
         // System-fixed priority order — provider order is ignored.
         // 1. RequestOverride
@@ -169,20 +171,19 @@ impl<'a> RequestCredentialContext<'a> {
 mod tests {
     use super::*;
 
-    #[async_trait::async_trait]
     impl SessionCredentialResolver for () {
-        async fn resolve(&self) -> Result<Option<SecretValue>, String> {
-            Ok(None)
+        fn resolve(&self) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
+            Box::pin(async { Ok(None) })
         }
     }
 
     /// A session resolver that returns a fixed value.
     struct FixedSession(&'static str);
 
-    #[async_trait::async_trait]
     impl SessionCredentialResolver for FixedSession {
-        async fn resolve(&self) -> Result<Option<SecretValue>, String> {
-            Ok(Some(SecretValue::new(self.0.to_string())))
+        fn resolve(&self) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
+            let val = self.0.to_string();
+            Box::pin(async move { Ok(Some(SecretValue::new(val))) })
         }
     }
 
@@ -224,7 +225,7 @@ mod tests {
             CredentialCandidate::RequestOverride,
             CredentialCandidate::ModelInline,
             CredentialCandidate::ModelEnvironment(vec!["ENV_KEY".into()]),
-            CredentialCandidate::Session,
+            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
         ]).await;
         assert_eq!(result.as_deref(), Some("req"));
     }
@@ -241,7 +242,7 @@ mod tests {
             CredentialCandidate::RequestOverride,
             CredentialCandidate::ModelInline,
             CredentialCandidate::ProviderEnvironment(vec!["PROV_KEY".into()]),
-            CredentialCandidate::Session,
+            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
         ]).await;
         assert_eq!(result.as_deref(), Some("model-inline"));
     }
@@ -255,7 +256,7 @@ mod tests {
         );
         let result = ctx.resolve_candidates(&[
             CredentialCandidate::BuiltinEnvironment(vec!["XAI_API_KEY".into()]),
-            CredentialCandidate::Session,
+            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
         ]).await;
         assert_eq!(result.as_deref(), Some("from-env"));
     }
@@ -272,7 +273,7 @@ mod tests {
             CredentialCandidate::ModelInline,
             CredentialCandidate::ProviderInline,
             CredentialCandidate::BuiltinEnvironment(vec!["MISSING_KEY".into()]),
-            CredentialCandidate::Session,
+            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
         ]).await;
         assert_eq!(result.as_deref(), Some("sess-token"));
     }
@@ -288,7 +289,7 @@ mod tests {
         let result = ctx.resolve_candidates(&[
             CredentialCandidate::RequestOverride,
             CredentialCandidate::ModelInline,
-            CredentialCandidate::Session,
+            CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
         ]).await;
         assert!(result.is_none());
     }

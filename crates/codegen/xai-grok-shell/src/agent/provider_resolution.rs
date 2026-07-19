@@ -38,6 +38,9 @@ pub enum ProviderResolutionError {
 
     #[error("bare model '{0}' not found in any provider's catalog")]
     ModelNotFound(String),
+
+    #[error("auth credential resolution failed: {0}")]
+    AuthCredential(String),
 }
 
 /// Migration adapter: converts route compiler output to `SamplerConfig`.
@@ -167,7 +170,7 @@ pub fn resolve_model_execution(
     // apply_auth_policy returns Err(MissingCredential) when required credentials
     // are not available — the request must not proceed without auth.
     let auth_headers = apply_auth_policy(&route.auth, &std::collections::HashMap::new())
-        .map_err(|e| ProviderResolutionError::Protocol(format!("auth error: {e}")))?;
+        .map_err(|e| ProviderResolutionError::AuthCredential(format!("{e}")))?;
     extra_headers.extend(auth_headers);
 
     // Derive auth_scheme from the auth policy

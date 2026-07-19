@@ -31,6 +31,9 @@ pub enum ProviderError {
     #[error("invalid header: {0}")]
     InvalidHeader(String),
 
+    #[error("header conflict: {0}")]
+    HeaderConflict(String),
+
     #[error("unknown protocol: {0}")]
     UnknownProtocol(String),
 
