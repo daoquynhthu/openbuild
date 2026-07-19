@@ -4,6 +4,52 @@ pub use crate::types::HeaderMap;
 /// confusion with `reqwest::HeaderMap`.
 pub type AuthHeaderMap = HeaderMap;
 
+/// Opaque secret value wrapper. Does not implement Serialize/Deserialize.
+/// Debug/Display output `[REDACTED]`.
+#[derive(Clone)]
+pub struct SecretValue {
+    #[allow(dead_code)]
+    inner: String,
+}
+
+impl SecretValue {
+    pub fn new(value: String) -> Self {
+        Self { inner: value }
+    }
+}
+
+
+
+impl std::fmt::Debug for SecretValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
+
+impl std::fmt::Display for SecretValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
+
+/// Runtime configuration for a provider — the resolved form of
+/// [`ProviderConfig`](crate::config::ProviderConfig) after precedence
+/// resolution.  Secret values are wrapped in [`SecretValue`] to prevent
+/// accidental leakage through Debug/Display/serialization.
+#[derive(Clone, Debug)]
+pub struct ProviderRuntimeConfig {
+    pub public: ProviderPublicConfig,
+    pub inline_api_key: Option<SecretValue>,
+}
+
+/// Public (non-secret) portion of a provider's runtime configuration.
+/// Safe for Debug/Display/serialization and diagnostic output.
+#[derive(Clone, Debug)]
+pub struct ProviderPublicConfig {
+    pub base_url: Option<String>,
+    pub extra_headers: Option<indexmap::IndexMap<String, String>>,
+}
+
 use crate::error::ProviderError;
 
 /// Declarative credential source. Provider constructors declare the source
@@ -461,4 +507,23 @@ mod tests {
         assert_eq!(headers.get("Authorization").unwrap(), "Bearer key1");
         assert_eq!(headers.get("x-custom").unwrap(), "key2");
     }
+
+    #[test]
+    fn secret_value_debug_redacted() {
+        let s = SecretValue::new("super-secret-key".into());
+        let debug = format!("{s:?}");
+        assert!(!debug.contains("super-secret-key"));
+        assert!(debug.contains("REDACTED"));
+    }
+
+    #[test]
+    fn secret_value_display_redacted() {
+        let s = SecretValue::new("another-secret".into());
+        let display = format!("{s}");
+        assert_eq!(display, "[REDACTED]");
+    }
+
+    // SecretValue intentionally does not implement Serialize/Deserialize.
+    // The compiler enforces this — any attempt to add serde derives would
+    // cause a compile error at the derive site.
 }

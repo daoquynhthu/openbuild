@@ -24,5 +24,8 @@ tokio-stream = { workspace = true }
 xai-grok-sampler = { path = "../xai-grok-sampler" }
 xai-grok-test-support = { path = "../xai-grok-test-support" }
 
+[features]
+integration-test-seams = []
+
 [lints]
 workspace = true

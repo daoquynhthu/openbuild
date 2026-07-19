@@ -45,6 +45,9 @@ pub struct ParsedProviderEntry {
     pub api_key: Option<String>,
     pub env_key: Option<Vec<String>>,
     pub base_url: Option<String>,
+    pub protocol: Option<String>,
+    pub model_list_path: Option<String>,
+    pub model_list_format: Option<String>,
     pub allow_insecure_http: Option<bool>,
     pub extra_headers: Option<IndexMap<String, String>>,
 }
@@ -85,6 +88,9 @@ pub fn parse_provider_toml(
                         api_key: parsed.api_key,
                         env_key: parsed.env_key,
                         base_url: parsed.base_url,
+                        protocol: parsed.protocol,
+                        model_list_path: parsed.model_list_path,
+                        model_list_format: parsed.model_list_format,
                         allow_insecure_http: parsed.allow_insecure_http,
                         extra_headers: parsed.extra_headers,
                     },
@@ -118,6 +124,9 @@ pub struct ProviderConfig {
     pub api_key: Option<String>,
     pub env_key: Option<Vec<String>>,
     pub base_url: Option<String>,
+    pub protocol: Option<String>,
+    pub model_list_path: Option<String>,
+    pub model_list_format: Option<String>,
     pub allow_insecure_http: Option<bool>,
     pub extra_headers: Option<IndexMap<String, String>>,
 }
@@ -132,6 +141,9 @@ impl fmt::Debug for ProviderConfig {
             .field("api_key", &self.api_key.as_ref().map(|_| "[REDACTED]"))
             .field("env_key", &self.env_key)
             .field("base_url", &self.base_url)
+            .field("protocol", &self.protocol)
+            .field("model_list_path", &self.model_list_path)
+            .field("model_list_format", &self.model_list_format)
             .field("allow_insecure_http", &self.allow_insecure_http)
             .field("extra_headers", &self.extra_headers)
             .finish()
@@ -175,6 +187,9 @@ impl ProviderConfig {
             api_key: other.api_key.or(self.api_key),
             env_key: other.env_key.or(self.env_key),
             base_url: other.base_url.or(self.base_url),
+            protocol: other.protocol.or(self.protocol),
+            model_list_path: other.model_list_path.or(self.model_list_path),
+            model_list_format: other.model_list_format.or(self.model_list_format),
             allow_insecure_http: other.allow_insecure_http.or(self.allow_insecure_http),
             extra_headers: match (self.extra_headers, other.extra_headers) {
                 (Some(mut base), Some(other)) => {
