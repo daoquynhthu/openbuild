@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
+use tracing;
 
 use crate::config::ProviderConfig;
 use crate::registry::ProviderRegistry;
@@ -89,7 +90,10 @@ pub fn configure_providers(
     compat: Option<ProviderConfig>,
     cli_override: Option<ProviderConfig>,
 ) {
-    let toml_configs = crate::config::parse_provider_toml(toml);
+    let (toml_configs, config_diagnostics) = crate::config::parse_provider_toml(toml);
+    for diag in &config_diagnostics {
+        tracing::warn!("{diag}");
+    }
     let env_configs = detect_env_vars(registry);
 
     for pid in registry.all_ids() {
