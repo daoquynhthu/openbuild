@@ -424,7 +424,7 @@ impl ConfigReloader {
             if let Some(ref runtime) = self.provider_runtime {
                 // Step 1: Parse new configs (already done by reloader)
                 // Step 2: Resolve provider configs from TOML
-                let parsed = xai_grok_provider::config::parse_provider_toml(&new_global);
+                let (parsed, _diags) = xai_grok_provider::config::parse_provider_toml(&new_global);
                 let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
                 for (id_str, cfg) in parsed {
                     let pid = ProviderId::new(id_str);
