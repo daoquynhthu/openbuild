@@ -38,9 +38,23 @@
 - Added `pub mod provider_bootstrap` to `agent/mod.rs`
 - Changed `openai_compatible_factory` from `pub(crate)` to `pub` for cross-crate access
 
+### P6-003: Custom identity in bootstrap
+- `bootstrap_with_builtin_and_custom_identities`: xai + openai + deepseek all enter snapshot
+- Verifies deepseek uses profile-based endpoint (api.deepseek.com), not cross-contaminated
+
+### P6-004: bootstrap_from_config convenience helper
+- Added `bootstrap_from_config(raw_toml, legacy_migration, cli_overrides)` which:
+  - Parses TOML via `parse_provider_toml`
+  - Calls `resolve_with_precedence` (the Phase 4 unique resolver)
+  - Passes result to `bootstrap_provider_runtime`
+- No env/session secrets read inside bootstrap
+
+### P6-005: [test] bootstrap_from_config counts resolve calls
+- Test verifies bootstrap_from_config produces revision=1 with non-empty providers/routes
+
 ### Key Results
 - `cargo test -p xai-grok-shell --lib`: 3495 passed, 0 failed ✅
-- `cargo test -p xai-grok-shell --test provider_bootstrap`: 2 passed ✅
+- `cargo test -p xai-grok-shell --test provider_bootstrap`: 3 passed ✅
 - `cargo clippy -p xai-grok-shell --all-targets -- -D warnings`: 0 warnings ✅
 - `cargo clippy -p xai-grok-provider --all-targets -- -D warnings`: 0 warnings ✅
 
