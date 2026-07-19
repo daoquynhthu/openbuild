@@ -5,8 +5,9 @@
 //! Readers receive immutable `Arc<ModelCatalogSnapshot>`.
 
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 
 /// Redirect policy per P9-002: max 3 redirects, same-origin only, no credential copy.
@@ -54,6 +55,22 @@ pub enum CatalogShutdownError {
     Timeout { task_id: String, timeout_secs: u64 },
 }
 
+/// Serde helpers for `SystemTime` (serialized as seconds since UNIX_EPOCH).
+mod system_time_serde {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    pub fn serialize<S: Serializer>(t: &Option<SystemTime>, s: S) -> Result<S::Ok, S::Error> {
+        let secs = t.map(|t| t.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs());
+        serde::Serialize::serialize(&secs, s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<SystemTime>, D::Error> {
+        let secs: Option<u64> = serde::Deserialize::deserialize(d)?;
+        Ok(secs.map(|s| UNIX_EPOCH + Duration::from_secs(s)))
+    }
+}
+
 /// Catalog configuration with validated TTL.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderCatalogConfig {
@@ -89,7 +106,7 @@ impl Default for ProviderCatalogConfig {
 }
 
 /// Per-provider catalog state (P9-001).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProviderCatalogState {
     Empty,
     Loading,
@@ -99,11 +116,12 @@ pub enum ProviderCatalogState {
 }
 
 /// Per-provider catalog entry.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderCatalogEntry {
     pub provider_id: ProviderId,
     pub state: ProviderCatalogState,
     /// Wall-clock timestamp of last successful fetch (P9-001).
+    #[serde(with = "system_time_serde")]
     pub fetched_at: Option<SystemTime>,
     pub source_url: String,
     pub models: Vec<ModelEntryConfig>,
@@ -121,7 +139,7 @@ impl ProviderCatalogEntry {
 }
 
 /// Immutable, atomic, revisioned snapshot of the entire model catalog.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelCatalogSnapshot {
     pub catalog_revision: u64,
     pub providers: IndexMap<ProviderId, ProviderCatalogEntry>,
@@ -1049,6 +1067,106 @@ mod tests {
         assert!(
             total >= 6,
             "all 6 providers must have been refreshed, got {total}"
+        );
+    }
+
+    // P9-010: snapshot serialization roundtrip tests
+    #[test]
+    fn snapshot_roundtrip_preserves_all_fields() {
+        use std::time::UNIX_EPOCH;
+
+        let mut providers = IndexMap::new();
+        providers.insert(
+            ProviderId::new("openai"),
+            ProviderCatalogEntry {
+                provider_id: ProviderId::new("openai"),
+                state: ProviderCatalogState::Fresh,
+                fetched_at: Some(UNIX_EPOCH + Duration::from_secs(1000)),
+                source_url: "https://api.openai.com/v1/models".into(),
+                models: vec![],
+                error_summary: None,
+            },
+        );
+        providers.insert(
+            ProviderId::new("ollama"),
+            ProviderCatalogEntry {
+                provider_id: ProviderId::new("ollama"),
+                state: ProviderCatalogState::Failed("timeout".into()),
+                fetched_at: None,
+                source_url: "http://localhost:11434/api/tags".into(),
+                models: vec![],
+                error_summary: Some("timeout".into()),
+            },
+        );
+
+        let snap = ModelCatalogSnapshot {
+            catalog_revision: 42,
+            providers,
+        };
+
+        let json = serde_json::to_string_pretty(&snap).unwrap();
+        let restored: ModelCatalogSnapshot = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.catalog_revision, 42);
+        assert_eq!(restored.providers.len(), 2);
+
+        let openai = restored.providers.get(&ProviderId::new("openai")).unwrap();
+        assert_eq!(openai.state, ProviderCatalogState::Fresh);
+        assert_eq!(
+            openai.fetched_at,
+            Some(UNIX_EPOCH + Duration::from_secs(1000)),
+            "timestamp must be preserved, not replaced with now()"
+        );
+        assert!(openai.error_summary.is_none());
+
+        let ollama = restored.providers.get(&ProviderId::new("ollama")).unwrap();
+        assert_eq!(ollama.state, ProviderCatalogState::Failed("timeout".into()));
+        assert!(ollama.fetched_at.is_none());
+        assert!(ollama.models.is_empty());
+        assert_eq!(ollama.error_summary.as_deref(), Some("timeout"));
+    }
+
+    #[test]
+    fn snapshot_roundtrip_historical_not_disguised_as_fresh() {
+        use std::time::UNIX_EPOCH;
+
+        // Stale entry with old timestamp — after roundtrip must stay Stale
+        let old_stamp = UNIX_EPOCH + Duration::from_secs(500);
+        let mut providers = IndexMap::new();
+        providers.insert(
+            ProviderId::new("stale-provider"),
+            ProviderCatalogEntry {
+                provider_id: ProviderId::new("stale-provider"),
+                state: ProviderCatalogState::Stale,
+                fetched_at: Some(old_stamp),
+                source_url: "https://example.com/models".into(),
+                models: vec![],
+                error_summary: None,
+            },
+        );
+
+        let snap = ModelCatalogSnapshot {
+            catalog_revision: 1,
+            providers,
+        };
+
+        let json = serde_json::to_string_pretty(&snap).unwrap();
+        assert!(
+            json.contains("\"fetched_at\": 500"),
+            "JSON must contain raw epoch seconds, got: {json}"
+        );
+        assert!(
+            json.contains("\"Stale\""),
+            "JSON must preserve Stale state, got: {json}"
+        );
+
+        let restored: ModelCatalogSnapshot = serde_json::from_str(&json).unwrap();
+        let entry = restored.providers.get(&ProviderId::new("stale-provider")).unwrap();
+        assert_eq!(entry.state, ProviderCatalogState::Stale);
+        assert_eq!(
+            entry.fetched_at,
+            Some(old_stamp),
+            "old timestamp must be preserved exactly, not replaced with now()"
         );
     }
 
