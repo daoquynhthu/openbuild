@@ -1,5 +1,7 @@
 //! Type-safe path wrappers for absolute and relative UTF-8 paths.
 
+pub mod atomic_write;
+
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::ffi::OsStr;
@@ -426,6 +428,7 @@ mod tests {
         assert_eq!(rel.as_str(), "src/main.rs");
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_rel_path_buf_new_absolute_fails() {
         let result = RelPathBuf::new("/absolute/path");
@@ -537,6 +540,7 @@ mod tests {
         assert_eq!(deserialized, rel);
     }
 
+    #[cfg(unix)]
     #[test]
     fn test_rel_path_buf_serde_absolute_fails() {
         let json = "\"/absolute/path\"";

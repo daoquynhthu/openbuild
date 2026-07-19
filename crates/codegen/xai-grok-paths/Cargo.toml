@@ -7,8 +7,10 @@ description = "Type-safe path wrappers for absolute and relative UTF-8 paths"
 
 [dependencies]
 camino = { workspace = true }
-serde = { workspace = true }
+dunce = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
+tempfile = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
