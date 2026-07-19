@@ -11478,6 +11478,55 @@ default = "grok-4.5"
     }
 
     #[test]
+    fn missing_provider_returns_hard_error() {
+        use xai_grok_provider::config::ProviderConfig;
+        use xai_grok_provider::types::ProviderId;
+
+        let rt = crate::agent::provider_runtime::ProviderRuntime::new();
+        xai_grok_provider::providers::register_all(&rt.registry);
+        let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
+        config_map.insert(
+            ProviderId::new("xai"),
+            ProviderConfig::new(
+                Some("xai".into()),
+                Some("sk-test".into()),
+                Some("https://api.x.ai/v1".into()),
+            ),
+        );
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(rt.rebuild(&config_map))
+            .expect("rebuild");
+        let snapshot = rt.snapshot();
+
+        // Model with provider_id pointing to a non-existent provider
+        let mut model = ModelEntry::fallback("some-model", &EndpointsConfig::default());
+        model.provider_id = Some("nonexistent-provider".into());
+
+        let credentials = resolve_credentials_enforced(&model, None, false);
+        let result = sampling_config_for_model_with_registry(
+            &model,
+            credentials,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&snapshot),
+        );
+        assert!(
+            result.is_err(),
+            "missing provider must return hard error, got Ok: {:?}",
+            result
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("nonexistent-provider"),
+            "error should mention the missing provider: {err}"
+        );
+    }
+
+    #[test]
     fn web_search_sampling_config_with_registry_uses_route_compiler() {
         use xai_grok_provider::config::ProviderConfig;
         use xai_grok_provider::types::ProviderId;
