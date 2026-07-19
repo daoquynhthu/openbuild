@@ -629,6 +629,198 @@ mod tests {
     }
 
     #[test]
+    fn rebuild_from_resolved_creates_snapshot() {
+        let reg = ProviderRegistry::new();
+        reg.register_definition(Arc::new(DummyProvider::new()))
+            .unwrap();
+
+        // Register factory
+        let factory =
+            Arc::new(crate::providers::openai_compatible_factory::OpenAiCompatibleProviderFactory);
+        reg.register_factory(ProviderFactoryKind::OpenAiCompatible, factory)
+            .unwrap();
+
+        // Build resolved set with builtin dummy + custom compatible
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::from([
+                (
+                    ProviderId::new("dummy"),
+                    crate::resolution::ResolvedProviderSpec {
+                        id: ProviderId::new("dummy"),
+                        implementation: ProviderImplementation::Builtin {
+                            definition_id: ProviderId::new("dummy"),
+                        },
+                        config: crate::resolution::ProviderRuntimeConfig {
+                            public: crate::resolution::ProviderPublicConfig {
+                                base_url: None,
+                                protocol: None,
+                                model_list_path: None,
+                                allow_insecure_http: false,
+                                model_list_format: None,
+                                extra_headers: IndexMap::new(),
+                            },
+                            inline_api_key: None,
+                        },
+                    },
+                ),
+                (
+                    ProviderId::new("custom"),
+                    crate::resolution::ResolvedProviderSpec {
+                        id: ProviderId::new("custom"),
+                        implementation: ProviderImplementation::OpenAiCompatible { profile: None },
+                        config: crate::resolution::ProviderRuntimeConfig {
+                            public: crate::resolution::ProviderPublicConfig {
+                                base_url: Some("https://custom.api/v1".into()),
+                                protocol: None,
+                                model_list_path: None,
+                                allow_insecure_http: false,
+                                model_list_format: None,
+                                extra_headers: IndexMap::new(),
+                            },
+                            inline_api_key: None,
+                        },
+                    },
+                ),
+            ]),
+        };
+
+        let rev = reg.rebuild_from_resolved(&resolved).unwrap();
+        assert_eq!(rev, 1);
+        assert_eq!(reg.snapshot().revision, 1);
+        assert_eq!(reg.snapshot().providers.len(), 2);
+    }
+
+    #[test]
+    fn sealed_registry_hot_add_custom_identity() {
+        // First rebuild with only the built-in definition
+        let reg = ProviderRegistry::new();
+        reg.register_definition(Arc::new(DummyProvider::new()))
+            .unwrap();
+        let factory =
+            Arc::new(crate::providers::openai_compatible_factory::OpenAiCompatibleProviderFactory);
+        reg.register_factory(ProviderFactoryKind::OpenAiCompatible, factory)
+            .unwrap();
+
+        let first_resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("dummy"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("dummy"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("dummy"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                    },
+                },
+            )]),
+        };
+        let r1 = reg.rebuild_from_resolved(&first_resolved).unwrap();
+        assert_eq!(r1, 1);
+        assert_eq!(reg.snapshot().providers.len(), 1);
+
+        // Second rebuild: add custom identity (no new definition needed)
+        let second_resolved = ResolvedProviderSet {
+            providers: IndexMap::from([
+                (
+                    ProviderId::new("dummy"),
+                    crate::resolution::ResolvedProviderSpec {
+                        id: ProviderId::new("dummy"),
+                        implementation: ProviderImplementation::Builtin {
+                            definition_id: ProviderId::new("dummy"),
+                        },
+                        config: crate::resolution::ProviderRuntimeConfig {
+                            public: crate::resolution::ProviderPublicConfig {
+                                base_url: None,
+                                protocol: None,
+                                model_list_path: None,
+                                allow_insecure_http: false,
+                                model_list_format: None,
+                                extra_headers: IndexMap::new(),
+                            },
+                            inline_api_key: None,
+                        },
+                    },
+                ),
+                (
+                    ProviderId::new("deepseek"),
+                    crate::resolution::ResolvedProviderSpec {
+                        id: ProviderId::new("deepseek"),
+                        implementation: ProviderImplementation::OpenAiCompatible {
+                            profile: Some(crate::types::CompatibleProfileId::new("deepseek")),
+                        },
+                        config: crate::resolution::ProviderRuntimeConfig {
+                            public: crate::resolution::ProviderPublicConfig {
+                                base_url: None,
+                                protocol: None,
+                                model_list_path: None,
+                                allow_insecure_http: false,
+                                model_list_format: None,
+                                extra_headers: IndexMap::new(),
+                            },
+                            inline_api_key: None,
+                        },
+                    },
+                ),
+            ]),
+        };
+        let r2 = reg.rebuild_from_resolved(&second_resolved).unwrap();
+        assert_eq!(r2, 2, "revision must increment on hot add");
+        assert_eq!(reg.snapshot().providers.len(), 2, "two providers after add");
+
+        // Third rebuild: remove dummy, keep deepseek
+        let third_resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("deepseek"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("deepseek"),
+                    implementation: ProviderImplementation::OpenAiCompatible {
+                        profile: Some(crate::types::CompatibleProfileId::new("deepseek")),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                    },
+                },
+            )]),
+        };
+        let r3 = reg.rebuild_from_resolved(&third_resolved).unwrap();
+        assert_eq!(r3, 3, "revision must increment on remove");
+        assert_eq!(
+            reg.snapshot().providers.len(),
+            1,
+            "one provider after remove"
+        );
+        assert!(
+            reg.snapshot()
+                .providers
+                .contains_key(&ProviderId::new("deepseek")),
+            "deepseek must survive"
+        );
+        assert!(
+            !reg.snapshot()
+                .providers
+                .contains_key(&ProviderId::new("dummy")),
+            "dummy must have been removed"
+        );
+    }
+
+    #[test]
     fn concurrent_rebuild_gives_sequential_revisions() {
         let reg = Arc::new(ProviderRegistry::new());
         reg.register_definition(Arc::new(DummyProvider::new()))
