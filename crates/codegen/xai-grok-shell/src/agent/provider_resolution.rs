@@ -85,16 +85,23 @@ pub fn resolve_model_execution(
         .ok_or_else(|| ProviderResolutionError::DefaultRouteNotFound(route_id.clone()))?;
 
     let protocol_id = route.protocol_id.clone();
-    let endpoint_path = route.endpoint.path_for_default();
-    let endpoint_query = route.endpoint.query.as_ref().map(|q| {
-        q.iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<Vec<_>>()
-    });
 
-    let base_url = base_url_override
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| route.endpoint.base_url.clone().unwrap_or_default());
+    // P7-004: Use Endpoint::render as the sole URL construction entry point.
+    // No string concatenation for URL building.
+    let input = xai_grok_provider::endpoint::EndpointInput::new(
+        xai_grok_provider::types::LLMRequest::new(&model.info.model),
+        (),
+    );
+    let endpoint_url = route
+        .endpoint
+        .render(&input)
+        .map_err(|e| ProviderResolutionError::Protocol(format!("endpoint render failed: {e}")))?;
+
+    let base_url = if let Some(override_url) = base_url_override {
+        override_url.to_string()
+    } else {
+        endpoint_url.to_string()
+    };
 
     // Merge static headers and auth
     let mut extra_headers = route.static_headers.clone();
@@ -129,8 +136,8 @@ pub fn resolve_model_execution(
         api_key: api_key.map(|s| s.to_string()),
         model: model.info.model.clone(),
         base_url,
-        endpoint_path: Some(endpoint_path),
-        endpoint_query,
+        endpoint_path: None,
+        endpoint_query: None,
         api_backend,
         protocol_id: Some(protocol_id.as_str().into()),
         auth_scheme,

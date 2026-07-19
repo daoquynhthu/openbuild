@@ -52,6 +52,12 @@ pub struct EndpointInput<Body> {
     pub body: Body,
 }
 
+impl<Body> EndpointInput<Body> {
+    pub fn new(request: LLMRequest, body: Body) -> Self {
+        Self { request, body }
+    }
+}
+
 /// A path segment in an API endpoint URL.
 /// Either a static string or a dynamic function that takes request input.
 #[derive(Clone)]

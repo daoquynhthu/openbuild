@@ -195,6 +195,17 @@ pub struct LLMRequest {
     pub temperature: Option<f32>,
 }
 
+impl LLMRequest {
+    pub fn new(model: impl Into<String>) -> Self {
+        Self {
+            model: model.into(),
+            messages: Vec::new(),
+            max_tokens: None,
+            temperature: None,
+        }
+    }
+}
+
 /// Result value from a provider-executed tool call.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
