@@ -73,6 +73,24 @@
 - `xai-grok-pager/src/providers_cmd.rs`: replaced standalone registry creation with `bootstrap_from_config`
 - No independent `ProviderRegistry::new()` in providers CLI
 
+### P6-009: AgentConfig only holds runtime, not parallel registry/catalog
+- Removed `provider_registry` and `provider_catalog` fields from `Config` struct
+- Added `Config::provider_registry()` and `Config::provider_catalog()` accessor methods deriving from `provider_runtime`
+- Removed separate assignments in `main.rs` (only `provider_runtime` is set)
+- Updated `models.rs` and `agent_ops.rs` to use accessor methods
+
+### P6-010: Runtime identity regression test
+- `bootstrap_runtime_identity_is_unique_across_clones`: verifies cloned Arc shares same pointer
+- Verifies `config.provider_registry()` returns same `Arc` as `runtime.registry`
+- Verifies `config.provider_catalog()` returns same `Arc` as `runtime.catalog`
+
+### Phase 6 Gate
+- main、Pager、providers CLI 无 `configure_providers()` 调用 ✅
+- production call graph 中 runtime 只构造一次 ✅
+- snapshot providers/routes 均非空 ✅
+- P6 bootstrap integration tests (4) 通过 ✅
+- A-01 的"启动不 rebuild"部分关闭，legacy fallback 部分留 P7
+
 ## Phase 10: Real TUI and CLI Provider Configuration Closure
 
 ### Completion

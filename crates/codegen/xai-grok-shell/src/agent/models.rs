@@ -958,8 +958,7 @@ impl ModelsManager {
             .inner
             .cfg
             .read()
-            .provider_registry
-            .as_ref()
+            .provider_registry()
             .and_then(|reg| {
                 crate::agent::config::resolve_model_route(current_model, Some(reg.as_ref()))
             });

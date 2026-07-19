@@ -941,11 +941,7 @@ async fn run_agent_command(
     .await
     .map_err(|e| anyhow::anyhow!("Failed to bootstrap provider runtime: {e}"))?;
 
-    let provider_registry = provider_runtime.registry.clone();
-
-    agent_config.provider_catalog = Some(provider_runtime.catalog.clone());
     agent_config.provider_runtime = Some(provider_runtime.clone());
-    agent_config.provider_registry = Some(provider_registry.clone());
 
     // Parse --model for provider/model format (e.g. "openai/gpt-4o").
     // Backward compatible: bare model names (e.g. "grok-build") pass through unchanged.

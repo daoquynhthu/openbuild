@@ -1398,13 +1398,8 @@ pub struct Config {
     /// CLI override for provider ID (from --provider or inferred from --model).
     #[serde(skip)]
     pub provider_override: Option<String>,
-    /// Resolved provider registry with all built-in and user-configured providers.
-    /// Set during startup in main.rs, threaded through to model resolution.
-    #[serde(skip)]
-    pub provider_registry: Option<std::sync::Arc<xai_grok_provider::registry::ProviderRegistry>>,
-    #[serde(skip)]
-    pub provider_catalog:
-        Option<std::sync::Arc<crate::agent::provider_catalog::ProviderCatalogService>>,
+    /// Provider runtime (registry + catalog + rebuild). Set during bootstrap.
+    /// Access registry/catalog through the accessor methods below.
     #[serde(skip)]
     pub provider_runtime: Option<std::sync::Arc<crate::agent::provider_runtime::ProviderRuntime>>,
     /// CLI override for API key (from --api-key).
@@ -1771,8 +1766,6 @@ impl Default for Config {
             storage_mode: StorageMode::resolve(None, None),
             default_model_override: None,
             provider_override: None,
-            provider_registry: None,
-            provider_catalog: None,
             provider_runtime: None,
             api_key_override: None,
             base_url_override: None,
@@ -1818,6 +1811,16 @@ impl Default for Config {
     }
 }
 impl Config {
+    /// Access the provider registry through the runtime.
+    pub fn provider_registry(&self) -> Option<std::sync::Arc<xai_grok_provider::registry::ProviderRegistry>> {
+        self.provider_runtime.as_ref().map(|rt| rt.registry.clone())
+    }
+
+    /// Access the provider catalog through the runtime.
+    pub fn provider_catalog(&self) -> Option<std::sync::Arc<crate::agent::provider_catalog::ProviderCatalogService>> {
+        self.provider_runtime.as_ref().map(|rt| rt.catalog.clone())
+    }
+
     /// Reject invalid glob patterns in the model-filter lists at config load, so
     /// a typo fails loudly instead of silently changing availability.
     pub fn validate_model_filters(&self) -> Result<(), String> {
@@ -3183,7 +3186,7 @@ pub fn resolve_model_list(
         resolved = prefetched;
     }
     // Layer 2b: Provider API models (fetched dynamically).
-    if let Some(registry) = &cfg.provider_registry {
+    if let Some(registry) = cfg.provider_registry().as_ref() {
         let provider_models = crate::agent::models::fetch_provider_models_blocking(registry);
         if !provider_models.is_empty() {
             tracing::debug!(

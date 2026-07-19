@@ -39,8 +39,7 @@ impl MvpAgent {
         let registry_snapshot = self
             .cfg
             .borrow()
-            .provider_registry
-            .as_ref()
+            .provider_registry()
             .map(|reg| reg.snapshot());
         let config = match crate::agent::config::resolve_aux_model_sampling_config(
             &slug,
@@ -1155,8 +1154,7 @@ impl MvpAgent {
             cfg.endpoints.deployment_key.as_deref(),
         );
         let registry_snapshot = cfg
-            .provider_registry
-            .as_ref()
+            .provider_registry()
             .map(|reg| reg.snapshot());
         drop(cfg);
         let user_id = self
@@ -1346,8 +1344,7 @@ impl MvpAgent {
         let registry_snapshot = self
             .cfg
             .borrow()
-            .provider_registry
-            .as_ref()
+            .provider_registry()
             .map(|reg| reg.snapshot());
         let mut cfg = config::resolve_web_search_sampling_config(
             &model_id,

@@ -138,6 +138,51 @@ fn bootstrap_provider_runtime_produces_full_snapshot() {
     assert_eq!(r2.unwrap(), 2, "second rebuild must produce revision=2");
 }
 
+/// Runtime identity: bootstrap produces a unique Arc, clones share same pointer.
+#[test]
+fn bootstrap_runtime_identity_is_unique_across_clones() {
+    let input = xai_grok_shell::agent::provider_bootstrap::ProviderBootstrapInput {
+        resolved: ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("xai"),
+                xai_spec(),
+            )]),
+        },
+    };
+
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let rt = runtime.block_on(
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input),
+    )
+    .expect("bootstrap");
+
+    // Clone the Arc — must point to the same heap allocation.
+    let rt_clone = rt.clone();
+    assert!(Arc::ptr_eq(&rt, &rt_clone), "cloned Arc must point to same ProviderRuntime");
+
+    // Registry and catalog inside the runtime must also be the same across clones.
+    let snap1 = rt.snapshot();
+    let snap2 = rt_clone.snapshot();
+    assert!(Arc::ptr_eq(&snap1, &snap2), "snapshot from cloned runtime must be same Arc");
+
+    // AgentConfig deriving registry/catalog from runtime must return the same Arc.
+    let config = xai_grok_shell::agent::config::Config {
+        provider_runtime: Some(rt.clone()),
+        ..Default::default()
+    };
+
+    let reg_from_config = config.provider_registry().expect("registry from config");
+    let cat_from_config = config.provider_catalog().expect("catalog from config");
+    assert!(
+        Arc::ptr_eq(&reg_from_config, &rt.registry),
+        "config.provider_registry() must return same Arc as runtime.registry"
+    );
+    assert!(
+        Arc::ptr_eq(&cat_from_config, &rt.catalog),
+        "config.provider_catalog() must return same Arc as runtime.catalog"
+    );
+}
+
 /// Bootstrap with both built-in and custom (OpenAiCompatible) identities.
 #[test]
 fn bootstrap_with_builtin_and_custom_identities() {
