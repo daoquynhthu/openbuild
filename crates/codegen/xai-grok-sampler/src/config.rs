@@ -51,6 +51,12 @@ pub struct SamplerConfig {
     /// Route-selected query parameters preserved across retries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub endpoint_query: Option<Vec<(String, String)>>,
+    /// Fully resolved request URL from the route compiler (P7-004).
+    /// When set, the sampler uses this URL directly instead of
+    /// string-concatenating base_url + endpoint_path + endpoint_query.
+    /// This is the preferred path after Phase 7.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_url: Option<String>,
     pub max_completion_tokens: Option<u32>,
     pub temperature: Option<f32>,
     pub top_p: Option<f32>,
@@ -141,6 +147,7 @@ impl Default for SamplerConfig {
             model: String::new(),
             endpoint_path: None,
             endpoint_query: None,
+            request_url: None,
             max_completion_tokens: None,
             temperature: None,
             top_p: None,

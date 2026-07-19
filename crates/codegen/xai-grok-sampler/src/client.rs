@@ -319,6 +319,7 @@ struct ClientDefaults {
     doom_loop_recovery: Option<xai_grok_sampling_types::DoomLoopRecoveryPolicy>,
     endpoint_path: Option<String>,
     endpoint_query: Option<Vec<(String, String)>>,
+    request_url: Option<String>,
 }
 
 // =============================================================================
@@ -546,6 +547,7 @@ impl SamplingClient {
             doom_loop_recovery: config.doom_loop_recovery,
             endpoint_path: config.endpoint_path,
             endpoint_query: config.endpoint_query,
+            request_url: config.request_url,
         };
 
         Ok(Self {
@@ -796,6 +798,11 @@ impl SamplingClient {
     }
 
     fn endpoint(&self, default_path: &str) -> String {
+        // P7-005: prefer request_url from the route compiler (full URL, no concatenation).
+        if let Some(ref full_url) = self.defaults.request_url {
+            return full_url.clone();
+        }
+        // Legacy path: string concatenation (will be removed in P8).
         let base = self.base_url.trim_end_matches('/');
         let path = self
             .defaults
@@ -2082,6 +2089,7 @@ mod tests {
             stream_tool_calls: false,
             endpoint_path: None,
             endpoint_query: None,
+            request_url: None,
             idle_timeout_secs: None,
             reasoning_effort: None,
             origin_client: None,

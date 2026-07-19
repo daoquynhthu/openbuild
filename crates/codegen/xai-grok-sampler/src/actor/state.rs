@@ -97,6 +97,7 @@ mod tests {
             stream_tool_calls: false,
             endpoint_path: None,
             endpoint_query: None,
+            request_url: None,
             idle_timeout_secs: None,
             reasoning_effort: None,
             origin_client: None,
