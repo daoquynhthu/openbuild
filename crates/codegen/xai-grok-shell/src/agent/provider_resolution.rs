@@ -34,6 +34,9 @@ pub enum ProviderResolutionError {
 
     #[error("conflicting provider: --provider {provider} conflicts with --model {model}")]
     ConflictingProvider { provider: String, model: String },
+
+    #[error("bare model '{0}' not found in any provider's catalog")]
+    ModelNotFound(String),
 }
 
 /// Resolve a `SamplerConfig` from a `ModelEntry`, registry snapshot, and credentials.
@@ -142,6 +145,18 @@ pub fn resolve_model_execution(
     })
 }
 
+/// Known legacy xAI model names that can be migrated to `xai/model` without
+/// an explicit provider prefix. This is the only code path that maps a bare
+/// model name to a provider — all other bare models must be explicitly
+/// qualified or found in a provider's model catalog.
+fn resolve_legacy_model_ref(bare_model: &str) -> Option<String> {
+    match bare_model {
+        "grok-build" | "grok-3" | "grok-3-mini" | "grok-3-fast" | "grok-3-mini-fast"
+        | "grok-2" | "grok-2-mini" | "grok-vision" | "grok-1" => Some("xai".to_string()),
+        _ => None,
+    }
+}
+
 /// Resolve a CLI model reference against the merged catalog.
 ///
 /// Cases:
@@ -184,8 +199,12 @@ pub fn resolve_cli_model_reference(
 
             match matches.len() {
                 0 => {
-                    // Fall back to xAI for legacy bare model compatibility
-                    Ok(("xai".to_string(), bare_model))
+                    // Try legacy xAI migration path
+                    if let Some(mapped) = resolve_legacy_model_ref(&bare_model) {
+                        Ok((mapped, bare_model))
+                    } else {
+                        Err(ProviderResolutionError::ModelNotFound(bare_model))
+                    }
                 }
                 1 => {
                     let provider = matches[0].split('/').next().unwrap_or("xai").to_string();
