@@ -70,7 +70,13 @@ jobs:
           toolchain: "1.92.0"
           components: clippy, rustfmt
       - name: Install protoc
-        run: choco install protoc --version 3.21.12 -y
+        shell: pwsh
+        run: |
+          $url = "https://github.com/protocolbuffers/protobuf/releases/download/v28.2/protoc-28.2-win64.zip"
+          $zip = "$env:RUNNER_TEMP\protoc.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip -ErrorAction Stop
+          Expand-Archive -Path $zip -DestinationPath "$env:RUNNER_TEMP\protoc" -Force
+          "$env:RUNNER_TEMP\protoc\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Capture environment
         shell: pwsh
         run: |
