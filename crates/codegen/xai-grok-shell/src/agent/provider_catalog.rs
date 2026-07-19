@@ -35,7 +35,50 @@ use xai_grok_provider::types::{ProviderDefaults, ProviderId};
 use super::config::{self, ModelEntryConfig};
 
 /// Default TTL for cached model lists (300 seconds).
-const DEFAULT_CACHE_TTL: Duration = Duration::from_secs(300);
+pub const DEFAULT_CACHE_TTL_SECONDS: u32 = 300;
+pub const MIN_CACHE_TTL_SECONDS: u32 = 30;
+pub const MAX_CACHE_TTL_SECONDS: u32 = 86400;
+
+/// Typed config error for catalog TTL validation (P9-008).
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum CatalogConfigError {
+    #[error("TTL must be between {min} and {max} seconds, got {got}")]
+    TtlOutOfRange { got: u32, min: u32, max: u32 },
+}
+
+/// Catalog configuration with validated TTL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderCatalogConfig {
+    pub ttl_seconds: u32,
+}
+
+impl ProviderCatalogConfig {
+    pub const DEFAULT_TTL: u32 = DEFAULT_CACHE_TTL_SECONDS;
+
+    pub fn new(ttl_seconds: u32) -> Result<Self, CatalogConfigError> {
+        Self::validate_ttl(ttl_seconds)?;
+        Ok(Self { ttl_seconds })
+    }
+
+    pub fn validate_ttl(v: u32) -> Result<(), CatalogConfigError> {
+        if v < MIN_CACHE_TTL_SECONDS || v > MAX_CACHE_TTL_SECONDS {
+            return Err(CatalogConfigError::TtlOutOfRange {
+                got: v,
+                min: MIN_CACHE_TTL_SECONDS,
+                max: MAX_CACHE_TTL_SECONDS,
+            });
+        }
+        Ok(())
+    }
+}
+
+impl Default for ProviderCatalogConfig {
+    fn default() -> Self {
+        Self {
+            ttl_seconds: Self::DEFAULT_TTL,
+        }
+    }
+}
 
 /// Per-provider catalog state (P9-001).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -929,6 +972,77 @@ mod tests {
     fn catalog_user_agent_is_fixed() {
         let svc = ProviderCatalogService::new();
         _ = svc.http_client;
+    }
+
+    // P9-008: TTL config validation
+    #[test]
+    fn ttl_accepts_min_boundary() {
+        assert!(ProviderCatalogConfig::new(MIN_CACHE_TTL_SECONDS).is_ok());
+    }
+
+    #[test]
+    fn ttl_accepts_max_boundary() {
+        assert!(ProviderCatalogConfig::new(MAX_CACHE_TTL_SECONDS).is_ok());
+    }
+
+    #[test]
+    fn ttl_accepts_default() {
+        assert!(ProviderCatalogConfig::new(DEFAULT_CACHE_TTL_SECONDS).is_ok());
+    }
+
+    #[test]
+    fn ttl_accepts_in_between() {
+        assert!(ProviderCatalogConfig::new(299).is_ok());
+        assert!(ProviderCatalogConfig::new(300).is_ok());
+        assert!(ProviderCatalogConfig::new(301).is_ok());
+    }
+
+    #[test]
+    fn ttl_rejects_below_min() {
+        let err = ProviderCatalogConfig::new(MIN_CACHE_TTL_SECONDS - 1).unwrap_err();
+        assert!(matches!(err, CatalogConfigError::TtlOutOfRange { .. }));
+    }
+
+    #[test]
+    fn ttl_rejects_above_max() {
+        let err = ProviderCatalogConfig::new(MAX_CACHE_TTL_SECONDS + 1).unwrap_err();
+        assert!(matches!(err, CatalogConfigError::TtlOutOfRange { .. }));
+    }
+
+    #[test]
+    fn ttl_error_message_contains_values() {
+        let err = ProviderCatalogConfig::new(MAX_CACHE_TTL_SECONDS + 1).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("86400"), "error msg should contain max: {msg}");
+        assert!(msg.contains("86401"), "error msg should contain got: {msg}");
+    }
+
+    #[test]
+    fn ttl_default_is_300() {
+        let cfg = ProviderCatalogConfig::default();
+        assert_eq!(cfg.ttl_seconds, 300);
+    }
+
+    // P9-008: is_stale with system clock — using Instant cannot detect rewind.
+    // SystemTime::elapsed() returns Err when clock moves backwards.
+    #[test]
+    fn is_stale_detects_system_clock_rewind() {
+        // Simulate clock rewind: fetched_at in the future (after a rewind,
+        // elapsed() returns Err, which is_stale treats as stale).
+        let future = SystemTime::now() + Duration::from_secs(3600);
+        let entry = ProviderCatalogEntry {
+            provider_id: ProviderId::new("test"),
+            state: ProviderCatalogState::Fresh,
+            fetched_at: Some(future),
+            source_url: "https://example.com/models".into(),
+            models: vec![],
+            error_summary: None,
+        };
+        // When SystemTime.elapsed() errors (clock rewind), is_stale returns true
+        assert!(
+            entry.is_stale(Duration::from_secs(300)),
+            "future fetched_at (clock rewind) should be considered stale"
+        );
     }
 
     fn dummy_defaults() -> ProviderDefaults {
