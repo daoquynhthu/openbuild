@@ -1156,16 +1156,19 @@ impl MvpAgent {
         let registry_snapshot = cfg
             .provider_registry()
             .map(|reg| reg.snapshot());
+        let has_provider_binding = model.provider_id.is_some();
+        let has_registry = registry_snapshot
+            .as_ref()
+            .map_or(false, |snap| snap.revision > 0);
         drop(cfg);
         let user_id = self
             .auth_manager
             .current_or_expired()
             .filter(|a| a.is_xai_auth())
             .map(|a| a.user_id);
-        let cred_api_key = credentials.api_key.clone();
-        let cred_base_url = credentials.base_url.clone();
-        let auth_type = credentials.auth_type;
-        let auth_scheme = credentials.auth_scheme;
+
+        // P7-003: when model has provider binding AND registry revision>0,
+        // route compiler errors MUST propagate (no legacy fallback).
         let mut config = crate::agent::config::sampling_config_for_model_with_registry(
             model,
             credentials,
@@ -1176,14 +1179,20 @@ impl MvpAgent {
             None,
             registry_snapshot.as_deref(),
         )
-        .unwrap_or_else(|_| {
+        .unwrap_or_else(|e| {
+            if has_provider_binding && has_registry {
+                panic!(
+                    "P7-003: route compiler hard error for provider-bound model `{}`: {e}",
+                    model.info.model
+                );
+            }
             crate::agent::config::sampling_config_for_model(
                 model,
                 crate::agent::config::ResolvedCredentials {
-                    api_key: cred_api_key,
-                    base_url: cred_base_url,
-                    auth_type,
-                    auth_scheme,
+                    api_key: None,
+                    base_url: String::new(),
+                    auth_type: xai_chat_state::AuthType::ApiKey,
+                    auth_scheme: xai_grok_sampler::AuthScheme::None,
                 },
                 alpha_test_key,
                 client_version,

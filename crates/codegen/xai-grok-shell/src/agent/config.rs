@@ -4527,8 +4527,10 @@ pub fn resolve_aux_model_sampling_config(
 ) -> Option<SamplerConfig> {
     let catalog_entry = find_model_by_id(models, model_id).cloned();
     if let Some(entry) = &catalog_entry {
+        let has_provider_binding = entry.provider_id.is_some();
+        let has_registry = registry.map_or(false, |snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(entry, session_key, disable_api_key_auth);
-        if let Ok(sampler) = sampling_config_for_model_with_registry(
+        match sampling_config_for_model_with_registry(
             entry,
             credentials,
             alpha_test_key.clone(),
@@ -4538,9 +4540,15 @@ pub fn resolve_aux_model_sampling_config(
             None,
             registry,
         ) {
-            if sampler.api_key.is_some() {
-                return Some(sampler);
+            Ok(sampler) if sampler.api_key.is_some() => return Some(sampler),
+            Ok(_) => {}
+            Err(e) if has_provider_binding && has_registry => {
+                panic!(
+                    "P7-003: route compiler hard error for provider-bound aux model `{}`: {e}",
+                    entry.info.model
+                );
             }
+            Err(_) => {}
         }
     }
     let xai_bearer = session_key
