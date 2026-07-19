@@ -547,6 +547,47 @@ mod tests {
         assert_eq!(headers.get("x-custom").unwrap(), "key2");
     }
 
+    // P8-001: required/optional semantics tests
+    #[test]
+    fn bearer_required_without_candidates_errors() {
+        let result = apply_auth_policy(
+            &AuthPolicy::bearer(vec![], true),
+            &HeaderMap::new(),
+        );
+        assert!(result.is_err(), "required bearer without candidates must error");
+        assert!(matches!(
+            result.unwrap_err(),
+            ProviderError::MissingCredential(_)
+        ));
+    }
+
+    #[test]
+    fn bearer_optional_without_candidates_succeeds() {
+        let result = apply_auth_policy(
+            &AuthPolicy::bearer(vec![], false),
+            &HeaderMap::new(),
+        );
+        assert!(result.is_ok(), "optional bearer without candidates is ok");
+    }
+
+    #[test]
+    fn header_required_without_candidates_errors() {
+        let result = apply_auth_policy(
+            &AuthPolicy::header("x-api-key", vec![], true),
+            &HeaderMap::new(),
+        );
+        assert!(result.is_err(), "required header without candidates must error");
+    }
+
+    #[test]
+    fn header_optional_without_candidates_succeeds() {
+        let result = apply_auth_policy(
+            &AuthPolicy::header("x-api-key", vec![], false),
+            &HeaderMap::new(),
+        );
+        assert!(result.is_ok(), "optional header without candidates is ok");
+    }
+
     #[test]
     fn secret_value_debug_redacted() {
         let s = SecretValue::new("super-secret-key".into());
@@ -568,32 +609,36 @@ mod tests {
 
     // P8-001: Inline/Public semantics tests
     //
-    // These tests assert the EXPECTED behavior under the P8 auth model.
-    // They are RED on the current implementation because `resolve_credential_source`
-    // returns `None` for both `Inline` and `Public` — it has no way to carry
-    // a concrete value. After P8-002 the new `CredentialCandidate` types and
-    // `RequestCredentialContext` will make these assertions pass.
-    //
-    // The current test assertions intentionally fail (RED):
-    //   line 1: Inline with value should resolve, but current code returns None
-    //   line 2: Public should produce no auth (correct), but the type distinction matters
+    // After P8-002/P8-011, CredentialCandidate + prepare_sampler_config provide
+    // proper inline resolution and Public/None distinction.
 
     #[test]
-    fn inline_with_value_should_resolve() {
-        // Current: CredentialSource::Inline carries no value → always None.
-        // Expected: CredentialCandidate + context carries value → resolves.
-        let result = resolve_credential_source(&CredentialSource::Inline).unwrap();
-        assert!(
-            result.value.is_some(),
-            "P8-001 RED: Inline with value must resolve, got None — \
-             current CredentialSource::Inline has no value slot"
+    fn bearer_with_request_override_resolves() {
+        // Simulate the new API: RequestCredential with an override value.
+        // The prepare_sampler_config function resolves candidates in system order.
+        use crate::prepared::{RequestCredential, resolve_auth_from_policy};
+
+        let val = SecretValue::new("sk-override".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let policy = AuthPolicy::bearer(
+            vec![CredentialCandidate::RequestOverride],
+            true,
         );
+        let result = resolve_auth_from_policy(&policy, &ctx);
+        assert!(result.is_ok());
+        let (name, value) = result.unwrap().expect("must resolve");
+        assert_eq!(name, "Authorization");
+        assert_eq!(value, "Bearer sk-override");
     }
 
     #[test]
     fn public_is_distinct_from_none_for_auth() {
-        // Current: Public and None both produce None.
-        // Expected: Public must be explicitly non-auth; None means unconfigured.
         assert_ne!(
             CredentialSource::Public,
             CredentialSource::None,

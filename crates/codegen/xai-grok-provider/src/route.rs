@@ -97,7 +97,7 @@ impl Route {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::{CredentialCandidate, CredentialSource};
+    use crate::auth::CredentialCandidate;
     use crate::endpoint::EndpointPart;
 
     fn test_route() -> Route {

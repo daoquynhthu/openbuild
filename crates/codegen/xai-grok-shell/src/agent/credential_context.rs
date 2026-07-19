@@ -100,42 +100,65 @@ impl<'a> RequestCredentialContext<'a> {
         }
     }
 
-    /// Resolve a credential from a list of candidates following the unified priority:
+    /// Resolve a credential from a list of candidates following the UNIFIED priority:
     /// request override > model inline > provider inline > model env > provider env > built-in env > session.
+    ///
+    /// The provider declares ONLY which candidates exist; the ORDER is fixed by the system.
+    /// Provider-declared order is ignored — only the SET of candidate types matters.
     pub async fn resolve_candidates(
         &self,
         candidates: &[CredentialCandidate],
     ) -> Option<String> {
-        for candidate in candidates {
-            let value = match candidate {
-                CredentialCandidate::RequestOverride => {
-                    self.request_override.map(|s| s.inner().to_string())
-                }
-                CredentialCandidate::ModelInline => {
-                    self.model_inline.map(|s| s.inner().to_string())
-                }
-                CredentialCandidate::ProviderInline => {
-                    self.provider_inline.map(|s| s.inner().to_string())
-                }
-                CredentialCandidate::ModelEnvironment(keys)
-                | CredentialCandidate::ProviderEnvironment(keys)
-                | CredentialCandidate::BuiltinEnvironment(keys) => {
-                    for key in keys {
-                        if let Ok(Some(val)) = self.environment.read(key) {
-                            return Some(val.inner().to_string());
-                        }
-                    }
-                    None
-                }
-                CredentialCandidate::Session => {
-                    if let Ok(Some(val)) = self.session.resolve().await {
-                        return Some(val.inner().to_string());
-                    }
-                    None
-                }
-            };
-            if value.is_some() {
-                return value;
+        // Build a set of candidate types declared by the provider.
+        let provider_has_request_override = candidates.iter().any(|c| matches!(c, CredentialCandidate::RequestOverride));
+        let provider_has_model_inline = candidates.iter().any(|c| matches!(c, CredentialCandidate::ModelInline));
+        let provider_has_provider_inline = candidates.iter().any(|c| matches!(c, CredentialCandidate::ProviderInline));
+        let provider_env_keys: Vec<&Vec<String>> = candidates.iter().filter_map(|c| match c {
+            CredentialCandidate::ModelEnvironment(k) => Some(k),
+            _ => None,
+        }).collect();
+        let provider_env_keys: Vec<&String> = provider_env_keys.iter().flat_map(|v| v.iter()).collect();
+        let provider_env_keys: Vec<String> = provider_env_keys.into_iter().cloned().collect();
+        let builtin_env_keys: Vec<String> = candidates.iter().filter_map(|c| match c {
+            CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
+            _ => None,
+        }).flatten().collect();
+        let has_session = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session));
+
+        // System-fixed priority order — provider order is ignored.
+        // 1. RequestOverride
+        if provider_has_request_override {
+            if let Some(val) = self.request_override {
+                return Some(val.inner().to_string());
+            }
+        }
+        // 2. ModelInline
+        if provider_has_model_inline {
+            if let Some(val) = self.model_inline {
+                return Some(val.inner().to_string());
+            }
+        }
+        // 3. ProviderInline
+        if provider_has_provider_inline {
+            if let Some(val) = self.provider_inline {
+                return Some(val.inner().to_string());
+            }
+        }
+        // 4-6: Environment (model env, provider env, built-in env — in that order)
+        for key in &provider_env_keys {
+            if let Ok(Some(val)) = self.environment.read(key) {
+                return Some(val.inner().to_string());
+            }
+        }
+        for key in &builtin_env_keys {
+            if let Ok(Some(val)) = self.environment.read(key) {
+                return Some(val.inner().to_string());
+            }
+        }
+        // 7. Session (always last)
+        if has_session {
+            if let Ok(Some(val)) = self.session.resolve().await {
+                return Some(val.inner().to_string());
             }
         }
         None

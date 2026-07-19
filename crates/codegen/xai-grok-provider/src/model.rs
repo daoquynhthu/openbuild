@@ -93,7 +93,7 @@ impl Model {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::{AuthPolicy, CredentialCandidate, CredentialSource};
+    use crate::auth::AuthPolicy;
     use crate::endpoint::{Endpoint, EndpointPart};
     use crate::route::Route;
 
