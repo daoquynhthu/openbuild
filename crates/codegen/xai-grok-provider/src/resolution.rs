@@ -38,6 +38,7 @@ pub struct ProviderPublicConfig {
     pub base_url: Option<String>,
     pub protocol: Option<String>,
     pub model_list_path: Option<String>,
+    pub allow_insecure_http: bool,
     pub model_list_format: Option<ModelListFormat>,
     pub extra_headers: IndexMap<String, String>,
 }
@@ -60,6 +61,7 @@ fn resolve_one(
         base_url: config.base_url,
         protocol: config.protocol,
         model_list_path: config.model_list_path,
+        allow_insecure_http: config.allow_insecure_http.unwrap_or(false),
         model_list_format: None,
         extra_headers: config.extra_headers.unwrap_or_default(),
     };
@@ -193,7 +195,7 @@ pub fn resolve_with_precedence(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{ConfigDiagnostic, ParsedProviderConfig};
+    use crate::config::ParsedProviderConfig;
 
     #[test]
     fn builtin_xai_resolves_correctly() {

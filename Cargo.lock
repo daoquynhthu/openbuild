@@ -13536,6 +13536,7 @@ dependencies = [
  "toml",
  "tracing",
  "url",
+ "walkdir",
  "xai-grok-sampler",
  "xai-grok-sampling-types",
  "xai-grok-test-support",

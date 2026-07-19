@@ -145,16 +145,47 @@ pub fn resolve_model_execution(
     })
 }
 
-/// Known legacy xAI model names that can be migrated to `xai/model` without
-/// an explicit provider prefix. This is the only code path that maps a bare
-/// model name to a provider — all other bare models must be explicitly
+/// A legacy (unqualified) xAI model reference that can be migrated to
+/// `provider/model` syntax. This is the only way a bare model name maps
+/// to a specific provider — all other bare models must be explicitly
 /// qualified or found in a provider's model catalog.
-fn resolve_legacy_model_ref(bare_model: &str) -> Option<String> {
-    match bare_model {
-        "grok-build" | "grok-3" | "grok-3-mini" | "grok-3-fast" | "grok-3-mini-fast"
-        | "grok-2" | "grok-2-mini" | "grok-vision" | "grok-1" => Some("xai".to_string()),
-        _ => None,
+pub struct LegacyModelReference(&'static str);
+
+impl LegacyModelReference {
+    /// All known legacy xAI model names.
+    pub const ALL: &'static [LegacyModelReference] = &[
+        LegacyModelReference("grok-build"),
+        LegacyModelReference("grok-3"),
+        LegacyModelReference("grok-3-mini"),
+        LegacyModelReference("grok-3-fast"),
+        LegacyModelReference("grok-3-mini-fast"),
+        LegacyModelReference("grok-2"),
+        LegacyModelReference("grok-2-mini"),
+        LegacyModelReference("grok-vision"),
+        LegacyModelReference("grok-1"),
+    ];
+
+    /// The provider to which this legacy model resolves.
+    pub fn provider(&self) -> &'static str {
+        "xai"
     }
+
+    /// The bare model name.
+    pub fn model(&self) -> &'static str {
+        self.0
+    }
+
+    /// Look up a bare model name; returns `Some` only for known legacy names.
+    pub fn try_resolve(bare_model: &str) -> Option<&'static LegacyModelReference> {
+        LegacyModelReference::ALL.iter().find(|lr| lr.0 == bare_model)
+    }
+}
+
+/// Resolve a bare model name through the legacy xAI model table.
+/// Returns `None` for models not in the known legacy set.
+fn resolve_legacy_model_ref(bare_model: &str) -> Option<String> {
+    LegacyModelReference::try_resolve(bare_model)
+        .map(|lr| lr.provider().to_string())
 }
 
 /// Resolve a CLI model reference against the merged catalog.

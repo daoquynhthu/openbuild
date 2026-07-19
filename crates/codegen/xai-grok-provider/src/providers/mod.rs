@@ -28,7 +28,16 @@ pub fn register_all(registry: &ProviderRegistry) {
 /// Detect environment variables for every registered provider.
 /// Returns a map of provider_id → `ProviderConfig` with `api_key` set
 /// from the first matching env var in the provider's `env_key` list.
+///
+/// NOTE: Per the V1 plan (P4-008), environment variable *values* should
+/// NOT be read during bootstrap — they should be resolved at request time
+/// (Phase 8). This function exists for legacy compatibility and will be
+/// removed once the request-time credential context is fully integrated.
 pub fn detect_env_vars(registry: &ProviderRegistry) -> IndexMap<String, ProviderConfig> {
+    tracing::warn!(
+        "detect_env_vars reads env values at bootstrap — \
+         this will be removed in P8 (request-time credential resolution)"
+    );
     let mut result = IndexMap::new();
     for pid in registry.all_ids() {
         let Some(provider) = registry.get(&pid) else {

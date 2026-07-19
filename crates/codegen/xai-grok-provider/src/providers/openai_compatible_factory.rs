@@ -106,6 +106,25 @@ impl ProviderFactory for OpenAiCompatibleProviderFactory {
     }
 }
 
+/// Profile metadata: default protocol and model-list format.
+struct ProfileMeta {
+    protocol: &'static str,
+    model_format: Option<&'static str>,
+}
+
+fn profile_meta(profile: &str) -> ProfileMeta {
+    match profile {
+        "openrouter" => ProfileMeta {
+            protocol: "chat_completions",
+            model_format: Some("openai_compatible"),
+        },
+        _ => ProfileMeta {
+            protocol: "chat_completions",
+            model_format: None,
+        },
+    }
+}
+
 impl OpenAiCompatibleProviderFactory {
     fn env_key_for_profile(profile: Option<&str>) -> Vec<String> {
         match profile {
@@ -134,6 +153,7 @@ mod tests {
                     base_url,
                     protocol: None,
                     model_list_path: None,
+                    allow_insecure_http: false,
                     model_list_format: None,
                     extra_headers: IndexMap::new(),
                 },
@@ -249,6 +269,7 @@ mod tests {
                     base_url: None,
                     protocol: None,
                     model_list_path: None,
+                    allow_insecure_http: false,
                     model_list_format: None,
                     extra_headers: IndexMap::new(),
                 },

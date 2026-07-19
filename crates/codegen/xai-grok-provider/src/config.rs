@@ -65,7 +65,40 @@ pub struct ProviderConfigInput {
     pub extra_headers: Option<IndexMap<String, String>>,
 }
 
+/// Well-known protocol identifiers.
+fn is_known_protocol(protocol: &str) -> bool {
+    matches!(protocol, "chat_completions" | "responses" | "messages")
+}
+
 impl ProviderConfigInput {
+    /// Validate config fields and return diagnostics for any issues.
+    pub fn validate(&self, provider_id: &str) -> Vec<ConfigDiagnostic> {
+        let mut diags = Vec::new();
+
+        // allow_insecure_http must be explicit boolean (it defaults to false).
+        // serde defaults to None, but the semantic default is false.
+        if self.allow_insecure_http == Some(true) {
+            diags.push(ConfigDiagnostic::new(
+                provider_id,
+                "allow_insecure_http",
+                "insecure HTTP is enabled — this is a security risk",
+            ));
+        }
+
+        // Protocol validation: unknown protocols get a diagnostic.
+        if let Some(ref proto) = self.protocol {
+            if !is_known_protocol(proto) {
+                diags.push(ConfigDiagnostic::new(
+                    provider_id,
+                    "protocol",
+                    format!("unknown protocol `{proto}` — must be one of: chat_completions, responses, messages"),
+                ));
+            }
+        }
+
+        diags
+    }
+
     /// Consume this input and produce a [`ProviderRuntimeConfig`].
     /// `api_key` is wrapped in [`SecretValue`] and never returned as `String`.
     pub fn into_runtime_config(self) -> crate::resolution::ProviderRuntimeConfig {
@@ -74,6 +107,7 @@ impl ProviderConfigInput {
                 base_url: self.base_url,
                 protocol: self.protocol,
                 model_list_path: self.model_list_path,
+                allow_insecure_http: self.allow_insecure_http.unwrap_or(false),
                 model_list_format: self.model_list_format.map(|s| match s.as_str() {
                     "ollama_tags" | "ollama" => crate::types::ModelListFormat::OllamaTags,
                     _ => crate::types::ModelListFormat::OpenAiCompatible,
@@ -476,6 +510,49 @@ api_key = "sk-test"
         };
         let rt = input.into_runtime_config();
         assert!(rt.inline_api_key.is_none());
+    }
+
+    #[test]
+    fn allow_insecure_http_defaults_to_false() {
+        let input = ProviderConfigInput {
+            ..Default::default()
+        };
+        let rt = input.into_runtime_config();
+        assert!(!rt.public.allow_insecure_http);
+    }
+
+    #[test]
+    fn allow_insecure_http_true_produces_diagnostic() {
+        let input = ProviderConfigInput {
+            allow_insecure_http: Some(true),
+            ..Default::default()
+        };
+        let diags = input.validate("test");
+        assert!(!diags.is_empty());
+        assert!(diags[0].to_string().contains("insecure HTTP"));
+    }
+
+    #[test]
+    fn unknown_protocol_produces_diagnostic() {
+        let input = ProviderConfigInput {
+            protocol: Some("unknown_protocol".into()),
+            ..Default::default()
+        };
+        let diags = input.validate("test");
+        assert!(!diags.is_empty());
+        assert!(diags[0].to_string().contains("unknown protocol"));
+    }
+
+    #[test]
+    fn known_protocol_no_diagnostic() {
+        for proto in &["chat_completions", "responses", "messages"] {
+            let input = ProviderConfigInput {
+                protocol: Some((*proto).into()),
+                ..Default::default()
+            };
+            let diags = input.validate("test");
+            assert!(diags.is_empty(), "expected no diagnostic for {proto}");
+        }
     }
 
     #[test]

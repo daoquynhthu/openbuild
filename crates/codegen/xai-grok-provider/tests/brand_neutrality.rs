@@ -6,7 +6,18 @@
 
 use std::path::Path;
 
-const ALLOWED_XAI_FILES: &[&str] = &["providers/xai.rs", "auth.rs", "types.rs"];
+// Allowed xAI brand-specific files:
+// - providers/xai.rs: xAI provider implementation
+// - auth.rs: xAI-specific auth handling (session, OAuth)
+// - types.rs: constant definitions (ProviderId::XAI etc.)
+// - migration paths (*/migration*, */legacy*): backward compat code
+const ALLOWED_XAI_FILES: &[&str] = &[
+    "providers/xai.rs",
+    "auth.rs",
+    "types.rs",
+    "/migration",
+    "/legacy",
+];
 
 #[test]
 fn generic_code_must_not_branch_on_xai() {
