@@ -21,6 +21,7 @@ xai-grok-sampling-types = { path = "../xai-grok-sampling-types" }
 futures-util = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
 tokio-stream = { workspace = true }
+walkdir = { workspace = true }
 xai-grok-sampler = { path = "../xai-grok-sampler" }
 xai-grok-test-support = { path = "../xai-grok-test-support" }
 

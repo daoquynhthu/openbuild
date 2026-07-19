@@ -180,7 +180,6 @@ pub fn resolve_with_precedence(
     // If CLI overrides target a provider not in TOML or legacy, add it
     if let Some(ref cli) = cli_overrides {
         if let Some(ref cli_id) = cli.id {
-            let pid = ProviderId::new(cli_id);
             let already_present = merged_configs.iter().any(|(id, _)| id == cli_id);
             if !already_present {
                 merged_configs.push((cli_id.clone(), cli.clone()));
