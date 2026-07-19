@@ -58,6 +58,21 @@
 - `cargo clippy -p xai-grok-shell --all-targets -- -D warnings`: 0 warnings ✅
 - `cargo clippy -p xai-grok-provider --all-targets -- -D warnings`: 0 warnings ✅
 
+### P6-006: launcher uses bootstrap helper
+- `xai-grok-pager-bin/src/main.rs`: replaced `register_all + configure_providers` block with `bootstrap_from_config`
+- compat override and CLI override computation kept, passed to bootstrap
+- TUI path (async_main) also bootstraps its own runtime with `bootstrap_from_config`
+- Error returns clear message on failure
+
+### P6-007: Pager run() receives Arc<ProviderRuntime>
+- `xai-grok-pager/src/app/mod.rs` run() parameter changed from `Option<Arc<ProviderRegistry>>` to `Arc<ProviderRuntime>`
+- `unwrap_or_else` fallback removed — tests must bootstrap their own runtime
+- Main.rs call site updated to pass `tui_provider_runtime`
+
+### P6-008: providers CLI uses bootstrap helper
+- `xai-grok-pager/src/providers_cmd.rs`: replaced standalone registry creation with `bootstrap_from_config`
+- No independent `ProviderRegistry::new()` in providers CLI
+
 ## Phase 10: Real TUI and CLI Provider Configuration Closure
 
 ### Completion
