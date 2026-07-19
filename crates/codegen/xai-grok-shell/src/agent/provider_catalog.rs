@@ -814,6 +814,64 @@ mod tests {
         assert!(ProviderCatalogService::validate_concurrency(0).is_err());
         assert!(ProviderCatalogService::validate_concurrency(17).is_err());
     }
+    /// Helper: fire `n` parallel GETs and return when all complete.
+    async fn parallel_gets(client: &reqwest::Client, url: &str, n: usize) {
+        let mut handles = Vec::with_capacity(n);
+        for _ in 0..n {
+            let c = client.clone();
+            let u = url.to_string();
+            handles.push(tokio::spawn(async move { c.get(&u).send().await }));
+        }
+        for h in handles {
+            let _ = h.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn concurrency_limits_parallel_in_flight() {
+        use xai_grok_provider::types::ProviderId;
+        use std::sync::Arc;
+
+        // Start a slow server (200ms per request)
+        let server = xai_grok_test_support::redirect_mock::SlowServer::start(
+            std::time::Duration::from_millis(200),
+        ).await;
+        let url = server.url();
+
+        // Create catalog service with concurrency=2 and the slow server's client
+        let svc = ProviderCatalogService::with_client_and_concurrency(
+            reqwest::Client::new(), 2,
+        );
+
+        // Use 6 known built-in provider IDs so refresh_all can build URLs for them
+        let pids = vec![
+            ProviderId::new("xai"),
+            ProviderId::new("openai"),
+            ProviderId::new("anthropic"),
+            ProviderId::new("opencode"),
+            ProviderId::new("ollama"),
+            ProviderId::new("openai-compatible"),
+        ];
+
+        let defaults: ProviderDefaults = Default::default();
+        svc.refresh_all(
+            &pids,
+            |_pid| Some((url.clone(), defaults.clone())),
+            std::time::Duration::from_secs(0), // TTL=0 → all stale
+        ).await;
+
+        let peak = server.in_flight_peak();
+        let total = server.request_count();
+        assert!(
+            peak <= 2,
+            "concurrency=2: peak in-flight was {peak}, expected <= 2"
+        );
+        assert!(
+            total >= 6,
+            "all 6 providers must have been refreshed, got {total}"
+        );
+    }
+
     #[tokio::test]
     async fn concurrency_limit_creates_correct_permits() {
         let svc = ProviderCatalogService::with_client_and_concurrency(
