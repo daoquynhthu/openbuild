@@ -293,12 +293,23 @@ impl ProviderCatalogService {
 
             handles.push(tokio::spawn(async move {
                 // P9-003: bounded concurrency — acquire permit inside the spawned task.
-                // If max concurrency is reached, this awaits until a permit is available.
                 let _permit = sem.acquire().await;
                 if cancelled.load(Ordering::Relaxed) {
                     return (pid.clone(), None, Some("cancelled".into()));
                 }
-                let response = match client.get(&url).send().await {
+                // P9-006: apply provider auth and extra headers to model list request.
+                let mut req = client.get(&url);
+                for (k, v) in &defaults.extra_headers {
+                    req = req.header(k.as_str(), v.as_str());
+                }
+                // Resolve auth from env keys at request time (P8 pattern)
+                let auth_value = defaults.env_key.iter().find_map(|key| {
+                    std::env::var(key).ok().filter(|v| !v.is_empty())
+                });
+                if let Some(token) = auth_value {
+                    req = req.header("Authorization", format!("Bearer {token}"));
+                }
+                let response = match req.send().await {
                     Ok(r) => r,
                     Err(e) => return (pid.clone(), None, Some(format!("HTTP error: {e}"))),
                 };
