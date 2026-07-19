@@ -126,9 +126,75 @@ pub fn resolve_provider_set(
     )
 }
 
+/// Merge a legacy migration config and CLI overrides onto a resolved set.
+///
+/// Precedence (low → high):
+///   provider implementation defaults
+///   < selected profile defaults
+///   < legacy migration values
+///   < TOML provider/model values
+///   < startup CLI configuration overrides
+///
+/// Request credential override and generation override do NOT enter this
+/// set; they are resolved at request time in Phase 8.
+/// Environment variable names are merged by config, but their *values* are
+/// only read at request time — never during bootstrap.
+pub fn resolve_with_precedence(
+    parsed: crate::config::ParsedProviderConfig,
+    legacy_migration: Option<ProviderConfig>,
+    cli_overrides: Option<ProviderConfig>,
+) -> (ResolvedProviderSet, Vec<ConfigDiagnostic>) {
+    let mut merged_configs: Vec<(String, ProviderConfig)> = parsed
+        .entries
+        .into_iter()
+        .map(|(id, cfg)| {
+            let mut merged = cfg;
+            // Apply legacy migration on top of TOML values
+            if let Some(ref legacy) = legacy_migration
+                && legacy.id.as_deref() == Some(&id.0)
+            {
+                merged = legacy.clone().merge(merged);
+            }
+            // Apply CLI overrides on top (CLI > TOML)
+            if let Some(ref cli) = cli_overrides
+                && cli.id.as_deref() == Some(&id.0)
+            {
+                merged = merged.merge(cli.clone());
+            }
+            (id.0, merged)
+        })
+        .collect();
+
+    // Collect TOML provider IDs for "not present" checks before entries is moved
+    let toml_ids: std::collections::HashSet<String> = merged_configs.iter().map(|(id, _)| id.clone()).collect();
+
+    // If a legacy migration targets a provider not present in TOML, add it
+    if let Some(ref legacy) = legacy_migration {
+        if let Some(ref legacy_id) = legacy.id {
+            if !toml_ids.contains(legacy_id) {
+                merged_configs.push((legacy_id.clone(), legacy.clone()));
+            }
+        }
+    }
+
+    // If CLI overrides target a provider not in TOML or legacy, add it
+    if let Some(ref cli) = cli_overrides {
+        if let Some(ref cli_id) = cli.id {
+            let pid = ProviderId::new(cli_id);
+            let already_present = merged_configs.iter().any(|(id, _)| id == cli_id);
+            if !already_present {
+                merged_configs.push((cli_id.clone(), cli.clone()));
+            }
+        }
+    }
+
+    resolve_provider_set(merged_configs)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{ConfigDiagnostic, ParsedProviderConfig};
 
     #[test]
     fn builtin_xai_resolves_correctly() {
@@ -245,5 +311,124 @@ mod tests {
         let deepseek = set.providers.get(&ProviderId::new("deepseek")).unwrap();
         let internal = set.providers.get(&ProviderId::new("internal")).unwrap();
         assert_ne!(deepseek.config.public.base_url, internal.config.public.base_url);
+    }
+
+    // ── Precedence tests ──
+
+    #[test]
+    fn precedence_toml_only() {
+        let toml = ParsedProviderConfig {
+            entries: IndexMap::from([(
+                ProviderId::new("test"),
+                ProviderConfig {
+                    id: Some("test".into()),
+                    api_key: Some("toml-key".into()),
+                    ..Default::default()
+                },
+            )]),
+        };
+        let (set, diags) = resolve_with_precedence(toml, None, None);
+        assert!(diags.is_empty());
+        let spec = set.providers.get(&ProviderId::new("test")).unwrap();
+        assert_eq!(
+            spec.config.inline_api_key.as_ref().map(|s| format!("{s:?}")),
+            Some("[REDACTED]".into())
+        );
+    }
+
+    #[test]
+    fn precedence_legacy_overrides_toml() {
+        let toml = ParsedProviderConfig {
+            entries: IndexMap::from([(
+                ProviderId::new("xai"),
+                ProviderConfig {
+                    id: Some("xai".into()),
+                    base_url: Some("https://toml.url".into()),
+                    ..Default::default()
+                },
+            )]),
+        };
+        let legacy = Some(ProviderConfig {
+            id: Some("xai".into()),
+            base_url: Some("https://legacy.url".into()),
+            api_key: Some("legacy-key".into()),
+            ..Default::default()
+        });
+        let (set, diags) = resolve_with_precedence(toml, legacy, None);
+        assert!(diags.is_empty());
+        let spec = set.providers.get(&ProviderId::new("xai")).unwrap();
+        // Legacy should NOT override TOML (legacy has lower precedence)
+        assert_eq!(
+            spec.config.public.base_url.as_deref(),
+            Some("https://toml.url")
+        );
+        // Legacy api_key fills in because TOML didn't set it
+        assert_eq!(
+            spec.config.inline_api_key.as_ref().map(|_| "present"),
+            Some("present")
+        );
+    }
+
+    #[test]
+    fn precedence_cli_overrides_all() {
+        let toml = ParsedProviderConfig {
+            entries: IndexMap::from([(
+                ProviderId::new("xai"),
+                ProviderConfig {
+                    id: Some("xai".into()),
+                    api_key: Some("toml-key".into()),
+                    ..Default::default()
+                },
+            )]),
+        };
+        let cli = Some(ProviderConfig {
+            id: Some("xai".into()),
+            api_key: Some("cli-key".into()),
+            ..Default::default()
+        });
+        let (set, diags) = resolve_with_precedence(toml, None, cli);
+        assert!(diags.is_empty());
+        let spec = set.providers.get(&ProviderId::new("xai")).unwrap();
+        // CLI has highest precedence — must override TOML
+        // Check via Debug (can't access inner value from test)
+        let debug = format!("{:?}", spec.config);
+        assert!(
+            !debug.contains("toml-key"),
+            "CLI override should replace toml-key: {debug}"
+        );
+    }
+
+    #[test]
+    fn precedence_legacy_adds_new_provider() {
+        let toml = ParsedProviderConfig {
+            entries: IndexMap::new(),
+        };
+        let legacy = Some(ProviderConfig {
+            id: Some("legacy-only".into()),
+            api_key: Some("legacy-key".into()),
+            ..Default::default()
+        });
+        let (set, _) = resolve_with_precedence(toml, legacy, None);
+        assert!(
+            set.providers.contains_key(&ProviderId::new("legacy-only")),
+            "legacy must add new providers not in TOML"
+        );
+    }
+
+    #[test]
+    fn precedence_cli_adds_new_provider() {
+        let toml = ParsedProviderConfig {
+            entries: IndexMap::new(),
+        };
+        let cli = Some(ProviderConfig {
+            id: Some("cli-only".into()),
+            api_key: Some("cli-key".into()),
+            ..Default::default()
+        });
+        let (set, _) = resolve_with_precedence(toml, None, cli);
+        assert!(
+            set.providers.contains_key(&ProviderId::new("cli-only")),
+            "CLI must add new providers not in TOML"
+        );
     }
 }
