@@ -96,7 +96,7 @@ pub fn merge_headers(
         let v = http::HeaderValue::from_str(value)
             .map_err(|_| ProviderError::InvalidHeader(value.to_string()))?;
         if let Some(existing) = merged.get(&n) {
-            if existing != &v {
+            if existing != v {
                 return Err(ProviderError::HeaderConflict(format!(
                     "`{name}`: existing value differs from new value"
                 )));

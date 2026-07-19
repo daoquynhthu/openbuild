@@ -5,8 +5,9 @@
 //! Readers receive immutable `Arc<ModelCatalogSnapshot>`.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, SystemTime};
+
+use tokio_util::sync::CancellationToken;
 
 /// Redirect policy per P9-002: max 3 redirects, same-origin only, no credential copy.
 fn catalog_redirect_policy() -> reqwest::redirect::Policy {
@@ -46,6 +47,13 @@ pub enum CatalogConfigError {
     TtlOutOfRange { got: u32, min: u32, max: u32 },
 }
 
+/// Typed error for catalog shutdown (P9-009).
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum CatalogShutdownError {
+    #[error("catalog shutdown timed out after {timeout_secs}s — task {task_id} did not complete")]
+    Timeout { task_id: String, timeout_secs: u64 },
+}
+
 /// Catalog configuration with validated TTL.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderCatalogConfig {
@@ -61,7 +69,7 @@ impl ProviderCatalogConfig {
     }
 
     pub fn validate_ttl(v: u32) -> Result<(), CatalogConfigError> {
-        if v < MIN_CACHE_TTL_SECONDS || v > MAX_CACHE_TTL_SECONDS {
+        if !(MIN_CACHE_TTL_SECONDS..=MAX_CACHE_TTL_SECONDS).contains(&v) {
             return Err(CatalogConfigError::TtlOutOfRange {
                 got: v,
                 min: MIN_CACHE_TTL_SECONDS,
@@ -130,16 +138,26 @@ pub enum RefreshStrategy {
 /// Asynchronous provider catalog service with bounded concurrent refresh,
 /// TTL cache, cancellation, and stale fallback.
 pub struct ProviderCatalogService {
-    snapshot: RwLock<Arc<ModelCatalogSnapshot>>,
+    snapshot: Arc<RwLock<Arc<ModelCatalogSnapshot>>>,
     http_client: reqwest::Client,
-    cancelled: Arc<AtomicBool>,
+    cancel_token: CancellationToken,
     concurrency: Arc<tokio::sync::Semaphore>,
+    active_refresh: tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl std::fmt::Debug for ProviderCatalogService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ProviderCatalogService").finish()
     }
+}
+
+/// Look up the source URL for a provider ID from the pre-computed tasks list.
+fn url_for_pid(tasks: &[(ProviderId, String, ProviderDefaults)], pid: &ProviderId) -> String {
+    tasks
+        .iter()
+        .find(|(id, _, _)| id == pid)
+        .map(|(_, url, _)| url.clone())
+        .unwrap_or_default()
 }
 
 /// Build a cache key for a provider's model list.
@@ -177,7 +195,7 @@ impl ProviderCatalogService {
     }
 
     /// Build the unique reqwest client with P9-002 policy.
-    fn build_http_client() -> reqwest::Client {
+    pub(crate) fn build_http_client() -> reqwest::Client {
         reqwest::Client::builder()
             .connect_timeout(std::time::Duration::from_secs(5))
             .timeout(std::time::Duration::from_secs(30))
@@ -192,7 +210,7 @@ impl ProviderCatalogService {
     pub const MAX_CONCURRENCY: u32 = 16;
 
     pub fn validate_concurrency(v: u32) -> Result<(), String> {
-        if v < Self::MIN_CONCURRENCY || v > Self::MAX_CONCURRENCY {
+        if !(Self::MIN_CONCURRENCY..=Self::MAX_CONCURRENCY).contains(&v) {
             return Err(format!(
                 "concurrency must be between {} and {}, got {}",
                 Self::MIN_CONCURRENCY, Self::MAX_CONCURRENCY, v
@@ -201,7 +219,7 @@ impl ProviderCatalogService {
         Ok(())
     }
 
-    /// Constructor with explicit client and concurrency limit (for testing).
+    /// Constructor with explicit client, concurrency limit, and optional cancellation token.
     pub(crate) fn with_client_and_concurrency(
         http_client: reqwest::Client,
         max_concurrency: u32,
@@ -211,13 +229,36 @@ impl ProviderCatalogService {
             "concurrency out of range"
         );
         Self {
-            snapshot: RwLock::new(Arc::new(ModelCatalogSnapshot {
+            snapshot: Arc::new(RwLock::new(Arc::new(ModelCatalogSnapshot {
                 catalog_revision: 0,
                 providers: IndexMap::new(),
-            })),
+            }))),
             http_client,
-            cancelled: Arc::new(AtomicBool::new(false)),
+            cancel_token: CancellationToken::new(),
             concurrency: Arc::new(tokio::sync::Semaphore::new(max_concurrency as usize)),
+            active_refresh: tokio::sync::Mutex::new(None),
+        }
+    }
+
+    /// Constructor with explicit client and cancellation token (for sharing with ProviderRuntime).
+    pub(crate) fn with_client_and_token(
+        http_client: reqwest::Client,
+        cancel_token: CancellationToken,
+        max_concurrency: u32,
+    ) -> Self {
+        assert!(
+            (Self::MIN_CONCURRENCY..=Self::MAX_CONCURRENCY).contains(&max_concurrency),
+            "concurrency out of range"
+        );
+        Self {
+            snapshot: Arc::new(RwLock::new(Arc::new(ModelCatalogSnapshot {
+                catalog_revision: 0,
+                providers: IndexMap::new(),
+            }))),
+            http_client,
+            cancel_token,
+            concurrency: Arc::new(tokio::sync::Semaphore::new(max_concurrency as usize)),
+            active_refresh: tokio::sync::Mutex::new(None),
         }
     }
 
@@ -306,14 +347,15 @@ impl ProviderCatalogService {
 
     /// Refresh all providers with bounded concurrency and TTL-awareness.
     /// Skips providers whose cache is still fresh.
+    /// Spawned tasks check the shared cancellation token (P9-009).
     pub async fn refresh_all(
         &self,
         provider_ids: &[ProviderId],
         build_url: impl Fn(&ProviderId) -> Option<(String, ProviderDefaults)>,
         ttl: Duration,
     ) {
-        // Collect stale providers first (outside the async loop to avoid
-        // holding the snapshot lock across awaits).
+        // Pre-compute stale provider tasks outside the spawned wrapper
+        // so non-'static closures can be used.
         let stale_pids: Vec<ProviderId> = {
             let current = self.snapshot.read().await;
             provider_ids
@@ -323,89 +365,163 @@ impl ProviderCatalogService {
                 .collect()
         };
 
-        let mut handles = Vec::new();
-        let semaphore = Arc::clone(&self.concurrency);
-        for pid in &stale_pids {
-            let Some((url, defaults)) = build_url(pid) else {
-                continue;
-            };
-            let pid = pid.clone();
-            let client = self.http_client.clone();
-            let cancelled = self.cancelled.clone();
-            let sem = Arc::clone(&semaphore);
+        let tasks: Vec<(ProviderId, String, ProviderDefaults)> = stale_pids
+            .iter()
+            .filter_map(|pid| {
+                let (url, defaults) = build_url(pid)?;
+                Some((pid.clone(), url, defaults))
+            })
+            .collect();
 
-            handles.push(tokio::spawn(async move {
-                // P9-003: bounded concurrency — acquire permit inside the spawned task.
-                let _permit = sem.acquire().await;
-                if cancelled.load(Ordering::Relaxed) {
-                    return (pid.clone(), None, Some("cancelled".into()));
-                }
-                // P9-006: apply provider auth and extra headers to model list request.
-                let mut req = client.get(&url);
-                for (k, v) in &defaults.extra_headers {
-                    req = req.header(k.as_str(), v.as_str());
-                }
-                // Resolve auth from env keys at request time (P8 pattern)
-                let auth_value = defaults.env_key.iter().find_map(|key| {
-                    std::env::var(key).ok().filter(|v| !v.is_empty())
-                });
-                if let Some(token) = auth_value {
-                    req = req.header("Authorization", format!("Bearer {token}"));
-                }
-                let response = match req.send().await {
-                    Ok(r) => r,
-                    Err(e) => return (pid.clone(), None, Some(format!("HTTP error: {e}"))),
-                };
-                let body: serde_json::Value = match response.json().await {
-                    Ok(v) => v,
-                    Err(e) => return (pid.clone(), None, Some(format!("JSON error: {e}"))),
-                };
-                // P9-004: use declared format, NOT URL-based inference.
-                let models = match defaults.model_list_format {
-                    xai_grok_provider::types::ModelListFormat::OllamaTags => {
-                        crate::agent::provider_catalog::parse_ollama_tags_models(&body, &defaults)
-                    }
-                    xai_grok_provider::types::ModelListFormat::OpenAiCompatible => {
-                        crate::agent::provider_catalog::parse_openai_compatible_provider_models(
-                            &body,
-                            &defaults.base_url,
-                        )
-                    }
-                };
-                (pid, Some(models), None)
-            }));
+        if tasks.is_empty() {
+            return;
         }
 
-        // Collect results — one failure does not discard others
-        for handle in handles {
-            if let Ok((pid, models_opt, error)) = handle.await {
-                let mut snap = self.snapshot.write().await;
-                let mut new_snapshot = (**snap).clone();
-                let source = build_url(&pid).map(|(u, _)| u).unwrap_or_default();
-                // P9-005: on error, preserve old models (don't overwrite with empty list)
-                let existing_models = new_snapshot.providers.get(&pid)
-                    .map(|e| e.models.clone())
-                    .unwrap_or_default();
-                let entry = ProviderCatalogEntry {
-                    provider_id: pid.clone(),
-                    state: if error.is_some() {
-                        ProviderCatalogState::Failed(error.clone().unwrap_or_default())
-                    } else {
-                        ProviderCatalogState::Fresh
-                    },
-                    fetched_at: if error.is_some() {
-                        None
-                    } else {
-                        Some(SystemTime::now())
-                    },
-                    source_url: source,
-                    models: models_opt.unwrap_or(existing_models),
-                    error_summary: error,
-                };
-                new_snapshot.providers.insert(pid, entry);
-                new_snapshot.catalog_revision += 1;
-                *snap = Arc::new(new_snapshot);
+        let semaphore = Arc::clone(&self.concurrency);
+        let cancel_token = self.cancel_token.clone();
+        let client = self.http_client.clone();
+        let snapshot = Arc::clone(&self.snapshot);
+
+        let handle = tokio::spawn(async move {
+            let mut spawned = Vec::new();
+            for (pid, url, defaults) in &tasks {
+                let pid = pid.clone();
+                let url = url.clone();
+                let defaults = defaults.clone();
+                let sem = Arc::clone(&semaphore);
+                let ct = cancel_token.clone();
+                let cl = client.clone();
+
+                spawned.push(tokio::spawn(async move {
+                    // P9-009: cancellation-safe semaphore acquire
+                    let _permit = tokio::select! {
+                        permit = sem.acquire() => permit,
+                        _ = ct.cancelled() => return (pid.clone(), None, Some("cancelled".into())),
+                    };
+
+                    // P9-006: apply provider auth and extra headers
+                    let mut req = cl.get(&url);
+                    for (k, v) in &defaults.extra_headers {
+                        req = req.header(k.as_str(), v.as_str());
+                    }
+                    let auth_value = defaults.env_key.iter().find_map(|key| {
+                        std::env::var(key).ok().filter(|v| !v.is_empty())
+                    });
+                    if let Some(token) = auth_value {
+                        req = req.header("Authorization", format!("Bearer {token}"));
+                    }
+
+                    // P9-009: cancellation-safe HTTP request
+                    let response = tokio::select! {
+                        result = req.send() => match result {
+                            Ok(r) => r,
+                            Err(e) => return (pid.clone(), None, Some(format!("HTTP error: {e}"))),
+                        },
+                        _ = ct.cancelled() => return (pid.clone(), None, Some("cancelled".into())),
+                    };
+
+                    let body: serde_json::Value = tokio::select! {
+                        result = response.json() => match result {
+                            Ok(v) => v,
+                            Err(e) => return (pid.clone(), None, Some(format!("JSON error: {e}"))),
+                        },
+                        _ = ct.cancelled() => return (pid.clone(), None, Some("cancelled".into())),
+                    };
+
+                    let models = match defaults.model_list_format {
+                        xai_grok_provider::types::ModelListFormat::OllamaTags => {
+                            crate::agent::provider_catalog::parse_ollama_tags_models(
+                                &body,
+                                &defaults,
+                            )
+                        }
+                        xai_grok_provider::types::ModelListFormat::OpenAiCompatible => {
+                            crate::agent::provider_catalog::parse_openai_compatible_provider_models(
+                                &body,
+                                &defaults.base_url,
+                            )
+                        }
+                    };
+                    (pid, Some(models), None)
+                }));
             }
+
+            for handle in spawned {
+                if cancel_token.is_cancelled() {
+                    break; // P9-009: stop collecting on cancellation
+                }
+                if let Ok((pid, models_opt, error)) = handle.await {
+                    let mut snap = snapshot.write().await;
+                    if cancel_token.is_cancelled() {
+                        break; // P9-009: don't publish half-complete snapshot
+                    }
+                    let mut new_snapshot = (**snap).clone();
+                    let source = url_for_pid(&tasks, &pid);
+                    let existing_models = new_snapshot.providers.get(&pid)
+                        .map(|e| e.models.clone())
+                        .unwrap_or_default();
+                    let entry = ProviderCatalogEntry {
+                        provider_id: pid.clone(),
+                        state: if error.is_some() {
+                            ProviderCatalogState::Failed(error.clone().unwrap_or_default())
+                        } else {
+                            ProviderCatalogState::Fresh
+                        },
+                        fetched_at: if error.is_some() {
+                            None
+                        } else {
+                            Some(SystemTime::now())
+                        },
+                        source_url: source,
+                        models: models_opt.unwrap_or(existing_models),
+                        error_summary: error,
+                    };
+                    new_snapshot.providers.insert(pid, entry);
+                    new_snapshot.catalog_revision += 1;
+                    *snap = Arc::new(new_snapshot);
+                }
+            }
+        });
+
+        *self.active_refresh.lock().await = Some(handle);
+    }
+
+    /// Cancel all outstanding catalog operations and join with a 2-second deadline.
+    /// Returns `Ok(())` if all tasks completed within the deadline.
+    pub async fn shutdown(&self) -> Result<(), CatalogShutdownError> {
+        self.cancel_token.cancel();
+        let handle = {
+            let mut active = self.active_refresh.lock().await;
+            active.take()
+        };
+        match handle {
+            Some(h) => {
+                let task_id = format!("{:?}", h);
+                if tokio::time::timeout(Duration::from_secs(2), h)
+                    .await
+                    .is_err()
+                {
+                    return Err(CatalogShutdownError::Timeout {
+                        task_id,
+                        timeout_secs: 2,
+                    });
+                }
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Expose the cancellation token for sharing with ProviderRuntime.
+    pub fn cancel_token(&self) -> CancellationToken {
+        self.cancel_token.clone()
+    }
+
+    /// Wait for the current active refresh to complete (for testing).
+    pub async fn join_active_refresh(&self) {
+        let handle = self.active_refresh.lock().await.take();
+        if let Some(h) = handle {
+            let _ = h.await;
         }
     }
 
@@ -913,6 +1029,7 @@ mod tests {
             |_pid| Some((url.clone(), defaults.clone())),
             std::time::Duration::from_secs(0), // TTL=0 → all stale
         ).await;
+        svc.join_active_refresh().await;
 
         let peak = server.in_flight_peak();
         let total = server.request_count();
@@ -924,6 +1041,96 @@ mod tests {
             total >= 6,
             "all 6 providers must have been refreshed, got {total}"
         );
+    }
+
+    // P9-009: cancellation tests
+    #[tokio::test]
+    async fn cancel_releases_semaphore_waiters() {
+        let server = xai_grok_test_support::redirect_mock::SlowServer::start(
+            std::time::Duration::from_millis(500),
+        ).await;
+        let url = server.url();
+        let svc = ProviderCatalogService::with_client_and_concurrency(
+            reqwest::Client::new(), 1,
+        );
+        let defaults = ProviderDefaults::default();
+        let pids = vec![ProviderId::new("a"), ProviderId::new("b")];
+
+        svc.refresh_all(&pids, |_| Some((url.clone(), defaults.clone())), Duration::from_secs(0)).await;
+
+        // Wait for first request to start (semaphore acquired, request in-flight)
+        tokio::time::timeout(Duration::from_millis(200), async {
+            while server.in_flight_peak() == 0 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }).await.expect("request should start within 200ms");
+
+        // The second task is now waiting on the semaphore. Cancel releases it.
+        let shutdown_result = tokio::time::timeout(Duration::from_secs(2), svc.shutdown()).await;
+        assert!(shutdown_result.is_ok(), "shutdown must complete within 2s");
+
+        // Only 1 request should have been made (the one that got the semaphore).
+        // The second task was released by cancellation before acquiring the permit.
+        assert_eq!(server.request_count(), 1, "second waiter must be released by cancellation");
+    }
+
+    #[tokio::test]
+    async fn cancel_terminates_in_flight_request() {
+        let server = xai_grok_test_support::redirect_mock::SlowServer::start(
+            std::time::Duration::from_secs(10), // very slow — would timeout test
+        ).await;
+        let url = server.url();
+        let svc = ProviderCatalogService::new();
+        let defaults = ProviderDefaults::default();
+        let pids = vec![ProviderId::new("a")];
+
+        svc.refresh_all(&pids, |_| Some((url.clone(), defaults.clone())), Duration::from_secs(0)).await;
+
+        // Wait for in-flight request
+        tokio::time::timeout(Duration::from_millis(500), async {
+            while server.in_flight_peak() == 0 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }).await.expect("request should start within 500ms");
+
+        // Cancel the in-flight request — shutdown should complete within 2s,
+        // NOT wait for the 10s server delay.
+        let shutdown_result = tokio::time::timeout(Duration::from_secs(3), svc.shutdown()).await;
+        assert!(shutdown_result.is_ok(), "shutdown must complete within 3s");
+    }
+
+    #[tokio::test]
+    async fn cancel_prevents_half_complete_snapshot() {
+        let server = xai_grok_test_support::redirect_mock::SlowServer::start(
+            std::time::Duration::from_secs(10),
+        ).await;
+        let url = server.url();
+        let svc = ProviderCatalogService::with_client_and_concurrency(
+            reqwest::Client::new(), 2,
+        );
+        let defaults = ProviderDefaults::default();
+        let pids = vec![
+            ProviderId::new("a"),
+            ProviderId::new("b"),
+            ProviderId::new("c"),
+        ];
+
+        svc.refresh_all(&pids, |_| Some((url.clone(), defaults.clone())), Duration::from_secs(0)).await;
+
+        // Wait for 2 in-flight requests (both permits taken)
+        tokio::time::timeout(Duration::from_millis(500), async {
+            while server.in_flight_peak() < 2 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }).await.expect("2 requests should be in-flight within 500ms");
+
+        svc.shutdown().await.unwrap();
+
+        // No request should have completed before cancellation (10s delay),
+        // so the snapshot must be pristine.
+        let snap = svc.snapshot().await;
+        assert_eq!(snap.catalog_revision, 0, "no revision bump after cancellation");
+        assert!(snap.providers.is_empty(), "no providers after cancellation");
     }
 
     // P9-007: stale-while-revalidate tests

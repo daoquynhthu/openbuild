@@ -206,14 +206,11 @@ pub fn apply_auth_policy(
 }
 
 fn candidates_to_source(candidates: &[CredentialCandidate]) -> Option<CredentialSource> {
-    for candidate in candidates {
-        return Some(match candidate {
-            CredentialCandidate::RequestOverride | CredentialCandidate::ModelInline | CredentialCandidate::ProviderInline => CredentialSource::Inline,
-            CredentialCandidate::ModelEnvironment(keys) | CredentialCandidate::ProviderEnvironment(keys) | CredentialCandidate::BuiltinEnvironment(keys) => CredentialSource::Environment(keys.clone()),
-            CredentialCandidate::Session(_) => CredentialSource::Session,
-        });
-    }
-    None
+    candidates.first().map(|candidate| match candidate {
+        CredentialCandidate::RequestOverride | CredentialCandidate::ModelInline | CredentialCandidate::ProviderInline => CredentialSource::Inline,
+        CredentialCandidate::ModelEnvironment(keys) | CredentialCandidate::ProviderEnvironment(keys) | CredentialCandidate::BuiltinEnvironment(keys) => CredentialSource::Environment(keys.clone()),
+        CredentialCandidate::Session(_) => CredentialSource::Session,
+    })
 }
 
 /// Input to an [`AuthFn::apply`] call. Carries request metadata and

@@ -134,13 +134,13 @@ fn resolve_candidates_system_order(
     }).flatten().collect();
     let has_sess = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session(_)));
 
-    if has_req { if let Some(v) = ctx.request_override { return Some(v.inner().to_string()); } }
-    if has_model { if let Some(v) = ctx.model_inline { return Some(v.inner().to_string()); } }
-    if has_prov { if let Some(v) = ctx.provider_inline { return Some(v.inner().to_string()); } }
+    if let Some(v) = ctx.request_override.filter(|_| has_req) { return Some(v.inner().to_string()); }
+    if let Some(v) = ctx.model_inline.filter(|_| has_model) { return Some(v.inner().to_string()); }
+    if let Some(v) = ctx.provider_inline.filter(|_| has_prov) { return Some(v.inner().to_string()); }
     for key in &env_keys {
         if let Ok(Some(v)) = (ctx.env_reader)(key) { return Some(v.inner().to_string()); }
     }
-    if has_sess { if let Some(v) = (ctx.session_resolver)() { return Some(v.inner().to_string()); } }
+    if let Some(v) = (ctx.session_resolver)().filter(|_| has_sess) { return Some(v.inner().to_string()); }
     None
 }
 

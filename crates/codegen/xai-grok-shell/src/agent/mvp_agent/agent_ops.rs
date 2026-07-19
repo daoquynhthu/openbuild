@@ -1159,7 +1159,7 @@ impl MvpAgent {
         let has_provider_binding = model.provider_id.is_some();
         let has_registry = registry_snapshot
             .as_ref()
-            .map_or(false, |snap| snap.revision > 0);
+            .is_some_and(|snap| snap.revision > 0);
         drop(cfg);
         let user_id = self
             .auth_manager

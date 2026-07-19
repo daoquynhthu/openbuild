@@ -1,34 +1,42 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use indexmap::IndexMap;
 use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::provider::SharedProvider;
 use xai_grok_provider::registry::{ProviderRegistry, RegistrySnapshot};
 use xai_grok_provider::types::ProviderId;
 
-use super::provider_catalog::{self, ProviderCatalogService};
+use super::provider_catalog::{self, CatalogShutdownError, ProviderCatalogService};
 
 /// Runtime container holding the provider registry and catalog service.
 ///
 /// The launcher creates one instance and injects it into shell and pager.
 /// Provides transactional rebuild and explicit refresh.
+/// Shares a CancellationToken with the catalog for coordinated shutdown (P9-009).
 #[derive(Debug)]
 pub struct ProviderRuntime {
     pub registry: Arc<ProviderRegistry>,
     pub catalog: Arc<ProviderCatalogService>,
     config_revision: RwLock<u64>,
-    cancelled: AtomicBool,
+    cancel_token: CancellationToken,
 }
 
 impl ProviderRuntime {
+    /// Create a new runtime with a fresh cancellation token shared with the catalog.
     pub fn new() -> Self {
+        let token = CancellationToken::new();
+        let catalog = Arc::new(ProviderCatalogService::with_client_and_token(
+            ProviderCatalogService::build_http_client(),
+            token.child_token(),
+            ProviderCatalogService::DEFAULT_CONCURRENCY,
+        ));
         Self {
             registry: Arc::new(ProviderRegistry::new()),
-            catalog: Arc::new(ProviderCatalogService::new()),
+            catalog,
             config_revision: RwLock::new(0),
-            cancelled: AtomicBool::new(false),
+            cancel_token: token,
         }
     }
 
@@ -57,9 +65,16 @@ impl ProviderRuntime {
         Ok(revision)
     }
 
-    /// Cancel outstanding catalog operations.
+    /// Cancel the shared cancellation token (P9-009).
+    /// All spawned catalog tasks will see cancellation at their next check point.
     pub fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Relaxed);
+        self.cancel_token.cancel();
+    }
+
+    /// Cancel and wait for catalog tasks with a 2-second deadline.
+    pub async fn shutdown(&self) -> Result<(), CatalogShutdownError> {
+        self.cancel_token.cancel();
+        self.catalog.shutdown().await
     }
 
     /// Current config revision.

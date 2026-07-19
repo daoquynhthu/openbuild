@@ -4528,7 +4528,7 @@ pub fn resolve_aux_model_sampling_config(
     let catalog_entry = find_model_by_id(models, model_id).cloned();
     if let Some(entry) = &catalog_entry {
         let has_provider_binding = entry.provider_id.is_some();
-        let has_registry = registry.map_or(false, |snap| snap.revision > 0);
+        let has_registry = registry.is_some_and(|snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(entry, session_key, disable_api_key_auth);
         match sampling_config_for_model_with_registry(
             entry,
@@ -4922,7 +4922,7 @@ pub fn resolve_web_search_sampling_config(
 ) -> Option<SamplerConfig> {
     let resolved = if let Some(entry) = find_model_by_id(models, model_id).cloned() {
         let has_provider_binding = entry.provider_id.is_some();
-        let has_registry = registry.map_or(false, |snap| snap.revision > 0);
+        let has_registry = registry.is_some_and(|snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
         match sampling_config_for_model_with_registry(
             &entry,
