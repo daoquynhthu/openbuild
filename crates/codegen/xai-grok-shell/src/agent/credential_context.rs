@@ -35,6 +35,36 @@ pub trait SessionCredentialResolver: Send + Sync {
 /// Concrete environment reader that reads from process env at request time.
 pub(crate) struct ProcessEnvironment;
 
+/// xAI OAuth session resolver. Wraps the existing `AuthManager` to provide
+/// session tokens as a `CredentialCandidate::Session` resolver (P8-005).
+#[derive(Clone)]
+pub struct XaiSessionResolver {
+    manager: std::sync::Arc<crate::auth::manager::AuthManager>,
+}
+
+impl XaiSessionResolver {
+    pub fn new(manager: std::sync::Arc<crate::auth::manager::AuthManager>) -> Self {
+        Self { manager }
+    }
+}
+
+#[async_trait::async_trait]
+impl SessionCredentialResolver for XaiSessionResolver {
+    async fn resolve(&self) -> Result<Option<SecretValue>, String> {
+        let auth = self.manager.current_or_expired();
+        match auth {
+            Some(a) => Ok(Some(SecretValue::new(a.key.clone()))),
+            None => {
+                // Try env fallback for CLI-only scenarios
+                match std::env::var("XAI_SESSION_TOKEN") {
+                    Ok(val) if !val.is_empty() => Ok(Some(SecretValue::new(val))),
+                    _ => Ok(None),
+                }
+            }
+        }
+    }
+}
+
 impl EnvironmentReader for ProcessEnvironment {
     fn read(&self, var: &str) -> Result<Option<SecretValue>, String> {
         match std::env::var(var) {
