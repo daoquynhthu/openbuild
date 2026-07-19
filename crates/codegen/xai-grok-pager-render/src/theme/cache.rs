@@ -21,7 +21,6 @@ use super::system_appearance;
 /// `load_from_disk()`, then kept in sync by `set()`.
 static CURRENT: AtomicU8 = AtomicU8::new(ThemeKind::GrokNight as u8);
 static LOADED: AtomicBool = AtomicBool::new(false);
-#[cfg(any(test, feature = "default-bazel"))]
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 
 /// Whether auto-switching mode is active. Set when the config file
@@ -287,7 +286,6 @@ pub fn seed_auto_theme_defaults_for_test() {
     *AUTO_THEME_CONFIG.lock().unwrap_or_else(|e| e.into_inner()) = Some(AutoThemeConfig::default());
 }
 
-#[cfg(any(test, feature = "default-bazel"))]
 pub fn test_lock() -> &'static Mutex<()> {
     &TEST_LOCK
 }
