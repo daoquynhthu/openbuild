@@ -1,8 +1,6 @@
-use std::path::{Path, PathBuf};
-#[cfg(test)]
 use std::fs::File;
-#[cfg(test)]
 use std::io::Write;
+use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::Mutex;
 
@@ -26,7 +24,6 @@ pub enum AtomicWriteError {
     Cleanup { target: PathBuf, source: std::io::Error },
 }
 
-#[cfg(test)]
 pub(crate) trait AtomicReplaceBackend: Send + Sync {
     fn create_unique_temp(&self, target: &Path) -> Result<(PathBuf, File), AtomicWriteError>;
     fn replace_existing(&self, temp: &Path, target: &Path) -> Result<(), AtomicWriteError>;
@@ -34,21 +31,7 @@ pub(crate) trait AtomicReplaceBackend: Send + Sync {
     fn cleanup_temp(&self, temp: &Path);
 }
 
-/// Write bytes atomically to `path` using a platform-appropriate backend.
-///
-/// Backend implementations are provided in P3-007 (Unix) and P3-008 (Windows).
-#[allow(unused_variables)]
-pub fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), AtomicWriteError> {
-    panic!("atomic_replace requires a real backend — use atomic_replace_test in tests")
-}
-
-/// Test-only helper: run atomic replace with a given backend.
-#[cfg(test)]
-pub(crate) fn atomic_replace_test(
-    path: &Path,
-    bytes: &[u8],
-    backend: &dyn AtomicReplaceBackend,
-) -> Result<(), AtomicWriteError> {
+fn do_atomic_replace(path: &Path, bytes: &[u8], backend: &dyn AtomicReplaceBackend) -> Result<(), AtomicWriteError> {
     let (temp_path, mut file) = backend.create_unique_temp(path)?;
     let result = (|| -> Result<(), AtomicWriteError> {
         file.write_all(bytes).map_err(|e| AtomicWriteError::Write {
@@ -76,7 +59,63 @@ pub(crate) fn atomic_replace_test(
     result
 }
 
+/// Atomically replace file contents.
+pub fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), AtomicWriteError> {
+    do_atomic_replace(path, bytes, &UnixBackend)
+}
+
+#[cfg(test)]
+pub(crate) fn atomic_replace_test(
+    path: &Path,
+    bytes: &[u8],
+    backend: &dyn AtomicReplaceBackend,
+) -> Result<(), AtomicWriteError> {
+    do_atomic_replace(path, bytes, backend)
+}
+
 // ── Unix backend (P3-007) ──
+
+struct UnixBackend;
+
+impl AtomicReplaceBackend for UnixBackend {
+    fn create_unique_temp(&self, target: &Path) -> Result<(PathBuf, File), AtomicWriteError> {
+        let dir = target.parent().unwrap_or(Path::new("."));
+        let mut err = None;
+        for _ in 0..10 {
+            let temp = dir.join(format!(".tmp_{}", std::process::id()));
+            match std::fs::OpenOptions::new().create_new(true).write(true).open(&temp) {
+                Ok(f) => return Ok((temp, f)),
+                Err(e) => err = Some(e),
+            }
+        }
+        Err(AtomicWriteError::CreateTemp {
+            target: target.to_path_buf(),
+            source: err.unwrap_or_else(|| std::io::Error::other("too many collisions")),
+        })
+    }
+
+    fn replace_existing(&self, temp: &Path, target: &Path) -> Result<(), AtomicWriteError> {
+        std::fs::rename(temp, target).map_err(|e| AtomicWriteError::Replace {
+            target: target.to_path_buf(),
+            source: e,
+        })
+    }
+
+    fn sync_parent(&self, parent: &Path) -> Result<(), AtomicWriteError> {
+        let dir = File::open(parent).map_err(|e| AtomicWriteError::SyncParent {
+            target: parent.to_path_buf(),
+            source: e,
+        })?;
+        dir.sync_all().map_err(|e| AtomicWriteError::SyncParent {
+            target: parent.to_path_buf(),
+            source: e,
+        })
+    }
+
+    fn cleanup_temp(&self, temp: &Path) {
+        let _ = std::fs::remove_file(temp);
+    }
+}
 
 // ── Windows backend (P3-008) ──
 
