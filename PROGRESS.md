@@ -21,6 +21,29 @@
 - `rg` 不存在 production legacy mutator 调用 ✅
 - provider core check/clippy/test zero failure ✅
 
+## Phase 6: Single ProviderRuntime Bootstrap Chain — 2026-07-19
+
+### P6-001: Legacy configure_providers empty snapshot test
+- Created `xai-grok-shell/tests/provider_bootstrap.rs`
+- `legacy_configure_providers_snapshot_is_empty`: records that current legacy path produces revision=0, providers empty, routes empty (root-cause evidence)
+- `bootstrap_provider_runtime_produces_full_snapshot`: verifies new helper produces revision=1, providers+Routes non-empty, and seal is correct
+
+### P6-002: Bootstrap helper skeleton
+- Created `xai-grok-shell/src/agent/provider_bootstrap.rs` with:
+  - `ProviderBootstrapInput { resolved: ResolvedProviderSet }`
+  - `ProviderBootstrapError` (thiserror)
+  - `bootstrap_provider_runtime(input) -> Result<Arc<ProviderRuntime>, ProviderBootstrapError>`
+- Registers 6 built-in definitions + `OpenAiCompatibleProviderFactory`
+- Calls `rebuild_from_resolved` for atomic publish
+- Added `pub mod provider_bootstrap` to `agent/mod.rs`
+- Changed `openai_compatible_factory` from `pub(crate)` to `pub` for cross-crate access
+
+### Key Results
+- `cargo test -p xai-grok-shell --lib`: 3495 passed, 0 failed ✅
+- `cargo test -p xai-grok-shell --test provider_bootstrap`: 2 passed ✅
+- `cargo clippy -p xai-grok-shell --all-targets -- -D warnings`: 0 warnings ✅
+- `cargo clippy -p xai-grok-provider --all-targets -- -D warnings`: 0 warnings ✅
+
 ## Phase 10: Real TUI and CLI Provider Configuration Closure
 
 ### Completion

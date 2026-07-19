@@ -11,6 +11,7 @@ pub(crate) mod handlers;
 pub mod init;
 pub mod models;
 pub mod mvp_agent;
+pub mod provider_bootstrap;
 pub mod provider_catalog;
 pub mod provider_resolution;
 pub mod provider_runtime;
