@@ -32,23 +32,9 @@ impl std::fmt::Display for SecretValue {
     }
 }
 
-/// Runtime configuration for a provider — the resolved form of
-/// [`ProviderConfig`](crate::config::ProviderConfig) after precedence
-/// resolution.  Secret values are wrapped in [`SecretValue`] to prevent
-/// accidental leakage through Debug/Display/serialization.
-#[derive(Clone, Debug)]
-pub struct ProviderRuntimeConfig {
-    pub public: ProviderPublicConfig,
-    pub inline_api_key: Option<SecretValue>,
-}
-
-/// Public (non-secret) portion of a provider's runtime configuration.
-/// Safe for Debug/Display/serialization and diagnostic output.
-#[derive(Clone, Debug)]
-pub struct ProviderPublicConfig {
-    pub base_url: Option<String>,
-    pub extra_headers: Option<indexmap::IndexMap<String, String>>,
-}
+// ProviderRuntimeConfig and ProviderPublicConfig are defined in
+// `crate::resolution`.  Re-export them here for convenience.
+pub use crate::resolution::{ProviderPublicConfig, ProviderRuntimeConfig};
 
 use crate::error::ProviderError;
 
