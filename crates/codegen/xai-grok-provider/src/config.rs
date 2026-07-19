@@ -46,6 +46,45 @@ pub struct ParsedProviderConfig {
     pub entries: IndexMap<ProviderId, ProviderConfig>,
 }
 
+/// Serde-facing input for a single provider's configuration.
+/// Values exist only during resolution; after resolution they are consumed
+/// into [`ProviderRuntimeConfig`](crate::resolution::ProviderRuntimeConfig).
+/// `api_key` is immediately wrapped in [`SecretValue`](crate::auth::SecretValue)
+/// and never exposed as a plain `String` beyond this point.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[non_exhaustive]
+#[serde(default)]
+pub struct ProviderConfigInput {
+    pub api_key: Option<String>,
+    pub env_key: Option<Vec<String>>,
+    pub base_url: Option<String>,
+    pub protocol: Option<String>,
+    pub model_list_path: Option<String>,
+    pub model_list_format: Option<String>,
+    pub allow_insecure_http: Option<bool>,
+    pub extra_headers: Option<IndexMap<String, String>>,
+}
+
+impl ProviderConfigInput {
+    /// Consume this input and produce a [`ProviderRuntimeConfig`].
+    /// `api_key` is wrapped in [`SecretValue`] and never returned as `String`.
+    pub fn into_runtime_config(self) -> crate::resolution::ProviderRuntimeConfig {
+        crate::resolution::ProviderRuntimeConfig {
+            public: crate::resolution::ProviderPublicConfig {
+                base_url: self.base_url,
+                protocol: self.protocol,
+                model_list_path: self.model_list_path,
+                model_list_format: self.model_list_format.map(|s| match s.as_str() {
+                    "ollama_tags" | "ollama" => crate::types::ModelListFormat::OllamaTags,
+                    _ => crate::types::ModelListFormat::OpenAiCompatible,
+                }),
+                extra_headers: self.extra_headers.unwrap_or_default(),
+            },
+            inline_api_key: self.api_key.map(crate::auth::SecretValue::new),
+        }
+    }
+}
+
 /// Single parsed [provider.*] entry — the deserialization target.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[non_exhaustive]
@@ -408,6 +447,48 @@ api_key = "sk-test"
         let merged = base.merge(other);
         assert_eq!(merged.api_key.as_deref(), Some("other-key"));
         assert_eq!(merged.base_url.as_deref(), Some("https://base.url"));
+    }
+
+    #[test]
+    fn provider_config_input_to_runtime_redacts_secret() {
+        let input = ProviderConfigInput {
+            api_key: Some("canary-secret-not-in-output".into()),
+            base_url: Some("https://api.example.com".into()),
+            ..Default::default()
+        };
+        let rt = input.into_runtime_config();
+        let debug = format!("{rt:?}");
+        assert!(
+            !debug.contains("canary-secret-not-in-output"),
+            "runtime config Debug must not leak secret"
+        );
+        assert!(
+            debug.contains("[REDACTED]"),
+            "runtime config Debug must show [REDACTED] for inline_api_key"
+        );
+    }
+
+    #[test]
+    fn provider_config_input_empty_api_key_is_none() {
+        let input = ProviderConfigInput {
+            api_key: None,
+            ..Default::default()
+        };
+        let rt = input.into_runtime_config();
+        assert!(rt.inline_api_key.is_none());
+    }
+
+    #[test]
+    fn provider_config_input_model_list_format_maps_correctly() {
+        let input = ProviderConfigInput {
+            model_list_format: Some("ollama_tags".into()),
+            ..Default::default()
+        };
+        let rt = input.into_runtime_config();
+        assert_eq!(
+            rt.public.model_list_format,
+            Some(crate::types::ModelListFormat::OllamaTags)
+        );
     }
 
 }
