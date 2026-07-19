@@ -5,6 +5,7 @@ pub mod endpoint;
 pub mod error;
 pub mod events;
 pub mod model;
+pub mod prepared;
 pub mod protocol;
 pub mod provider;
 pub mod providers;

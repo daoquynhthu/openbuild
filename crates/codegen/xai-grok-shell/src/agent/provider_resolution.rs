@@ -40,14 +40,10 @@ pub enum ProviderResolutionError {
     ModelNotFound(String),
 }
 
-/// Temporary migration function: converts a `RegistrySnapshot` + model + overrides
-/// into a `SamplerConfig`. New code should call `resolve_model_execution` which
-/// returns `ResolvedModelExecution` directly.
-///
-/// This function does NOT send requests or fill auth headers.
-/// It will be removed in P8-011 (Phase 8).
-#[deprecated(note = "removed in P8-011 — use resolve_model_execution directly")]
-pub fn execution_to_unprepared_sampler_config_for_migration(
+/// Migration adapter: converts route compiler output to `SamplerConfig`.
+/// This is the only remaining path producing `SamplerConfig` from the route compiler.
+/// It will be removed when all callers use `PreparedSamplerConfig` directly.
+pub fn execution_to_sampler_config(
     model: &ModelEntry,
     registry: &RegistrySnapshot,
     api_key: Option<&str>,
