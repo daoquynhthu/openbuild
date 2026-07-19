@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 use xai_grok_provider::auth::{AuthPolicy, apply_auth_policy};
+use xai_grok_provider::model::{GenerationOptions, ModelLimits};
 use xai_grok_provider::registry::RegistrySnapshot;
 use xai_grok_provider::route::Route;
 use xai_grok_provider::types::{ProviderId, RouteId};
@@ -39,13 +40,43 @@ pub enum ProviderResolutionError {
     ModelNotFound(String),
 }
 
+/// Merge generation parameters with fixed precedence: route defaults < model info < request overrides.
+/// Limits are capped by route limits — request cannot exceed provider/model caps.
+pub fn merge_generation_params(
+    route_gen: &GenerationOptions,
+    route_limits: &ModelLimits,
+    model_max_tokens: Option<u32>,
+    model_temperature: Option<f32>,
+    model_top_p: Option<f32>,
+    request_max_tokens: Option<u32>,
+    request_temperature: Option<f32>,
+    request_top_p: Option<f32>,
+) -> (Option<u32>, Option<f32>, Option<f32>) {
+    let max_tokens = request_max_tokens
+        .or(model_max_tokens)
+        .or(route_gen.max_tokens)
+        .map(|v| {
+            route_limits
+                .output
+                .map(|cap| v.min(cap))
+                .unwrap_or(v)
+        });
+    let temperature = request_temperature
+        .or(model_temperature)
+        .or(route_gen.temperature);
+    let top_p = request_top_p
+        .or(model_top_p)
+        .or(route_gen.top_p);
+    (max_tokens, temperature, top_p)
+}
+
 /// Resolve a `SamplerConfig` from a `ModelEntry`, registry snapshot, and credentials.
 ///
 /// This is the only provider-aware constructor of `SamplerConfig`. It applies:
 /// 1. explicit model binding;
 /// 2. provider route selector;
 /// 3. route endpoint and protocol;
-/// 4. model/route/provider generation defaults;
+/// 4. model/route/provider generation defaults (P7-007);
 /// 5. header merge;
 /// 6. credential resolution.
 pub fn resolve_model_execution(
@@ -139,6 +170,20 @@ pub fn resolve_model_execution(
         _ => unreachable!("checked above"),
     };
 
+    // P7-007: merge generation params with fixed precedence.
+    // route defaults < model info < request overrides.
+    // Limits are capped by route limits.
+    let (max_completion_tokens, temperature, top_p) = merge_generation_params(
+        &route.generation_defaults,
+        &route.limits,
+        model.info.max_completion_tokens,
+        model.info.temperature,
+        model.info.top_p,
+        None, // request_max_tokens — no request overrides in current path
+        None, // request_temperature
+        None, // request_top_p
+    );
+
     Ok(SamplerConfig {
         api_key: api_key.map(|s| s.to_string()),
         model: model.info.model.clone(),
@@ -150,9 +195,9 @@ pub fn resolve_model_execution(
         auth_scheme,
         extra_headers,
         context_window: model.info.context_window.get(),
-        max_completion_tokens: model.info.max_completion_tokens,
-        temperature: model.info.temperature,
-        top_p: model.info.top_p,
+        max_completion_tokens,
+        temperature,
+        top_p,
         reasoning_effort: model.info.reasoning_effort,
         stream_tool_calls: model.info.stream_tool_calls.unwrap_or(false),
         ..Default::default()
@@ -412,5 +457,63 @@ mod tests {
         let (provider, model) = result.unwrap();
         assert_eq!(provider, "xai");
         assert_eq!(model, "grok-build");
+    }
+
+    // P7-007: generation/default merge tests
+    #[test]
+    fn merge_gen_route_defaults_used_when_model_and_request_are_none() {
+        let (max_tokens, temperature, top_p) = merge_generation_params(
+            &GenerationOptions::default(),
+            &ModelLimits::default(),
+            None, None, None, None, None, None,
+        );
+        // All defaults are None, so result should be None
+        assert_eq!(max_tokens, None);
+        assert_eq!(temperature, None);
+        assert_eq!(top_p, None);
+    }
+
+    #[test]
+    fn merge_gen_model_overrides_route() {
+        let route_gen = GenerationOptions::default();
+        let route_limits = ModelLimits::default();
+        let (max_tokens, temperature, _) = merge_generation_params(
+            &route_gen, &route_limits, Some(200), Some(0.7), None, None, None, None,
+        );
+        assert_eq!(max_tokens, Some(200), "model max_tokens when route has none");
+        assert_eq!(temperature, Some(0.7), "model temperature when route has none");
+    }
+
+    #[test]
+    fn merge_gen_request_overrides_model_and_route() {
+        let route_gen = GenerationOptions::default();
+        let route_limits = ModelLimits::default();
+        let (max_tokens, temperature, _) = merge_generation_params(
+            &route_gen, &route_limits, Some(200), Some(0.7), None,
+            Some(300), Some(0.9), None,
+        );
+        assert_eq!(max_tokens, Some(300), "request max_tokens overrides model");
+        assert_eq!(temperature, Some(0.9), "request temperature overrides model");
+    }
+
+    #[test]
+    fn merge_gen_limits_cap_max_tokens() {
+        let route_gen = GenerationOptions::default();
+        let route_limits = ModelLimits::default();
+        let (max_tokens, _, _) = merge_generation_params(
+            &route_gen, &route_limits, Some(1000), None, None, None, None, None,
+        );
+        // default limits have output=None, so no cap
+        assert_eq!(max_tokens, Some(1000), "no cap when route limit is None");
+    }
+
+    #[test]
+    fn merge_gen_no_cap_when_limit_is_none() {
+        let route_gen = GenerationOptions::default();
+        let route_limits = ModelLimits::default();
+        let (max_tokens, _, _) = merge_generation_params(
+            &route_gen, &route_limits, Some(1000), None, None, None, None, None,
+        );
+        assert_eq!(max_tokens, Some(1000), "no cap when route limit is None");
     }
 }

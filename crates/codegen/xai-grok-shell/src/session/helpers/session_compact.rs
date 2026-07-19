@@ -1591,6 +1591,7 @@ mod reasoning_compaction_regression_tests {
             model: "test-model".to_string(),
             endpoint_path: None,
             endpoint_query: None,
+            request_url: None,
             protocol_id: None,
             max_completion_tokens: Some(1000),
             temperature: Some(0.7),

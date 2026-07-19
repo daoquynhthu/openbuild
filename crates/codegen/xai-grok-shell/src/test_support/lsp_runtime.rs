@@ -42,6 +42,7 @@ pub(crate) fn ctx_with_toggle(toggle: HashMap<String, bool>) -> SubagentSpawnCon
             model: String::new(),
             endpoint_path: None,
             endpoint_query: None,
+            request_url: None,
             protocol_id: None,
             max_completion_tokens: None,
             temperature: None,
