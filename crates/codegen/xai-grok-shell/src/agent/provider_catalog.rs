@@ -306,13 +306,17 @@ impl ProviderCatalogService {
                     Ok(v) => v,
                     Err(e) => return (pid.clone(), None, Some(format!("JSON error: {e}"))),
                 };
-                let models = if url.contains("/api/tags") {
-                    crate::agent::provider_catalog::parse_ollama_tags_models(&body, &defaults)
-                } else {
-                    crate::agent::provider_catalog::parse_openai_compatible_provider_models(
-                        &body,
-                        &defaults.base_url,
-                    )
+                // P9-004: use declared format, NOT URL-based inference.
+                let models = match defaults.model_list_format {
+                    xai_grok_provider::types::ModelListFormat::OllamaTags => {
+                        crate::agent::provider_catalog::parse_ollama_tags_models(&body, &defaults)
+                    }
+                    xai_grok_provider::types::ModelListFormat::OpenAiCompatible => {
+                        crate::agent::provider_catalog::parse_openai_compatible_provider_models(
+                            &body,
+                            &defaults.base_url,
+                        )
+                    }
                 };
                 (pid, Some(models), None)
             }));
