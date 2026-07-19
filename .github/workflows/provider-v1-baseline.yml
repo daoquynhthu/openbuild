@@ -54,6 +54,7 @@ jobs:
           cargo doc --workspace --no-deps --locked 2>&1 | tee artifacts/provider-v1/linux/docs.log
         continue-on-error: true
       - name: Disk before/after
+        continue-on-error: true
         run: df -h . >> artifacts/provider-v1/linux/disk.log
       - uses: actions/upload-artifact@v4
         with:
@@ -114,6 +115,7 @@ jobs:
           cargo doc --workspace --no-deps --locked 2>&1 | Tee-Object -FilePath artifacts/provider-v1/windows/docs.log
         continue-on-error: true
       - name: Disk before/after
+        continue-on-error: true
         shell: pwsh
         run: Get-Volume | Select-Object DriveLetter,SizeRemaining,Size >> artifacts/provider-v1/windows/disk.log
       - uses: actions/upload-artifact@v4
@@ -163,6 +165,7 @@ jobs:
           cargo doc --workspace --no-deps --locked 2>&1 | tee artifacts/provider-v1/macos/docs.log
         continue-on-error: true
       - name: Disk before/after
+        continue-on-error: true
         run: df -h . >> artifacts/provider-v1/macos/disk.log
       - uses: actions/upload-artifact@v4
         with:
