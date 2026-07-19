@@ -150,7 +150,11 @@ def repair_mode(args):
     excl = []
     if args.exclusions:
         excl = parse_exclusions(args.exclusions)
-        print(f"Parsed {len(excl)} exclusion rows", file=sys.stderr)
+        if args.owner_phase:
+            excl = [r for r in excl if r.get("owner phase", r.get("Owner Phase", "")) == args.owner_phase]
+            print(f"Filtered to {len(excl)} exclusion rows for owner phase {args.owner_phase}", file=sys.stderr)
+        else:
+            print(f"Parsed {len(excl)} exclusion rows", file=sys.stderr)
 
     rows = ledger + excl
     if not rows:
@@ -231,6 +235,7 @@ def main():
     parser.add_argument("--phase", type=int, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--check", action="store_true", help="Verify existing output is unmodified")
+    parser.add_argument("--owner-phase", type=str, help="Filter exclusion rows by owner phase (P11/P12/P13)")
     args = parser.parse_args()
 
     if args.mode == "classify":

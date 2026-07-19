@@ -116,13 +116,47 @@ def write_ledger(entries, output_path):
     return len(entries)
 
 
+def validate_ledger(ledger_path: Path, crates_root: Path) -> int:
+    """Validate that ledger scan results match current source."""
+    fresh = scan_all(crates_root)
+    fresh_ids = {r["ID"] for r in fresh}
+
+    text = ledger_path.read_text(encoding="utf-8")
+    import re
+    ledger_ids = set(re.findall(r"WX-[a-f0-9]{12}", text))
+
+    only_fresh = fresh_ids - ledger_ids
+    only_ledger = ledger_ids - fresh_ids
+
+    if only_fresh:
+        print(f"ERROR: {len(only_fresh)} exclusion(s) in source but not in ledger:", file=sys.stderr)
+        for wid in sorted(only_fresh)[:10]:
+            print(f"  {wid}", file=sys.stderr)
+    if only_ledger:
+        print(f"ERROR: {len(only_ledger)} exclusion(s) in ledger but not in source:", file=sys.stderr)
+        for wid in sorted(only_ledger)[:10]:
+            print(f"  {wid}", file=sys.stderr)
+
+    return len(only_fresh) + len(only_ledger)
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--validate-ledger", type=Path, help="Validate an existing ledger against current source")
     args = parser.parse_args()
 
     crates_root = Path(__file__).resolve().parent.parent.parent / "crates"
+
+    if args.validate_ledger:
+        errors = validate_ledger(args.validate_ledger, crates_root)
+        if errors:
+            print(f"VALIDATION FAILED: {errors} discrepancies", file=sys.stderr)
+            exit(1)
+        print("VALIDATION PASSED: ledger matches source", file=sys.stderr)
+        exit(0)
+
     entries = scan_all(crates_root)
     n = write_ledger(entries, args.output)
     print(f"Wrote {n} entries to {args.output}", file=sys.stderr)
