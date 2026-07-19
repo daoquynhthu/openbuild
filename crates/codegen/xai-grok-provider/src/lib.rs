@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod config;
+pub mod headers;
 pub mod endpoint;
 pub mod error;
 pub mod events;

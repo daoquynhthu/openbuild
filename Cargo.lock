@@ -13527,6 +13527,7 @@ dependencies = [
  "bytes",
  "futures",
  "futures-util",
+ "http 1.4.0",
  "indexmap",
  "parking_lot",
  "serde",
