@@ -58,6 +58,13 @@
 - `cargo clippy -p xai-grok-shell --all-targets -- -D warnings`: 0 warnings ✅
 - `cargo clippy -p xai-grok-provider --all-targets -- -D warnings`: 0 warnings ✅
 
+### Phase 6 Audit (2026-07-19): 5 gaps found and closed
+- **GAP-1** (P6-001): removed permanent `legacy_configure_providers_snapshot_is_empty` — plan says "不得写断言坏行为成立的永久测试"
+- **GAP-2** (P6-004): `bootstrap_from_config` returns `ConfigDiagnostic` error instead of silently ignoring `_diags`
+- **GAP-3** (P6-005): added `bootstrap_precedence_applied_once` + `bootstrap_fails_on_config_diagnostics` tests
+- **GAP-4** (P6-006): TUI path (`async_main`) — compat/cli=None is correct for non-agent TUI path
+- **GAP-5** (P6-010): ConfigReloader in `app.rs` now receives `agent_config.provider_runtime` instead of `None`; identity test added
+
 ### P6-006: launcher uses bootstrap helper
 - `xai-grok-pager-bin/src/main.rs`: replaced `register_all + configure_providers` block with `bootstrap_from_config`
 - compat override and CLI override computation kept, passed to bootstrap
