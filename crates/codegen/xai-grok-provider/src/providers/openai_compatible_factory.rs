@@ -120,6 +120,7 @@ impl OpenAiCompatibleProviderFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ProviderConfig;
     use crate::resolution::ResolvedProviderSpec;
 
     fn make_spec(id: &str, profile: Option<&str>, base_url: Option<String>) -> ResolvedProviderSpec {
@@ -142,17 +143,97 @@ mod tests {
     }
 
     #[test]
-    fn factory_creates_independent_instances() {
+    fn factory_two_custom_compatible_providers_independent() {
+        // Simulate parsing the frozen TOML example from the plan:
+        //   [provider.deepseek]
+        //   kind = "openai_compatible"
+        //   profile = "deepseek"
+        //
+        //   [provider.internal]
+        //   kind = "openai_compatible"
+        //   base_url = "https://llm.example/v1"
+        //   protocol = "chat_completions"
+        //   model_list_path = "/models"
+        //   model_list_format = "openai_compatible"
         let factory = OpenAiCompatibleProviderFactory;
-        let deepseek = make_spec("deepseek", Some("deepseek"), None);
-        let internal = make_spec("internal", None, Some("https://llm.internal/v1".into()));
 
-        let ds_provider = factory.create(&deepseek).unwrap();
-        let int_provider = factory.create(&internal).unwrap();
+        let deepseek_spec = make_spec("deepseek", Some("deepseek"), None);
+        let internal_spec = make_spec("internal", None, Some("https://llm.example/v1".into()));
 
+        let ds_provider = factory.create(&deepseek_spec).unwrap();
+        let int_provider = factory.create(&internal_spec).unwrap();
+
+        // Identity isolation
         assert_eq!(ds_provider.id().0, "deepseek");
         assert_eq!(int_provider.id().0, "internal");
-        assert_ne!(ds_provider.id().0, int_provider.id().0);
+
+        // Configure each provider with its own user config
+        let ds_cfg = ProviderConfig {
+            id: Some("deepseek".into()),
+            kind: Some("openai_compatible".into()),
+            profile: Some("deepseek".into()),
+            ..Default::default()
+        };
+        let int_cfg = ProviderConfig {
+            id: Some("internal".into()),
+            kind: Some("openai_compatible".into()),
+            base_url: Some("https://llm.example/v1".into()),
+            protocol: Some("chat_completions".into()),
+            ..Default::default()
+        };
+
+        let ds_configured = ds_provider.configure(ds_cfg);
+        let int_configured = int_provider.configure(int_cfg);
+
+        // Endpoint isolation: each route must reference its own provider
+        for (route_id, route) in &ds_configured.routes {
+            assert_eq!(
+                route.provider_id.0, "deepseek",
+                "route {} must belong to deepseek",
+                route_id.0
+            );
+        }
+        for (route_id, route) in &int_configured.routes {
+            assert_eq!(
+                route.provider_id.0, "internal",
+                "route {} must belong to internal",
+                route_id.0
+            );
+        }
+
+        // env_key isolation: deepseek route uses DEEPSEEK_API_KEY, internal uses empty
+        let ds_route = ds_configured.routes.values().next().unwrap();
+        let int_route = int_configured.routes.values().next().unwrap();
+        let ds_auth = format!("{:?}", ds_route.auth);
+        let int_auth = format!("{:?}", int_route.auth);
+        assert!(
+            ds_auth.contains("DEEPSEEK_API_KEY"),
+            "deepseek route auth should contain DEEPSEEK_API_KEY, got {ds_auth}"
+        );
+        assert!(
+            !int_auth.contains("DEEPSEEK_API_KEY"),
+            "internal route auth should NOT contain DEEPSEEK_API_KEY, got {int_auth}"
+        );
+
+        // Route count: each must have exactly one route
+        assert_eq!(ds_configured.routes.len(), 1);
+        assert_eq!(int_configured.routes.len(), 1);
+
+        // Route IDs must be distinct (use provider-specific prefix)
+        let ds_route_id = &ds_configured.routes.keys().next().unwrap().0;
+        let int_route_id = &int_configured.routes.keys().next().unwrap().0;
+        assert_ne!(
+            ds_route_id, int_route_id,
+            "route IDs must not collide across providers"
+        );
+        assert!(
+            ds_route_id.starts_with("deepseek-"),
+            "deepseek route must use deepseek- prefix, got {ds_route_id}"
+        );
+        assert!(
+            int_route_id.starts_with("internal-"),
+            "internal route must use internal- prefix, got {int_route_id}"
+        );
     }
 
     #[test]
