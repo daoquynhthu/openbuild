@@ -90,6 +90,7 @@ pub struct ProviderCatalogService {
     snapshot: RwLock<Arc<ModelCatalogSnapshot>>,
     http_client: reqwest::Client,
     cancelled: Arc<AtomicBool>,
+    concurrency: Arc<tokio::sync::Semaphore>,
 }
 
 impl std::fmt::Debug for ProviderCatalogService {
@@ -143,8 +144,29 @@ impl ProviderCatalogService {
             .expect("catalog HTTP client build must succeed")
     }
 
-    /// Constructor with explicit client (for testing).
-    pub(crate) fn with_client(http_client: reqwest::Client) -> Self {
+    pub const DEFAULT_CONCURRENCY: u32 = 4;
+    pub const MIN_CONCURRENCY: u32 = 1;
+    pub const MAX_CONCURRENCY: u32 = 16;
+
+    pub fn validate_concurrency(v: u32) -> Result<(), String> {
+        if v < Self::MIN_CONCURRENCY || v > Self::MAX_CONCURRENCY {
+            return Err(format!(
+                "concurrency must be between {} and {}, got {}",
+                Self::MIN_CONCURRENCY, Self::MAX_CONCURRENCY, v
+            ));
+        }
+        Ok(())
+    }
+
+    /// Constructor with explicit client and concurrency limit (for testing).
+    pub(crate) fn with_client_and_concurrency(
+        http_client: reqwest::Client,
+        max_concurrency: u32,
+    ) -> Self {
+        assert!(
+            (Self::MIN_CONCURRENCY..=Self::MAX_CONCURRENCY).contains(&max_concurrency),
+            "concurrency out of range"
+        );
         Self {
             snapshot: RwLock::new(Arc::new(ModelCatalogSnapshot {
                 catalog_revision: 0,
@@ -152,7 +174,13 @@ impl ProviderCatalogService {
             })),
             http_client,
             cancelled: Arc::new(AtomicBool::new(false)),
+            concurrency: Arc::new(tokio::sync::Semaphore::new(max_concurrency as usize)),
         }
+    }
+
+    /// Constructor with explicit client (for testing, uses default concurrency).
+    pub(crate) fn with_client(http_client: reqwest::Client) -> Self {
+        Self::with_client_and_concurrency(http_client, Self::DEFAULT_CONCURRENCY)
     }
 
     /// Return the current immutable snapshot.
@@ -253,6 +281,7 @@ impl ProviderCatalogService {
         };
 
         let mut handles = Vec::new();
+        let semaphore = Arc::clone(&self.concurrency);
         for pid in &stale_pids {
             let Some((url, defaults)) = build_url(pid) else {
                 continue;
@@ -260,8 +289,12 @@ impl ProviderCatalogService {
             let pid = pid.clone();
             let client = self.http_client.clone();
             let cancelled = self.cancelled.clone();
+            let sem = Arc::clone(&semaphore);
 
             handles.push(tokio::spawn(async move {
+                // P9-003: bounded concurrency — acquire permit inside the spawned task.
+                // If max concurrency is reached, this awaits until a permit is available.
+                let _permit = sem.acquire().await;
                 if cancelled.load(Ordering::Relaxed) {
                     return (pid.clone(), None, Some("cancelled".into()));
                 }
@@ -709,6 +742,35 @@ mod tests {
         let svc = ProviderCatalogService::new();
         // We can't directly inspect the policy, but the builder was called.
         _ = svc.http_client;
+    }
+
+    // P9-003: bounded concurrency tests
+    #[test]
+    fn concurrency_default_is_four() {
+        assert_eq!(ProviderCatalogService::DEFAULT_CONCURRENCY, 4);
+    }
+    #[test]
+    fn concurrency_validate_accepts_range() {
+        assert!(ProviderCatalogService::validate_concurrency(1).is_ok());
+        assert!(ProviderCatalogService::validate_concurrency(4).is_ok());
+        assert!(ProviderCatalogService::validate_concurrency(16).is_ok());
+    }
+    #[test]
+    fn concurrency_validate_rejects_out_of_range() {
+        assert!(ProviderCatalogService::validate_concurrency(0).is_err());
+        assert!(ProviderCatalogService::validate_concurrency(17).is_err());
+    }
+    #[tokio::test]
+    async fn concurrency_limit_creates_correct_permits() {
+        let svc = ProviderCatalogService::with_client_and_concurrency(
+            reqwest::Client::new(), 1,
+        );
+        assert_eq!(svc.concurrency.available_permits(), 1);
+    }
+    #[tokio::test]
+    async fn concurrency_default_creates_4_permits() {
+        let svc = ProviderCatalogService::new();
+        assert_eq!(svc.concurrency.available_permits(), 4);
     }
 
     #[test]
