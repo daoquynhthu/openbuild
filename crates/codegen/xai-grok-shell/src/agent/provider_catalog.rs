@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 /// Redirect policy per P9-002: max 3 redirects, same-origin only, no credential copy.
 fn catalog_redirect_policy() -> reqwest::redirect::Policy {
@@ -52,7 +52,8 @@ pub enum ProviderCatalogState {
 pub struct ProviderCatalogEntry {
     pub provider_id: ProviderId,
     pub state: ProviderCatalogState,
-    pub fetched_at: Option<Instant>,
+    /// Wall-clock timestamp of last successful fetch (P9-001).
+    pub fetched_at: Option<SystemTime>,
     pub source_url: String,
     pub models: Vec<ModelEntryConfig>,
     pub error_summary: Option<String>,
@@ -62,7 +63,7 @@ impl ProviderCatalogEntry {
     /// Returns true if the entry is stale (TTL exceeded) or has no fetch timestamp.
     pub fn is_stale(&self, ttl: Duration) -> bool {
         match self.fetched_at {
-            Some(then) => then.elapsed() >= ttl,
+            Some(then) => then.elapsed().map_or(true, |elapsed| elapsed >= ttl),
             None => true,
         }
     }
@@ -201,7 +202,7 @@ impl ProviderCatalogService {
                     ProviderCatalogEntry {
                         provider_id: pid,
                         state: ProviderCatalogState::Fresh,
-                        fetched_at: Some(Instant::now()),
+                        fetched_at: Some(SystemTime::now()),
                         source_url: url.to_string(),
                         models,
                         error_summary: None,
@@ -300,7 +301,7 @@ impl ProviderCatalogService {
                     fetched_at: if error.is_some() {
                         None
                     } else {
-                        Some(Instant::now())
+                        Some(SystemTime::now())
                     },
                     source_url: source,
                     models: models_opt.unwrap_or_default(),
@@ -445,7 +446,9 @@ pub fn save_catalog_snapshot(snapshot: &ModelCatalogSnapshot) -> Result<(), Stri
         .map(|entry| SerializableEntry {
             provider_id: entry.provider_id.0.clone(),
             state: format!("{:?}", entry.state),
-            fetched_at_unix: entry.fetched_at.map(|i| i.elapsed().as_secs()),
+            fetched_at_unix: entry.fetched_at.and_then(|t|
+                t.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs())
+            ),
             source_url: entry.source_url.clone(),
             model_ids: entry.models.iter().map(|m| m.model.clone()).collect(),
             model_names: entry.models.iter().filter_map(|m| m.name.clone()).collect(),
@@ -500,7 +503,9 @@ pub fn load_catalog_snapshot() -> ModelCatalogSnapshot {
             ProviderCatalogEntry {
                 provider_id: pid,
                 state: ProviderCatalogState::Stale,
-                fetched_at: entry.fetched_at_unix.map(|_| Instant::now()),
+                fetched_at: entry.fetched_at_unix.map(|unix_secs|
+                    std::time::UNIX_EPOCH + Duration::from_secs(unix_secs)
+                ),
                 source_url: entry.source_url,
                 models: vec![],
                 error_summary: entry.error_summary,
@@ -602,7 +607,7 @@ mod tests {
         let entry = ProviderCatalogEntry {
             provider_id: ProviderId::new("test"),
             state: ProviderCatalogState::Fresh,
-            fetched_at: Some(Instant::now()),
+            fetched_at: Some(SystemTime::now()),
             source_url: "https://example.com/models".into(),
             models: vec![],
             error_summary: None,
@@ -614,10 +619,11 @@ mod tests {
 
     #[test]
     fn state_stale_after_ttl() {
+        use std::time::SystemTime;
         let entry = ProviderCatalogEntry {
             provider_id: ProviderId::new("test"),
             state: ProviderCatalogState::Fresh,
-            fetched_at: Some(Instant::now() - Duration::from_secs(1000)),
+            fetched_at: Some(SystemTime::now() - Duration::from_secs(1000)),
             source_url: "https://example.com/models".into(),
             models: vec![],
             error_summary: None,
@@ -646,7 +652,7 @@ mod tests {
         let entry = ProviderCatalogEntry {
             provider_id: ProviderId::new("test"),
             state: ProviderCatalogState::Fresh,
-            fetched_at: Some(Instant::now()),
+            fetched_at: Some(SystemTime::now()),
             source_url: "https://example.com/models".into(),
             models: vec![],
             error_summary: None,
