@@ -91,6 +91,11 @@
 - Verifies `config.provider_registry()` returns same `Arc` as `runtime.registry`
 - Verifies `config.provider_catalog()` returns same `Arc` as `runtime.catalog`
 
+### P9 Audit Gaps
+- P9-002: 缺少 mock server redirect 测试（TCP server 测试挂起，暂跳过）
+- P9-003: 并发测试验证 permit count 而非实际 in-flight 上限
+- 其余 P9-001~005 按计划忠实实现
+
 ### Phase 6 Gate
 - main、Pager、providers CLI 无 `configure_providers()` 调用 ✅
 - production call graph 中 runtime 只构造一次 ✅
