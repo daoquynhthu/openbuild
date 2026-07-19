@@ -11,9 +11,9 @@
 
 | ID | Platform | Command | Package/Target | Failure Class | First Causal Error | Root Cause | Owner Phase | Status |
 |---|---|---|---|---|---|---|---|---|
-| BL-WIN-CHECK-001 | WIN | check --all-targets | xai-grok-pager-minimal (lib test) | compile-contract | E0425: cannot find function set_show_thinking_blocks in module minimal_api | Removed #[cfg(test)] from 11 functions. Fix: cc9102d | P3 | CLOSED |
+| BL-WIN-CHECK-001 | WIN | check --all-targets | xai-grok-pager-minimal (lib test) | compile-contract | E0425: cannot find function set_show_thinking_blocks in module minimal_api | Removed #[cfg(test)] from 11 functions + test_lock. Fixes: cc9102d, 68abd1f | P3 | CLOSED |
 | BL-WIN-CLIPPY-001 | WIN | clippy --all-targets -D warnings | xai-grok-config (lib) | clippy | type_complexity: Mutex<Option<Vec<(String, Vec<u8>)>>> in signed_policy.rs:75 | Added type alias OverrideKeys. Fix: cc9102d | P3 | CLOSED |
-| BL-WIN-TEST-001 | WIN | test --all-targets --no-run | multi-crate cascade | compile-contract | E0463/E0432 cascading from check failures | Resolved by BL-WIN-CHECK-001 fix. Cascade errors gone. | P3 | VERIFY |
+| BL-WIN-TEST-001 | WIN | test --all-targets --no-run | xai-grok-pager-minimal (lib test) | compile-contract | E0425/E0282 in theme_cache::test_lock | Removed cfg from test_lock(). Fix: 68abd1f. Full workspace test-build still has pre-existing issues (pagefile, sentry) | P3 | CLOSED |
 
 ## Unpopulated Baselines (CI Required)
 - BL-LNX-CHECK-*
