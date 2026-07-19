@@ -91,10 +91,17 @@ pub fn configure_providers(
     compat: Option<ProviderConfig>,
     cli_override: Option<ProviderConfig>,
 ) {
-    let (toml_configs, config_diagnostics) = crate::config::parse_provider_toml(toml);
-    for diag in &config_diagnostics {
-        tracing::warn!("{diag}");
-    }
+    let toml_configs = match crate::config::parse_provider_toml(toml) {
+        Ok(parsed) => {
+            parsed.entries.into_iter().map(|(id, cfg)| (id.0, cfg)).collect::<Vec<_>>()
+        }
+        Err(diags) => {
+            for d in &diags {
+                tracing::warn!("{d}");
+            }
+            return;
+        }
+    };
     let env_configs = detect_env_vars(registry);
 
     for pid in registry.all_ids() {

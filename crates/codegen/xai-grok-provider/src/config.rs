@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 
 use crate::error::ProviderError;
+use crate::types::ProviderId;
 
 /// A single configuration diagnostic: a non-fatal warning or error with
 /// a path that points to the exact TOML field.
@@ -34,6 +35,17 @@ impl fmt::Display for ConfigDiagnostic {
     }
 }
 
+/// The result of parsing all `[provider.*]` sections.
+/// `Ok` carries the parsed configs; `Err` carries cumulative diagnostics
+/// for entries that could not be parsed at all.
+pub type ParseProviderTomlResult = Result<ParsedProviderConfig, Vec<ConfigDiagnostic>>;
+
+/// Wrapper over all successfully-parsed provider configurations.
+#[derive(Debug, Clone)]
+pub struct ParsedProviderConfig {
+    pub entries: IndexMap<ProviderId, ProviderConfig>,
+}
+
 /// Single parsed [provider.*] entry — the deserialization target.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[non_exhaustive]
@@ -56,12 +68,14 @@ pub struct ParsedProviderEntry {
 /// for parse errors instead of silently dropping them.
 pub fn parse_provider_toml(
     toml: &toml::Value,
-) -> (Vec<(String, ProviderConfig)>, Vec<ConfigDiagnostic>) {
+) -> ParseProviderTomlResult {
     let Some(table) = toml.get("provider").and_then(|v| v.as_table()) else {
-        return (vec![], vec![]);
+        return Ok(ParsedProviderConfig {
+            entries: IndexMap::new(),
+        });
     };
 
-    let mut configs = Vec::new();
+    let mut entries = IndexMap::new();
     let mut diagnostics = Vec::new();
 
     for (id, entry) in table.iter() {
@@ -78,8 +92,17 @@ pub fn parse_provider_toml(
         };
         match toml::from_str::<ParsedProviderEntry>(&entry_str) {
             Ok(parsed) => {
-                configs.push((
-                    id.clone(),
+                let pid = ProviderId::new(id);
+                if entries.contains_key(&pid) {
+                    diagnostics.push(ConfigDiagnostic::new(
+                        id,
+                        "[provider.{id}]",
+                        format!("duplicate provider `{id}` — keeping first entry"),
+                    ));
+                    continue;
+                }
+                entries.insert(
+                    pid,
                     ProviderConfig {
                         id: Some(id.clone()),
                         enabled: parsed.enabled,
@@ -94,7 +117,7 @@ pub fn parse_provider_toml(
                         allow_insecure_http: parsed.allow_insecure_http,
                         extra_headers: parsed.extra_headers,
                     },
-                ));
+                );
             }
             Err(e) => {
                 diagnostics.push(ConfigDiagnostic::new(
@@ -106,7 +129,30 @@ pub fn parse_provider_toml(
         }
     }
 
-    (configs, diagnostics)
+    if !diagnostics.is_empty() {
+        Err(diagnostics)
+    } else {
+        Ok(ParsedProviderConfig { entries })
+    }
+}
+
+/// Low-level helper: parse TOML entries into a plain ordered Vec, returning
+/// diagnostics separately.  Used by legacy callers that need the flat list.
+/// New code should prefer [`parse_provider_toml`].
+pub fn parse_provider_toml_legacy(
+    toml: &toml::Value,
+) -> (Vec<(String, ProviderConfig)>, Vec<ConfigDiagnostic>) {
+    match parse_provider_toml(toml) {
+        Ok(parsed) => {
+            let vec: Vec<(String, ProviderConfig)> = parsed
+                .entries
+                .into_iter()
+                .map(|(id, cfg)| (id.0, cfg))
+                .collect();
+            (vec, vec![])
+        }
+        Err(diags) => (vec![], diags),
+    }
 }
 
 /// Merged configuration for a single provider.
@@ -259,9 +305,10 @@ mod tests {
     #[test]
     fn parse_provider_toml_empty() {
         let toml: toml::Value = toml::from_str("").unwrap();
-        let (configs, diags) = parse_provider_toml(&toml);
-        assert!(configs.is_empty());
-        assert!(diags.is_empty());
+        let result = parse_provider_toml(&toml);
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        assert!(parsed.entries.is_empty());
     }
 
     #[test]
@@ -274,11 +321,13 @@ base_url = "https://api.openai.com/v1"
 "#,
         )
         .unwrap();
-        let (configs, diags) = parse_provider_toml(&toml);
-        assert!(diags.is_empty());
-        assert_eq!(configs.len(), 1);
-        assert_eq!(configs[0].0, "openai");
-        assert_eq!(configs[0].1.api_key.as_deref(), Some("sk-test"));
+        let result = parse_provider_toml(&toml);
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        assert_eq!(parsed.entries.len(), 1);
+        let (pid, cfg) = parsed.entries.into_iter().next().unwrap();
+        assert_eq!(pid.0, "openai");
+        assert_eq!(cfg.api_key.as_deref(), Some("sk-test"));
     }
 
     #[test]
@@ -293,9 +342,10 @@ api_key = "sk-2"
 "#,
         )
         .unwrap();
-        let (configs, diags) = parse_provider_toml(&toml);
-        assert!(diags.is_empty());
-        assert_eq!(configs.len(), 2);
+        let result = parse_provider_toml(&toml);
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        assert_eq!(parsed.entries.len(), 2);
     }
 
     #[test]
@@ -310,15 +360,14 @@ api_key = "sk-test"
 "#,
         )
         .unwrap();
-        let (configs, diags) = parse_provider_toml(&toml);
-        assert!(diags.is_empty());
-        assert_eq!(configs.len(), 1);
-        assert_eq!(configs[0].1.enabled, Some(true));
-        assert_eq!(
-            configs[0].1.kind.as_deref(),
-            Some("openai_compatible")
-        );
-        assert_eq!(configs[0].1.profile.as_deref(), Some("deepseek"));
+        let result = parse_provider_toml(&toml);
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        assert_eq!(parsed.entries.len(), 1);
+        let cfg = parsed.entries.into_values().next().unwrap();
+        assert_eq!(cfg.enabled, Some(true));
+        assert_eq!(cfg.kind.as_deref(), Some("openai_compatible"));
+        assert_eq!(cfg.profile.as_deref(), Some("deepseek"));
     }
 
     #[test]

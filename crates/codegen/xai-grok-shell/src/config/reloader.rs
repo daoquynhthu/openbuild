@@ -424,9 +424,16 @@ impl ConfigReloader {
             if let Some(ref runtime) = self.provider_runtime {
                 // Step 1: Parse new configs (already done by reloader)
                 // Step 2: Resolve provider configs from TOML
-                let (parsed, _diags) = xai_grok_provider::config::parse_provider_toml(&new_global);
+                let toml_parsed = xai_grok_provider::config::parse_provider_toml(&new_global);
+                let (toml_configs, _diags) = match toml_parsed {
+                    Ok(p) => {
+                        let v = p.entries.into_iter().map(|(id, cfg)| (id.0, cfg)).collect::<Vec<_>>();
+                        (v, vec![])
+                    }
+                    Err(d) => (vec![], d),
+                };
                 let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
-                for (id_str, cfg) in parsed {
+                for (id_str, cfg) in toml_configs {
                     let pid = ProviderId::new(id_str);
                     config_map.insert(pid, cfg);
                 }
