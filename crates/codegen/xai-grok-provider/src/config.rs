@@ -90,14 +90,16 @@ impl ProviderConfigInput {
         }
 
         // Protocol validation: unknown protocols get a diagnostic.
-        if let Some(ref proto) = self.protocol {
-            if !is_known_protocol(proto) {
-                diags.push(ConfigDiagnostic::new(
-                    provider_id,
-                    "protocol",
-                    format!("unknown protocol `{proto}` — must be one of: chat_completions, responses, messages"),
-                ));
-            }
+        if let Some(proto) = self
+            .protocol
+            .as_ref()
+            .filter(|p| !is_known_protocol(p.as_str()))
+        {
+            diags.push(ConfigDiagnostic::new(
+                provider_id,
+                "protocol",
+                format!("unknown protocol `{proto}` — must be one of: chat_completions, responses, messages"),
+            ));
         }
 
         diags

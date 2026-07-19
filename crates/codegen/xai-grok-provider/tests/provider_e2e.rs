@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 
 use futures_util::stream::StreamExt;
 use xai_grok_provider::config::ProviderConfig;
-use xai_grok_provider::registry::ProviderRegistry;
+use xai_grok_provider::registry::{ProviderRegistry, ProviderRouteKey};
 use xai_grok_provider::types::{ProviderId, RouteId};
 use xai_grok_sampler::SamplerConfig;
 use xai_grok_sampler::client::SamplingClient;
@@ -628,7 +628,10 @@ fn hot_reload_config_switch() {
     assert_eq!(snap1.revision, rev1);
     let a_route = snap1
         .routes
-        .get(&RouteId::new("openai-chat"))
+        .get(&ProviderRouteKey {
+            provider_id: ProviderId::new("openai"),
+            local_route_id: RouteId::new("openai-chat"),
+        })
         .expect("openai-chat route after first rebuild");
     assert_eq!(
         a_route.endpoint.base_url.as_deref(),
@@ -651,7 +654,10 @@ fn hot_reload_config_switch() {
     assert_eq!(snap2.revision, rev2);
     let b_route = snap2
         .routes
-        .get(&RouteId::new("openai-chat"))
+        .get(&ProviderRouteKey {
+            provider_id: ProviderId::new("openai"),
+            local_route_id: RouteId::new("openai-chat"),
+        })
         .expect("openai-chat route after second rebuild");
     assert_eq!(
         b_route.endpoint.base_url.as_deref(),
@@ -835,7 +841,13 @@ fn model_switch_no_stale_route_leak() {
     reg.rebuild(&configs).expect("rebuild with openai override");
 
     let snap1 = reg.snapshot();
-    let openai_route = snap1.routes.get(&RouteId::new("openai-chat")).unwrap();
+    let openai_route = snap1
+        .routes
+        .get(&ProviderRouteKey {
+            provider_id: ProviderId::new("openai"),
+            local_route_id: RouteId::new("openai-chat"),
+        })
+        .unwrap();
     assert_eq!(
         openai_route.endpoint.base_url.as_deref(),
         Some("https://openai-custom.local/v1"),
@@ -862,7 +874,13 @@ fn model_switch_no_stale_route_leak() {
     assert_eq!(snap2.providers.len(), 6, "all 6 registered providers");
 
     // OpenAI's custom URL must be replaced by its default
-    let openai_route2 = snap2.routes.get(&RouteId::new("openai-chat")).unwrap();
+    let openai_route2 = snap2
+        .routes
+        .get(&ProviderRouteKey {
+            provider_id: ProviderId::new("openai"),
+            local_route_id: RouteId::new("openai-chat"),
+        })
+        .unwrap();
     assert_ne!(
         openai_route2.endpoint.base_url.as_deref(),
         Some("https://openai-custom.local/v1"),
@@ -872,7 +890,10 @@ fn model_switch_no_stale_route_leak() {
     // Anthropic routes must reflect the new override
     let anthropic_route = snap2
         .routes
-        .get(&RouteId::new("anthropic-messages"))
+        .get(&ProviderRouteKey {
+            provider_id: ProviderId::new("anthropic"),
+            local_route_id: RouteId::new("anthropic-messages"),
+        })
         .unwrap();
     assert_eq!(
         anthropic_route.endpoint.base_url.as_deref(),

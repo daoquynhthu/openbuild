@@ -13,7 +13,7 @@ use crate::types::{ModelSourceSpec, ProviderDefaults, ProviderId, RouteId};
 
 pub type SharedProviderFactory = Arc<dyn ProviderFactory + Send + Sync>;
 
-pub trait ProviderFactory {
+pub trait ProviderFactory: std::fmt::Debug {
     fn create(
         &self,
         spec: &ResolvedProviderSpec,
@@ -79,6 +79,7 @@ impl Provider for FactoryProvider {
     }
 }
 
+#[derive(Debug)]
 pub struct OpenAiCompatibleProviderFactory;
 
 impl ProviderFactory for OpenAiCompatibleProviderFactory {

@@ -176,22 +176,18 @@ pub fn resolve_with_precedence(
         merged_configs.iter().map(|(id, _)| id.clone()).collect();
 
     // If a legacy migration targets a provider not present in TOML, add it
-    if let Some(ref legacy) = legacy_migration {
-        if let Some(ref legacy_id) = legacy.id {
-            if !toml_ids.contains(legacy_id) {
-                merged_configs.push((legacy_id.clone(), legacy.clone()));
-            }
-        }
+    if let Some(ref legacy) = legacy_migration
+        && !toml_ids.contains(legacy.id.as_deref().unwrap_or(""))
+    {
+        merged_configs.push((legacy.id.clone().unwrap_or_default(), legacy.clone()));
     }
 
     // If CLI overrides target a provider not in TOML or legacy, add it
-    if let Some(ref cli) = cli_overrides {
-        if let Some(ref cli_id) = cli.id {
-            let already_present = merged_configs.iter().any(|(id, _)| id == cli_id);
-            if !already_present {
-                merged_configs.push((cli_id.clone(), cli.clone()));
-            }
-        }
+    if let Some(ref cli) = cli_overrides
+        && let Some(ref cli_id) = cli.id
+        && !merged_configs.iter().any(|(mi, _)| mi == cli_id)
+    {
+        merged_configs.push((cli_id.clone(), cli.clone()));
     }
 
     resolve_provider_set(merged_configs)
