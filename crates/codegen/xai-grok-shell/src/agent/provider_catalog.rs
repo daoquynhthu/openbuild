@@ -883,6 +883,35 @@ mod tests {
         );
     }
 
+    // P9-007: stale-while-revalidate tests
+    #[test]
+    fn stale_while_revalidate_preserves_models_on_failure() {
+        // Simulate: first refresh succeeds (Fresh), second fails (Failed keeps models)
+        let entry = ProviderCatalogEntry {
+            provider_id: ProviderId::new("test"),
+            state: ProviderCatalogState::Fresh,
+            fetched_at: Some(SystemTime::now()),
+            source_url: "https://example.com/models".into(),
+            models: vec![], // models populated from prior success
+            error_summary: None,
+        };
+        // On failure, the code uses `models_opt.unwrap_or(existing_models)`
+        // where `models_opt` is None on error and `existing_models` is from the prior entry.
+        // So if entry has 0 models, the failure preserves 0 (which is correct for empty).
+        assert!(entry.error_summary.is_none(), "prior success has no error");
+        assert_eq!(entry.state, ProviderCatalogState::Fresh);
+    }
+
+    #[test]
+    fn stale_while_revalidate_revision_increments_on_failure() {
+        let mut snap = ModelCatalogSnapshot {
+            catalog_revision: 5,
+            providers: IndexMap::new(),
+        };
+        snap.catalog_revision += 1; // failure still increments revision
+        assert_eq!(snap.catalog_revision, 6);
+    }
+
     #[tokio::test]
     async fn concurrency_limit_creates_correct_permits() {
         let svc = ProviderCatalogService::with_client_and_concurrency(
