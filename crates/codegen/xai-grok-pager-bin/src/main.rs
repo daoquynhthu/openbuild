@@ -870,13 +870,7 @@ async fn run_agent_command(
     let is_stdio = matches!(agent_args.mode, Some(AgentCmd::Stdio));
     let is_leader = matches!(agent_args.mode, Some(AgentCmd::Leader(_)));
 
-    // Initialize ProviderRuntime (needed by both TUI and headless paths).
-    // Single container holding registry + catalog + rebuild methods.
-    let provider_runtime =
-        std::sync::Arc::new(xai_grok_shell::agent::provider_runtime::ProviderRuntime::new());
-    xai_grok_provider::providers::register_all(&provider_runtime.registry);
-    let provider_registry = provider_runtime.registry.clone();
-
+    // Print version and check for updates before loading config.
     if !is_stdio && !is_leader {
         eprintln!(
             "Grok Build (pager) - v{}",
@@ -902,57 +896,55 @@ async fn run_agent_command(
     let mut agent_config = AgentConfig::new_from_toml_cfg(&raw_config)
         .map_err(|e| anyhow::anyhow!("Failed to create agent config: {}", e))?;
 
-    // Configure ProviderRegistry: apply user config, env, CLI, compat.
+    // Determine which provider the CLI overrides target.
+    let cli_provider_name: Option<String> = agent_args.provider.clone().or_else(|| {
+        agent_args
+            .model
+            .as_ref()
+            .and_then(|m| xai_grok_provider::types::parse_model_ref(m).0.map(|p| p.0))
+    });
+
+    // Build CLI override ProviderConfig when a target provider is known.
+    let cli_override = cli_provider_name.clone().map(|provider_name| {
+        xai_grok_provider::config::ProviderConfig::new(
+            Some(provider_name),
+            agent_args.api_key.clone(),
+            agent_args.base_url.clone(),
+        )
+    });
+
+    // Phase 5.9: Map old [endpoints] section to xAI provider config for
+    // backward compatibility. Applied as the "compat" layer, between TOML
+    // and CLI in priority (CLI always wins).
+    let endpoints = &agent_config.endpoints;
+    let default_xai_url = "https://api.x.ai/v1";
+    let compat_override = if endpoints.xai_api_base_url != default_xai_url
+        || endpoints.alpha_test_key.is_some()
     {
-        let reg = &provider_registry;
+        Some(xai_grok_provider::config::ProviderConfig::new(
+            Some("xai".into()),
+            endpoints.alpha_test_key.clone(),
+            Some(endpoints.xai_api_base_url.clone()),
+        ))
+    } else {
+        None
+    };
 
-        // Determine which provider the CLI overrides target.
-        let cli_provider_name: Option<String> = agent_args.provider.clone().or_else(|| {
-            agent_args
-                .model
-                .as_ref()
-                .and_then(|m| xai_grok_provider::types::parse_model_ref(m).0.map(|p| p.0))
-        });
+    // Bootstrap single ProviderRuntime via the unique precedence resolver.
+    // Registers built-in definitions, registers generic factory, then
+    // atomically publishes the resolved provider set.
+    let provider_runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
+        &raw_config,
+        compat_override,
+        cli_override,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to bootstrap provider runtime: {e}"))?;
 
-        // Build CLI override ProviderConfig when a target provider is known.
-        let cli_override = cli_provider_name.clone().map(|provider_name| {
-            xai_grok_provider::config::ProviderConfig::new(
-                Some(provider_name),
-                agent_args.api_key.clone(),
-                agent_args.base_url.clone(),
-            )
-        });
-
-        // Phase 5.9: Map old [endpoints] section to xAI provider config for
-        // backward compatibility. Applied as the "compat" layer, between TOML
-        // and CLI in priority (CLI always wins).
-        let endpoints = &agent_config.endpoints;
-        let default_xai_url = "https://api.x.ai/v1";
-        let compat_override = if endpoints.xai_api_base_url != default_xai_url
-            || endpoints.alpha_test_key.is_some()
-        {
-            Some(xai_grok_provider::config::ProviderConfig::new(
-                Some("xai".into()),
-                endpoints.alpha_test_key.clone(),
-                Some(endpoints.xai_api_base_url.clone()),
-            ))
-        } else {
-            None
-        };
-
-        // Apply all config layers: env → TOML → [endpoints] → CLI.
-        xai_grok_provider::providers::configure_providers(
-            reg,
-            &raw_config,
-            compat_override,
-            cli_override,
-        );
-    }
+    let provider_registry = provider_runtime.registry.clone();
 
     agent_config.provider_catalog = Some(provider_runtime.catalog.clone());
     agent_config.provider_runtime = Some(provider_runtime.clone());
-
-    // Thread the registry into config for downstream model resolution.
     agent_config.provider_registry = Some(provider_registry.clone());
 
     // Parse --model for provider/model format (e.g. "openai/gpt-4o").
@@ -1945,9 +1937,18 @@ async fn async_main() -> Result<()> {
         } else {
             None
         };
-    // Registry is already attached to agent_config for headless mode.
-    // The TUI pager creates its own reference via provider_state.
-    let result = xai_grok_pager::app::run(args, bg_update_rx, None).await;
+    // Bootstrap provider runtime for the TUI pager path.
+    // config is re-loaded here because it was not needed until the TUI path.
+    let tui_raw_config = xai_grok_shell::config::load_effective_config()
+        .map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
+    let tui_provider_runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
+        &tui_raw_config,
+        None,
+        None,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Failed to bootstrap provider runtime: {e}"))?;
+    let result = xai_grok_pager::app::run(args, bg_update_rx, tui_provider_runtime).await;
     xai_grok_sandbox::flush();
     match result {
         Ok(true) => {

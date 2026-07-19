@@ -386,7 +386,7 @@ pub async fn run(
     bg_update_rx: Option<
         tokio::sync::oneshot::Receiver<Option<xai_grok_update::auto_update::UpdateAvailable>>,
     >,
-    provider_registry: Option<std::sync::Arc<xai_grok_provider::registry::ProviderRegistry>>,
+    provider_runtime: std::sync::Arc<xai_grok_shell::agent::provider_runtime::ProviderRuntime>,
 ) -> anyhow::Result<bool> {
     xai_tty_utils::redirect_native_stderr();
     let screen_mode_override = screen_mode_relaunch::take_screen_mode_env_override();
@@ -395,14 +395,8 @@ pub async fn run(
     let raw_config = xai_grok_shell::config::load_effective_config()
         .map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
 
-    // Use the externally-constructed ProviderRegistry (from launcher) or
-    // create a standalone one for tests/tools that call run() directly.
-    let reg = provider_registry.unwrap_or_else(|| {
-        let r = std::sync::Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
-        xai_grok_provider::providers::register_all(&r);
-        xai_grok_provider::providers::configure_providers(&r, &raw_config, None, None);
-        r
-    });
+    // Tests/tools that call run() directly must bootstrap their own runtime.
+    let reg = provider_runtime.registry.clone();
     let _ = crate::provider_state::init(reg);
 
     let grok_com_config =
