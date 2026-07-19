@@ -1,4 +1,25 @@
-# Progress — Provider Model Adapter Refactoring
+# Progress — Provider Model Adapter Refactoring (V2 Closure Plan)
+
+## Phase 5: Transactional Registry — 2026-07-19
+
+### Audit Gaps (Phase 5-007 residual)
+- Gap A — `prepare()` held read lock for entire duration → fixed: short read lock clones definitions/factories/revision, all provider creation/validation outside lock
+- Gap B — Missing P5-004 failure tests → added: `prepare_rejects_spec_id_mismatch` (spec ID != key), unknown implementation kind covered by Rust exhaustive match
+- Gap C — `RouteSelector::referenced_route_ids()` returned `Vec<RouteId>` vs plan's `&[RouteId]` → fixed
+- Gap D — P5-006 `failed_rebuild_leaves_snapshot_unchanged` covered empty set, not actual failures → replaced with `prepare_failure_leaves_snapshot_unchanged` and `prepare_failure_on_unknown_definition_keeps_snapshot_ptr`
+- Gap E — P5-007: `store_config`/`register_route` still called in production `configure_providers` → removed calls; legacy mutators marked `#[doc(hidden)]`
+- Gap F — `commit_rejects_stale_prepared` test was inadequate → rewritten with real stale prepared rejection scenario
+- Gap G — P5-011 test used `dummy`+`deepseek` instead of `deepseek`+`internal` → aligned to plan spec with identity isolation checks
+- Gap H — Missing lock-duration seam tests → added: `slow_factory_does_not_block_snapshot`, `concurrent_prepare_does_not_hold_write_lock`
+- Gap I — Concurrent test used legacy `rebuild()` → added `concurrent_rebuild_from_resolved_gives_sequential_revisions`
+
+### Phase 5 Gate
+- A-12 Closed ✅
+- registry 并发/失败原子性测试全绿 ✅
+- sealed 后 custom identity 增删回归测试全绿 ✅
+- `ProviderRouteKey` 跨 provider 查路由不串线 ✅
+- `rg` 不存在 production legacy mutator 调用 ✅
+- provider core check/clippy/test zero failure ✅
 
 ## Phase 10: Real TUI and CLI Provider Configuration Closure
 

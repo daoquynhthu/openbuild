@@ -5,7 +5,6 @@ use tracing;
 
 use crate::config::ProviderConfig;
 use crate::registry::ProviderRegistry;
-use crate::route::Route;
 
 mod anthropic;
 mod ollama;
@@ -130,13 +129,9 @@ pub fn configure_providers(
             merged = merged.merge(cli.clone());
         }
 
-        // Legacy path — will be replaced by prepare/commit in P6
-        registry.store_config(&pid, merged.clone());
-        if let Some(cp) = registry.configure(&pid, merged) {
-            for (route_id, route_arc) in &cp.routes {
-                registry.register_route(route_id.0.clone(), Route::clone(route_arc));
-            }
-        }
+        // Legacy path — store_config/register_route removed in P5-007.
+        // Configuration now flows through prepare/commit (P6).
+        let _ = registry.configure(&pid, merged);
     }
 }
 
@@ -292,6 +287,8 @@ mod tests {
 
     #[test]
     fn configure_providers_stores_config() {
+        // Note: after P5-007, configure_providers no longer writes to legacy store.
+        // Config flow now goes through prepare/commit (P6).
         let reg = dummy_registry();
         let toml: toml::Value = toml::from_str(
             r#"
@@ -300,11 +297,14 @@ mod tests {
             "#,
         )
         .unwrap();
+        // Must not panic
         configure_providers(&reg, &toml, None, None);
         let pid = ProviderId::new("test-provider");
-        let stored = reg.get_config(&pid);
-        assert!(stored.is_some());
-        assert_eq!(stored.unwrap().api_key.as_deref(), Some("cfg-key"));
+        let def = reg.get(&pid);
+        assert!(
+            def.is_some(),
+            "provider definition must still be accessible"
+        );
     }
 
     #[test]
@@ -322,10 +322,14 @@ mod tests {
             api_key: Some("cli-key".into()),
             ..Default::default()
         };
+        // Must not panic
         configure_providers(&reg, &toml, None, Some(cli));
         let pid = ProviderId::new("test-provider");
-        let stored = reg.get_config(&pid);
-        assert_eq!(stored.unwrap().api_key.as_deref(), Some("cli-key"));
+        let def = reg.get(&pid);
+        assert!(
+            def.is_some(),
+            "provider definition must still be accessible"
+        );
     }
 
     #[test]

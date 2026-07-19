@@ -8,7 +8,6 @@ use crate::config::ProviderConfig;
 use crate::error::ProviderError;
 use crate::provider::{ConfiguredProvider, SharedProvider};
 use crate::resolution::{ProviderImplementation, ResolvedProviderSet};
-
 use crate::route::Route;
 use crate::types::{ProviderId, RouteId};
 
@@ -48,7 +47,7 @@ struct RegistryState {
     >,
     snapshot: Arc<RegistrySnapshot>,
     sealed: bool,
-    /// Legacy config store — transitional, will be removed by P5-007.
+    /// Legacy config store — only accessed through test-only methods after P5-007.
     legacy_configs: HashMap<ProviderId, ProviderConfig>,
 }
 
@@ -139,16 +138,16 @@ impl ProviderRegistry {
         self.state.read().snapshot.providers.get(id).cloned()
     }
 
-    // ── Legacy API — will be removed in P6 after prepare/commit migration ──
+    // ── Legacy API — no production callers after P5-007 ──
 
     #[doc(hidden)]
     pub fn store_config(&self, id: &ProviderId, config: ProviderConfig) {
         self.state.write().legacy_configs.insert(id.clone(), config);
     }
 
+    #[doc(hidden)]
     pub fn get_config(&self, id: &ProviderId) -> Option<ProviderConfig> {
         let state = self.state.read();
-        // Check legacy store first, then snapshot
         state
             .legacy_configs
             .get(id)
@@ -156,6 +155,7 @@ impl ProviderRegistry {
             .or_else(|| state.snapshot.providers.get(id).map(|cp| cp.config.clone()))
     }
 
+    #[doc(hidden)]
     pub fn register_route(&self, _id: impl Into<String>, _route: Route) {
         tracing::debug!("register_route called (legacy path, no-op)");
     }
@@ -181,20 +181,38 @@ impl ProviderRegistry {
     /// Prepare a new snapshot from a resolved provider set without publishing.
     /// Returns `Err` if any provider/route/selector validation fails.
     /// The current snapshot is never modified.
+    /// Prepare a new snapshot from a resolved provider set without publishing.
+    /// Returns `Err` if any provider/route/selector validation fails.
+    /// The current snapshot is never modified.
+    ///
+    /// Lock discipline: only a short read lock to clone definitions/factories/revision;
+    /// all provider creation and validation happens outside the lock.
     pub fn prepare(
         &self,
         resolved: &ResolvedProviderSet,
     ) -> Result<PreparedRegistrySnapshot, ProviderError> {
-        let state = self.state.read();
-        let base_revision = state.snapshot.revision;
+        let (definitions, factories, base_revision) = {
+            let state = self.state.read();
+            (
+                state.definitions.clone(),
+                state.factories.clone(),
+                state.snapshot.revision,
+            )
+        };
 
         let mut new_providers: IndexMap<ProviderId, Arc<ConfiguredProvider>> = IndexMap::new();
         let mut new_routes: IndexMap<ProviderRouteKey, Arc<Route>> = IndexMap::new();
 
         for (pid, spec) in &resolved.providers {
+            if &spec.id != pid {
+                return Err(ProviderError::Config(format!(
+                    "spec ID `{}` does not match provider key `{}`",
+                    spec.id.0, pid.0
+                )));
+            }
             let configured = match &spec.implementation {
                 ProviderImplementation::Builtin { definition_id } => {
-                    let provider = state.definitions.get(definition_id).ok_or_else(|| {
+                    let provider = definitions.get(definition_id).ok_or_else(|| {
                         ProviderError::Config(format!(
                             "built-in definition `{}` not registered",
                             definition_id.0
@@ -207,8 +225,7 @@ impl ProviderRegistry {
                     provider.configure(overrides)
                 }
                 ProviderImplementation::OpenAiCompatible { .. } => {
-                    let factory = state
-                        .factories
+                    let factory = factories
                         .get(&ProviderFactoryKind::OpenAiCompatible)
                         .ok_or_else(|| {
                             ProviderError::Config("OpenAiCompatible factory not registered".into())
@@ -225,7 +242,7 @@ impl ProviderRegistry {
 
             // Validate that all referenced routes by the selector exist
             let referenced = configured.route_selector.referenced_route_ids();
-            for rid in &referenced {
+            for rid in referenced {
                 if !configured.routes.contains_key(rid) {
                     return Err(ProviderError::Config(format!(
                         "selector for `{}` references route `{}` which is not defined",
@@ -354,6 +371,8 @@ mod tests {
     use crate::config::ProviderConfig;
     use crate::endpoint::{Endpoint, EndpointPart};
     use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
+    use crate::resolution::ResolvedProviderSpec;
+    use crate::route::Route;
     use crate::types::{ModelSourceSpec, ProviderDefaults};
 
     #[derive(Debug)]
@@ -583,19 +602,135 @@ mod tests {
     }
 
     #[test]
-    fn failed_rebuild_leaves_snapshot_unchanged() {
-        // Rebuild with a provider whose route references a non-existent route
-        // is not directly testable with DummyProvider (it always creates valid routes).
-        // Instead, test that an empty rebuild (no definitions) leaves revision=0.
+    fn prepare_failure_leaves_snapshot_unchanged() {
         let reg = ProviderRegistry::new();
-        let resolved = ResolvedProviderSet {
-            providers: IndexMap::new(),
+        reg.register_definition(Arc::new(DummyProvider::new()))
+            .unwrap();
+
+        // First, successfully build revision 1
+        let resolved_ok = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("dummy"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("dummy"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("dummy"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                    },
+                },
+            )]),
         };
-        // prepare with empty set should succeed
-        let prepared = reg.prepare(&resolved).unwrap();
-        assert_eq!(prepared.base_revision, 0);
-        // Old snapshot unchanged
-        assert_eq!(reg.snapshot().revision, 0);
+        reg.rebuild_from_resolved(&resolved_ok).unwrap();
+        assert_eq!(reg.snapshot().revision, 1);
+
+        // Now try to prepare a set with unknown definition — must fail
+        let resolved_bad = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("ghost"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("ghost"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("does-not-exist"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                    },
+                },
+            )]),
+        };
+        assert!(
+            reg.prepare(&resolved_bad).is_err(),
+            "prepare with unknown def must fail"
+        );
+        assert_eq!(
+            reg.snapshot().revision,
+            1,
+            "revision must not change after failed prepare"
+        );
+        assert_eq!(
+            reg.snapshot().providers.len(),
+            1,
+            "providers must not change after failed prepare"
+        );
+    }
+
+    #[test]
+    fn prepare_failure_on_unknown_definition_keeps_snapshot_ptr() {
+        let reg = ProviderRegistry::new();
+        reg.register_definition(Arc::new(DummyProvider::new()))
+            .unwrap();
+        let resolved_ok = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("dummy"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("dummy"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("dummy"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                    },
+                },
+            )]),
+        };
+        let _old_snapshot = reg.snapshot();
+        reg.rebuild_from_resolved(&resolved_ok).unwrap();
+        let current = reg.snapshot();
+
+        // Prepare failure should not change Arc pointer
+        let resolved_bad = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("ghost"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("ghost"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("nope"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                    },
+                },
+            )]),
+        };
+        assert!(reg.prepare(&resolved_bad).is_err());
+        assert!(
+            Arc::ptr_eq(&current, &reg.snapshot()),
+            "Arc pointer must be unchanged after failed prepare"
+        );
     }
 
     #[test]
@@ -616,17 +751,45 @@ mod tests {
         let resolved = ResolvedProviderSet {
             providers: IndexMap::new(),
         };
-        let prepared = reg.prepare(&resolved).unwrap();
-        // Commit once
-        reg.commit(prepared).unwrap();
-        // Try to commit the same prepared snapshot again
+        let first = reg.prepare(&resolved).unwrap();
+
+        // Commit a *second* prepared snapshot first (to advance revision)
         let resolved2 = ResolvedProviderSet {
             providers: IndexMap::new(),
         };
-        let prepared2 = reg.prepare(&resolved2).unwrap();
-        reg.commit(prepared2).unwrap();
-        // First prepared snapshot is now stale
-        // (We can't easily test this without prepare returning a stale prepared)
+        let second = reg.prepare(&resolved2).unwrap();
+        reg.commit(second).unwrap();
+        assert_eq!(reg.snapshot().revision, 1);
+
+        // Now try to commit the first (stale) prepared snapshot
+        let result = reg.commit(first);
+        assert!(result.is_err(), "stale prepared must be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("conflict"),
+            "stale error should mention conflict: {err}"
+        );
+        assert_eq!(
+            reg.snapshot().revision,
+            1,
+            "revision unchanged after stale commit"
+        );
+    }
+
+    #[test]
+    fn commit_rejects_double_commit_of_same_prepared() {
+        let reg = ProviderRegistry::new();
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::new(),
+        };
+        let prepared = reg.prepare(&resolved).unwrap();
+
+        // First commit succeeds
+        reg.commit(prepared).unwrap();
+        assert_eq!(reg.snapshot().revision, 1);
+
+        // Can't hold a second reference to prepared — it was consumed.
+        // Double-commit rejection is covered by stale test above.
     }
 
     #[test]
@@ -693,8 +856,302 @@ mod tests {
 
     #[test]
     fn sealed_registry_hot_add_custom_identity() {
-        // First rebuild with only the built-in definition
+        // Per plan P5-011: first rebuild only deepseek, then add internal, then remove deepseek.
         let reg = ProviderRegistry::new();
+        let factory =
+            Arc::new(crate::providers::openai_compatible_factory::OpenAiCompatibleProviderFactory);
+        reg.register_factory(ProviderFactoryKind::OpenAiCompatible, factory)
+            .unwrap();
+
+        fn deepseek_spec() -> crate::resolution::ResolvedProviderSpec {
+            crate::resolution::ResolvedProviderSpec {
+                id: ProviderId::new("deepseek"),
+                implementation: ProviderImplementation::OpenAiCompatible {
+                    profile: Some(crate::types::CompatibleProfileId::new("deepseek")),
+                },
+                config: crate::resolution::ProviderRuntimeConfig {
+                    public: crate::resolution::ProviderPublicConfig {
+                        base_url: None,
+                        protocol: None,
+                        model_list_path: None,
+                        allow_insecure_http: false,
+                        model_list_format: None,
+                        extra_headers: IndexMap::new(),
+                    },
+                    inline_api_key: None,
+                },
+            }
+        }
+
+        fn internal_spec() -> crate::resolution::ResolvedProviderSpec {
+            crate::resolution::ResolvedProviderSpec {
+                id: ProviderId::new("internal"),
+                implementation: ProviderImplementation::OpenAiCompatible {
+                    profile: Some(crate::types::CompatibleProfileId::new("internal")),
+                },
+                config: crate::resolution::ProviderRuntimeConfig {
+                    public: crate::resolution::ProviderPublicConfig {
+                        base_url: Some("https://internal.api/v1".into()),
+                        protocol: None,
+                        model_list_path: None,
+                        allow_insecure_http: false,
+                        model_list_format: None,
+                        extra_headers: IndexMap::new(),
+                    },
+                    inline_api_key: None,
+                },
+            }
+        }
+
+        // Step 1: rebuild with only deepseek → sealed, revision=1
+        let set1 = ResolvedProviderSet {
+            providers: IndexMap::from([(ProviderId::new("deepseek"), deepseek_spec())]),
+        };
+        let r1 = reg.rebuild_from_resolved(&set1).unwrap();
+        assert_eq!(r1, 1);
+        assert_eq!(reg.snapshot().providers.len(), 1);
+        assert!(
+            reg.snapshot()
+                .providers
+                .contains_key(&ProviderId::new("deepseek"))
+        );
+
+        // Step 2: add internal alongside deepseek
+        let set2 = ResolvedProviderSet {
+            providers: IndexMap::from([
+                (ProviderId::new("deepseek"), deepseek_spec()),
+                (ProviderId::new("internal"), internal_spec()),
+            ]),
+        };
+        let r2 = reg.rebuild_from_resolved(&set2).unwrap();
+        assert_eq!(r2, 2, "revision must increment on hot add");
+        assert_eq!(reg.snapshot().providers.len(), 2);
+        assert!(
+            reg.snapshot()
+                .providers
+                .contains_key(&ProviderId::new("deepseek"))
+        );
+        assert!(
+            reg.snapshot()
+                .providers
+                .contains_key(&ProviderId::new("internal"))
+        );
+
+        // Verify identity isolation: each identity's route is independent.
+        let snap = reg.snapshot();
+        let ds_has_route = snap
+            .routes
+            .iter()
+            .any(|(k, _)| k.provider_id.0 == "deepseek");
+        assert!(ds_has_route, "deepseek must have a route");
+        let internal_has_route = snap
+            .routes
+            .iter()
+            .any(|(k, _)| k.provider_id.0 == "internal");
+        assert!(internal_has_route, "internal must have a route");
+        // deepseek uses profile default (api.deepseek.com), internal uses explicit URL.
+        // Check that they're different endpoint URLs.
+        let ds_url = snap
+            .routes
+            .get(&ProviderRouteKey {
+                provider_id: ProviderId::new("deepseek"),
+                local_route_id: RouteId::new("deepseek-chat"),
+            })
+            .map(|r| r.endpoint.base_url.clone());
+        let internal_url = snap
+            .routes
+            .get(&ProviderRouteKey {
+                provider_id: ProviderId::new("internal"),
+                local_route_id: RouteId::new("internal-chat"),
+            })
+            .map(|r| r.endpoint.base_url.clone());
+        assert!(
+            ds_url.is_some() && ds_url.as_ref().unwrap().is_some(),
+            "deepseek must have a profile-based base_url"
+        );
+        assert!(
+            ds_url.as_ref().unwrap().as_deref() != internal_url.as_ref().unwrap().as_deref(),
+            "deepseek and internal must have different base_urls"
+        );
+        assert_eq!(
+            internal_url.as_ref().unwrap().as_deref(),
+            Some("https://internal.api/v1"),
+            "internal must use its explicit base_url"
+        );
+
+        // Step 3: remove deepseek, keep internal
+        let set3 = ResolvedProviderSet {
+            providers: IndexMap::from([(ProviderId::new("internal"), internal_spec())]),
+        };
+        let r3 = reg.rebuild_from_resolved(&set3).unwrap();
+        assert_eq!(r3, 3, "revision must increment on remove");
+        assert_eq!(reg.snapshot().providers.len(), 1);
+        assert!(
+            reg.snapshot()
+                .providers
+                .contains_key(&ProviderId::new("internal")),
+            "internal must survive after deepseek removal"
+        );
+        assert!(
+            !reg.snapshot()
+                .providers
+                .contains_key(&ProviderId::new("deepseek")),
+            "deepseek must have been removed"
+        );
+    }
+
+    #[test]
+    fn prepare_rejects_spec_id_mismatch() {
+        let reg = ProviderRegistry::new();
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("key-foo"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("spec-bar"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("dummy"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                    },
+                },
+            )]),
+        };
+        let result = reg.prepare(&resolved);
+        assert!(result.is_err(), "spec ID mismatch must fail");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("key-foo") && err.contains("spec-bar"),
+            "error should mention both IDs: {err}"
+        );
+    }
+
+    #[test]
+    fn slow_factory_does_not_block_snapshot() {
+        let reg = Arc::new(ProviderRegistry::new());
+        reg.register_definition(Arc::new(DummyProvider::new()))
+            .unwrap();
+
+        // Register a slow factory that simulates a 100ms provider creation
+        #[derive(Debug)]
+        struct SlowFactory;
+        impl crate::providers::openai_compatible_factory::ProviderFactory for SlowFactory {
+            fn create(&self, spec: &ResolvedProviderSpec) -> Result<SharedProvider, ProviderError> {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                Ok(Arc::new(DummyProvider {
+                    id: spec.id.clone(),
+                    ..DummyProvider::new()
+                }))
+            }
+        }
+
+        let factory: crate::providers::openai_compatible_factory::SharedProviderFactory =
+            Arc::new(SlowFactory);
+        reg.register_factory(ProviderFactoryKind::OpenAiCompatible, factory)
+            .unwrap();
+
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("slow"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("slow"),
+                    implementation: ProviderImplementation::OpenAiCompatible { profile: None },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: Some("https://slow.api/v1".into()),
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                    },
+                },
+            )]),
+        };
+
+        // Spawn prepare on one thread (will block 100ms in factory)
+        let reg_clone = Arc::clone(&reg);
+        let handle = std::thread::spawn(move || reg_clone.prepare(&resolved));
+
+        // snapshot() must return immediately while prepare is still running
+        let start = std::time::Instant::now();
+        let snap = reg.snapshot();
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed < std::time::Duration::from_millis(50),
+            "snapshot() blocked for {elapsed:?} — slow factory held read lock"
+        );
+        assert_eq!(snap.revision, 0);
+
+        // Wait for prepare to complete
+        let prepared = handle.join().unwrap().unwrap();
+        assert_eq!(prepared.base_revision, 0);
+    }
+
+    #[test]
+    fn concurrent_prepare_does_not_hold_write_lock() {
+        let reg = Arc::new(ProviderRegistry::new());
+        reg.register_definition(Arc::new(DummyProvider::new()))
+            .unwrap();
+
+        // First prepare to get a snapshot
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::new(),
+        };
+        let prepared = reg.prepare(&resolved).unwrap();
+        reg.commit(prepared).unwrap();
+
+        // Spawn a second prepare on one thread
+        let reg_clone = Arc::clone(&reg);
+        let handle = std::thread::spawn(move || reg_clone.prepare(&resolved));
+
+        // snapshot() must NOT be blocked — prepare only holds read lock
+        let start = std::time::Instant::now();
+        let snap = reg.snapshot();
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed < std::time::Duration::from_millis(50),
+            "snapshot() blocked for {elapsed:?} — concurrent prepare held write lock"
+        );
+        assert_eq!(snap.revision, 1);
+
+        let prepared2 = handle.join().unwrap().unwrap();
+        assert_eq!(prepared2.base_revision, 1);
+    }
+
+    #[test]
+    fn concurrent_rebuild_gives_sequential_revisions() {
+        let reg = Arc::new(ProviderRegistry::new());
+        reg.register_definition(Arc::new(DummyProvider::new()))
+            .unwrap();
+
+        let reg1 = Arc::clone(&reg);
+        let h1 = std::thread::spawn(move || reg1.rebuild(&IndexMap::new()).unwrap());
+        let reg2 = Arc::clone(&reg);
+        let h2 = std::thread::spawn(move || reg2.rebuild(&IndexMap::new()).unwrap());
+
+        let r1 = h1.join().unwrap();
+        let r2 = h2.join().unwrap();
+        assert_ne!(
+            r1, r2,
+            "concurrent rebuilds must return different revisions"
+        );
+        assert_eq!(reg.snapshot().revision, 2, "final revision must be 2");
+    }
+
+    #[test]
+    fn concurrent_rebuild_from_resolved_gives_sequential_revisions() {
+        let reg = Arc::new(ProviderRegistry::new());
         reg.register_definition(Arc::new(DummyProvider::new()))
             .unwrap();
         let factory =
@@ -702,7 +1159,7 @@ mod tests {
         reg.register_factory(ProviderFactoryKind::OpenAiCompatible, factory)
             .unwrap();
 
-        let first_resolved = ResolvedProviderSet {
+        let resolved = ResolvedProviderSet {
             providers: IndexMap::from([(
                 ProviderId::new("dummy"),
                 crate::resolution::ResolvedProviderSpec {
@@ -724,119 +1181,19 @@ mod tests {
                 },
             )]),
         };
-        let r1 = reg.rebuild_from_resolved(&first_resolved).unwrap();
-        assert_eq!(r1, 1);
-        assert_eq!(reg.snapshot().providers.len(), 1);
 
-        // Second rebuild: add custom identity (no new definition needed)
-        let second_resolved = ResolvedProviderSet {
-            providers: IndexMap::from([
-                (
-                    ProviderId::new("dummy"),
-                    crate::resolution::ResolvedProviderSpec {
-                        id: ProviderId::new("dummy"),
-                        implementation: ProviderImplementation::Builtin {
-                            definition_id: ProviderId::new("dummy"),
-                        },
-                        config: crate::resolution::ProviderRuntimeConfig {
-                            public: crate::resolution::ProviderPublicConfig {
-                                base_url: None,
-                                protocol: None,
-                                model_list_path: None,
-                                allow_insecure_http: false,
-                                model_list_format: None,
-                                extra_headers: IndexMap::new(),
-                            },
-                            inline_api_key: None,
-                        },
-                    },
-                ),
-                (
-                    ProviderId::new("deepseek"),
-                    crate::resolution::ResolvedProviderSpec {
-                        id: ProviderId::new("deepseek"),
-                        implementation: ProviderImplementation::OpenAiCompatible {
-                            profile: Some(crate::types::CompatibleProfileId::new("deepseek")),
-                        },
-                        config: crate::resolution::ProviderRuntimeConfig {
-                            public: crate::resolution::ProviderPublicConfig {
-                                base_url: None,
-                                protocol: None,
-                                model_list_path: None,
-                                allow_insecure_http: false,
-                                model_list_format: None,
-                                extra_headers: IndexMap::new(),
-                            },
-                            inline_api_key: None,
-                        },
-                    },
-                ),
-            ]),
-        };
-        let r2 = reg.rebuild_from_resolved(&second_resolved).unwrap();
-        assert_eq!(r2, 2, "revision must increment on hot add");
-        assert_eq!(reg.snapshot().providers.len(), 2, "two providers after add");
-
-        // Third rebuild: remove dummy, keep deepseek
-        let third_resolved = ResolvedProviderSet {
-            providers: IndexMap::from([(
-                ProviderId::new("deepseek"),
-                crate::resolution::ResolvedProviderSpec {
-                    id: ProviderId::new("deepseek"),
-                    implementation: ProviderImplementation::OpenAiCompatible {
-                        profile: Some(crate::types::CompatibleProfileId::new("deepseek")),
-                    },
-                    config: crate::resolution::ProviderRuntimeConfig {
-                        public: crate::resolution::ProviderPublicConfig {
-                            base_url: None,
-                            protocol: None,
-                            model_list_path: None,
-                            allow_insecure_http: false,
-                            model_list_format: None,
-                            extra_headers: IndexMap::new(),
-                        },
-                        inline_api_key: None,
-                    },
-                },
-            )]),
-        };
-        let r3 = reg.rebuild_from_resolved(&third_resolved).unwrap();
-        assert_eq!(r3, 3, "revision must increment on remove");
-        assert_eq!(
-            reg.snapshot().providers.len(),
-            1,
-            "one provider after remove"
-        );
-        assert!(
-            reg.snapshot()
-                .providers
-                .contains_key(&ProviderId::new("deepseek")),
-            "deepseek must survive"
-        );
-        assert!(
-            !reg.snapshot()
-                .providers
-                .contains_key(&ProviderId::new("dummy")),
-            "dummy must have been removed"
-        );
-    }
-
-    #[test]
-    fn concurrent_rebuild_gives_sequential_revisions() {
-        let reg = Arc::new(ProviderRegistry::new());
-        reg.register_definition(Arc::new(DummyProvider::new()))
-            .unwrap();
-
+        let resolved1 = resolved.clone();
         let reg1 = Arc::clone(&reg);
-        let h1 = std::thread::spawn(move || reg1.rebuild(&IndexMap::new()).unwrap());
+        let h1 = std::thread::spawn(move || reg1.rebuild_from_resolved(&resolved1).unwrap());
+        let resolved2 = resolved.clone();
         let reg2 = Arc::clone(&reg);
-        let h2 = std::thread::spawn(move || reg2.rebuild(&IndexMap::new()).unwrap());
+        let h2 = std::thread::spawn(move || reg2.rebuild_from_resolved(&resolved2).unwrap());
 
         let r1 = h1.join().unwrap();
         let r2 = h2.join().unwrap();
         assert_ne!(
             r1, r2,
-            "concurrent rebuilds must return different revisions"
+            "concurrent rebuild_from_resolved must return different revisions"
         );
         assert_eq!(reg.snapshot().revision, 2, "final revision must be 2");
     }

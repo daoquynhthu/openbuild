@@ -64,7 +64,7 @@ pub trait RouteSelector: Send + Sync + core::fmt::Debug {
     fn select(&self, model_id: &str) -> Result<RouteId, ProviderError>;
     /// Returns all route IDs this selector may return from `select()`.
     /// Used by registry validation to verify all referenced routes exist.
-    fn referenced_route_ids(&self) -> Vec<RouteId>;
+    fn referenced_route_ids(&self) -> &[RouteId];
 }
 
 /// Route selector that always returns the default route.
@@ -78,8 +78,8 @@ impl RouteSelector for DefaultRouteSelector {
         Ok(self.default_route_id.clone())
     }
 
-    fn referenced_route_ids(&self) -> Vec<RouteId> {
-        vec![self.default_route_id.clone()]
+    fn referenced_route_ids(&self) -> &[RouteId] {
+        std::slice::from_ref(&self.default_route_id)
     }
 }
 
