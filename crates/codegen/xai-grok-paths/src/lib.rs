@@ -1,6 +1,7 @@
 //! Type-safe path wrappers for absolute and relative UTF-8 paths.
 
 pub mod atomic_write;
+pub mod normalize;
 
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
