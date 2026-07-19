@@ -16,7 +16,11 @@ pub struct ConfigDiagnostic {
 }
 
 impl ConfigDiagnostic {
-    pub fn new(provider_id: impl Into<String>, field_path: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn new(
+        provider_id: impl Into<String>,
+        field_path: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             provider_id: provider_id.into(),
             field_path: field_path.into(),
@@ -139,9 +143,7 @@ pub struct ParsedProviderEntry {
 
 /// Parse all `[provider.*]` sections from a TOML Value, collecting diagnostics
 /// for parse errors instead of silently dropping them.
-pub fn parse_provider_toml(
-    toml: &toml::Value,
-) -> ParseProviderTomlResult {
+pub fn parse_provider_toml(toml: &toml::Value) -> ParseProviderTomlResult {
     let Some(table) = toml.get("provider").and_then(|v| v.as_table()) else {
         return Ok(ParsedProviderConfig {
             entries: IndexMap::new(),
@@ -567,5 +569,4 @@ api_key = "sk-test"
             Some(crate::types::ModelListFormat::OllamaTags)
         );
     }
-
 }

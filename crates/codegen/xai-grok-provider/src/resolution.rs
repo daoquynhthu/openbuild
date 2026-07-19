@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 
 use crate::auth::SecretValue;
 use crate::config::{ConfigDiagnostic, ProviderConfig};
-use crate::types::{ProviderId, ModelListFormat};
+use crate::types::{CompatibleProfileId, ModelListFormat, ProviderId};
 
 /// Result of resolving configuration precedence into a provider set.
 #[derive(Clone, Debug)]
@@ -21,8 +21,12 @@ pub struct ResolvedProviderSpec {
 /// How a provider is implemented: built-in definition or generic compatible.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ProviderImplementation {
-    Builtin { definition_id: ProviderId },
-    OpenAiCompatible { profile: Option<String> },
+    Builtin {
+        definition_id: ProviderId,
+    },
+    OpenAiCompatible {
+        profile: Option<CompatibleProfileId>,
+    },
 }
 
 /// Runtime configuration with secret values wrapped.
@@ -50,10 +54,7 @@ fn is_builtin_id(id: &str) -> bool {
 
 /// Resolve a single provider config into a spec, using built-in defaults
 /// for known provider IDs and the `kind` field for custom providers.
-fn resolve_one(
-    id: String,
-    config: ProviderConfig,
-) -> (ProviderId, ResolvedProviderSpec) {
+fn resolve_one(id: String, config: ProviderConfig) -> (ProviderId, ResolvedProviderSpec) {
     let pid = ProviderId::new(&id);
     let implementation = resolve_implementation(&id, &config);
 
@@ -70,15 +71,19 @@ fn resolve_one(
     let spec = ResolvedProviderSpec {
         id: pid.clone(),
         implementation,
-        config: ProviderRuntimeConfig { public, inline_api_key },
+        config: ProviderRuntimeConfig {
+            public,
+            inline_api_key,
+        },
     };
     (pid, spec)
 }
 
 fn resolve_implementation(id: &str, config: &ProviderConfig) -> ProviderImplementation {
+    let compat_profile = config.profile.clone().map(CompatibleProfileId::new);
     match config.kind.as_deref() {
         Some("openai_compatible") => ProviderImplementation::OpenAiCompatible {
-            profile: config.profile.clone(),
+            profile: compat_profile,
         },
         Some(other) => {
             tracing::warn!("unknown provider kind `{other}` for `{id}`, falling back to builtin");
@@ -90,9 +95,11 @@ fn resolve_implementation(id: &str, config: &ProviderConfig) -> ProviderImplemen
             definition_id: ProviderId::new(id),
         },
         None => {
-            tracing::warn!("no `kind` specified for provider `{id}`, treating as openai-compatible");
+            tracing::warn!(
+                "no `kind` specified for provider `{id}`, treating as openai-compatible"
+            );
             ProviderImplementation::OpenAiCompatible {
-                profile: config.profile.clone(),
+                profile: compat_profile,
             }
         }
     }
@@ -122,10 +129,7 @@ pub fn resolve_provider_set(
         providers.insert(pid, spec);
     }
 
-    (
-        ResolvedProviderSet { providers },
-        diagnostics,
-    )
+    (ResolvedProviderSet { providers }, diagnostics)
 }
 
 /// Merge a legacy migration config and CLI overrides onto a resolved set.
@@ -168,7 +172,8 @@ pub fn resolve_with_precedence(
         .collect();
 
     // Collect TOML provider IDs for "not present" checks before entries is moved
-    let toml_ids: std::collections::HashSet<String> = merged_configs.iter().map(|(id, _)| id.clone()).collect();
+    let toml_ids: std::collections::HashSet<String> =
+        merged_configs.iter().map(|(id, _)| id.clone()).collect();
 
     // If a legacy migration targets a provider not present in TOML, add it
     if let Some(ref legacy) = legacy_migration {
@@ -196,6 +201,7 @@ pub fn resolve_with_precedence(
 mod tests {
     use super::*;
     use crate::config::ParsedProviderConfig;
+    use crate::types::CompatibleProfileId;
 
     #[test]
     fn builtin_xai_resolves_correctly() {
@@ -236,7 +242,7 @@ mod tests {
         assert_eq!(
             spec.implementation,
             ProviderImplementation::OpenAiCompatible {
-                profile: Some("deepseek".into())
+                profile: Some(CompatibleProfileId::new("deepseek"))
             }
         );
     }
@@ -311,7 +317,10 @@ mod tests {
         // Verify identity isolation
         let deepseek = set.providers.get(&ProviderId::new("deepseek")).unwrap();
         let internal = set.providers.get(&ProviderId::new("internal")).unwrap();
-        assert_ne!(deepseek.config.public.base_url, internal.config.public.base_url);
+        assert_ne!(
+            deepseek.config.public.base_url,
+            internal.config.public.base_url
+        );
     }
 
     // ── Precedence tests ──
@@ -332,7 +341,10 @@ mod tests {
         assert!(diags.is_empty());
         let spec = set.providers.get(&ProviderId::new("test")).unwrap();
         assert_eq!(
-            spec.config.inline_api_key.as_ref().map(|s| format!("{s:?}")),
+            spec.config
+                .inline_api_key
+                .as_ref()
+                .map(|s| format!("{s:?}")),
             Some("[REDACTED]".into())
         );
     }

@@ -427,7 +427,11 @@ impl ConfigReloader {
                 let toml_parsed = xai_grok_provider::config::parse_provider_toml(&new_global);
                 let (toml_configs, _diags) = match toml_parsed {
                     Ok(p) => {
-                        let v = p.entries.into_iter().map(|(id, cfg)| (id.0, cfg)).collect::<Vec<_>>();
+                        let v = p
+                            .entries
+                            .into_iter()
+                            .map(|(id, cfg)| (id.0, cfg))
+                            .collect::<Vec<_>>();
                         (v, vec![])
                     }
                     Err(d) => (vec![], d),

@@ -28,9 +28,7 @@ fn generic_code_must_not_branch_on_xai() {
 
     for entry in walkdir::WalkDir::new(&src_dir) {
         let entry = entry.expect("walk error");
-        if !entry.file_type().is_file()
-            || !entry.path().extension().is_some_and(|e| e == "rs")
-        {
+        if !entry.file_type().is_file() || !entry.path().extension().is_some_and(|e| e == "rs") {
             continue;
         }
 
@@ -70,4 +68,3 @@ fn generic_code_must_not_branch_on_xai() {
         );
     }
 }
-

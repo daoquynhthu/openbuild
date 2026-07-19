@@ -14,7 +14,10 @@ use crate::types::{ModelSourceSpec, ProviderDefaults, ProviderId, RouteId};
 pub type SharedProviderFactory = Arc<dyn ProviderFactory + Send + Sync>;
 
 pub trait ProviderFactory {
-    fn create(&self, spec: &ResolvedProviderSpec) -> Result<SharedProvider, crate::error::ProviderError>;
+    fn create(
+        &self,
+        spec: &ResolvedProviderSpec,
+    ) -> Result<SharedProvider, crate::error::ProviderError>;
 }
 
 /// A lightweight provider struct created by the factory for each identity.
@@ -43,7 +46,10 @@ impl Provider for FactoryProvider {
     }
 
     fn configure(&self, overrides: crate::config::ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides.base_url.clone().unwrap_or_else(|| self.base_url.clone());
+        let base_url = overrides
+            .base_url
+            .clone()
+            .unwrap_or_else(|| self.base_url.clone());
         let display_name = format!("{} (OpenAI Compatible)", self.id.0);
         let route_id = RouteId::new(format!("{}-chat", self.id.0));
         let route = Route::make(
@@ -76,17 +82,26 @@ impl Provider for FactoryProvider {
 pub struct OpenAiCompatibleProviderFactory;
 
 impl ProviderFactory for OpenAiCompatibleProviderFactory {
-    fn create(&self, spec: &ResolvedProviderSpec) -> Result<SharedProvider, crate::error::ProviderError> {
+    fn create(
+        &self,
+        spec: &ResolvedProviderSpec,
+    ) -> Result<SharedProvider, crate::error::ProviderError> {
         let profile = match &spec.implementation {
-            ProviderImplementation::OpenAiCompatible { profile } => profile.clone(),
+            ProviderImplementation::OpenAiCompatible { profile } => {
+                profile.as_ref().map(|p| p.0.clone())
+            }
             _ => {
                 return Err(crate::error::ProviderError::Config(
                     "factory called with non-openai-compatible implementation".into(),
-                ))
+                ));
             }
         };
 
-        let base_url = spec.config.public.base_url.clone()
+        let base_url = spec
+            .config
+            .public
+            .base_url
+            .clone()
             .or_else(|| {
                 profile
                     .as_deref()
@@ -141,12 +156,17 @@ mod tests {
     use super::*;
     use crate::config::ProviderConfig;
     use crate::resolution::ResolvedProviderSpec;
+    use crate::types::CompatibleProfileId;
 
-    fn make_spec(id: &str, profile: Option<&str>, base_url: Option<String>) -> ResolvedProviderSpec {
+    fn make_spec(
+        id: &str,
+        profile: Option<&str>,
+        base_url: Option<String>,
+    ) -> ResolvedProviderSpec {
         ResolvedProviderSpec {
             id: ProviderId::new(id),
             implementation: ProviderImplementation::OpenAiCompatible {
-                profile: profile.map(|s| s.to_string()),
+                profile: profile.map(CompatibleProfileId::new),
             },
             config: crate::resolution::ProviderRuntimeConfig {
                 public: crate::resolution::ProviderPublicConfig {

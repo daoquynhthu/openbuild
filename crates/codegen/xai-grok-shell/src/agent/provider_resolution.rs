@@ -177,15 +177,16 @@ impl LegacyModelReference {
 
     /// Look up a bare model name; returns `Some` only for known legacy names.
     pub fn try_resolve(bare_model: &str) -> Option<&'static LegacyModelReference> {
-        LegacyModelReference::ALL.iter().find(|lr| lr.0 == bare_model)
+        LegacyModelReference::ALL
+            .iter()
+            .find(|lr| lr.0 == bare_model)
     }
 }
 
 /// Resolve a bare model name through the legacy xAI model table.
 /// Returns `None` for models not in the known legacy set.
 fn resolve_legacy_model_ref(bare_model: &str) -> Option<String> {
-    LegacyModelReference::try_resolve(bare_model)
-        .map(|lr| lr.provider().to_string())
+    LegacyModelReference::try_resolve(bare_model).map(|lr| lr.provider().to_string())
 }
 
 /// Resolve a CLI model reference against the merged catalog.

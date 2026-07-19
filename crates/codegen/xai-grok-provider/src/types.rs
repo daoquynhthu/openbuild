@@ -45,6 +45,41 @@ impl ProviderId {
     }
 }
 
+/// Identifier for a known OpenAI-compatible provider profile (e.g., "deepseek", "groq").
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CompatibleProfileId(pub String);
+
+impl CompatibleProfileId {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+}
+
+impl std::fmt::Display for CompatibleProfileId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::ops::Deref for CompatibleProfileId {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for CompatibleProfileId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
+impl From<String> for CompatibleProfileId {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
 /// Stable model identifier in the ACP protocol.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]

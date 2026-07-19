@@ -101,9 +101,11 @@ pub fn configure_providers(
     cli_override: Option<ProviderConfig>,
 ) {
     let toml_configs = match crate::config::parse_provider_toml(toml) {
-        Ok(parsed) => {
-            parsed.entries.into_iter().map(|(id, cfg)| (id.0, cfg)).collect::<Vec<_>>()
-        }
+        Ok(parsed) => parsed
+            .entries
+            .into_iter()
+            .map(|(id, cfg)| (id.0, cfg))
+            .collect::<Vec<_>>(),
         Err(diags) => {
             for d in &diags {
                 tracing::warn!("{d}");
