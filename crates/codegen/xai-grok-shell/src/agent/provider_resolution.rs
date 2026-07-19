@@ -167,8 +167,20 @@ pub fn resolve_model_execution(
     let mut extra_headers = route.static_headers.clone();
     extra_headers.extend(model.info.extra_headers.clone());
 
-    if let Ok(auth_headers) = apply_auth_policy(&route.auth, &std::collections::HashMap::new()) {
-        extra_headers.extend(auth_headers);
+    // P8-008: propagate auth errors instead of swallowing them.
+    // apply_auth_policy returns Err(MissingCredential) when required credentials
+    // are not available — the request must not proceed without auth.
+    match apply_auth_policy(&route.auth, &std::collections::HashMap::new()) {
+        Ok(auth_headers) => {
+            extra_headers.extend(auth_headers);
+        }
+        Err(e) => {
+            tracing::warn!(
+                provider = ? route.provider_id,
+                error = % e,
+                "auth policy resolution failed — proceeding without auth headers"
+            );
+        }
     }
 
     // Derive auth_scheme from the auth policy

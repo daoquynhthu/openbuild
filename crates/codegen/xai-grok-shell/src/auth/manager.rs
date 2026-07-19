@@ -2219,7 +2219,15 @@ impl xai_grok_tools::types::ApiKeyProvider for SharedAuthKeyProvider {
         &self,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Option<String>> + Send + '_>> {
         let am = self.0.clone();
-        Box::pin(async move { am.get_valid_token().await.ok() })
+        Box::pin(async move {
+            match am.get_valid_token().await {
+                Ok(tok) => Some(tok),
+                Err(e) => {
+                    tracing::warn!(error = % e, "failed to get valid token for API key provider");
+                    None
+                }
+            }
+        })
     }
 }
 

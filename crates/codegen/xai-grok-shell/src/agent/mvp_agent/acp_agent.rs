@@ -823,8 +823,13 @@ impl acp::Agent for MvpAgent {
                     .data("initialize must be called before new_session")
             })?;
         self.seed_client_config_auth_if_available();
-        if let Ok(auth) = self.auth_manager.auth().await {
-            self.refresh_settings_and_reapply(&auth).await;
+        match self.auth_manager.auth().await {
+            Ok(auth) => {
+                self.refresh_settings_and_reapply(&auth).await;
+            }
+            Err(e) => {
+                tracing::warn!(error = % e, "auth failed in new_session — remote settings not refreshed");
+            }
         }
         let cwd = AbsPathBuf::new(arguments.cwd.clone())
             .map_err(|e| acp::Error::invalid_params().data(e.to_string()))?;

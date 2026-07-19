@@ -1014,7 +1014,13 @@ impl ModelsManager {
         let mgr = self.clone();
 
         tokio::task::spawn(async move {
-            let auth = auth_manager.auth().await.ok();
+            let auth = match auth_manager.auth().await {
+                Ok(a) => Some(a),
+                Err(e) => {
+                    tracing::warn!(error = % e, "auth failed during model refresh");
+                    None
+                }
+            };
             let new_prefetched = fetch_models_async(endpoints, auth, fetch_auth).await;
             if !mgr.apply_refresh_result(&cfg, new_prefetched, new_etag) {
                 return;
@@ -1076,7 +1082,13 @@ impl ModelsManager {
             tracing::info!("model catalog refresh skipped: remote_fetch disabled");
             return;
         }
-        let auth = self.inner.auth_manager.auth().await.ok();
+        let auth = match self.inner.auth_manager.auth().await {
+            Ok(a) => Some(a),
+            Err(e) => {
+                tracing::warn!(error = % e, "auth failed during model fetch");
+                None
+            }
+        };
         let has_auth = auth.is_some();
         let fetch_auth = *self.inner.fetch_auth.read();
         let cfg = self.inner.cfg.read().clone();
