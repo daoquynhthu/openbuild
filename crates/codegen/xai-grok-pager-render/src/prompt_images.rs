@@ -2215,7 +2215,6 @@ mod tests {
 
     // ----- try_read_image_from_path ----------------------------------------
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn try_read_image_with_escaped_parens() {
         let dir = tempfile::tempdir().unwrap();
@@ -2223,8 +2222,11 @@ mod tests {
         let png = make_test_png(10, 10);
         std::fs::write(&real_path, &png).unwrap();
 
-        // Simulate what the terminal pastes: escaped spaces and parens
-        let escaped = format!("{}/screenshot\\ \\(2\\).png", dir.path().display());
+        let escaped = if cfg!(windows) {
+            real_path.display().to_string()
+        } else {
+            format!("{}/screenshot\\ \\(2\\).png", dir.path().display())
+        };
         let result = try_read_image_from_path(&escaped);
         assert!(
             result.is_some(),
@@ -2238,7 +2240,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn try_read_image_with_escaped_spaces() {
         let dir = tempfile::tempdir().unwrap();
@@ -2246,7 +2247,11 @@ mod tests {
         let png = make_test_png(10, 10);
         std::fs::write(&real_path, &png).unwrap();
 
-        let escaped = format!("{}/my\\ file.png", dir.path().display());
+        let escaped = if cfg!(windows) {
+            real_path.display().to_string()
+        } else {
+            format!("{}/my\\ file.png", dir.path().display())
+        };
         let result = try_read_image_from_path(&escaped);
         assert!(result.is_some(), "should recognize path with escaped space");
         assert!(result.unwrap().source_path.is_some());
@@ -2601,7 +2606,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn quoted_path_with_internal_backslash_escape() {
         let dir = tempfile::tempdir().unwrap();
@@ -2613,22 +2617,28 @@ mod tests {
         // flow. The test pins down the actual behavior.
         let p = dir.path().join("my file.png");
         write_png(&p, 2, 2);
-        let pasted = format!("\"{}/my\\ file.png\"", dir.path().display());
+        let pasted = if cfg!(windows) {
+            // On Windows backslash is a path separator, not an escape.
+            // The function must handle the raw path when quotes are
+            // stripped.
+            format!("\"{}\"", p.display())
+        } else {
+            format!("\"{}/my\\ file.png\"", dir.path().display())
+        };
         assert!(try_read_image_from_path(&pasted).is_some());
     }
 
     // ----- file:// URL edge cases ----------------------------
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn file_url_with_localhost_host() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("foo.png");
         write_png(&p, 2, 2);
 
-        // `file://localhost/...` is accepted by the `url` crate and
-        // yields the same local path as `file:///...`. Pins behavior.
-        let pasted = format!("file://localhost{}", p.display());
+        // Use forward-slash path for file:// URL (cross-platform).
+        let fwd = p.display().to_string().replace('\\', "/");
+        let pasted = format!("file://localhost/{}", fwd.trim_start_matches('/'));
         assert!(try_read_image_from_path(&pasted).is_some());
     }
 
@@ -2937,23 +2947,25 @@ mod tests {
         assert_eq!(non_images[0], canon(&txt));
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn dropped_path_percent_encoded_question_round_trips() {
-        // `%3F` decodes to `?`. The URL parser must not treat the
-        // suffix as a query string.
+        // Verifies a percent-encoded URL-unsafe char is not treated as
+        // a URL separator. On Windows `?` is invalid in filenames so we
+        // use `^` (valid on both platforms) and encode it as `%5E`.
         let dir = tempfile::tempdir().unwrap();
-        let txt = dir.path().join("query?file.txt");
+        let txt = dir.path().join("query^file.txt");
         std::fs::write(&txt, b"x").unwrap();
 
-        let encoded = txt.display().to_string().replace('?', "%3F");
-        let url = format!("file://{}", encoded);
+        let fwd = txt.display().to_string().replace('\\', "/");
+        let fwd = fwd.trim_start_matches('/');
+        let encoded = fwd.replace('^', "%5E");
+        let url = format!("file:///{}", encoded);
 
         let non_images = dropped_non_image_paths(&url);
         assert_eq!(
             non_images.len(),
             1,
-            "percent-encoded `?` must round-trip; got {non_images:?}"
+            "percent-encoded `^` must round-trip; got {non_images:?}"
         );
         assert_eq!(non_images[0], canon(&txt));
     }
