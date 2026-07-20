@@ -1070,6 +1070,70 @@ mod tests {
 
     // P9-002: HTTP client policy tests
     #[tokio::test]
+    async fn redirect_cross_origin_is_rejected() {
+        use std::error::Error;
+        // Use reqwest directly with our redirect policy, not through the catalog
+        // refresh_all spawned task, to eliminate timing/async complexity.
+        let client = reqwest::Client::builder()
+            .redirect(catalog_redirect_policy())
+            .build()
+            .unwrap();
+
+        // Server B — returns 200 but has a different origin (different port)
+        let (shutdown_b, shutdown_rx_b) = tokio::sync::oneshot::channel::<()>();
+        let app_b = axum::Router::new().route(
+            "/v1/models",
+            axum::routing::get(|| async {
+                axum::Json(serde_json::json!({"data": []}))
+            }),
+        );
+        let listener_b = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr_b = listener_b.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener_b, app_b)
+                .with_graceful_shutdown(async { shutdown_rx_b.await.ok(); })
+                .await;
+        });
+
+        // Server A — redirects to server B (cross-origin: different port)
+        let (shutdown_a, shutdown_rx_a) = tokio::sync::oneshot::channel::<()>();
+        let target_url = format!("http://{addr_b}/v1/models");
+        let app_a = axum::Router::new().route(
+            "/v1/models",
+            axum::routing::get(move || {
+                let loc = target_url.clone();
+                async move {
+                    axum::response::Response::builder()
+                        .status(302)
+                        .header("Location", &loc)
+                        .body(axum::body::Body::empty())
+                        .unwrap()
+                }
+            }),
+        );
+        let listener_a = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr_a = listener_a.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener_a, app_a)
+                .with_graceful_shutdown(async { shutdown_rx_a.await.ok(); })
+                .await;
+        });
+
+        let url_a = format!("http://{addr_a}/v1/models");
+        let result = client.get(&url_a).send().await;
+        assert!(result.is_err(), "cross-origin redirect should be rejected");
+        let err = result.unwrap_err();
+        let source = format!("{}", err.source().unwrap());
+        assert!(
+            source.contains("cross-origin"),
+            "error source should mention cross-origin, got source={source:?} full={err}"
+        );
+
+        let _ = shutdown_a.send(());
+        let _ = shutdown_b.send(());
+    }
+
+    #[tokio::test]
     async fn catalog_connect_timeout_fast_failure() {
         use std::time::Duration;
         // Connect to a black-hole address — must fail with timeout, not hang.
