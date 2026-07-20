@@ -1035,6 +1035,61 @@ mod tests {
         );
     }
 
+    /// ProcessTerminator::graceful_shutdown SIGTERM equivalent terminates child (P12-003).
+    #[tokio::test]
+    async fn terminator_graceful_terminates_attached_child() {
+        let mut cmd = if cfg!(windows) {
+            let mut c = tokio::process::Command::new("cmd");
+            c.args(["/C", "ping", "-n", "60", "127.0.0.1"]);
+            c
+        } else {
+            let mut c = tokio::process::Command::new("sleep");
+            c.arg("60");
+            c
+        };
+        new_process_group(&mut cmd);
+        let mut group = ProcessGroup::new().expect("create ProcessGroup");
+        let mut child = cmd.spawn().expect("spawn child");
+        group.attach(&child).expect("attach child to group");
+
+        let terminator: &dyn ProcessTerminator = &group;
+        terminator.graceful_shutdown().expect("graceful_shutdown via ProcessTerminator");
+
+        let status = tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
+            .await
+            .expect("child should exit within 5s of graceful shutdown")
+            .expect("wait returns ok");
+        assert!(
+            !status.success(),
+            "terminated child should not exit successfully"
+        );
+    }
+
+    /// ProcessTerminator::force_terminate on already-exited child is safe (P12-003).
+    #[tokio::test]
+    async fn terminator_force_already_exited_child() {
+        let mut cmd = if cfg!(windows) {
+            let mut c = tokio::process::Command::new("cmd");
+            c.args(["/C", "ver"]);
+            c
+        } else {
+            let mut c = tokio::process::Command::new("true");
+            c
+        };
+        new_process_group(&mut cmd);
+        let mut group = ProcessGroup::new().expect("create ProcessGroup");
+        let mut child = cmd.spawn().expect("spawn child");
+        group.attach(&child).expect("attach child to group");
+
+        // Wait for the quick child to exit
+        let _ = child.wait().await.expect("child should exit quickly");
+
+        // force_terminate on already-dead process must not error
+        let terminator: &dyn ProcessTerminator = &group;
+        let result = terminator.force_terminate();
+        assert!(result.is_ok(), "force_terminate on already-exited child must not error: {result:?}");
+    }
+
     /// [`ProcessGroupId`] rejects degenerate pids (0, 1, own group) at
     /// construction so `killpg` can never broadcast outside a child's group.
     #[cfg(unix)]
