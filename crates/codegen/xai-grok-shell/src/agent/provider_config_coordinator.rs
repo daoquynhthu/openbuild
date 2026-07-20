@@ -15,6 +15,7 @@ pub struct ProviderResolutionContext {
 }
 
 /// Outcome of a config apply operation.
+#[derive(Debug)]
 pub enum ConfigApplyOutcome {
     Applied { new_revision: u64 },
     Unchanged,
@@ -71,8 +72,10 @@ impl ProviderConfigCoordinator {
     pub async fn apply_external_file(&self) -> Result<ConfigApplyOutcome, ConfigApplyError> {
         let _lock = self.update_lock.lock().await;
 
-        let raw_toml = crate::config::load_effective_config()
-            .map_err(|e| ConfigApplyError::FileReadError(e.to_string()))?;
+        let content = std::fs::read_to_string(&self.config_path)
+            .map_err(|e| ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display())))?;
+        let raw_toml: toml::Value = toml::from_str(&content)
+            .map_err(|e| ConfigApplyError::ParseError(format!("{}: {e}", self.config_path.display())))?;
 
         let parsed = xai_grok_provider::config::parse_provider_toml(&raw_toml)
             .map_err(|diags| {
@@ -110,6 +113,7 @@ impl ProviderConfigCoordinator {
 mod tests {
     use super::*;
     use std::sync::Arc;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[tokio::test]
     async fn coordinator_uses_same_runtime_arc() {
@@ -121,5 +125,65 @@ mod tests {
         });
         let coord = ProviderConfigCoordinator::new(Arc::clone(&rt), config_path, ctx);
         assert!(Arc::ptr_eq(&rt, &coord.runtime));
+    }
+
+    #[tokio::test]
+    async fn apply_external_file_valid_config_increments_revision() {
+        let dir = std::env::temp_dir().join(format!("coord-test-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = std::fs::create_dir_all(&dir);
+        let config_path = dir.join("config.toml");
+        let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n\n[provider.openai]\nenabled = true\nkind = \"openai_compatible\"\nprofile = \"openai\"\nbase_url = \"https://api.openai.com/v1\"\napi_key = \"sk-openai-test\"\n";
+        std::fs::write(&config_path, config_content).unwrap();
+
+        let rt = Arc::new(ProviderRuntime::new());
+        // Register at least the xai definition so rebuild has something to work with
+        xai_grok_provider::providers::register_all(&rt.registry);
+        rt.registry.register_factory(
+            xai_grok_provider::registry::ProviderFactoryKind::OpenAiCompatible,
+            Arc::new(xai_grok_provider::providers::openai_compatible_factory::OpenAiCompatibleProviderFactory),
+        ).unwrap();
+
+        let ctx = Arc::new(ProviderResolutionContext {
+            legacy_migration: None,
+            cli_overrides: None,
+        });
+        let coord = ProviderConfigCoordinator::new(Arc::clone(&rt), config_path.clone(), ctx);
+
+        let rev_before = rt.registry.snapshot().revision;
+        let result = coord.apply_external_file().await;
+        assert!(result.is_ok(), "apply_external_file should succeed: {:?}", result);
+        let rev_after = rt.registry.snapshot().revision;
+        assert!(rev_after > rev_before, "revision should increase: {rev_after} > {rev_before}");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn apply_external_file_invalid_config_keeps_old_revision() {
+        let dir = std::env::temp_dir().join(format!("coord-test-invalid-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = std::fs::create_dir_all(&dir);
+        let config_path = dir.join("config.toml");
+        let config_content = r#"
+[provider.bad]
+enabled = true
+kind = "nonexistent"
+"#;
+        std::fs::write(&config_path, config_content).unwrap();
+
+        let rt = Arc::new(ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
+        let ctx = Arc::new(ProviderResolutionContext {
+            legacy_migration: None,
+            cli_overrides: None,
+        });
+        let coord = ProviderConfigCoordinator::new(Arc::clone(&rt), config_path.clone(), ctx);
+
+        let rev_before = rt.registry.snapshot().revision;
+        let result = coord.apply_external_file().await;
+        assert!(result.is_err(), "apply_external_file should fail for invalid config");
+        let rev_after = rt.registry.snapshot().revision;
+        assert_eq!(rev_after, rev_before, "revision must not change on invalid config");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
