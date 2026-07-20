@@ -4,6 +4,7 @@
 //! not HTTP responses. This makes them testable without network.
 //! Readers receive immutable `Arc<ModelCatalogSnapshot>`.
 
+use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -801,6 +802,45 @@ pub fn load_catalog_snapshot() -> ModelCatalogSnapshot {
     let mut providers = IndexMap::new();
     for entry in entries {
         let pid = ProviderId::new(&entry.provider_id);
+        let models: Vec<ModelEntryConfig> = entry
+            .model_ids
+            .into_iter()
+            .enumerate()
+            .map(|(i, mid)| ModelEntryConfig {
+                id: None,
+                model: mid,
+                base_url: String::new(),
+                name: entry.model_names.get(i).cloned(),
+                description: None,
+                max_completion_tokens: None,
+                temperature: None,
+                top_p: None,
+                api_key: None,
+                env_key: None,
+                api_backend: Default::default(),
+                auth_scheme: None,
+                reasoning_effort: None,
+                supports_reasoning_effort: false,
+                reasoning_efforts: vec![],
+                extra_headers: IndexMap::new(),
+                context_window: NonZeroU64::new(1).unwrap(),
+                auto_compact_threshold_percent: None,
+                system_prompt_label: None,
+                api_base_url: None,
+                use_concise: false,
+                agent_type: config::default_agent_type(),
+                inference_idle_timeout_secs: None,
+                max_retries: None,
+                hidden: false,
+                supported_in_api: false,
+                supports_backend_search: false,
+                compactions_remaining: None,
+                compaction_at_tokens: None,
+                show_model_fingerprint: false,
+                stream_tool_calls: None,
+                laziness_detector: config::LazinessDetectorPerModelConfig::default(),
+            })
+            .collect();
         providers.insert(
             pid.clone(),
             ProviderCatalogEntry {
@@ -810,7 +850,7 @@ pub fn load_catalog_snapshot() -> ModelCatalogSnapshot {
                     .fetched_at_unix
                     .map(|unix_secs| std::time::UNIX_EPOCH + Duration::from_secs(unix_secs)),
                 source_url: entry.source_url,
-                models: vec![],
+                models,
                 error_summary: entry.error_summary,
             },
         );
