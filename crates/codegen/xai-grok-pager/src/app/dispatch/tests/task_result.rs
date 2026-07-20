@@ -2257,3 +2257,29 @@ fn session_list_nonempty_partial_modal_toasts_in_chat_mode_only() {
         "Build-mode modal non-empty degraded list stays silent"
     );
 }
+
+#[test]
+fn provider_config_saved_success_no_follow_up_effects() {
+    let mut app = test_app();
+    let effects = dispatch_task_result(
+        TaskResult::ProviderConfigSaved {
+            provider_id: "xai".into(),
+            result: Ok(()),
+        },
+        &mut app,
+    );
+    assert!(effects.is_empty(), "save success must not emit follow-up effects");
+}
+
+#[test]
+fn provider_config_saved_failure_no_follow_up_effects() {
+    let mut app = test_app();
+    let effects = dispatch_task_result(
+        TaskResult::ProviderConfigSaved {
+            provider_id: "xai".into(),
+            result: Err("network error".into()),
+        },
+        &mut app,
+    );
+    assert!(effects.is_empty(), "save failure must not emit follow-up effects");
+}

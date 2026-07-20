@@ -542,8 +542,8 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
                     if !agent.prompt.history_search.is_browse() {
                         let query = agent.prompt.text().to_owned();
                         agent.prompt.history_search.update_query(&query);
-                    }
-                }
+    }
+}
             }
             vec![]
         }
