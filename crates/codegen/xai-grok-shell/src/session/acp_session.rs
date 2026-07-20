@@ -1547,7 +1547,7 @@ mod fs_injection_regression_tests;
 #[cfg(test)]
 #[path = "acp_session_tests/interjection_actor_tests.rs"]
 mod interjection_actor_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/observability_bridge_mapping_tests.rs"]
 mod observability_bridge_mapping_tests;
 #[cfg(all(test, not(target_os = "windows")))]
