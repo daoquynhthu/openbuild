@@ -9,6 +9,9 @@ use xai_grok_provider::registry::ProviderRegistry;
 
 use super::provider_runtime::ProviderRuntime;
 
+#[cfg(test)]
+use std::sync::atomic::{AtomicBool, Ordering};
+
 /// A typed patch for a single `[provider.<id>]` section.
 pub struct ProviderConfigPatch {
     pub provider_id: String,
@@ -84,6 +87,8 @@ pub struct ProviderConfigCoordinator {
     pub config_path: PathBuf,
     pub resolution_context: Arc<ProviderResolutionContext>,
     update_lock: Mutex<()>,
+    #[cfg(test)]
+    pub pre_cas_hook: std::sync::Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
 }
 
 impl ProviderConfigCoordinator {
@@ -97,6 +102,8 @@ impl ProviderConfigCoordinator {
             config_path,
             resolution_context,
             update_lock: Mutex::new(()),
+            #[cfg(test)]
+            pre_cas_hook: std::sync::Mutex::new(None),
         }
     }
 
@@ -188,6 +195,10 @@ impl ProviderConfigCoordinator {
             .map_err(|e| ConfigApplyError::PrepareError(e.to_string()))?;
 
         // Step 5: Compare-and-swap — re-read file SHA-256
+        #[cfg(test)]
+        if let Some(ref hook) = *self.pre_cas_hook.lock().unwrap() {
+            hook();
+        }
         let current_bytes = std::fs::read(&self.config_path)
             .map_err(|e| ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display())))?;
         let current_sha = Sha256::digest(&current_bytes);
@@ -403,6 +414,61 @@ theme = "dark"
             let rev_after = rt.registry.snapshot().revision;
             assert_eq!(rev_after, rev_before, "revision must not change on error");
         }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn save_patch_cas_conflict_detects_external_edit() {
+        let dir = std::env::temp_dir().join(format!("save-patch-cas-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = std::fs::create_dir_all(&dir);
+        let config_path = dir.join("config.toml");
+        let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
+        std::fs::write(&config_path, config_content).unwrap();
+
+        let rt = Arc::new(ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
+
+        let ctx = Arc::new(ProviderResolutionContext {
+            legacy_migration: None,
+            cli_overrides: None,
+        });
+        let coord = ProviderConfigCoordinator::new(Arc::clone(&rt), config_path.clone(), ctx);
+
+        let rev_before = rt.registry.snapshot().revision;
+        let file_before = std::fs::read_to_string(&config_path).unwrap();
+
+        // Inject a hook that modifies the file between prepare and CAS check
+        let config_path_clone = config_path.clone();
+        *coord.pre_cas_hook.lock().unwrap() = Some(Box::new(move || {
+            // Simulate external edit: write a different api_key
+            let external_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"external-key\"\n";
+            std::fs::write(&config_path_clone, external_content).unwrap();
+        }));
+
+        let mut fields = IndexMap::new();
+        fields.insert("api_key".into(), toml_edit::Value::from("new-key"));
+        let patch = ProviderConfigPatch {
+            provider_id: "xai".into(),
+            fields,
+        };
+        let result = coord.save_patch(&patch).await;
+
+        assert!(result.is_err(), "CAS conflict should return error");
+        match result {
+            Err(ConfigApplyError::FileChanged) => {} // expected
+            Err(ref e) => panic!("expected FileChanged, got: {e}"),
+            Ok(_) => panic!("expected FileChanged error"),
+        }
+
+        // File should have the externally written key, not the patch key
+        let file_after = std::fs::read_to_string(&config_path).unwrap();
+        assert!(file_after.contains(r#"api_key = "external-key""#), "external edit should be preserved");
+        assert!(!file_after.contains(r#"api_key = "new-key""#), "patch should NOT be written");
+
+        // Revision unchanged
+        let rev_after = rt.registry.snapshot().revision;
+        assert_eq!(rev_after, rev_before, "revision must not change on CAS conflict");
 
         let _ = std::fs::remove_dir_all(&dir);
     }
