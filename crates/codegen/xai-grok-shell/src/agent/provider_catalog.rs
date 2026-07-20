@@ -336,6 +336,24 @@ impl ProviderCatalogService {
         }
         drop(current);
 
+        // P9-001: publish Loading state before the HTTP request
+        {
+            let mut snap = self.snapshot.write().await;
+            let mut new_snapshot = (**snap).clone();
+            new_snapshot.providers.insert(
+                provider_id.clone(),
+                ProviderCatalogEntry {
+                    provider_id: provider_id.clone(),
+                    state: ProviderCatalogState::Loading,
+                    fetched_at: None,
+                    source_url: url.to_string(),
+                    models: vec![],
+                    error_summary: None,
+                },
+            );
+            *snap = Arc::new(new_snapshot);
+        }
+
         let result = self.fetch_and_parse(url, parse, defaults).await;
         let mut snap = self.snapshot.write().await;
         let mut new_snapshot = (**snap).clone();
@@ -943,6 +961,50 @@ mod tests {
         let state = ProviderCatalogState::Loading;
         assert_ne!(state, ProviderCatalogState::Empty);
         assert_ne!(state, ProviderCatalogState::Fresh);
+    }
+
+    #[tokio::test]
+    async fn refresh_provider_goes_loading_to_fresh() {
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let app = axum::Router::new().route(
+            "/v1/models",
+            axum::routing::get(|| async {
+                axum::Json(serde_json::json!({"data": [{"id": "m1"}]}))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app)
+                .with_graceful_shutdown(async { shutdown_rx.await.ok(); })
+                .await;
+        });
+        let url = format!("http://{addr}/v1/models");
+
+        let svc = ProviderCatalogService::with_client(reqwest::Client::new());
+        let pid = ProviderId::new("test");
+        let defaults = dummy_defaults();
+
+        // Before refresh, state is Empty
+        let snap = svc.snapshot().await;
+        assert!(!snap.providers.contains_key(&pid));
+
+        svc.refresh_provider(
+            pid.clone(),
+            &url,
+            parse_ollama_tags_models,
+            &defaults,
+            RefreshStrategy::ForceRefresh,
+            Duration::from_secs(300),
+        )
+        .await;
+
+        let snap = svc.snapshot().await;
+        let entry = snap.providers.get(&pid).unwrap();
+        assert_eq!(entry.state, ProviderCatalogState::Fresh);
+        assert!(entry.fetched_at.is_some());
+
+        let _ = shutdown_tx.send(());
     }
 
     #[test]
