@@ -69,19 +69,35 @@ pub fn open_url(url: &str) {
 /// [`open_path`] so it can be unit-tested without spawning. The path is a single
 /// argument, never interpolated into a shell string. Windows uses
 /// [`reveal_in_explorer`] instead.
-#[cfg(not(target_os = "windows"))]
 fn build_open_path_command(path: &std::path::Path) -> std::process::Command {
+    #[cfg(target_os = "windows")]
+    {
+        let mut command = std::process::Command::new("explorer");
+        command.arg("/select,").arg(path);
+        command
+    }
     #[cfg(target_os = "macos")]
-    let mut command = std::process::Command::new("open");
-    #[cfg(not(target_os = "macos"))]
-    let mut command = std::process::Command::new("xdg-open");
-    command
-        .arg(path)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null());
-    xai_tty_utils::detach_std_command(&mut command);
-    command
+    {
+        let mut command = std::process::Command::new("open");
+        command
+            .arg(path)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        xai_tty_utils::detach_std_command(&mut command);
+        command
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let mut command = std::process::Command::new("xdg-open");
+        command
+            .arg(path)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        xai_tty_utils::detach_std_command(&mut command);
+        command
+    }
 }
 
 /// Reveal/open a local file in the OS file manager or default application.
@@ -236,12 +252,12 @@ pub fn ensure_query_param(url: &str, key: &str, value: &str) -> String {
 mod tests {
     use super::*;
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn open_path_command_passes_path_as_a_single_arg() {
         // Path with spaces must be one argument, never shell-interpolated.
-        let path = std::path::Path::new("/tmp/grok session/image 1.jpg");
-        let command = build_open_path_command(path);
+        let dir = std::env::temp_dir();
+        let path = dir.join("grok session").join("image 1.jpg");
+        let command = build_open_path_command(&path);
         let args: Vec<_> = command.get_args().map(|a| a.to_os_string()).collect();
         assert!(args.contains(&path.as_os_str().to_os_string()));
     }
