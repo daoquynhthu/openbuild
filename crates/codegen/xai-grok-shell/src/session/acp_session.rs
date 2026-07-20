@@ -1341,10 +1341,10 @@ fn load_prompt_context_from_dir(
         .map_err(|e| tracing::warn!(?e, "failed to deserialize prompt_context.json"))
         .ok()
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/client_hooks_tests.rs"]
 mod client_hooks_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/replace_system_prompt_tests.rs"]
 mod replace_system_prompt_tests;
 #[cfg(test)]
