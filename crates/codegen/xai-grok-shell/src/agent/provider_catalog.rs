@@ -458,6 +458,13 @@ impl ProviderCatalogService {
                         _ = ct.cancelled() => return (pid.clone(), None, Some("cancelled".into())),
                     };
 
+                    // P9-005: check HTTP status before parsing JSON
+                    let status = response.status();
+                    if !status.is_success() {
+                        let error = ProviderCatalogService::classify_http_status(status);
+                        return (pid.clone(), None, Some(error));
+                    }
+
                     let body: serde_json::Value = tokio::select! {
                         result = response.json() => match result {
                             Ok(v) => v,
@@ -1104,6 +1111,114 @@ mod tests {
             total >= 6,
             "all 6 providers must have been refreshed, got {total}"
         );
+    }
+
+    // P9-005: HTTP status classification
+    #[test]
+    fn classify_http_status_401_auth_required() {
+        let status = reqwest::StatusCode::UNAUTHORIZED;
+        let msg = ProviderCatalogService::classify_http_status(status);
+        assert_eq!(msg, "auth required (HTTP 401)");
+    }
+
+    #[test]
+    fn classify_http_status_403_forbidden() {
+        let status = reqwest::StatusCode::FORBIDDEN;
+        let msg = ProviderCatalogService::classify_http_status(status);
+        assert_eq!(msg, "forbidden (HTTP 403)");
+    }
+
+    #[test]
+    fn classify_http_status_404_endpoint_not_found() {
+        let status = reqwest::StatusCode::NOT_FOUND;
+        let msg = ProviderCatalogService::classify_http_status(status);
+        assert_eq!(msg, "endpoint not found (HTTP 404)");
+    }
+
+    #[test]
+    fn classify_http_status_429_rate_limited() {
+        let status = reqwest::StatusCode::TOO_MANY_REQUESTS;
+        let msg = ProviderCatalogService::classify_http_status(status);
+        assert_eq!(msg, "rate limited (HTTP 429)");
+    }
+
+    #[test]
+    fn classify_http_status_5xx_server_error() {
+        let status = reqwest::StatusCode::INTERNAL_SERVER_ERROR;
+        let msg = ProviderCatalogService::classify_http_status(status);
+        assert_eq!(msg, "server error (HTTP 500)");
+    }
+
+    #[test]
+    fn classify_http_status_503_server_error() {
+        let status = reqwest::StatusCode::SERVICE_UNAVAILABLE;
+        let msg = ProviderCatalogService::classify_http_status(status);
+        assert_eq!(msg, "server error (HTTP 503)");
+    }
+
+    #[test]
+    fn classify_http_status_200_is_unexpected() {
+        let status = reqwest::StatusCode::OK;
+        let msg = ProviderCatalogService::classify_http_status(status);
+        assert_eq!(msg, "unexpected HTTP status 200");
+    }
+
+    #[test]
+    fn classify_http_status_302_is_unexpected() {
+        let status = reqwest::StatusCode::FOUND;
+        let msg = ProviderCatalogService::classify_http_status(status);
+        assert_eq!(msg, "unexpected HTTP status 302");
+    }
+
+    #[tokio::test]
+    async fn refresh_all_returns_http_error_on_non_2xx() {
+        // Start an axum server that returns 403
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+        let app = axum::Router::new().route(
+            "/v1/models",
+            axum::routing::get(|| async {
+                axum::response::Response::builder()
+                    .status(403)
+                    .body(axum::body::Body::from("forbidden"))
+                    .unwrap()
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app)
+                .with_graceful_shutdown(async { shutdown_rx.await.ok(); })
+                .await;
+        });
+        let base_url = format!("http://{addr}");
+        let url = format!("{base_url}/v1/models");
+
+        let svc = ProviderCatalogService::with_client(reqwest::Client::new());
+        let pid = ProviderId::new("test");
+        let mut defaults = dummy_defaults();
+        defaults.base_url = base_url;
+        defaults.model_list_endpoint = Some(url.clone());
+
+        svc.refresh_all(&[pid.clone()], |p| {
+            if p == &ProviderId::new("test") {
+                Some((url.clone(), defaults.clone()))
+            } else {
+                None
+            }
+        }, Duration::from_secs(300)).await;
+
+        // Wait briefly for the spawned task to complete
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let snap = svc.snapshot().await;
+        let entry = snap.providers.get(&pid).unwrap();
+        assert_eq!(entry.state, ProviderCatalogState::Failed("forbidden (HTTP 403)".into()));
+        assert_eq!(
+            entry.error_summary.as_deref(),
+            Some("forbidden (HTTP 403)")
+        );
+
+        let _ = shutdown_tx.send(());
     }
 
     // P9-010: snapshot serialization roundtrip tests
