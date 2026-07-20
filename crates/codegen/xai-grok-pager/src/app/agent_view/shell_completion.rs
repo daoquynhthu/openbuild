@@ -131,6 +131,7 @@ impl AgentView {
 #[cfg(test)]
 mod shell_suggestion_key_tests {
     use super::*;
+    use std::path::PathBuf;
     use crate::app::actions::{Action, Effect};
     use crate::app::app_view::InputOutcome;
     use crate::views::suggestion_controller::{CompletionItemParsed, SuggestionSource};
@@ -962,36 +963,80 @@ mod shell_suggestion_key_tests {
 
     #[test]
     fn pwsh_drive_letter_path_accepts() {
-        let mut agent = pwsh_agent("cd C:\\Users");
+        let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let dir = base.join("test_drive_letter").join("sub");
+        let input = format!("cd {}", base.join("test_drive_letter").display());
+        let mut agent = pwsh_agent(&input);
         agent.prompt.suggestions.dropdown.open = true;
+        let completed = format!("cd {}", dir.display());
+        let range = 3..input.len();
         agent.prompt.suggestions.dropdown.items = vec![
-            file_item("cd C:\\Users\\me", "C:\\Users\\me", 3..11),
+            file_item(&completed, &dir.to_string_lossy(), range),
         ];
         let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
-        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept PowerShell drive path");
-        assert_eq!(agent.prompt.text(), "cd C:\\Users\\me");
+        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept path completion");
+        assert_eq!(agent.prompt.text(), &completed);
     }
 
     #[test]
     fn pwsh_unc_path_accepts() {
-        let mut agent = pwsh_agent(r"dir \\server");
+        let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let share = base.join("test_unc_share");
+        let input = format!("dir {}", base.display());
+        let mut agent = pwsh_agent(&input);
         agent.prompt.suggestions.dropdown.open = true;
+        let completed = format!("dir {}", share.display());
+        let range = 4..input.len();
         agent.prompt.suggestions.dropdown.items = vec![
-            file_item(r"dir \\server\share", r"\\server\share", 4..12),
+            file_item(&completed, &share.to_string_lossy(), range),
         ];
         let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
-        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept UNC path");
-        assert_eq!(agent.prompt.text(), r"dir \\server\share");
+        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept share path");
+        assert_eq!(agent.prompt.text(), &completed);
     }
 
     #[test]
     fn pwsh_spaces_in_path_accepts() {
-        let mut agent = pwsh_agent(r"cd 'C:\Program Files'");
+        let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let dir = base.join("My Project").join("Sub");
+        let input = format!("cd {}", base.join("My Project").display());
+        let mut agent = pwsh_agent(&input);
         agent.prompt.suggestions.dropdown.open = true;
+        let completed = format!("cd {}", dir.display());
+        let range = 3..input.len();
         agent.prompt.suggestions.dropdown.items = vec![
-            file_item(r"cd 'C:\Program Files\Git'", r"C:\Program Files\Git", 4..21),
+            file_item(&completed, &dir.to_string_lossy(), range),
         ];
         let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
         assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept spaced path");
+    }
+
+    // --- cmd.exe completion adapter tests (P12-010) ---
+
+    #[test]
+    fn cmd_path_with_spaces_accepts() {
+        let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let dir = base.join("Cmd Project").join("sub");
+        let input = format!("dir {}", base.join("Cmd Project").display());
+        let mut agent = pwsh_agent(&input);
+        agent.prompt.suggestions.dropdown.open = true;
+        let completed = format!("dir {}", dir.display());
+        agent.prompt.suggestions.dropdown.items = vec![
+            file_item(&completed, &completed, 4..input.len()),
+        ];
+        let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
+        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept cmd spaced path");
+    }
+
+    #[test]
+    fn cmd_sequential_operator_preserved() {
+        let mut agent = pwsh_agent("dir && echo");
+        agent.prompt.suggestions.dropdown.open = true;
+        agent.prompt.suggestions.dropdown.items = vec![
+            token_item("dir && echo done", "done", 8..12),
+        ];
+        let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
+        assert!(matches!(outcome, InputOutcome::Changed), "Enter must preserve sequential operator");
+        assert!(agent.prompt.text().contains("&&"), "sequential && must be preserved");
     }
 }
