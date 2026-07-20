@@ -832,6 +832,37 @@ mod tests {
         assert!(count <= 3, "expected coalesced events (<=3), got {count}");
     }
 
+    #[test]
+    fn atomic_replace_triggers_watcher_and_coalesces() {
+        let tmp = TempDir::new().unwrap();
+        let config_path = tmp.path().join("config.toml");
+        fs::write(&config_path, "version = 0").unwrap();
+
+        let (_w, mut rx) =
+            ConfigFileWatcher::start(tmp.path(), &[], None, Some(Duration::from_millis(500)))
+                .expect("watcher should start");
+
+        wait_ms(200);
+
+        // atomic_replace must trigger the same watcher events as fs::write
+        for i in 1..=3 {
+            xai_grok_paths::atomic_write::atomic_replace(
+                &config_path,
+                format!("version = {i}").as_bytes(),
+            )
+            .unwrap();
+            wait_ms(10);
+        }
+        wait_ms(800);
+
+        let mut count = 0;
+        while rx.try_recv().is_ok() {
+            count += 1;
+        }
+        assert!(count >= 1, "expected at least 1 event after atomic_replace, got {count}");
+        assert!(count <= 3, "expected coalesced events (<=3), got {count}");
+    }
+
     /// A write to `<cwd>/.grok/config.toml` must surface as
     /// a `ConfigChangeEvent::ProjectConfigChanged` so the reloader emits
     /// `ConfigUpdate::ProjectMcpServersChanged { cwd }`. Uses a longer
