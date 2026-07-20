@@ -453,12 +453,8 @@ mod tests {
         let compressed_bytes = std::fs::read(&compressed).unwrap();
         assert_ne!(&compressed_bytes[..], &test_data[..]);
 
-        // Decompress
-        let bytes_written = decompress_file(&compressed, &decompressed).unwrap();
-        assert_eq!(bytes_written, test_data.len() as u64);
-
-        // Verify roundtrip
-        let result = std::fs::read(&decompressed).unwrap();
+        // Decompress and verify roundtrip
+        let result = decompress_to_bytes(&compressed).unwrap();
         assert_eq!(&result[..], &test_data[..]);
     }
 

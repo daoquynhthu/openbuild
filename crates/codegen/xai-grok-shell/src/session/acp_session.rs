@@ -59,7 +59,7 @@ use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
 use std::sync::Arc;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 use std::sync::OnceLock;
 use tokio::sync::{Mutex as TokioMutex, mpsc, oneshot};
 use tokio::time::{Duration, sleep};
@@ -1347,7 +1347,7 @@ mod client_hooks_tests;
 #[cfg(all(test, not(target_os = "windows")))]
 #[path = "acp_session_tests/replace_system_prompt_tests.rs"]
 mod replace_system_prompt_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/support.rs"]
 mod support;
 #[cfg(all(test, not(target_os = "windows")))]
@@ -1768,7 +1768,7 @@ impl Drop for TurnMetrics {
 /// proactive refresh loop and the per-turn pre-request refresh
 /// (`refresh_token_if_expired`). `handle_sampling_failure` surfaces
 /// auth errors to the caller and never invokes the refresher itself.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/auth_error_no_retry_tests.rs"]
 mod auth_error_no_retry_tests;
 /// Regression coverage for the auto-wake suppression sweep + shutdown
