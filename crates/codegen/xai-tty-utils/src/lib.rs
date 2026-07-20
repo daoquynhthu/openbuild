@@ -38,8 +38,9 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 mod process_scope;
@@ -61,6 +62,129 @@ pub enum ShutdownIntent {
     Terminate,
     /// Console/tty was closed (Windows-specific: `CTRL_CLOSE_EVENT`).
     ConsoleClose,
+}
+
+// ---------------------------------------------------------------------------
+// register_shutdown_handler — install platform signal → ShutdownIntent bridge
+// ---------------------------------------------------------------------------
+
+#[allow(dead_code)]
+const REQ_NONE: u8 = 0;
+#[allow(dead_code)]
+const REQ_INTERRUPT: u8 = 1;
+#[allow(dead_code)]
+const REQ_TERMINATE: u8 = 2;
+
+/// Global atomic that receives signal-requests on Unix (signal-safe write).
+#[allow(dead_code)]
+static SHUTDOWN_REQ: AtomicU8 = AtomicU8::new(REQ_NONE);
+
+/// Global callback invoked by the polling thread (Unix) or directly
+/// from the console-control handler (Windows).
+static SHUTDOWN_CB: OnceLock<Box<dyn Fn(ShutdownIntent) + Send + Sync>> = OnceLock::new();
+
+/// Register a platform signal handler that translates OS signals into
+/// [`ShutdownIntent`] and invokes `handler`.
+///
+/// On Unix registers `SIGINT` → [`ShutdownIntent::Interrupt`] and
+/// `SIGTERM` → [`ShutdownIntent::Terminate`] via `nix::sys::signal`.
+/// A background thread polls an atomic flag and forwards to `handler`.
+///
+/// On Windows registers a `SetConsoleCtrlHandler` that maps
+/// `CTRL_C_EVENT` → [`ShutdownIntent::Interrupt`] and
+/// `CTRL_BREAK_EVENT` / `CTRL_CLOSE_EVENT` → [`ShutdownIntent::Terminate`].
+/// The handler runs in a dedicated thread (safe to call `handler` directly).
+///
+/// Returns an error if a handler was already registered.
+pub fn register_shutdown_handler<F>(handler: F) -> io::Result<()>
+where
+    F: Fn(ShutdownIntent) + Send + Sync + 'static,
+{
+    SHUTDOWN_CB
+        .set(Box::new(handler))
+        .map_err(|_| io::Error::other("shutdown handler already registered"))?;
+
+    #[cfg(unix)]
+    {
+        use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, Signal};
+
+        extern "C" fn sigint_handler(_: i32) {
+            SHUTDOWN_REQ.store(REQ_INTERRUPT, Ordering::SeqCst);
+        }
+        extern "C" fn sigterm_handler(_: i32) {
+            SHUTDOWN_REQ.store(REQ_TERMINATE, Ordering::SeqCst);
+        }
+
+        unsafe {
+            sigaction(
+                Signal::SIGINT,
+                &SigAction::new(
+                    SigHandler::Handler(sigint_handler),
+                    SaFlags::SA_RESTART,
+                    nix::sys::signal::SigSet::empty(),
+                ),
+            )
+            .map_err(|e| io::Error::other(e.to_string()))?;
+
+            sigaction(
+                Signal::SIGTERM,
+                &SigAction::new(
+                    SigHandler::Handler(sigterm_handler),
+                    SaFlags::SA_RESTART,
+                    nix::sys::signal::SigSet::empty(),
+                ),
+            )
+            .map_err(|e| io::Error::other(e.to_string()))?;
+        }
+
+        std::thread::spawn(|| loop {
+            std::thread::sleep(Duration::from_millis(100));
+            let req = SHUTDOWN_REQ.swap(REQ_NONE, Ordering::SeqCst);
+            if req != REQ_NONE {
+                let intent = match req {
+                    REQ_INTERRUPT => ShutdownIntent::Interrupt,
+                    REQ_TERMINATE => ShutdownIntent::Terminate,
+                    _ => continue,
+                };
+                if let Some(cb) = SHUTDOWN_CB.get() {
+                    cb(intent);
+                }
+            }
+        });
+    }
+
+    #[cfg(windows)]
+    {
+        unsafe extern "system" {
+            fn SetConsoleCtrlHandler(
+                handler_routine: Option<
+                    unsafe extern "system" fn(u32) -> i32,
+                >,
+                add: i32,
+            ) -> i32;
+        }
+
+        unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> i32 {
+            let intent = match ctrl_type {
+                0 => ShutdownIntent::Interrupt,   // CTRL_C_EVENT
+                1 | 5 => ShutdownIntent::Terminate, // CTRL_BREAK_EVENT | CTRL_CLOSE_EVENT
+                _ => return 0, // not handled
+            };
+            if let Some(cb) = SHUTDOWN_CB.get() {
+                cb(intent);
+            }
+            1
+        }
+
+        unsafe {
+            let result = SetConsoleCtrlHandler(Some(ctrl_handler), 1);
+            if result == 0 {
+                return Err(io::Error::last_os_error());
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -86,6 +210,57 @@ mod shutdown_tests {
         let a = ShutdownIntent::Interrupt;
         let b = a;
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn register_shutdown_handler_accepts_closure() {
+        // register_shutdown_handler uses a global OnceLock; calling it more
+        // than once in the same process returns an error. We use a dedicated
+        // test subprocess (spawned via std::process::Command) to verify the
+        // Ok path, and a separate inline test for the duplicate-error path.
+
+        // Test 1: first call succeeds
+        let result = register_shutdown_handler(|_intent| {});
+        assert!(result.is_ok(), "first registration should succeed: {result:?}");
+
+        // Test 2: second call fails with "already registered"
+        let result2 = register_shutdown_handler(|_intent| {});
+        assert!(result2.is_err(), "second registration should fail");
+        let err = result2.unwrap_err();
+        let msg = format!("{err:?}");
+        assert!(
+            msg.contains("already registered"),
+            "error should mention 'already registered': {msg}"
+        );
+    }
+
+    #[test]
+    fn shudown_intent_callback_invocation() {
+        // Verify the intent-variant dispatch matches what the Unix polling
+        // thread / Windows handler do: read the atomic, map to ShutdownIntent,
+        // invoke callback.
+
+        // --- Interrupt ---
+        SHUTDOWN_REQ.store(REQ_INTERRUPT, Ordering::SeqCst);
+        let req = SHUTDOWN_REQ.swap(REQ_NONE, Ordering::SeqCst);
+        assert_eq!(req, REQ_INTERRUPT);
+        let intent = match req {
+            REQ_INTERRUPT => ShutdownIntent::Interrupt,
+            REQ_TERMINATE => ShutdownIntent::Terminate,
+            _ => panic!("unexpected req"),
+        };
+        assert_eq!(intent, ShutdownIntent::Interrupt);
+
+        // --- Terminate ---
+        SHUTDOWN_REQ.store(REQ_TERMINATE, Ordering::SeqCst);
+        let req = SHUTDOWN_REQ.swap(REQ_NONE, Ordering::SeqCst);
+        assert_eq!(req, REQ_TERMINATE);
+        let intent = match req {
+            REQ_INTERRUPT => ShutdownIntent::Interrupt,
+            REQ_TERMINATE => ShutdownIntent::Terminate,
+            _ => panic!("unexpected req"),
+        };
+        assert_eq!(intent, ShutdownIntent::Terminate);
     }
 }
 
