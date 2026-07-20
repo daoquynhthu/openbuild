@@ -1,11 +1,44 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use indexmap::IndexMap;
 use tokio::sync::Mutex;
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::registry::ProviderRegistry;
 
 use super::provider_runtime::ProviderRuntime;
+
+/// A typed patch for a single `[provider.<id>]` section.
+pub struct ProviderConfigPatch {
+    pub provider_id: String,
+    pub fields: IndexMap<String, toml_edit::Value>,
+}
+
+/// Apply a patch to a TOML config string using toml_edit.
+/// Only the `[provider.<id>]` section is modified; all other sections,
+/// comments, and ordering are preserved.
+pub fn apply_toml_patch(config: &str, patch: &ProviderConfigPatch) -> Result<String, String> {
+    let mut doc: toml_edit::DocumentMut = config.parse()
+        .map_err(|e| format!("TOML parse error: {e}"))?;
+
+    let provider_table = doc
+        .entry("provider")
+        .or_insert(toml_edit::table())
+        .as_table_mut()
+        .ok_or_else(|| "provider entry is not a table".to_string())?;
+
+    let target = provider_table
+        .entry(&patch.provider_id)
+        .or_insert(toml_edit::table())
+        .as_table_mut()
+        .ok_or_else(|| format!("provider.{} is not a table", patch.provider_id))?;
+
+    for (key, value) in &patch.fields {
+        target.insert(key, toml_edit::value(value.clone()));
+    }
+
+    Ok(doc.to_string())
+}
 
 /// Frozen resolution context captured at startup: legacy migration policy
 /// and CLI overrides.  Excludes env/session secret values.
@@ -156,6 +189,71 @@ mod tests {
         assert!(rev_after > rev_before, "revision should increase: {rev_after} > {rev_before}");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn apply_toml_patch_modifies_only_target_section() {
+        let config = r#"
+[provider.xai]
+enabled = true
+kind = "xai"
+api_key = "old-key"
+
+[provider.openai]
+enabled = true
+kind = "openai_compatible"
+base_url = "https://api.openai.com/v1"
+"#;
+        let mut fields = IndexMap::new();
+        fields.insert("api_key".into(), toml_edit::Value::from("new-key"));
+        fields.insert("enabled".into(), toml_edit::Value::from(false));
+
+        let patch = ProviderConfigPatch {
+            provider_id: "xai".into(),
+            fields,
+        };
+        let result = apply_toml_patch(config, &patch).unwrap();
+
+        // xai section should have new values
+        assert!(result.contains(r#"api_key = "new-key""#), "xai api_key should be updated");
+        assert!(result.contains("enabled = false"), "xai enabled should be updated");
+        // openai section should be unchanged
+        assert!(result.contains(r#"kind = "openai_compatible""#), "openai section should be preserved");
+        assert!(result.contains(r#"base_url = "https://api.openai.com/v1""#), "openai base_url should be preserved");
+        // After patching, the document should still be valid TOML
+        let parsed: toml::Value = toml::from_str(&result).unwrap();
+        assert_eq!(
+            parsed["provider"]["xai"]["api_key"].as_str(),
+            Some("new-key")
+        );
+    }
+
+    #[test]
+    fn apply_toml_patch_preserves_unrelated_sections() {
+        let config = r#"
+[models]
+default = "xai/grok-latest"
+
+[provider.xai]
+enabled = true
+kind = "xai"
+
+[ui]
+theme = "dark"
+"#;
+        let mut fields = IndexMap::new();
+        fields.insert("enabled".into(), toml_edit::Value::from(false));
+
+        let patch = ProviderConfigPatch {
+            provider_id: "xai".into(),
+            fields,
+        };
+        let result = apply_toml_patch(config, &patch).unwrap();
+
+        assert!(result.contains(r#"[models]"#), "models section should be preserved");
+        assert!(result.contains(r#"default = "xai/grok-latest""#), "models content should be preserved");
+        assert!(result.contains(r#"[ui]"#), "ui section should be preserved");
+        assert!(result.contains(r#"theme = "dark""#), "ui content should be preserved");
     }
 
     #[tokio::test]
