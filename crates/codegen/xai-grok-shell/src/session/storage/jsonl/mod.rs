@@ -260,9 +260,13 @@ impl JsonlStorageAdapter {
             line.push(b'\n');
             content.extend(line);
         }
-        let tmp = path.with_extension("jsonl.tmp");
-        tokio::fs::write(&tmp, &content).await?;
-        tokio::fs::rename(&tmp, &path).await
+        tokio::task::spawn_blocking(move || {
+            xai_grok_paths::atomic_write::atomic_replace(&path, &content)
+                .map_err(|e| io::Error::other(e.to_string()))
+        })
+        .await
+        .map_err(io::Error::other)
+        .and_then(|r| r)
     }
     fn read_jsonl<T: serde::de::DeserializeOwned>(&self, path: PathBuf) -> io::Result<Vec<T>> {
         if !path.exists() {
@@ -863,6 +867,14 @@ impl JsonlStorageAdapter {
             compaction_segments_copied,
         })
     }
+    async fn write_atomic(&self, path: PathBuf, bytes: Vec<u8>) -> io::Result<()> {
+        tokio::task::spawn_blocking(move || {
+            xai_grok_paths::atomic_write::atomic_replace(&path, &bytes)
+                .map_err(|e| io::Error::other(e.to_string()))
+        })
+        .await
+        .map_err(io::Error::other)?
+    }
 }
 /// Next `segment_NNN` index in `compaction_dir`: one past the highest existing
 /// segment, or 0 when none exist. Resume-safe — derived from disk, not memory.
@@ -1017,7 +1029,7 @@ impl StorageAdapter for JsonlStorageAdapter {
     async fn write_plan_state(&self, info: &Info, state: &TodoState) -> io::Result<()> {
         let state_json = serde_json::to_vec_pretty(state)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        tokio::fs::write(self.plan_file(info), state_json).await
+        self.write_atomic(self.plan_file(info), state_json).await
     }
     async fn write_plan_mode_state(
         &self,
@@ -1027,9 +1039,7 @@ impl StorageAdapter for JsonlStorageAdapter {
         let json = serde_json::to_vec_pretty(state)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let target = self.plan_mode_state_file(info);
-        let tmp = target.with_extension("json.tmp");
-        tokio::fs::write(&tmp, json).await?;
-        tokio::fs::rename(&tmp, &target).await
+        self.write_atomic(target, json).await
     }
     async fn write_signals(
         &self,
@@ -1039,9 +1049,7 @@ impl StorageAdapter for JsonlStorageAdapter {
         let signals_json = serde_json::to_vec(signals)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let target = self.signals_file(info);
-        let tmp = target.with_extension("json.tmp");
-        tokio::fs::write(&tmp, signals_json).await?;
-        tokio::fs::rename(&tmp, &target).await
+        self.write_atomic(target, signals_json).await
     }
     async fn write_announcement_state(
         &self,
@@ -1051,9 +1059,7 @@ impl StorageAdapter for JsonlStorageAdapter {
         let json =
             serde_json::to_vec(state).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         let target = self.announcement_state_file(info);
-        let tmp = target.with_extension("json.tmp");
-        tokio::fs::write(&tmp, json).await?;
-        tokio::fs::rename(&tmp, &target).await
+        self.write_atomic(target, json).await
     }
     async fn write_goal_mode_state(
         &self,
@@ -1066,9 +1072,7 @@ impl StorageAdapter for JsonlStorageAdapter {
         if let Some(parent) = target.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        let tmp = target.with_extension("json.tmp");
-        tokio::fs::write(&tmp, json).await?;
-        tokio::fs::rename(&tmp, &target).await
+        self.write_atomic(target, json).await
     }
     async fn load_session(&self, info: &Info) -> io::Result<PersistedData> {
         let summary = self.read_summary_sync(info)?;
