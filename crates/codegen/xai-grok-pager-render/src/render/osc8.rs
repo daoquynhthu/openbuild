@@ -120,20 +120,26 @@ fn relative_file_path_regex() -> &'static regex::Regex {
 fn file_path_regex() -> &'static regex::Regex {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        // Absolute (`/Users/me/x.md`) or home-relative (`~/Desktop/x.md`) paths.
-        // Leading `~` is expanded to $HOME when building the `file://` URL.
-        //
-        // The *final* segment may include internal spaces when it looks like a
-        // filename with an extension (tutor report: `…/Demo App.app`
-        // only linkified up to the space). Intermediate segments stay
-        // space-free so `…/bar here.` does not eat the word `here`.
-        // Alternation prefers the spaced form first so it wins over the shorter
-        // no-space prefix at the same start position.
-        let pat = format!(
+        // Unix absolute (`/Users/me/x.md`) or home-relative (`~/Desktop/x.md`).
+        let unix_pat = format!(
             r"~?/(?:{seg}/)+(?:{spaced}|{seg})",
             seg = PATH_SEGMENT,
             spaced = PATH_SEGMENT_SPACED,
         );
+
+        let pat = if cfg!(windows) {
+            // Windows absolute with drive letter: `C:\Users\...`
+            // or UNC: `\\server\share\...`
+            let win_pat = format!(
+                r"(?:[a-zA-Z]:\\(?:{seg}\\)+(?:{spaced}|{seg})|\\\\(?:{seg}\\)+(?:{spaced}|{seg}))",
+                seg = PATH_SEGMENT,
+                spaced = PATH_SEGMENT_SPACED,
+            );
+            format!("{unix_pat}|{win_pat}")
+        } else {
+            unix_pat
+        };
+
         regex::Regex::new(&pat).expect("file path regex")
     })
 }
@@ -147,9 +153,18 @@ fn quoted_file_path_regex() -> &'static regex::Regex {
         // Opening quote + path; closing quote checked in code (regex crate has
         // no backreferences). Path allows spaces in segments; at least two
         // `/`-separated components required.
-        // `"/Users/me/My Dir/file.app"` or `'~/Desktop/My Notes/todo.md'`
+        // Unix: `"/Users/me/My Dir/file.app"` or `'~/Desktop/My Notes/todo.md'`
+        // Windows: `"C:\Program Files\app.exe"` or `'\\server\share\file.txt'`
         let seg = r#"[^/"']+"#;
-        let pat = format!(r#"(["'])(~?/(?:{seg}/)+{seg})"#);
+        let unix_pat = format!(r#"~?/(?:{seg}/)+{seg}"#);
+
+        let pat = if cfg!(windows) {
+            let win_pat = format!(r#"(?:[a-zA-Z]:\\(?:{seg}\\)+{seg}|\\\\(?:{seg}\\)+{seg})"#,);
+            format!(r#"(["'])((?:{unix_pat}|{win_pat}))"#)
+        } else {
+            format!(r#"(["'])({unix_pat})"#)
+        };
+
         regex::Regex::new(&pat).expect("quoted file path regex")
     })
 }
@@ -161,12 +176,31 @@ pub fn path_to_file_url(path: &str) -> Option<Arc<str>> {
 }
 
 fn file_path_to_url(path: &Path) -> Option<Arc<str>> {
-    url::Url::from_file_path(path)
+    #[cfg(windows)]
+    let path = {
+        // On Windows, url::Url::from_file_path rejects paths that lack
+        // a drive letter prefix (e.g. /Users/foo from Unix-style input).
+        // Prepend the current drive letter so it becomes a valid path.
+        let s = path.to_string_lossy();
+        if (s.starts_with('/') || s.starts_with('\\')) && !s.contains(':') {
+            if let Ok(cwd) = std::env::current_dir() {
+                let drive = cwd.to_string_lossy()[..2].to_string();
+                PathBuf::from(format!("{}{}", drive, path.display()))
+            } else {
+                path.to_path_buf()
+            }
+        } else {
+            path.to_path_buf()
+        }
+    };
+    #[cfg(not(windows))]
+    let path = path.to_path_buf();
+    url::Url::from_file_path(&path)
         .ok()
         .map(|u| Arc::from(u.as_str()))
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 fn tool_path_file_url_with_home(
     path: &str,
     cwd: Option<&Path>,
@@ -523,11 +557,30 @@ fn scan_logical_line(
 }
 
 #[cfg(test)]
-#[cfg(not(target_os = "windows"))]
 mod tests {
     use super::*;
 
     use ratatui::style::Color;
+
+    /// Convert a `/`-separated Unix path to a platform-native PathBuf using
+    /// the same drive letter that `file_path_to_url` will see at runtime.
+    fn p(unix: &str) -> PathBuf {
+        let trimmed = unix.trim_start_matches('/');
+        if cfg!(windows) {
+            let drive = std::env::current_dir()
+                .map(|c| c.to_string_lossy()[..2].to_string())
+                .unwrap_or_else(|_| "C:".into());
+            PathBuf::from(format!(r"{}\{}", drive, trimmed.replace('/', "\\")))
+        } else {
+            PathBuf::from(format!("/{}", trimmed))
+        }
+    }
+
+    /// Expected `file://` URL string for a path built by `p()`, using the
+    /// same `file_path_to_url` that production code calls.
+    fn url(unix: &str) -> String {
+        file_path_to_url(&p(unix)).unwrap().to_string()
+    }
 
     /// Scan rows as independent logical lines (hard breaks between rows) —
     /// the common shape for tests that don't exercise soft-wrap joining.
@@ -597,30 +650,38 @@ mod tests {
 
     #[test]
     fn tool_path_file_url_resolves_relative_against_cwd() {
-        let cwd = Path::new("/Users/me/project");
-        let url = tool_path_file_url("src/main.rs", Some(cwd)).expect("url");
-        assert!(url.starts_with("file://"), "got {url}");
-        assert!(url.contains("/Users/me/project/src/main.rs"), "got {url}");
+        let cwd_path = p("Users/me/project");
+        let cwd = Some(cwd_path.as_path());
+        let result = tool_path_file_url("src/main.rs", cwd).expect("url");
+        assert!(result.starts_with("file://"), "got {result}");
+        assert!(
+            result.contains(&url("Users/me/project/src/main.rs")),
+            "got {result}"
+        );
     }
 
     #[test]
     fn tool_path_file_url_accepts_absolute_without_existing_file() {
-        let url = tool_path_file_url("/tmp/does-not-exist-xyz/foo.rs", None).expect("url");
-        assert!(url.starts_with("file://"), "got {url}");
-        assert!(url.contains("foo.rs"), "got {url}");
+        let path_arg = p("tmp/does-not-exist-xyz/foo.rs").display().to_string();
+        let result = tool_path_file_url(&path_arg, None).expect("url");
+        assert!(result.starts_with("file://"), "got {result}");
+        assert!(result.contains("foo.rs"), "got {result}");
     }
 
     #[test]
     fn tool_path_file_url_preserves_parent_segments_for_os_resolution() {
-        let url = tool_path_file_url("/repo/link/../target.rs", None).expect("url");
-        assert!(url.contains("/repo/link/../target.rs"), "got {url}");
+        let path_arg = p("repo/link/../target.rs").display().to_string();
+        let result = tool_path_file_url(&path_arg, None).expect("url");
+        assert!(
+            result.contains(&url("repo/link/../target.rs")),
+            "got {result}"
+        );
     }
 
     #[test]
     fn unresolved_tilde_never_manufactures_a_cwd_file_url() {
-        assert!(
-            tool_path_file_url_with_home("~/target.rs", Some(Path::new("/repo")), None).is_none()
-        );
+        let repo = p("repo");
+        assert!(tool_path_file_url_with_home("~/target.rs", Some(&repo), None).is_none());
     }
 
     #[cfg(unix)]
@@ -805,7 +866,7 @@ mod tests {
         scan_unjoined(std::iter::once((0, &line)), 0, &[], &mut overlay);
 
         assert_eq!(overlay.links().len(), 1);
-        assert_eq!(&*overlay.links()[0].url, "file:///Users/foo/src/main.rs");
+        assert_eq!(&*overlay.links()[0].url, url("Users/foo/src/main.rs"));
     }
 
     #[test]
@@ -868,7 +929,7 @@ mod tests {
         assert_eq!(
             &*overlay.links()[0].url,
             // `%` is itself percent-encoded (`%25`) when building the file URL.
-            "file:///Users/alice/.grok/sessions/%252Fabc/00000000/images/1.jpg",
+            url("Users/alice/.grok/sessions/%2Fabc/00000000/images/1.jpg"),
         );
     }
 
@@ -887,8 +948,9 @@ mod tests {
         scan_lines_for_url_overlays(rows.into_iter(), 2, &[], &mut overlay);
 
         assert_eq!(overlay.links().len(), 2, "one overlay region per row");
-        let expected_url = "file:///Users/alice/.grok/sessions/%252FUsers%252Fali\
-                            ce%252Fcode%252Fxai/00000000-0000-0000-0000-000000000001/images/1.jpg";
+        let expected_url = url(
+            "Users/alice/.grok/sessions/%2FUsers%2Falice%2Fcode%2Fxai/00000000-0000-0000-0000-000000000001/images/1.jpg",
+        );
         for link in overlay.links() {
             assert_eq!(&*link.url, expected_url);
         }
@@ -930,7 +992,7 @@ mod tests {
         for link in overlay.links() {
             assert_eq!(
                 &*link.url,
-                "file:///Users/me/.grok/sessions/%252Fabc/019f3a86/images/1.jpg"
+                url("Users/me/.grok/sessions/%2Fabc/019f3a86/images/1.jpg")
             );
         }
         assert_eq!(overlay.links()[1].col_start, 0);
@@ -995,7 +1057,7 @@ mod tests {
 
         assert_eq!(overlay.links().len(), 2);
         for link in overlay.links() {
-            assert_eq!(&*link.url, "file:///tmp/release/Demo%20App.app");
+            assert_eq!(&*link.url, url("tmp/release/Demo App.app"));
         }
         // Row 1's region covers only `App.app` (the joiner space belongs
         // to no row).
@@ -1018,7 +1080,7 @@ mod tests {
         scan_lines_for_url_overlays(rows.into_iter(), 0, &[], &mut overlay);
 
         assert_eq!(overlay.links().len(), 1);
-        assert_eq!(&*overlay.links()[0].url, "file:///Users/alice");
+        assert_eq!(&*overlay.links()[0].url, url("Users/alice"));
         assert_eq!(overlay.links()[0].screen_row, 0);
     }
 
@@ -1035,7 +1097,7 @@ mod tests {
         scan_unjoined(std::iter::once((0, &line)), 0, &[], &mut overlay);
 
         assert_eq!(overlay.links().len(), 1);
-        assert_eq!(&*overlay.links()[0].url, "file:///Users/foo/images/1.jpg");
+        assert_eq!(&*overlay.links()[0].url, url("Users/foo/images/1.jpg"));
         assert_eq!(
             overlay.links()[0].col_start,
             UnicodeWidthStr::width("Saved to ") as u16
@@ -1051,7 +1113,7 @@ mod tests {
         assert_eq!(overlay.links().len(), 1);
         assert_eq!(
             &*overlay.links()[0].url,
-            "file:///Users/foo/bar.rs",
+            url("Users/foo/bar.rs"),
             "colon-delimited line number should be excluded"
         );
     }
@@ -1093,7 +1155,8 @@ mod tests {
         assert_eq!(overlay.links().len(), 2);
         let urls: Vec<&str> = overlay.links().iter().map(|l| &*l.url).collect();
         assert!(urls.contains(&"https://docs.rs/foo"));
-        assert!(urls.contains(&"file:///Users/me/src/lib.rs"));
+        let expected = url("Users/me/src/lib.rs");
+        assert!(urls.contains(&expected.as_str()));
     }
 
     #[test]
@@ -1103,7 +1166,7 @@ mod tests {
         scan_unjoined(std::iter::once((0, &line)), 0, &[], &mut overlay);
 
         assert_eq!(overlay.links().len(), 1);
-        assert_eq!(&*overlay.links()[0].url, "file:///tmp/grok-impl-summary.md");
+        assert_eq!(&*overlay.links()[0].url, url("tmp/grok-impl-summary.md"));
     }
 
     #[test]
@@ -1115,7 +1178,7 @@ mod tests {
         assert_eq!(overlay.links().len(), 1);
         assert_eq!(
             &*overlay.links()[0].url,
-            "file:///node_modules/@scope/package/index.js"
+            url("node_modules/@scope/package/index.js")
         );
     }
 
@@ -1135,7 +1198,8 @@ mod tests {
         );
         let link = &overlay.links()[0];
         assert_eq!(
-            &*link.url, "file:///Users/alice/src/app/release/mac-arm64/Demo%20App.app",
+            &*link.url,
+            url("Users/alice/src/app/release/mac-arm64/Demo App.app"),
             "space must be percent-encoded in the file URL"
         );
         // Clickable region must cover the *entire* displayed path, including
@@ -1158,10 +1222,7 @@ mod tests {
         scan_unjoined(std::iter::once((0, &line)), 0, &[], &mut overlay);
 
         assert_eq!(overlay.links().len(), 1);
-        assert_eq!(
-            &*overlay.links()[0].url,
-            "file:///tmp/release/Demo%20App.app"
-        );
+        assert_eq!(&*overlay.links()[0].url, url("tmp/release/Demo App.app"));
         assert_eq!(overlay.links()[0].col_start, 5); // "open "
         assert_eq!(
             overlay.links()[0].col_end,
@@ -1178,7 +1239,7 @@ mod tests {
         scan_unjoined(std::iter::once((0, &line)), 0, &[], &mut overlay);
 
         assert_eq!(overlay.links().len(), 1);
-        assert_eq!(&*overlay.links()[0].url, "file:///tmp/foo/bar");
+        assert_eq!(&*overlay.links()[0].url, url("tmp/foo/bar"));
         // "See " = 4 cols; path is 12 cols (`/tmp/foo/bar`).
         assert_eq!(overlay.links()[0].col_start, 4);
         assert_eq!(overlay.links()[0].col_end, 4 + 12);
@@ -1340,7 +1401,7 @@ mod tests {
             screen_row: 0,
             col_start: 9,
             col_end: 31,
-            url: Arc::from("file:///Users/foo/src/main.rs"),
+            url: Arc::from(url("Users/foo/src/main.rs")),
             id: None,
         });
         scan_unjoined(std::iter::once((0, &line)), 0, &[], &mut overlay);
