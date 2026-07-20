@@ -1353,7 +1353,7 @@ mod support;
 #[cfg(test)]
 #[path = "acp_session_tests/usage_categories_tests.rs"]
 mod usage_categories_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod managed_gateway_descriptor_tests {
     use super::*;
     use xai_grok_tools::types::output::{MCPOutput, ToolOutput};
