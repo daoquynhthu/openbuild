@@ -75,13 +75,17 @@ pub trait ShellCompletionAdapter: Send + Sync {
 /// quotes. This is the common subset shared by POSIX shells, PowerShell,
 /// and cmd.exe; each [`ShellCompletionAdapter`] may refine it.
 pub fn tokenize(input: &str) -> Vec<Token> {
+    tokenize_impl(input, b'\\')
+}
+
+/// Shared tokenizer core: `escape_byte` is `b'\\'` for POSIX, `` b'`' `` for PowerShell.
+fn tokenize_impl(input: &str, escape_byte: u8) -> Vec<Token> {
     let mut tokens = Vec::new();
     let bytes = input.as_bytes();
     let len = bytes.len();
     let mut i = 0;
 
     while i < len {
-        // skip whitespace
         if bytes[i].is_ascii_whitespace() {
             i += 1;
             continue;
@@ -94,48 +98,50 @@ pub fn tokenize(input: &str) -> Vec<Token> {
         while i < len {
             let b = bytes[i];
             if b == b'"' {
-                if quote == QuoteStyle::None {
-                    quote = QuoteStyle::Double;
-                    i += 1;
-                    continue;
+                match quote {
+                    QuoteStyle::None => {
+                        quote = QuoteStyle::Double;
+                        i += 1;
+                        continue;
+                    }
+                    QuoteStyle::Double => {
+                        quote = QuoteStyle::None;
+                        i += 1;
+                        continue;
+                    }
+                    QuoteStyle::Single => {}
                 }
-                if quote == QuoteStyle::Double {
-                    quote = QuoteStyle::None;
-                    i += 1;
-                    continue;
-                }
-                // Single-quoted: literal
-                value.push(b as char);
-                i += 1;
             } else if b == b'\'' {
-                if quote == QuoteStyle::None {
-                    quote = QuoteStyle::Single;
-                    i += 1;
-                    continue;
+                match quote {
+                    QuoteStyle::None => {
+                        quote = QuoteStyle::Single;
+                        i += 1;
+                        continue;
+                    }
+                    QuoteStyle::Single => {
+                        quote = QuoteStyle::None;
+                        i += 1;
+                        continue;
+                    }
+                    QuoteStyle::Double => {}
                 }
-                if quote == QuoteStyle::Single {
-                    quote = QuoteStyle::None;
-                    i += 1;
-                    continue;
-                }
-                // Double-quoted: literal
-                value.push(b as char);
+            } else if b == escape_byte && quote == QuoteStyle::None && i + 1 < len {
                 i += 1;
-            } else if b == b'\\' && quote == QuoteStyle::None {
-                if i + 1 < len {
-                    i += 1;
-                    value.push(bytes[i] as char);
-                    i += 1;
-                } else {
-                    value.push(b as char);
-                    i += 1;
-                }
-            } else if b.is_ascii_whitespace() && quote == QuoteStyle::None {
-                break;
-            } else {
-                value.push(b as char);
+                let next = bytes[i];
+                value.push(next as char);
                 i += 1;
+                continue;
             }
+
+            if b.is_ascii_whitespace() && quote == QuoteStyle::None {
+                break;
+            }
+
+            // Multi-byte UTF-8: advance by the char's byte length.
+            let ch = input[i..].chars().next().unwrap_or('\0');
+            let char_len = ch.len_utf8();
+            value.push(ch);
+            i += char_len;
         }
 
         tokens.push(Token::new(value, start, i, quote));
@@ -246,71 +252,7 @@ pub struct PowerShellAdapter;
 impl ShellCompletionAdapter for PowerShellAdapter {
     fn tokenize(&self, input: &str) -> Vec<Token> {
         // PowerShell uses backtick as escape, not backslash.
-        // Minimal tokenizer treats backtick-escaped chars literally.
-        let mut tokens = Vec::new();
-        let bytes = input.as_bytes();
-        let len = bytes.len();
-        let mut i = 0;
-
-        while i < len {
-            if bytes[i].is_ascii_whitespace() {
-                i += 1;
-                continue;
-            }
-
-            let start = i;
-            let mut value = String::new();
-            let mut quote = QuoteStyle::None;
-
-            while i < len {
-                let b = bytes[i];
-                if b == b'"' {
-                    if quote == QuoteStyle::None {
-                        quote = QuoteStyle::Double;
-                        i += 1;
-                        continue;
-                    }
-                    if quote == QuoteStyle::Double {
-                        quote = QuoteStyle::None;
-                        i += 1;
-                        continue;
-                    }
-                    value.push(b as char);
-                    i += 1;
-                } else if b == b'\'' {
-                    if quote == QuoteStyle::None {
-                        quote = QuoteStyle::Single;
-                        i += 1;
-                        continue;
-                    }
-                    if quote == QuoteStyle::Single {
-                        quote = QuoteStyle::None;
-                        i += 1;
-                        continue;
-                    }
-                    value.push(b as char);
-                    i += 1;
-                } else if b == b'`' && quote == QuoteStyle::None {
-                    if i + 1 < len {
-                        i += 1;
-                        value.push(bytes[i] as char);
-                        i += 1;
-                    } else {
-                        value.push(b as char);
-                        i += 1;
-                    }
-                } else if b.is_ascii_whitespace() && quote == QuoteStyle::None {
-                    break;
-                } else {
-                    value.push(b as char);
-                    i += 1;
-                }
-            }
-
-            tokens.push(Token::new(value, start, i, quote));
-        }
-
-        tokens
+        tokenize_impl(input, b'`')
     }
 
     fn score(&self, candidate: &str, prefix: &str) -> usize {
@@ -559,6 +501,45 @@ mod tests {
         assert_eq!(adapter.escape("it's"), "'it''s'");
     }
 
+    #[test]
+    fn powershell_tokenize_path_with_spaces() {
+        let adapter = PowerShellAdapter;
+        let t = adapter.tokenize("cd 'C:\\Program Files'");
+        assert_eq!(t.len(), 2);
+        assert_eq!(t[1].value, "C:\\Program Files");
+    }
+
+    #[test]
+    fn powershell_tokenize_unicode_path() {
+        let adapter = PowerShellAdapter;
+        let t = adapter.tokenize("ls 'C:\\Users\\Jürgen\\文件'");
+        assert_eq!(t.len(), 2);
+        assert_eq!(t[1].value, "C:\\Users\\Jürgen\\文件");
+    }
+
+    #[test]
+    fn powershell_tokenize_drive_letter() {
+        let adapter = PowerShellAdapter;
+        let t = adapter.tokenize("cd D:\\Projects");
+        assert_eq!(t.len(), 2);
+        assert_eq!(t[1].value, "D:\\Projects");
+    }
+
+    #[test]
+    fn powershell_tokenize_unc_path() {
+        let adapter = PowerShellAdapter;
+        let t = adapter.tokenize("ls \\\\server\\share\\folder");
+        assert_eq!(t.len(), 2);
+        assert_eq!(t[1].value, "\\\\server\\share\\folder");
+    }
+
+    #[test]
+    fn powershell_escape_path_with_spaces() {
+        let adapter = PowerShellAdapter;
+        let escaped = adapter.escape("C:\\Program Files\\app.exe");
+        assert_eq!(escaped, "'C:\\Program Files\\app.exe'");
+    }
+
     // --- CmdAdapter ---
 
     #[test]
@@ -573,5 +554,36 @@ mod tests {
     fn cmd_escape_double_quote() {
         let adapter = CmdAdapter;
         assert_eq!(adapter.escape("hello \"world\""), "\"hello \"\"world\"\"\"");
+    }
+
+    #[test]
+    fn cmd_tokenize_path_with_spaces() {
+        let adapter = CmdAdapter;
+        // cmd.exe splits on whitespace only; quotes are literal chars.
+        let t = adapter.tokenize("dir C:\\Program Files");
+        assert_eq!(t.len(), 3);
+        assert_eq!(t[1].value, "C:\\Program");
+        assert_eq!(t[2].value, "Files");
+    }
+
+    #[test]
+    fn cmd_tokenize_unicode() {
+        let adapter = CmdAdapter;
+        let t = adapter.tokenize("dir C:\\Users\\Jürgen");
+        assert_eq!(t.len(), 2);
+        assert_eq!(t[1].value, "C:\\Users\\Jürgen");
+    }
+
+    #[test]
+    fn cmd_escape_path_with_spaces() {
+        let adapter = CmdAdapter;
+        let escaped = adapter.escape("C:\\Program Files\\app.exe");
+        assert_eq!(escaped, "\"C:\\Program Files\\app.exe\"");
+    }
+
+    #[test]
+    fn cmd_escape_empty() {
+        let adapter = CmdAdapter;
+        assert_eq!(adapter.escape(""), "\"\"");
     }
 }
