@@ -1281,6 +1281,67 @@ mod tests {
         );
     }
 
+    /// Windows: Job Object kills the whole tree including grandchildren.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn process_group_kill_reaps_grandchild_tree_windows() {
+        let mut cmd = tokio::process::Command::new("powershell");
+        // Child starts a grandchild (60-second sleep), prints its PID, then
+        // waits for stdin; the grandchild inherits the parent's Job Object.
+        cmd.args([
+            "-NoP",
+            "-C",
+            "$p = Start-Process -PassThru -NoNewWindow powershell \
+             '-NoP','-C','Start-Sleep 60'; \
+             Write-Host $p.Id; \
+             Read-Host",
+        ]);
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stdin(std::process::Stdio::piped());
+        new_process_group(&mut cmd);
+
+        let mut group = ProcessGroup::new().expect("create ProcessGroup");
+        #[allow(clippy::disallowed_methods)]
+        let mut child = cmd.spawn().expect("spawn leader");
+        group.attach(&child).expect("attach leader to group");
+
+        let stdout = child.stdout.take().expect("piped stdout");
+        let mut line = String::new();
+        tokio::io::AsyncBufReadExt::read_line(&mut tokio::io::BufReader::new(stdout), &mut line)
+            .await
+            .expect("read grandchild pid");
+        let gc_pid: u32 = line.trim().parse().expect("parse grandchild pid");
+
+        let alive_windows = |pid: u32| -> bool {
+            std::process::Command::new("powershell")
+                .args([
+                    "-NoP",
+                    "-C",
+                    &format!("Get-Process -Id {pid} -ErrorAction SilentlyContinue"),
+                ])
+                .output()
+                .ok()
+                .is_some_and(|o| o.status.success())
+        };
+        assert!(
+            alive_windows(gc_pid),
+            "grandchild should be running before the kill"
+        );
+
+        // Kill the group via ProcessTerminator contract.
+        let terminator: &dyn ProcessTerminator = &group;
+        terminator
+            .force_terminate()
+            .expect("force_terminate via ProcessTerminator");
+
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        assert!(
+            !alive_windows(gc_pid),
+            "grandchild must be terminated with the group; pid {gc_pid} still alive \
+             after TerminateJobObject"
+        );
+    }
+
     /// ProcessTerminator::graceful_shutdown SIGTERM equivalent terminates child (P12-003).
     #[tokio::test]
     async fn terminator_graceful_terminates_attached_child() {
@@ -1339,6 +1400,18 @@ mod tests {
         assert!(
             result.is_ok(),
             "force_terminate on already-exited child must not error: {result:?}"
+        );
+    }
+
+    /// Attaching a nonexistent PID must return an error (permission/error path).
+    #[test]
+    fn attach_nonexistent_pid_returns_error() {
+        let mut group = ProcessGroup::new().expect("create ProcessGroup");
+        // PID 0xFFFFF is unlikely to exist on any real system.
+        let result = group.attach_pid(0xFFFFF);
+        assert!(
+            result.is_err(),
+            "attaching nonexistent pid should fail: {result:?}"
         );
     }
 
