@@ -1201,7 +1201,7 @@ mod tests {
     async fn catalog_0_redirects_ok() {
         let server = xai_grok_test_support::redirect_mock::RedirectMockServer::start(0).await;
         let svc = ProviderCatalogService::new();
-        let resp = svc.http_client.get(&server.url()).send().await;
+        let resp = svc.http_client.get(server.url()).send().await;
         assert!(resp.is_ok(), "0 redirects must succeed: {resp:?}");
         assert_eq!(server.request_count(), 1);
     }
@@ -1210,7 +1210,7 @@ mod tests {
     async fn catalog_1_redirect_ok() {
         let server = xai_grok_test_support::redirect_mock::RedirectMockServer::start(1).await;
         let svc = ProviderCatalogService::new();
-        let resp = svc.http_client.get(&server.url()).send().await;
+        let resp = svc.http_client.get(server.url()).send().await;
         assert!(resp.is_ok(), "1 redirect must succeed: {resp:?}");
         assert_eq!(server.request_count(), 2);
     }
@@ -1219,7 +1219,7 @@ mod tests {
     async fn catalog_3_redirects_ok() {
         let server = xai_grok_test_support::redirect_mock::RedirectMockServer::start(3).await;
         let svc = ProviderCatalogService::new();
-        let resp = svc.http_client.get(&server.url()).send().await;
+        let resp = svc.http_client.get(server.url()).send().await;
         assert!(resp.is_ok(), "3 redirects must succeed: {resp:?}");
         assert_eq!(server.request_count(), 4);
     }
@@ -1228,7 +1228,7 @@ mod tests {
     async fn catalog_4_redirects_fail() {
         let server = xai_grok_test_support::redirect_mock::RedirectMockServer::start(4).await;
         let svc = ProviderCatalogService::new();
-        let resp = svc.http_client.get(&server.url()).send().await;
+        let resp = svc.http_client.get(server.url()).send().await;
         assert!(resp.is_err(), "4 redirects must fail");
         // Server might see 3 or 4 requests depending on timing, but must not succeed
     }
@@ -1432,7 +1432,7 @@ mod tests {
         defaults.base_url = base_url;
         defaults.model_list_endpoint = Some(url.clone());
 
-        svc.refresh_all(&[pid.clone()], |p| {
+        svc.refresh_all(core::slice::from_ref(&pid), |p| {
             if p == &ProviderId::new("test") {
                 Some((url.clone(), defaults.clone()))
             } else {

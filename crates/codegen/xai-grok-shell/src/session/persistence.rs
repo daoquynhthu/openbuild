@@ -2145,7 +2145,8 @@ pub async fn new_with_explicit_dir(
     }
     let summary_json = serde_json::to_vec_pretty(&summary)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    std::fs::write(&summary_path, summary_json)?;
+    xai_grok_paths::atomic_write::atomic_replace(&summary_path, &summary_json)
+        .map_err(|e| io::Error::other(e.to_string()))?;
 
     if summary.current_model_id != model_id {
         storage.update_current_model(info, &model_id).await?;

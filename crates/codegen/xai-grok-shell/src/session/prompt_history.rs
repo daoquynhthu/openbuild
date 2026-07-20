@@ -95,7 +95,7 @@ pub fn truncate_if_needed(cwd: &str) -> io::Result<()> {
     }
 
     xai_grok_paths::atomic_write::atomic_replace(&path, &bytes)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+        .map_err(|e| io::Error::other(e.to_string()))?;
     Ok(())
 }
 

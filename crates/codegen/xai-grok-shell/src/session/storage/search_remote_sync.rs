@@ -365,7 +365,7 @@ async fn download_index_inner(
     tokio::task::spawn_blocking(move || -> io::Result<()> {
         let bytes = decompress_to_bytes(&src)?;
         xai_grok_paths::atomic_write::atomic_replace(&dst, &bytes)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| io::Error::other(e.to_string()))?;
         Ok(())
     })
     .await
