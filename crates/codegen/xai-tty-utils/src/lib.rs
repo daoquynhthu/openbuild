@@ -1012,7 +1012,9 @@ mod tests {
             "grandchild should be running before the kill"
         );
 
-        group.kill().expect("kill ProcessGroup");
+        // Use ProcessTerminator contract (P12-002): force_terminate
+        let terminator: &dyn ProcessTerminator = &group;
+        terminator.force_terminate().expect("force_terminate via ProcessTerminator");
 
         // Leader exits.
         tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
