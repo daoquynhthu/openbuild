@@ -38,6 +38,9 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 
 mod process_scope;
 pub use process_scope::{ProcessScope, global_process_scope};
@@ -216,19 +219,119 @@ impl ProcessGroupId {
 /// Uniform semantics:
 /// 1. `graceful_shutdown()` — request cooperative exit (SIGTERM on Unix,
 ///    TerminateJobObject on Windows).
-/// 2. `force_terminate()`  — immediate kill (SIGKILL / TerminateJobObject).
-/// 3. `wait_with_timeout()` — bounded reap. Returns `None` on timeout.
+/// 2. `wait_timeout(timeout)` — bounded wait for process to exit. Returns
+///    `Ok(true)` if exited, `Ok(false)` if timed out.
+/// 3. `force_terminate()` — immediate kill (SIGKILL / TerminateJobObject).
+/// 4. `reap()` — ensure no zombie remains.
 pub trait ProcessTerminator: Send + Sync {
     fn graceful_shutdown(&self) -> io::Result<()>;
+    fn wait_timeout(&self, timeout: Duration) -> io::Result<bool>;
     fn force_terminate(&self) -> io::Result<()>;
+    fn reap(&self) -> io::Result<()>;
+}
+
+/// A managed process combining a [`ProcessGroup`] with a [`tokio::process::Child`]
+/// so the full graceful→wait→force→reap sequence can be driven through the
+/// [`ProcessTerminator`] trait.
+pub struct ManagedProcess {
+    group: ProcessGroup,
+    child: tokio::process::Child,
+}
+
+impl ManagedProcess {
+    pub fn new(mut group: ProcessGroup, child: tokio::process::Child) -> io::Result<Self> {
+        group.attach(&child)?;
+        Ok(Self { group, child })
+    }
+}
+
+impl ManagedProcess {
+    async fn wait_child(&mut self, timeout: Duration) -> io::Result<bool> {
+        match tokio::time::timeout(timeout, self.child.wait()).await {
+            Ok(Ok(_)) => Ok(true),
+            Ok(Err(e)) => Err(io::Error::other(e.to_string())),
+            Err(_) => Ok(false),
+        }
+    }
+
+    async fn reap_child(&mut self) -> io::Result<()> {
+        self.child.wait().await?;
+        Ok(())
+    }
 }
 
 impl ProcessTerminator for ProcessGroup {
     fn graceful_shutdown(&self) -> io::Result<()> {
         self.terminate()
     }
+    fn wait_timeout(&self, _timeout: Duration) -> io::Result<bool> {
+        Err(io::Error::other("ProcessGroup::wait_timeout not supported — use ManagedProcess"))
+    }
     fn force_terminate(&self) -> io::Result<()> {
         self.kill()
+    }
+    fn reap(&self) -> io::Result<()> {
+        Err(io::Error::other("ProcessGroup::reap not supported — use ManagedProcess"))
+    }
+}
+
+impl ProcessTerminator for ManagedProcess {
+    fn graceful_shutdown(&self) -> io::Result<()> {
+        self.group.terminate()
+    }
+
+    fn wait_timeout(&self, _timeout: Duration) -> io::Result<bool> {
+        Err(io::Error::other("wait_timeout requires &mut self via ManagedProcess::wait_child"))
+    }
+
+    fn force_terminate(&self) -> io::Result<()> {
+        self.group.kill()
+    }
+
+    fn reap(&self) -> io::Result<()> {
+        Err(io::Error::other("reap requires &mut self via ManagedProcess::reap_child"))
+    }
+}
+
+/// Fake [`ProcessTerminator`] for shared contract tests (P12-001).
+/// Records which methods were called without actually spawning processes.
+#[derive(Clone)]
+pub struct FakeProcessTerminator {
+    pub graceful_called: Arc<AtomicBool>,
+    pub force_called: Arc<AtomicBool>,
+    pub wait_called: Arc<AtomicBool>,
+    pub reap_called: Arc<AtomicBool>,
+    pub wait_result: bool,
+}
+
+impl FakeProcessTerminator {
+    pub fn new() -> Self {
+        Self {
+            graceful_called: Arc::new(AtomicBool::new(false)),
+            force_called: Arc::new(AtomicBool::new(false)),
+            wait_called: Arc::new(AtomicBool::new(false)),
+            reap_called: Arc::new(AtomicBool::new(false)),
+            wait_result: true,
+        }
+    }
+}
+
+impl ProcessTerminator for FakeProcessTerminator {
+    fn graceful_shutdown(&self) -> io::Result<()> {
+        self.graceful_called.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+    fn wait_timeout(&self, _timeout: Duration) -> io::Result<bool> {
+        self.wait_called.store(true, Ordering::SeqCst);
+        Ok(self.wait_result)
+    }
+    fn force_terminate(&self) -> io::Result<()> {
+        self.force_called.store(true, Ordering::SeqCst);
+        Ok(())
+    }
+    fn reap(&self) -> io::Result<()> {
+        self.reap_called.store(true, Ordering::SeqCst);
+        Ok(())
     }
 }
 
@@ -1002,5 +1105,60 @@ mod tests {
             .expect("child should exit within 5s")
             .expect("wait ok");
         assert!(!status.success(), "terminated child should not exit successfully");
+    }
+
+    // --- ProcessTerminator contract tests with FakeProcessTerminator ---
+
+    #[test]
+    fn terminator_fake_full_sequence() {
+        let fake = FakeProcessTerminator::new();
+        let t: &dyn ProcessTerminator = &fake;
+
+        // 1. graceful shutdown
+        t.graceful_shutdown().expect("graceful_shutdown");
+        assert!(fake.graceful_called.load(Ordering::SeqCst), "graceful_shutdown must be called");
+
+        // 2. bounded wait
+        let exited = t.wait_timeout(Duration::from_secs(1)).expect("wait_timeout");
+        assert!(fake.wait_called.load(Ordering::SeqCst), "wait_timeout must be called");
+        assert!(exited, "fake returns exited=true");
+
+        // 3. force terminate
+        t.force_terminate().expect("force_terminate");
+        assert!(fake.force_called.load(Ordering::SeqCst), "force_terminate must be called");
+
+        // 4. reap
+        t.reap().expect("reap");
+        assert!(fake.reap_called.load(Ordering::SeqCst), "reap must be called");
+    }
+
+    #[test]
+    fn terminator_fake_wait_timeout_false() {
+        let mut fake = FakeProcessTerminator::new();
+        fake.wait_result = false;
+        let t: &dyn ProcessTerminator = &fake;
+
+        let exited = t.wait_timeout(Duration::from_secs(1)).expect("wait_timeout");
+        assert!(!exited, "fake returns exited=false when wait_result=false");
+    }
+
+    #[test]
+    fn terminator_fake_graceful_shutdown_then_force() {
+        let fake = FakeProcessTerminator::new();
+        let t: &dyn ProcessTerminator = &fake;
+
+        t.graceful_shutdown().expect("graceful_shutdown");
+        assert!(fake.graceful_called.load(Ordering::SeqCst));
+
+        // After graceful_shutdown, wait briefly
+        let _ = t.wait_timeout(Duration::from_millis(100)).expect("wait_timeout");
+
+        // If not exited, force terminate
+        t.force_terminate().expect("force_terminate");
+        assert!(fake.force_called.load(Ordering::SeqCst));
+
+        // Then reap
+        t.reap().expect("reap");
+        assert!(fake.reap_called.load(Ordering::SeqCst));
     }
 }
