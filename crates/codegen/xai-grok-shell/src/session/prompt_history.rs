@@ -86,19 +86,16 @@ pub fn truncate_if_needed(cwd: &str) -> io::Result<()> {
     // Keep the most recent entries
     let to_keep = &entries[entries.len() - MAX_PROMPT_HISTORY_ENTRIES..];
 
-    // Write to a temp file first, then rename (atomic)
-    let temp_path = path.with_extension("jsonl.tmp");
-    {
-        let mut file = std::fs::File::create(&temp_path)?;
-        for entry in to_keep {
-            let mut line = serde_json::to_vec(entry)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-            line.push(b'\n');
-            file.write_all(&line)?;
-        }
+    let mut bytes = Vec::new();
+    for entry in to_keep {
+        let mut line = serde_json::to_vec(entry)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        line.push(b'\n');
+        bytes.extend(line);
     }
 
-    std::fs::rename(temp_path, path)?;
+    xai_grok_paths::atomic_write::atomic_replace(&path, &bytes)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
     Ok(())
 }
 

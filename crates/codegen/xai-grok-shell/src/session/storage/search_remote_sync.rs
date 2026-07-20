@@ -9,7 +9,7 @@
 //!
 //! Gated behind `RemoteSyncConfig::enabled` (default false).
 
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::Duration;
@@ -95,12 +95,12 @@ fn compress_file(src: &Path, dst: &Path) -> io::Result<u64> {
 }
 
 /// Decompress a zstd-compressed file from `src` to `dst`.
-fn decompress_file(src: &Path, dst: &Path) -> io::Result<u64> {
+fn decompress_to_bytes(src: &Path) -> io::Result<Vec<u8>> {
     let input = std::fs::File::open(src)?;
     let mut decoder = zstd::Decoder::new(input)?;
-    let output = std::fs::File::create(dst)?;
-    let bytes = io::copy(&mut decoder, &mut io::BufWriter::new(output))?;
-    Ok(bytes)
+    let mut buf = Vec::new();
+    decoder.read_to_end(&mut buf)?;
+    Ok(buf)
 }
 
 // Staleness check
@@ -361,14 +361,11 @@ async fn download_index_inner(
 
     let src = compressed_path.clone();
     let dst = db_path.to_path_buf();
-    let dst_tmp = db_path.with_extension("sqlite.remote.tmp");
-    let dst_final = dst.clone();
 
     tokio::task::spawn_blocking(move || -> io::Result<()> {
-        // Decompress to a temp file first, then atomically rename
-        decompress_file(&src, &dst_tmp)?;
-        // Atomic rename to avoid partial-file issues
-        std::fs::rename(&dst_tmp, &dst_final)?;
+        let bytes = decompress_to_bytes(&src)?;
+        xai_grok_paths::atomic_write::atomic_replace(&dst, &bytes)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         Ok(())
     })
     .await

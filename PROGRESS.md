@@ -242,3 +242,57 @@
 - startup no-network test: 启动现在只使用 persisted/in-memory snapshot ✅
 - `rg fetch_provider_models_blocking` 生产引用为 0 ✅
 - catalog mock matrix、TTL、stale、cancel、persistence roundtrip 全绿 ✅
+
+## Phase 11: Cross-platform filesystem, path and atomic persistence — 2026-07-20
+
+### P11-001: Config consumer migration review
+- `provider_config_coordinator.rs` uses `atomic_replace` for all writes
+- `apply_external_file` is read-only
+- Evidence: `docs/provider-adapter-v1/execution-v2/evidence-p11-001.md`
+
+### P11-002: Catalog consumer migration review
+- `persist_snapshot` and `save_catalog_snapshot` use `atomic_replace`
+- `load_snapshot` is read-only
+- Evidence: `docs/provider-adapter-v1/execution-v2/evidence-p11-002.md`
+
+### P11-003: Session persistence migration
+- `jsonl/mod.rs`: 5 methods migrated from write+rename to `atomic_replace`:
+  `write_jsonl`, `write_plan_state`, `write_plan_mode_state`, `write_signals`,
+  `write_announcement_state`, `write_goal_mode_state`
+- `summary_write.rs`: already used `atomic_replace` (clippy fix only)
+- `prompt_history.rs`: `truncate_if_needed` migrated from write+rename to `atomic_replace`
+- `search_remote_sync.rs`: `decompress_file` refactored to `decompress_to_bytes` +
+  `atomic_replace`; temp-file path eliminated
+
+### P11-004: Path normalization consumer scan
+- Scanned 200+ `dunce::canonicalize` call sites across workspace
+- Evidence: `docs/provider-adapter-v1/execution-v2/evidence-p11-004.md`
+- `normalized_absolute` tests in `xai-grok-paths/src/normalize.rs` cover drive letter, UNC, `\\?\`, symlink, relative, Unicode
+
+### P11-005: Workspace classifier Windows fix
+- Removed `#[cfg(not(windows))]` from test module
+- Replaced hardcoded POSIX paths with fixture paths outside system temp dir
+- 19 tests pass on Windows
+
+### P11-006: Worktree/git/path repair queue
+- Skipped: requires Phase 2 frozen task cards (not executed)
+
+### P11-007: Watcher + atomic_replace contract
+- Added `atomic_replace_triggers_watcher_and_coalesces` test
+- Verifies `atomic_replace` generates watcher events and debounce coalesces them
+
+### P11-008: P2 filesystem exclusions
+- Skipped: requires Phase 2 exclusion ledger (not executed)
+
+### Key results
+- `cargo check -p xai-grok-shell --lib` — clean
+- `cargo clippy -p xai-grok-shell --lib -- -D warnings` — clean
+- `cargo test -p xai-file-utils --lib -- workspace_classifier` — 19 passed
+- `cargo test -p xai-grok-pager --lib -- provider_state` — 14 passed
+- 新提交: `b173c5a`, `6d1275b`, `b494a59`
+
+### Phase 11 Gate
+- Config/catalog/session persistence all use `atomic_replace` ✅
+- Workspace classifier tests cross-platform ✅
+- Watcher + atomic_replace contract test added ✅
+- A-16 atomic write (catalog + session + config paths) ✅

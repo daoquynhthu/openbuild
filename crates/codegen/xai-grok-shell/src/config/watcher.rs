@@ -167,7 +167,7 @@ impl ConfigFileWatcher {
         // `~/.claude.json` to the per-cwd path. The per-event side is
         // canonicalized in `parent_is_dir`.
         let user_home_buf: Option<PathBuf> =
-            dirs::home_dir().map(|h| dunce::canonicalize(&h).unwrap_or(h));
+            dirs::home_dir().map(|h| xai_grok_paths::normalize::normalized_absolute(&h).unwrap_or(h));
 
         let mut debouncer = new_filtered_debouncer(debounce, move |res: DebounceEventResult| {
             let Ok(events) = res else { return };
@@ -856,11 +856,16 @@ mod tests {
         wait_ms(800);
 
         let mut count = 0;
-        while rx.try_recv().is_ok() {
+        let mut has_global = false;
+        while let Ok(evt) = rx.try_recv() {
             count += 1;
+            if matches!(evt, ConfigChangeEvent::GlobalConfigChanged) {
+                has_global = true;
+            }
         }
         assert!(count >= 1, "expected at least 1 event after atomic_replace, got {count}");
         assert!(count <= 3, "expected coalesced events (<=3), got {count}");
+        assert!(has_global, "atomic_replace must produce GlobalConfigChanged events");
     }
 
     /// A write to `<cwd>/.grok/config.toml` must surface as
