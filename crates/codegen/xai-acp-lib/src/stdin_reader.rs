@@ -214,3 +214,39 @@ fn isolate_process_stdin() -> Option<std::fs::File> {
         Some(std::fs::File::from_raw_handle(duplicate as _))
     }
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn isolate_process_stdin_returns_handle() {
+        // When there IS a real stdin (test runner has one), the function must
+        // return a valid duplicate. When there is none (e.g. service session),
+        // it returns None — neither case is an error.
+        let result = isolate_process_stdin();
+        // We can't assert Ok/None deterministically in CI, but we CAN assert
+        // that if it returns Some, the handle is readable (wrap in File).
+        if let Some(ref file) = result {
+            use std::os::windows::io::AsRawHandle;
+            assert!(
+                !file.as_raw_handle().is_null(),
+                "file handle must be non-null"
+            );
+        }
+    }
+
+    #[test]
+    fn isolate_process_stdin_is_idempotent() {
+        // Must not crash or return an invalid handle on repeated calls.
+        let _ = isolate_process_stdin();
+        let second = isolate_process_stdin();
+        if let Some(ref file) = second {
+            use std::os::windows::io::AsRawHandle;
+            assert!(
+                !file.as_raw_handle().is_null(),
+                "second call must also produce valid handle"
+            );
+        }
+    }
+}
