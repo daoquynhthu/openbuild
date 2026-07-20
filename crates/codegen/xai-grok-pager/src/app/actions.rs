@@ -945,6 +945,13 @@ pub enum Action {
     /// Submit an inline edit: conversation-only rewind to that prompt, then
     /// resubmit the edited text (state lives on `AgentView::inline_edit`).
     InlineEditSubmit,
+    /// Persist a provider configuration to disk and trigger runtime rebuild.
+    SaveProviderConfig {
+        provider_id: String,
+        env_var_name: String,
+        api_key: String,
+        base_url: String,
+    },
 }
 /// Persist-and-notify semantics for [`Effect::PersistPermissionMode`].
 ///

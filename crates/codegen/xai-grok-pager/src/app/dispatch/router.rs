@@ -1290,11 +1290,33 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::RewindBackToModeSelect => dispatch_rewind_back_to_mode_select(app),
         Action::RewindDismissError => dispatch_rewind_dismiss_error(app),
         Action::InlineEditSubmit => dispatch_inline_edit_submit(app),
+        Action::SaveProviderConfig {
+            provider_id,
+            env_var_name,
+            api_key,
+            base_url,
+        } => dispatch_save_provider_config(app, provider_id, env_var_name, api_key, base_url),
     };
     app.reconcile_foreign_resume_launch();
     sync_sleep_inhibitor(app);
     effects
 }
+
+fn dispatch_save_provider_config(
+    _app: &mut AppView,
+    provider_id: String,
+    env_var_name: String,
+    api_key: String,
+    base_url: String,
+) -> Vec<Effect> {
+    vec![Effect::SaveProviderConfig {
+        provider_id,
+        env_var_name,
+        api_key,
+        base_url,
+    }]
+}
+
 pub(super) fn dispatch_action_result(
     app: &mut AppView,
     agent_id: crate::app::agent::AgentId,

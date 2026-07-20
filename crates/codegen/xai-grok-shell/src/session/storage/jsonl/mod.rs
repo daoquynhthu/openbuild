@@ -350,7 +350,7 @@ impl JsonlStorageAdapter {
         let bytes = serde_json::to_vec_pretty(summary)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         xai_grok_paths::atomic_write::atomic_replace(&summary_path, &bytes)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
+            .map_err(|e| io::Error::other(e.to_string()))
     }
     fn read_summary_sync(&self, info: &Info) -> io::Result<Summary> {
         let path = self.summary_file(info);
