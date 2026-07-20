@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
+use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::registry::ProviderRegistry;
@@ -137,6 +138,77 @@ impl ProviderConfigCoordinator {
         Ok(ConfigApplyOutcome::Applied { new_revision: revision })
     }
 
+    /// Apply a typed patch and save atomically with compare-and-swap.
+    ///
+    /// Locks `update_lock`, reads the current file, applies the TOML patch in memory,
+    /// resolves/prepares the candidate, verifies the file hasn't changed (SHA-256),
+    /// atomically writes via `atomic_replace`, and commits to the registry.
+    pub async fn save_patch(
+        &self,
+        patch: &ProviderConfigPatch,
+    ) -> Result<ConfigApplyOutcome, ConfigApplyError> {
+        let _lock = self.update_lock.lock().await;
+
+        // Step 1: Read old bytes + compute SHA-256
+        let old_bytes = std::fs::read(&self.config_path)
+            .map_err(|e| ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display())))?;
+        let old_sha = Sha256::digest(&old_bytes);
+        let old_content = String::from_utf8(old_bytes)
+            .map_err(|e| ConfigApplyError::ParseError(format!("file not valid UTF-8: {e}")))?;
+
+        // Step 2: Apply TOML patch in memory
+        let candidate_content =
+            apply_toml_patch(&old_content, patch).map_err(ConfigApplyError::ParseError)?;
+        let candidate_bytes = candidate_content.as_bytes();
+
+        // Step 3: Parse/resolve candidate
+        let candidate_toml: toml::Value = toml::from_str(&candidate_content)
+            .map_err(|e| ConfigApplyError::ParseError(format!("candidate parse: {e}")))?;
+        let parsed = xai_grok_provider::config::parse_provider_toml(&candidate_toml)
+            .map_err(|diags| {
+                ConfigApplyError::ParseError(
+                    diags.into_iter().map(|d| d.to_string()).collect::<Vec<_>>().join("; "),
+                )
+            })?;
+        let (resolved, diags) = xai_grok_provider::resolution::resolve_with_precedence(
+            parsed,
+            self.resolution_context.legacy_migration.clone(),
+            self.resolution_context.cli_overrides.clone(),
+        );
+        if !diags.is_empty() {
+            let msg = diags.into_iter().map(|d| d.to_string()).collect::<Vec<_>>().join("; ");
+            return Err(ConfigApplyError::ResolveError(msg));
+        }
+
+        // Step 4: Prepare the resolved candidate
+        let prepared = self
+            .runtime
+            .registry
+            .prepare(&resolved)
+            .map_err(|e| ConfigApplyError::PrepareError(e.to_string()))?;
+
+        // Step 5: Compare-and-swap — re-read file SHA-256
+        let current_bytes = std::fs::read(&self.config_path)
+            .map_err(|e| ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display())))?;
+        let current_sha = Sha256::digest(&current_bytes);
+        if current_sha != old_sha {
+            return Err(ConfigApplyError::FileChanged);
+        }
+
+        // Step 6: Atomic write
+        xai_grok_paths::atomic_write::atomic_replace(&self.config_path, candidate_bytes)
+            .map_err(|e| ConfigApplyError::WriteError(e.to_string()))?;
+
+        // Step 7: Commit to registry
+        let revision = self
+            .runtime
+            .registry
+            .commit(prepared)
+            .map_err(|e| ConfigApplyError::CommitError(e.to_string()))?;
+
+        Ok(ConfigApplyOutcome::Applied { new_revision: revision })
+    }
+
     pub fn registry(&self) -> Arc<ProviderRegistry> {
         Arc::clone(&self.runtime.registry)
     }
@@ -254,6 +326,44 @@ theme = "dark"
         assert!(result.contains(r#"default = "xai/grok-latest""#), "models content should be preserved");
         assert!(result.contains(r#"[ui]"#), "ui section should be preserved");
         assert!(result.contains(r#"theme = "dark""#), "ui content should be preserved");
+    }
+
+    #[tokio::test]
+    async fn save_patch_happy_path() {
+        let dir = std::env::temp_dir().join(format!("save-patch-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = std::fs::create_dir_all(&dir);
+        let config_path = dir.join("config.toml");
+        let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
+        std::fs::write(&config_path, config_content).unwrap();
+
+        let rt = Arc::new(ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
+
+        let ctx = Arc::new(ProviderResolutionContext {
+            legacy_migration: None,
+            cli_overrides: None,
+        });
+        let coord = ProviderConfigCoordinator::new(Arc::clone(&rt), config_path.clone(), ctx);
+
+        let rev_before = rt.registry.snapshot().revision;
+
+        let mut fields = IndexMap::new();
+        fields.insert("api_key".into(), toml_edit::Value::from("new-key"));
+        let patch = ProviderConfigPatch {
+            provider_id: "xai".into(),
+            fields,
+        };
+        let result = coord.save_patch(&patch).await;
+        assert!(result.is_ok(), "save_patch should succeed: {:?}", result);
+
+        let rev_after = rt.registry.snapshot().revision;
+        assert!(rev_after > rev_before, "revision should increase");
+
+        // File should contain the new key
+        let saved = std::fs::read_to_string(&config_path).unwrap();
+        assert!(saved.contains(r#"api_key = "new-key""#), "file should contain new api_key");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]
