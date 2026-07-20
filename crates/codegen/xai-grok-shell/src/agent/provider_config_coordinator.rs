@@ -591,6 +591,62 @@ theme = "dark"
     }
 
     #[tokio::test]
+    async fn concurrent_save_patches_serialize_and_increment_revision() {
+        let dir = std::env::temp_dir().join(format!("save-patch-concurrent-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = std::fs::create_dir_all(&dir);
+        let config_path = dir.join("config.toml");
+        let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
+        std::fs::write(&config_path, config_content).unwrap();
+
+        let rt = Arc::new(ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
+
+        let ctx = Arc::new(ProviderResolutionContext {
+            legacy_migration: None,
+            cli_overrides: None,
+        });
+        let coord = Arc::new(ProviderConfigCoordinator::new(Arc::clone(&rt), config_path.clone(), ctx));
+
+        let rev_before = rt.registry.snapshot().revision;
+
+        // Two concurrent save_patch calls to different fields
+        let coord_a = Arc::clone(&coord);
+        let coord_b = Arc::clone(&coord);
+
+        let (tx_a, rx_a) = tokio::sync::oneshot::channel();
+        let (tx_b, rx_b) = tokio::sync::oneshot::channel();
+
+        tokio::spawn(async move {
+            let mut fields = IndexMap::new();
+            fields.insert("api_key".into(), toml_edit::Value::from("key-a"));
+            let patch = ProviderConfigPatch { provider_id: "xai".into(), fields };
+            let _ = tx_a.send(coord_a.save_patch(&patch).await);
+        });
+
+        tokio::spawn(async move {
+            let mut fields = IndexMap::new();
+            fields.insert("api_key".into(), toml_edit::Value::from("key-b"));
+            let patch = ProviderConfigPatch { provider_id: "xai".into(), fields };
+            let _ = tx_b.send(coord_b.save_patch(&patch).await);
+        });
+
+        let result_a = rx_a.await.unwrap();
+        let result_b = rx_b.await.unwrap();
+
+        assert!(result_a.is_ok(), "first concurrent save should succeed");
+        assert!(result_b.is_ok(), "second concurrent save should succeed");
+
+        let rev_after = rt.registry.snapshot().revision;
+        assert_eq!(rev_after, rev_before + 2, "revision should increment by 2 for 2 saves");
+
+        // File content should reflect the last successful write (key-b wins)
+        let file_content = std::fs::read_to_string(&config_path).unwrap();
+        assert!(file_content.contains(r#"api_key = "key-b""#), "last write should win");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
     async fn apply_external_file_invalid_config_keeps_old_revision() {
         let dir = std::env::temp_dir().join(format!("coord-test-invalid-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
         let _ = std::fs::create_dir_all(&dir);
