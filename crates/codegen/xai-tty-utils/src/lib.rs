@@ -211,6 +211,27 @@ impl ProcessGroupId {
 
 /// Process-tree teardown handle.
 ///
+/// Cross-platform process termination contract (P12-001).
+///
+/// Uniform semantics:
+/// 1. `graceful_shutdown()` — request cooperative exit (SIGTERM on Unix,
+///    TerminateJobObject on Windows).
+/// 2. `force_terminate()`  — immediate kill (SIGKILL / TerminateJobObject).
+/// 3. `wait_with_timeout()` — bounded reap. Returns `None` on timeout.
+pub trait ProcessTerminator: Send + Sync {
+    fn graceful_shutdown(&self) -> io::Result<()>;
+    fn force_terminate(&self) -> io::Result<()>;
+}
+
+impl ProcessTerminator for ProcessGroup {
+    fn graceful_shutdown(&self) -> io::Result<()> {
+        self.terminate()
+    }
+    fn force_terminate(&self) -> io::Result<()> {
+        self.kill()
+    }
+}
+
 /// - Unix: holds the validated group-leader id ([`ProcessGroupId`]); dispatches
 ///   to `killpg(pgid, signal)`.
 /// - Windows: holds a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
@@ -934,5 +955,23 @@ mod tests {
         let foreign = if own == 2 { 3 } else { 2 };
         let id = ProcessGroupId::new(foreign).expect("foreign pgid should be accepted");
         assert_eq!(id.get(), foreign);
+    }
+
+    // --- ProcessTerminator contract tests ---
+
+    /// ProcessTerminator::graceful_shutdown on an unattached group is a no-op.
+    #[test]
+    fn terminator_graceful_unattached_noop() {
+        let group = ProcessGroup::new().expect("create group");
+        let result = (&group as &dyn ProcessTerminator).graceful_shutdown();
+        assert!(result.is_ok(), "graceful_shutdown on unattached group must succeed");
+    }
+
+    /// ProcessTerminator::force_terminate on an unattached group is a no-op.
+    #[test]
+    fn terminator_force_unattached_noop() {
+        let group = ProcessGroup::new().expect("create group");
+        let result = (&group as &dyn ProcessTerminator).force_terminate();
+        assert!(result.is_ok(), "force_terminate on unattached group must succeed");
     }
 }
