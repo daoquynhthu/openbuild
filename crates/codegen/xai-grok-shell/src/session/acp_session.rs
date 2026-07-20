@@ -1541,7 +1541,7 @@ mod managed_gateway_descriptor_tests {
 /// ToolBridge must route file operations through the injected FileSystem,
 /// not direct disk I/O. When `.with_fs()` is dropped from the builder,
 /// tools fall back to LocalFs and ACP client-side enforcement stops working.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/fs_injection_regression_tests.rs"]
 mod fs_injection_regression_tests;
 #[cfg(all(test, not(target_os = "windows")))]
