@@ -196,3 +196,91 @@ impl Drop for HostClipboardTextGuard {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    /// Serialize clipboard tests so they don't race on the single system
+    /// clipboard.
+    static CLIPBOARD_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn clipboard_roundtrip_text() {
+        let _lock = CLIPBOARD_LOCK.lock().unwrap();
+        if !clipboard_roundtrip_works() {
+            eprintln!("SKIP: no usable host clipboard in this session");
+            return;
+        }
+
+        let _guard = HostClipboardTextGuard::save();
+        let text = "hello clipboard";
+        pbcopy(text).expect("pbcopy must succeed");
+        let pasted = pbpaste().expect("pbpaste must return Some");
+        assert!(
+            pasted.trim_end() == text,
+            "pbcopy/pbpaste roundtrip: expected '{text}', got '{pasted}'"
+        );
+    }
+
+    #[test]
+    fn clipboard_roundtrip_url() {
+        let _lock = CLIPBOARD_LOCK.lock().unwrap();
+        if !clipboard_roundtrip_works() {
+            eprintln!("SKIP: no usable host clipboard in this session");
+            return;
+        }
+
+        let _guard = HostClipboardTextGuard::save();
+        // URL with special chars: single arg, no quoting corruption.
+        let url = "https://example.com/path?a=1&b=2";
+        pbcopy(url).expect("pbcopy must succeed");
+        let pasted = pbpaste().expect("pbpaste must return Some");
+        assert!(
+            pasted.trim_end() == url,
+            "URL roundtrip: expected '{url}', got '{pasted}'"
+        );
+    }
+
+    #[test]
+    fn clipboard_roundtrip_unicode() {
+        let _lock = CLIPBOARD_LOCK.lock().unwrap();
+        if !clipboard_roundtrip_works() {
+            eprintln!("SKIP: no usable host clipboard in this session");
+            return;
+        }
+
+        let _guard = HostClipboardTextGuard::save();
+        let text = "héllo wörld 🌍";
+        pbcopy(text).expect("pbcopy must succeed");
+        let pasted = pbpaste().expect("pbpaste must return Some");
+        assert!(
+            pasted.trim_end() == text,
+            "Unicode roundtrip: expected '{text}', got '{pasted}'"
+        );
+    }
+
+    #[test]
+    fn clipboard_guard_restores_prior() {
+        let _lock = CLIPBOARD_LOCK.lock().unwrap();
+        if !clipboard_roundtrip_works() {
+            eprintln!("SKIP: no usable host clipboard in this session");
+            return;
+        }
+
+        let prior = "prior content";
+        pbcopy(prior).expect("set prior content");
+
+        {
+            let _guard = HostClipboardTextGuard::save();
+            pbcopy("temporary").expect("set temporary content");
+        }
+
+        let restored = pbpaste().expect("pbpaste after guard drop");
+        assert!(
+            restored.trim_end() == prior,
+            "guard must restore prior: expected '{prior}', got '{restored}'"
+        );
+    }
+}
