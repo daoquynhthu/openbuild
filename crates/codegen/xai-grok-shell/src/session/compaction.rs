@@ -111,7 +111,7 @@ impl From<PrefireOutcome> for PrefirePass1Run {
         }
     }
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod two_pass_prefire_helper_tests {
     use super::{fingerprint_prefix, prefire_lead_percent};
     use xai_grok_sampling_types::ConversationItem;
