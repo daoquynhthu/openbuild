@@ -601,11 +601,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             let Some(agent) = app.agents.get_mut(&id) else {
                 return vec![];
             };
-            let provider_state = crate::provider_state::registry()
-                .map(|reg| ProviderState::new(reg.clone()))
+            let provider_state = crate::provider_state::runtime()
+                .map(|rt| ProviderState::new(rt.clone()))
                 .unwrap_or_else(|| {
                     ProviderState::new(std::sync::Arc::new(
-                        xai_grok_provider::registry::ProviderRegistry::new(),
+                        xai_grok_shell::agent::provider_runtime::ProviderRuntime::new(),
                     ))
                 });
             let modal = ActiveModal::Providers {

@@ -2,26 +2,28 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 
 use indexmap::IndexMap;
-use xai_grok_provider::registry::{ProviderRegistry, RegistrySnapshot};
+use xai_grok_provider::registry::RegistrySnapshot;
 use xai_grok_provider::types::ProviderId;
+use xai_grok_shell::agent::provider_runtime::ProviderRuntime;
 
-/// Global singleton registry (legacy accessor).
-static PROVIDER_REGISTRY: OnceLock<Arc<ProviderRegistry>> = OnceLock::new();
+/// Global singleton runtime.
+static PROVIDER_RUNTIME: OnceLock<Arc<ProviderRuntime>> = OnceLock::new();
 
-/// Initialize the global provider registry. Returns an error if already set.
-pub fn init(registry: Arc<ProviderRegistry>) -> Result<(), &'static str> {
-    PROVIDER_REGISTRY
-        .set(registry)
+/// Initialize the global provider runtime. Returns an error if already set.
+pub fn init(runtime: Arc<ProviderRuntime>) -> Result<(), &'static str> {
+    PROVIDER_RUNTIME
+        .set(runtime)
         .map_err(|_| "provider_state::init called more than once")
 }
 
-pub fn registry() -> Option<&'static Arc<ProviderRegistry>> {
-    PROVIDER_REGISTRY.get()
+/// Access the global provider runtime.
+pub fn runtime() -> Option<&'static Arc<ProviderRuntime>> {
+    PROVIDER_RUNTIME.get()
 }
 
 pub fn configured_providers() -> Vec<String> {
-    match PROVIDER_REGISTRY.get() {
-        Some(reg) => reg.all_ids().into_iter().map(|p| p.0).collect(),
+    match PROVIDER_RUNTIME.get() {
+        Some(rt) => rt.registry.all_ids().into_iter().map(|p| p.0).collect(),
         None => vec![],
     }
 }
@@ -65,6 +67,7 @@ pub struct ProviderView {
     pub credential: CredentialState,
     pub catalog: CatalogState,
     pub catalog_last_refresh: Option<String>,
+    pub route_count: usize,
     pub model_count: usize,
     pub last_error: Option<String>,
     pub registry_revision: u64,
@@ -75,15 +78,15 @@ pub struct ProviderView {
 /// Runtime-backed provider state container.
 #[derive(Debug)]
 pub struct ProviderState {
-    registry: Arc<ProviderRegistry>,
+    runtime: Arc<ProviderRuntime>,
     views: IndexMap<ProviderId, ProviderView>,
     revision: u64,
 }
 
 impl ProviderState {
-    pub fn new(registry: Arc<ProviderRegistry>) -> Self {
+    pub fn new(runtime: Arc<ProviderRuntime>) -> Self {
         let mut state = Self {
-            registry,
+            runtime,
             views: IndexMap::new(),
             revision: 0,
         };
@@ -93,7 +96,7 @@ impl ProviderState {
 
     /// Rebuild all views from the current registry snapshot.
     pub fn refresh(&mut self) {
-        let snapshot = self.registry.snapshot();
+        let snapshot = self.runtime.registry.snapshot();
         self.revision = snapshot.revision;
         let provider_count = snapshot.providers.len();
         let route_count: usize = snapshot.routes.len();
@@ -125,6 +128,7 @@ impl ProviderState {
                     credential,
                     catalog: CatalogState::Idle,
                     catalog_last_refresh: None,
+                    route_count: configured.routes.len(),
                     model_count,
                     last_error: None,
                     registry_revision: snapshot.revision,
@@ -135,9 +139,10 @@ impl ProviderState {
         }
 
         // Add any registered-but-not-configured providers
-        for pid in self.registry.all_ids() {
+        for pid in self.runtime.registry.all_ids() {
             if !views.contains_key(&pid) {
                 let display_name = self
+                    .runtime
                     .registry
                     .get(&pid)
                     .map(|p| p.name().to_string())
@@ -152,6 +157,7 @@ impl ProviderState {
                         credential: CredentialState::Missing,
                         catalog: CatalogState::Idle,
                         catalog_last_refresh: None,
+                        route_count: 0,
                         model_count: 0,
                         last_error: None,
                         registry_revision: snapshot.revision,
@@ -174,11 +180,15 @@ impl ProviderState {
     }
 
     pub fn snapshot(&self) -> Arc<RegistrySnapshot> {
-        self.registry.snapshot()
+        self.runtime.registry.snapshot()
     }
 
-    pub fn registry(&self) -> &Arc<ProviderRegistry> {
-        &self.registry
+    pub fn registry(&self) -> Arc<xai_grok_provider::registry::ProviderRegistry> {
+        self.runtime.registry.clone()
+    }
+
+    pub fn runtime_ref(&self) -> &Arc<ProviderRuntime> {
+        &self.runtime
     }
 
     pub fn revision(&self) -> u64 {
@@ -259,19 +269,18 @@ mod tests {
     use std::sync::Arc;
 
     use xai_grok_provider::config::ProviderConfig;
-    use xai_grok_provider::registry::ProviderRegistry;
 
-    fn real_registry() -> Arc<ProviderRegistry> {
-        let registry = Arc::new(ProviderRegistry::new());
-        xai_grok_provider::providers::register_all(&registry);
+    fn real_runtime() -> Arc<ProviderRuntime> {
+        let rt = Arc::new(ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
         let mut configs: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
-        for pid in registry.all_ids() {
+        for pid in rt.registry.all_ids() {
             let mut cfg = ProviderConfig::default();
             cfg.id = Some(pid.0.clone());
             configs.insert(pid, cfg);
         }
-        registry.rebuild(&configs).unwrap();
-        registry
+        rt.registry.rebuild(&configs).unwrap();
+        rt
     }
 
     #[test]
@@ -308,15 +317,15 @@ mod tests {
 
     #[test]
     fn provider_state_empty_registry_has_no_views() {
-        let registry = Arc::new(ProviderRegistry::new());
-        let state = ProviderState::new(registry);
+        let rt = Arc::new(ProviderRuntime::new());
+        let state = ProviderState::new(rt);
         assert_eq!(state.ordered_views().len(), 0);
     }
 
     #[test]
     fn provider_state_real_providers_have_views() {
-        let registry = real_registry();
-        let state = ProviderState::new(registry);
+        let rt = real_runtime();
+        let state = ProviderState::new(rt);
         assert!(
             state.ordered_views().len() >= 5,
             "expected at least 5 providers (xai, openai, anthropic, opencode, ollama)"
@@ -325,9 +334,9 @@ mod tests {
 
     #[test]
     fn provider_state_ordering_deterministic() {
-        let registry = real_registry();
-        let s1 = ProviderState::new(registry.clone());
-        let s2 = ProviderState::new(registry);
+        let rt = real_runtime();
+        let s1 = ProviderState::new(rt.clone());
+        let s2 = ProviderState::new(rt);
         let ids1: Vec<&str> = s1.ordered_views().iter().map(|v| v.id.0.as_str()).collect();
         let ids2: Vec<&str> = s2.ordered_views().iter().map(|v| v.id.0.as_str()).collect();
         assert_eq!(ids1, ids2, "provider order must be deterministic");
@@ -335,8 +344,8 @@ mod tests {
 
     #[test]
     fn provider_state_update_error_persists() {
-        let registry = real_registry();
-        let mut state = ProviderState::new(registry);
+        let rt = real_runtime();
+        let mut state = ProviderState::new(rt);
         let pid = ProviderId::new("xai");
         state.update_error(&pid, Some("something went wrong".into()));
         let view = state.view_for(&pid).expect("xai view should exist");
@@ -345,8 +354,8 @@ mod tests {
 
     #[test]
     fn provider_state_update_error_resets_to_none() {
-        let registry = real_registry();
-        let mut state = ProviderState::new(registry);
+        let rt = real_runtime();
+        let mut state = ProviderState::new(rt);
         let pid = ProviderId::new("xai");
         state.update_error(&pid, Some("old error".into()));
         state.update_error(&pid, None);
@@ -356,16 +365,16 @@ mod tests {
 
     #[test]
     fn provider_state_update_error_unknown_id_noop() {
-        let registry = real_registry();
-        let mut state = ProviderState::new(registry);
+        let rt = real_runtime();
+        let mut state = ProviderState::new(rt);
         state.update_error(&ProviderId::new("unknown"), Some("error".into()));
         assert!(state.view_for(&ProviderId::new("unknown")).is_none());
     }
 
     #[test]
     fn provider_state_update_catalog_transitions() {
-        let registry = real_registry();
-        let mut state = ProviderState::new(registry);
+        let rt = real_runtime();
+        let mut state = ProviderState::new(rt);
         let pid = ProviderId::new("xai");
 
         // Initially Idle
@@ -399,16 +408,23 @@ mod tests {
 
     #[test]
     fn provider_state_refresh_does_not_panic() {
-        let registry = real_registry();
-        let mut state = ProviderState::new(registry);
+        let rt = real_runtime();
+        let mut state = ProviderState::new(rt);
         state.refresh();
         assert!(!state.ordered_views().is_empty());
     }
 
     #[test]
+    fn provider_state_uses_same_runtime_arc() {
+        let rt = real_runtime();
+        let state = ProviderState::new(rt.clone());
+        assert!(Arc::ptr_eq(&rt, state.runtime_ref()), "ProviderState must hold the same Arc<ProviderRuntime>");
+    }
+
+    #[test]
     fn provider_view_credential_state_missing_by_default() {
-        let registry = real_registry();
-        let state = ProviderState::new(registry);
+        let rt = real_runtime();
+        let state = ProviderState::new(rt);
         for view in state.ordered_views() {
             match view.id.0.as_str() {
                 "opencode" => assert_eq!(

@@ -142,6 +142,9 @@ fn bootstrap_provider_runtime_produces_full_snapshot() {
 /// Runtime identity shared through ConfigReloader — identity must be injected.
 #[test]
 fn bootstrap_runtime_identity_reaches_config_reloader() {
+    use xai_grok_shell::agent::provider_config_coordinator::{
+        ProviderConfigCoordinator, ProviderResolutionContext,
+    };
     use xai_grok_shell::config::reloader::ConfigReloader;
 
     let input = xai_grok_shell::agent::provider_bootstrap::ProviderBootstrapInput {
@@ -155,10 +158,17 @@ fn bootstrap_runtime_identity_reaches_config_reloader() {
         .block_on(xai_grok_shell::agent::provider_bootstrap::bootstrap_provider_runtime(input))
         .expect("bootstrap");
 
-    // Construct a ConfigReloader with Some(runtime) — verifies the
-    // constructor accepts the Arc without type mismatch.
+    let coord = ProviderConfigCoordinator::new(
+        rt,
+        std::path::PathBuf::from("/tmp/nonexistent"),
+        Arc::new(ProviderResolutionContext {
+            legacy_migration: None,
+            cli_overrides: None,
+        }),
+    );
+
     let (_tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-    let reloader = ConfigReloader::new(
+    let _reloader = ConfigReloader::new(
         std::path::PathBuf::from("/tmp/nonexistent"),
         0,
         toml::from_str("").unwrap(),
@@ -167,12 +177,8 @@ fn bootstrap_runtime_identity_reaches_config_reloader() {
         _tx,
         false,
         false,
-        Some(rt.clone()),
+        Some(Arc::new(coord)),
     );
-
-    // Verify the runtime was accepted (reloader stores it internally).
-    // The reloader does not execute rebuilds yet (P9-07), but identity is injected.
-    drop(reloader);
 }
 
 /// Runtime identity: bootstrap produces a unique Arc, clones share same pointer.

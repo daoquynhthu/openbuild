@@ -718,15 +718,16 @@ mod tests {
     use std::sync::Arc;
 
     fn test_state() -> ProvidersModalState {
-        let registry = Arc::new(xai_grok_provider::registry::ProviderRegistry::new());
-        xai_grok_provider::providers::register_all(&registry);
-        let configs: indexmap::IndexMap<_, _> = registry
+        let rt = Arc::new(xai_grok_shell::agent::provider_runtime::ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
+        let configs: indexmap::IndexMap<_, _> = rt
+            .registry
             .all_ids()
             .into_iter()
             .map(|pid| (pid, xai_grok_provider::config::ProviderConfig::default()))
             .collect();
-        registry.rebuild(&configs).unwrap();
-        let provider_state = ProviderState::new(registry);
+        rt.registry.rebuild(&configs).unwrap();
+        let provider_state = ProviderState::new(rt);
         ProvidersModalState::new(provider_state)
     }
 

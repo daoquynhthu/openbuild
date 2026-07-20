@@ -396,8 +396,7 @@ pub async fn run(
         .map_err(|e| anyhow::anyhow!("Failed to load config: {e}"))?;
 
     // Tests/tools that call run() directly must bootstrap their own runtime.
-    let reg = provider_runtime.registry.clone();
-    let _ = crate::provider_state::init(reg);
+    let _ = crate::provider_state::init(provider_runtime.clone());
 
     let grok_com_config =
         match xai_grok_shell::agent::config::Config::new_from_toml_cfg(&raw_config) {
