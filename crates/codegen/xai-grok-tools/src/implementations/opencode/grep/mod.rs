@@ -370,7 +370,6 @@ impl xai_tool_runtime::Tool for GrepTool {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;
