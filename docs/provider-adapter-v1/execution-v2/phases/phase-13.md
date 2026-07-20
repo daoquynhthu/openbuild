@@ -440,9 +440,10 @@
 - WX-e55894161814: 
 - WX-6728599de8d6: 
 - Fingerprint: scan_lines_for_url_overlays regex only matches Unix /abs/paths
-- Status: NOT_STARTED
+- Status: PARTIALLY_COMPLETED
 - Phase 2 redo: WX-92e46d827d1e reclassified CROSS_PLATFORM → MISSING_WINDOWS_IMPLEMENTATION
-  Other rows likely same root cause; verify per-entry in P13 execution.
+  and fixed in P13-002 (commit 1d77db3). Remaining 13 rows need per-entry
+  verification in P13 execution.
 
 ### P13-R-WX-cacfede9f117: repair WX-cacfede9f117
 
@@ -457,15 +458,16 @@
 ### P13-R-WX-8c252e126d78: repair WX-8c252e126d78
 
 - Ledger ID: WX-8c252e126d78
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
-- Phase 2 redo: reclassified from CROSS_PLATFORM_CONTRACT to MISSING_WINDOWS_IMPLEMENTATION
-- Root cause: scan_lines_for_url_overlays regex only matches Unix /abs/paths
-- Fix: add Windows path regex (C:\... and \\UNC\...) to file_path_regex() in osc8.rs
+- Platform: all
+- Package: xai-grok-pager-render
+- Failure class: missing-windows-implementation
+- First causal error: Windows paths not detected by scanner regex
+- Fingerprint: file_path_regex() only matched Unix /abs/paths
+- Status: COMPLETED
+- Fix: added Windows absolute path patterns (C:\, UNC\) to file_path_regex()
+  and quoted_file_path_regex(). Added drive-letter prepend to file_path_to_url()
+  for Unix-style paths on Windows. 49 tests pass cross-platform.
+- Commit: 1d77db3
 
 ### P13-R-WX-aeecacf22636: repair WX-aeecacf22636
 
