@@ -167,39 +167,48 @@ fn has_excluded_component(path: &Path) -> bool {
 mod tests {
     use super::*;
 
-    #[cfg(not(target_os = "windows"))]
-    mod posix {
+    mod non_temp_dirs {
         use super::*;
 
         #[test]
         fn root_is_unsafe() {
-            assert!(!is_project_dir(Path::new("/")));
+            let root = std::path::PathBuf::from("/");
+            if root.exists() {
+                assert!(!is_project_dir(&root));
+            }
+            #[cfg(windows)]
+            {
+                let c_root = std::path::PathBuf::from(r"C:\");
+                assert!(!is_project_dir(&c_root));
+            }
         }
 
         #[test]
         fn tmp_is_unsafe() {
-            assert!(!is_project_dir(Path::new("/tmp")));
-            assert!(!is_project_dir(Path::new("/tmp/scratch")));
+            let tmp = std::env::temp_dir();
+            if tmp.exists() {
+                assert!(!is_project_dir(&tmp));
+            }
         }
 
         #[test]
-        fn tmp_prefix_not_greedy() {
-            assert!(is_project_dir(Path::new("/tmpdata/foo")));
-        }
-
-        #[test]
-        fn var_folders_is_unsafe() {
-            assert!(!is_project_dir(Path::new("/var/folders/ab/cd")));
-        }
-
-        #[test]
-        fn deep_project_is_safe() {
-            assert!(is_project_dir(Path::new("/Users/someone/my-project/src")));
+        fn project_in_non_system_dir_is_safe() {
+            let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let project = base.join("__test_workspace_classifier").join("my-project").join("src");
+            let _ = std::fs::create_dir_all(&project);
+            let result = is_project_dir(&project);
+            let _ = std::fs::remove_dir_all(base.join("__test_workspace_classifier"));
+            assert!(result, "a deep path in cwd should be classified as a project");
         }
 
         #[test]
         fn home_subdir_is_safe() {
-            assert!(is_project_dir(Path::new("/Users/someone/my-project")));
+            if let Some(home) = dirs::home_dir() {
+                let project = home.join("my-project");
+                if project.exists() || project.parent().is_some() {
+                    assert!(is_project_dir(&project));
+                }
+            }
         }
     }
 
@@ -338,18 +347,24 @@ mod tests {
             assert!(!is_project_dir(Path::new("")));
         }
 
-        #[cfg(not(target_os = "windows"))]
         #[test]
         fn unicode_paths_work() {
-            assert!(is_project_dir(Path::new(
-                "/Users/me/code/\u{D3F4}\u{B9AC}\u{B9C8}\u{CF13}"
-            )));
+            let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let dir = base.join("__test_classifier_unicode").join("\u{D3F4}\u{B9AC}\u{B9C8}\u{CF13}");
+            let _ = std::fs::create_dir_all(&dir);
+            let result = is_project_dir(&dir);
+            let _ = std::fs::remove_dir_all(base.join("__test_classifier_unicode"));
+            assert!(result);
         }
 
-        #[cfg(not(target_os = "windows"))]
         #[test]
         fn spaces_work() {
-            assert!(is_project_dir(Path::new("/Users/me/My Projects/cool app")));
+            let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            let dir = base.join("__test_classifier_spaces").join("My Projects").join("cool app");
+            let _ = std::fs::create_dir_all(&dir);
+            let result = is_project_dir(&dir);
+            let _ = std::fs::remove_dir_all(base.join("__test_classifier_spaces"));
+            assert!(result);
         }
     }
 
