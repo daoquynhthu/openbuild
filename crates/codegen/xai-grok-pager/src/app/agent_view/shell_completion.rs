@@ -197,6 +197,25 @@ mod shell_suggestion_key_tests {
         }
     }
 
+    /// PowerShell-mode agent fixture (P12-009). Sets prompt_input_mode to Bash
+    /// (powershell completion uses the same Tab surface) and populates with
+    /// PowerShell-style paths (drive letters, backslashes, UNC).
+    fn pwsh_agent(text: &str) -> AgentView {
+        let mut agent = pwsh_agent_always_on(text);
+        agent.prompt.suggestions.enabled = true;
+        agent
+    }
+
+    fn pwsh_agent_always_on(text: &str) -> AgentView {
+        let mut agent = super::test_fixtures::make_agent();
+        agent.prompt_input_mode = PromptInputMode::Bash;
+        agent.prompt.suggestions.enabled = false;
+        agent.prompt.textarea.insert_str(text);
+        agent.prompt.suggestions.dropdown.request_text = text.to_owned();
+        agent.prompt.suggestions.dropdown.request_cursor = text.len();
+        agent
+    }
+
     /// Bash-mode agent with the env-gated as-you-type pipeline ON and
     /// `text` typed (the dropdown's request-text anchor pinned to it — the
     /// state right after a suggest response landed for the draft).
@@ -937,5 +956,42 @@ mod shell_suggestion_key_tests {
                 .any(|e| matches!(e, Effect::FetchShellSuggestions { .. })),
             "Tab must refetch for the clicked position"
         );
+    }
+
+    // --- PowerShell completion adapter tests (P12-009) ---
+
+    #[test]
+    fn pwsh_drive_letter_path_accepts() {
+        let mut agent = pwsh_agent("cd C:\\Users");
+        agent.prompt.suggestions.dropdown.open = true;
+        agent.prompt.suggestions.dropdown.items = vec![
+            file_item("cd C:\\Users\\me", "C:\\Users\\me", 3..11),
+        ];
+        let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
+        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept PowerShell drive path");
+        assert_eq!(agent.prompt.text(), "cd C:\\Users\\me");
+    }
+
+    #[test]
+    fn pwsh_unc_path_accepts() {
+        let mut agent = pwsh_agent(r"dir \\server");
+        agent.prompt.suggestions.dropdown.open = true;
+        agent.prompt.suggestions.dropdown.items = vec![
+            file_item(r"dir \\server\share", r"\\server\share", 4..12),
+        ];
+        let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
+        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept UNC path");
+        assert_eq!(agent.prompt.text(), r"dir \\server\share");
+    }
+
+    #[test]
+    fn pwsh_spaces_in_path_accepts() {
+        let mut agent = pwsh_agent(r"cd 'C:\Program Files'");
+        agent.prompt.suggestions.dropdown.open = true;
+        agent.prompt.suggestions.dropdown.items = vec![
+            file_item(r"cd 'C:\Program Files\Git'", r"C:\Program Files\Git", 4..21),
+        ];
+        let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
+        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept spaced path");
     }
 }
