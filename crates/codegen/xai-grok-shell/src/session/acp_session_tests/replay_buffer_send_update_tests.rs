@@ -1,5 +1,6 @@
 use super::support::*;
 use super::*;
+use crate::session::streaming_capture::STREAMING_CAPTURE_MAX_BYTES;
 use crate::terminal::AsyncTerminalRunner;
 use crate::terminal::runner::{TerminalError, TerminalRunRequest, TerminalRunResult};
 use tokio::sync::mpsc;

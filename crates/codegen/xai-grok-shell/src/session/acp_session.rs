@@ -1550,68 +1550,57 @@ mod interjection_actor_tests;
 #[cfg(test)]
 #[path = "acp_session_tests/observability_bridge_mapping_tests.rs"]
 mod observability_bridge_mapping_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/permission_auto_mode_tests.rs"]
 mod permission_auto_mode_tests;
 /// Resume re-park of the parked `exit_plan_mode` approval.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/plan_approval_resume_tests.rs"]
 mod plan_approval_resume_tests;
 /// Plan-mode edit gate: read-only except the plan file, even under allow-all.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/plan_mode_edit_gate_tests.rs"]
 mod plan_mode_edit_gate_tests;
 /// Mid-turn plan-mode toggle: immediate activation + buffered reminder.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/plan_mode_midturn_tests.rs"]
 mod plan_mode_midturn_tests;
-/// Tests for [`conversation_has_project_instructions`], the idempotence
-/// helper that gates the spawn-time AGENTS.md / CLAUDE.md injector.
-///
-/// Coverage:
-/// - True when a tagged [`SyntheticReason::ProjectInstructions`] user item
-///   is present (the new post-Task-1 form).
-/// - True when an untagged legacy user item is present whose first text
-///   part begins with the wrapper-tag prefix written by older shells.
-/// - False for an empty conversation, for a conversation with only a real
-///   user message, when the wrapper prefix appears in a non-first content
-///   part, and when the wrapper prefix is buried mid-text.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/project_instructions_idempotence_tests.rs"]
 mod project_instructions_idempotence_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/prompt_mode_transition_tests.rs"]
 mod prompt_mode_transition_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/prompt_queue_actor_tests.rs"]
 mod prompt_queue_actor_tests;
 /// Regression coverage for the per-turn `record_token_usage` path.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/record_response_token_usage_tests.rs"]
 mod record_response_token_usage_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/replay_buffer_send_update_tests.rs"]
 mod replay_buffer_send_update_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/reverse_request_session_id_tests.rs"]
 mod reverse_request_session_id_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/rewind_cross_compaction_tests.rs"]
 mod rewind_cross_compaction_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/rewind_synthetic_turn_tests.rs"]
 mod rewind_synthetic_turn_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/rewrite_zero_turn_prefix_tests.rs"]
 mod rewrite_zero_turn_prefix_tests;
 /// Pins the `SubagentFinished` usage-fold attribution gate.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/subagent_usage_fold_tests.rs"]
 mod subagent_usage_fold_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/turn_completion_emit_tests.rs"]
 mod turn_completion_emit_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tool_meta_stamp_tests {
     //! Pin the `x.ai/tool` stamps on the harness emission paths: the early
     //! ToolCall registered by `prepare_tool_call` and the permission-request
