@@ -1,15 +1,25 @@
 //! `grok providers` subcommand — list configured providers and their status.
 
+use std::sync::Arc;
+
 use anyhow::Result;
+use xai_grok_shell::agent::provider_runtime::ProviderRuntime;
 
 /// Load provider state from disk config and print a summary.
-pub async fn list_providers() -> Result<()> {
-    let toml = xai_grok_shell::config::load_effective_config_disk_only()?;
+///
+/// When `runtime` is provided, uses that shared instance (P10-010).
+/// Standalone CLI callers pass `None` and bootstrap their own.
+pub async fn list_providers(runtime: Option<Arc<ProviderRuntime>>) -> Result<()> {
+    let rt = match runtime {
+        Some(r) => r,
+        None => {
+            let toml = xai_grok_shell::config::load_effective_config_disk_only()?;
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await?
+        }
+    };
 
-    let runtime =
-        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None).await?;
-
-    let snapshot = runtime.snapshot();
+    let snapshot = rt.snapshot();
     println!("Configured providers (rev {}):", snapshot.revision);
     println!();
 

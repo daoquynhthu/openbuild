@@ -1730,7 +1730,7 @@ async fn async_main() -> Result<()> {
             Command::Providers => {
                 init_tracing_simple("cli");
                 let _otel_guard = xai_grok_telemetry::otel_layer::otel_guard();
-                return xai_grok_pager::providers_cmd::list_providers().await;
+                return xai_grok_pager::providers_cmd::list_providers(None).await;
             }
             Command::Worktree(worktree_args) => {
                 init_tracing_simple("cli");
