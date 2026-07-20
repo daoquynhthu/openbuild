@@ -1456,7 +1456,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(test)]
     #[test]
     fn active_child_copy_uses_child_scrollback_cwd() {
         use crate::scrollback::block::RenderBlock;
