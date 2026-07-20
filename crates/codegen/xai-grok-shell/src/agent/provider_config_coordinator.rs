@@ -75,6 +75,8 @@ pub enum ConfigApplyError {
     FileChanged,
     #[error("failed to write: {0}")]
     WriteError(String),
+    #[error("consistency emergency: file modified by third party after atomic write — runtime state preserved, disk content preserved")]
+    ConsistencyEmergency,
 }
 
 /// Single coordination point for all provider config writes.
@@ -89,6 +91,8 @@ pub struct ProviderConfigCoordinator {
     update_lock: Mutex<()>,
     #[cfg(test)]
     pub pre_cas_hook: std::sync::Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
+    #[cfg(test)]
+    pub pre_commit_hook: std::sync::Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
 }
 
 impl ProviderConfigCoordinator {
@@ -104,6 +108,8 @@ impl ProviderConfigCoordinator {
             update_lock: Mutex::new(()),
             #[cfg(test)]
             pre_cas_hook: std::sync::Mutex::new(None),
+            #[cfg(test)]
+            pre_commit_hook: std::sync::Mutex::new(None),
         }
     }
 
@@ -206,18 +212,35 @@ impl ProviderConfigCoordinator {
             return Err(ConfigApplyError::FileChanged);
         }
 
-        // Step 6: Atomic write
-        xai_grok_paths::atomic_write::atomic_replace(&self.config_path, candidate_bytes)
-            .map_err(|e| ConfigApplyError::WriteError(e.to_string()))?;
+        // Step 6: Atomic write — capture candidate SHA for rollback guard
+        let candidate_sha = Sha256::digest(candidate_bytes);
+        let write_result =
+            xai_grok_paths::atomic_write::atomic_replace(&self.config_path, candidate_bytes);
+        if let Err(e) = write_result {
+            return Err(ConfigApplyError::WriteError(e.to_string()));
+        }
 
-        // Step 7: Commit to registry
-        let revision = self
-            .runtime
-            .registry
-            .commit(prepared)
-            .map_err(|e| ConfigApplyError::CommitError(e.to_string()))?;
-
-        Ok(ConfigApplyOutcome::Applied { new_revision: revision })
+        // Step 7: Commit to registry with rollback guard
+        #[cfg(test)]
+        if let Some(ref hook) = *self.pre_commit_hook.lock().unwrap() {
+            hook();
+        }
+        match self.runtime.registry.commit(prepared) {
+            Ok(rev) => Ok(ConfigApplyOutcome::Applied { new_revision: rev }),
+            Err(e) => {
+                // Commit failed — rollback file to old bytes if no external edit
+                let post_write = std::fs::read(&self.config_path).unwrap_or_default();
+                let post_write_sha = Sha256::digest(&post_write);
+                if post_write_sha == candidate_sha {
+                    // File still has what we wrote — safe to restore old content
+                    let _ = std::fs::write(&self.config_path, &old_content);
+                } else {
+                    // File was modified by another party — cannot safely rollback
+                    return Err(ConfigApplyError::ConsistencyEmergency);
+                }
+                Err(ConfigApplyError::CommitError(e.to_string()))
+            }
+        }
     }
 
     pub fn registry(&self) -> Arc<ProviderRegistry> {
@@ -518,6 +541,53 @@ theme = "dark"
         // but we can verify the error was returned.
         // Clean up the file we created in place of the directory
         let _ = std::fs::remove_file(&dir_for_cleanup);
+    }
+
+    #[tokio::test]
+    async fn save_patch_commit_failure_rolls_back_file() {
+        let dir = std::env::temp_dir().join(format!("save-patch-rollback-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = std::fs::create_dir_all(&dir);
+        let config_path = dir.join("config.toml");
+        let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
+        std::fs::write(&config_path, config_content).unwrap();
+
+        let rt = Arc::new(ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
+
+        let ctx = Arc::new(ProviderResolutionContext {
+            legacy_migration: None,
+            cli_overrides: None,
+        });
+        let coord = ProviderConfigCoordinator::new(Arc::clone(&rt), config_path.clone(), ctx);
+
+        let file_before = std::fs::read_to_string(&config_path).unwrap();
+        let rev_before = rt.registry.snapshot().revision;
+
+        // After prepare/CAS but before commit, increment the registry revision
+        // to make commit reject the stale prepared batch.
+        let rt_for_hook = Arc::clone(&rt);
+        coord.pre_commit_hook.lock().unwrap().replace(Box::new(move || {
+            // Bump the registry revision by doing an empty rebuild
+            let _ = rt_for_hook.registry.rebuild(&IndexMap::new());
+        }));
+
+        let mut fields = IndexMap::new();
+        fields.insert("api_key".into(), toml_edit::Value::from("new-key"));
+        let patch = ProviderConfigPatch {
+            provider_id: "xai".into(),
+            fields,
+        };
+        let result = coord.save_patch(&patch).await;
+
+        // commit should fail due to stale revision
+        assert!(result.is_err(), "commit failure should return error");
+
+        // File should be rolled back to original content (the hook's write was
+        // overwritten by rollback; the original file content should be restored)
+        let file_after = std::fs::read_to_string(&config_path).unwrap();
+        assert_eq!(file_after, file_before, "file should be rolled back to original");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]
