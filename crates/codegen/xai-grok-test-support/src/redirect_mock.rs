@@ -3,7 +3,7 @@
 //! Starts an axum server that returns `n` sequential 302 redirects (self-referencing)
 //! followed by a 200 OK with JSON body.  `n=0` returns 200 immediately.
 //!
-//! Also provides [`ConcurrencyBarrierServer`] for P9-003 bounded concurrency tests.
+//! Also provides [`SlowServer`] for P9-003 bounded concurrency tests.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
