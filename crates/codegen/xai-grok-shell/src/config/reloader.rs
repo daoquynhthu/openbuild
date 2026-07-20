@@ -118,7 +118,9 @@ impl ConfigReloader {
         config_update_tx: mpsc::UnboundedSender<ConfigUpdate>,
         experimental_memory: bool,
         no_memory: bool,
-        coordinator: Option<Arc<crate::agent::provider_config_coordinator::ProviderConfigCoordinator>>,
+        coordinator: Option<
+            Arc<crate::agent::provider_config_coordinator::ProviderConfigCoordinator>,
+        >,
     ) -> Self {
         Self {
             last_auth_key_hash: initial_auth_key_hash,

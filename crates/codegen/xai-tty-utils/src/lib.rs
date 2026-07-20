@@ -38,9 +38,9 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::time::Duration;
 
 mod process_scope;
@@ -106,7 +106,7 @@ where
 
     #[cfg(unix)]
     {
-        use nix::sys::signal::{sigaction, SaFlags, SigAction, SigHandler, Signal};
+        use nix::sys::signal::{SaFlags, SigAction, SigHandler, Signal, sigaction};
 
         extern "C" fn sigint_handler(_: i32) {
             SHUTDOWN_REQ.store(REQ_INTERRUPT, Ordering::SeqCst);
@@ -137,17 +137,19 @@ where
             .map_err(|e| io::Error::other(e.to_string()))?;
         }
 
-        std::thread::spawn(|| loop {
-            std::thread::sleep(Duration::from_millis(100));
-            let req = SHUTDOWN_REQ.swap(REQ_NONE, Ordering::SeqCst);
-            if req != REQ_NONE {
-                let intent = match req {
-                    REQ_INTERRUPT => ShutdownIntent::Interrupt,
-                    REQ_TERMINATE => ShutdownIntent::Terminate,
-                    _ => continue,
-                };
-                if let Some(cb) = SHUTDOWN_CB.get() {
-                    cb(intent);
+        std::thread::spawn(|| {
+            loop {
+                std::thread::sleep(Duration::from_millis(100));
+                let req = SHUTDOWN_REQ.swap(REQ_NONE, Ordering::SeqCst);
+                if req != REQ_NONE {
+                    let intent = match req {
+                        REQ_INTERRUPT => ShutdownIntent::Interrupt,
+                        REQ_TERMINATE => ShutdownIntent::Terminate,
+                        _ => continue,
+                    };
+                    if let Some(cb) = SHUTDOWN_CB.get() {
+                        cb(intent);
+                    }
                 }
             }
         });
@@ -157,18 +159,16 @@ where
     {
         unsafe extern "system" {
             fn SetConsoleCtrlHandler(
-                handler_routine: Option<
-                    unsafe extern "system" fn(u32) -> i32,
-                >,
+                handler_routine: Option<unsafe extern "system" fn(u32) -> i32>,
                 add: i32,
             ) -> i32;
         }
 
         unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> i32 {
             let intent = match ctrl_type {
-                0 => ShutdownIntent::Interrupt,   // CTRL_C_EVENT
+                0 => ShutdownIntent::Interrupt,     // CTRL_C_EVENT
                 1 | 5 => ShutdownIntent::Terminate, // CTRL_BREAK_EVENT | CTRL_CLOSE_EVENT
-                _ => return 0, // not handled
+                _ => return 0,                      // not handled
             };
             if let Some(cb) = SHUTDOWN_CB.get() {
                 cb(intent);
@@ -202,7 +202,10 @@ mod shutdown_tests {
     #[test]
     fn shutdown_intent_debug() {
         let s = format!("{:?}", ShutdownIntent::Interrupt);
-        assert!(s.contains("Interrupt"), "Debug output should contain variant name: {s}");
+        assert!(
+            s.contains("Interrupt"),
+            "Debug output should contain variant name: {s}"
+        );
     }
 
     #[test]
@@ -221,7 +224,10 @@ mod shutdown_tests {
 
         // Test 1: first call succeeds
         let result = register_shutdown_handler(|_intent| {});
-        assert!(result.is_ok(), "first registration should succeed: {result:?}");
+        assert!(
+            result.is_ok(),
+            "first registration should succeed: {result:?}"
+        );
 
         // Test 2: second call fails with "already registered"
         let result2 = register_shutdown_handler(|_intent| {});
@@ -487,13 +493,17 @@ impl ProcessTerminator for ProcessGroup {
         self.terminate()
     }
     fn wait_timeout(&self, _timeout: Duration) -> io::Result<bool> {
-        Err(io::Error::other("ProcessGroup::wait_timeout not supported — use ManagedProcess"))
+        Err(io::Error::other(
+            "ProcessGroup::wait_timeout not supported — use ManagedProcess",
+        ))
     }
     fn force_terminate(&self) -> io::Result<()> {
         self.kill()
     }
     fn reap(&self) -> io::Result<()> {
-        Err(io::Error::other("ProcessGroup::reap not supported — use ManagedProcess"))
+        Err(io::Error::other(
+            "ProcessGroup::reap not supported — use ManagedProcess",
+        ))
     }
 }
 
@@ -503,7 +513,9 @@ impl ProcessTerminator for ManagedProcess {
     }
 
     fn wait_timeout(&self, _timeout: Duration) -> io::Result<bool> {
-        Err(io::Error::other("wait_timeout requires &mut self via ManagedProcess::wait_child"))
+        Err(io::Error::other(
+            "wait_timeout requires &mut self via ManagedProcess::wait_child",
+        ))
     }
 
     fn force_terminate(&self) -> io::Result<()> {
@@ -511,7 +523,9 @@ impl ProcessTerminator for ManagedProcess {
     }
 
     fn reap(&self) -> io::Result<()> {
-        Err(io::Error::other("reap requires &mut self via ManagedProcess::reap_child"))
+        Err(io::Error::other(
+            "reap requires &mut self via ManagedProcess::reap_child",
+        ))
     }
 }
 
@@ -1190,7 +1204,9 @@ mod tests {
 
         // Use ProcessTerminator contract (P12-002): force_terminate
         let terminator: &dyn ProcessTerminator = &group;
-        terminator.force_terminate().expect("force_terminate via ProcessTerminator");
+        terminator
+            .force_terminate()
+            .expect("force_terminate via ProcessTerminator");
 
         let status = tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
             .await
@@ -1242,7 +1258,9 @@ mod tests {
 
         // Use ProcessTerminator contract (P12-002): force_terminate
         let terminator: &dyn ProcessTerminator = &group;
-        terminator.force_terminate().expect("force_terminate via ProcessTerminator");
+        terminator
+            .force_terminate()
+            .expect("force_terminate via ProcessTerminator");
 
         // Leader exits.
         tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
@@ -1281,7 +1299,9 @@ mod tests {
         group.attach(&child).expect("attach child to group");
 
         let terminator: &dyn ProcessTerminator = &group;
-        terminator.graceful_shutdown().expect("graceful_shutdown via ProcessTerminator");
+        terminator
+            .graceful_shutdown()
+            .expect("graceful_shutdown via ProcessTerminator");
 
         let status = tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
             .await
@@ -1316,7 +1336,10 @@ mod tests {
         // force_terminate on already-dead process must not error
         let terminator: &dyn ProcessTerminator = &group;
         let result = terminator.force_terminate();
-        assert!(result.is_ok(), "force_terminate on already-exited child must not error: {result:?}");
+        assert!(
+            result.is_ok(),
+            "force_terminate on already-exited child must not error: {result:?}"
+        );
     }
 
     /// [`ProcessGroupId`] rejects degenerate pids (0, 1, own group) at
@@ -1355,7 +1378,10 @@ mod tests {
     fn terminator_graceful_unattached_noop() {
         let group = ProcessGroup::new().expect("create group");
         let result = (&group as &dyn ProcessTerminator).graceful_shutdown();
-        assert!(result.is_ok(), "graceful_shutdown on unattached group must succeed");
+        assert!(
+            result.is_ok(),
+            "graceful_shutdown on unattached group must succeed"
+        );
     }
 
     /// ProcessTerminator::force_terminate on an unattached group is a no-op.
@@ -1363,7 +1389,10 @@ mod tests {
     fn terminator_force_unattached_noop() {
         let group = ProcessGroup::new().expect("create group");
         let result = (&group as &dyn ProcessTerminator).force_terminate();
-        assert!(result.is_ok(), "force_terminate on unattached group must succeed");
+        assert!(
+            result.is_ok(),
+            "force_terminate on unattached group must succeed"
+        );
     }
 
     /// ProcessTerminator::force_terminate terminates attached child (P12-003).
@@ -1390,7 +1419,10 @@ mod tests {
             .await
             .expect("child should exit within 5s")
             .expect("wait ok");
-        assert!(!status.success(), "terminated child should not exit successfully");
+        assert!(
+            !status.success(),
+            "terminated child should not exit successfully"
+        );
     }
 
     // --- ProcessTerminator contract tests with FakeProcessTerminator ---
@@ -1402,20 +1434,34 @@ mod tests {
 
         // 1. graceful shutdown
         t.graceful_shutdown().expect("graceful_shutdown");
-        assert!(fake.graceful_called.load(Ordering::SeqCst), "graceful_shutdown must be called");
+        assert!(
+            fake.graceful_called.load(Ordering::SeqCst),
+            "graceful_shutdown must be called"
+        );
 
         // 2. bounded wait
-        let exited = t.wait_timeout(Duration::from_secs(1)).expect("wait_timeout");
-        assert!(fake.wait_called.load(Ordering::SeqCst), "wait_timeout must be called");
+        let exited = t
+            .wait_timeout(Duration::from_secs(1))
+            .expect("wait_timeout");
+        assert!(
+            fake.wait_called.load(Ordering::SeqCst),
+            "wait_timeout must be called"
+        );
         assert!(exited, "fake returns exited=true");
 
         // 3. force terminate
         t.force_terminate().expect("force_terminate");
-        assert!(fake.force_called.load(Ordering::SeqCst), "force_terminate must be called");
+        assert!(
+            fake.force_called.load(Ordering::SeqCst),
+            "force_terminate must be called"
+        );
 
         // 4. reap
         t.reap().expect("reap");
-        assert!(fake.reap_called.load(Ordering::SeqCst), "reap must be called");
+        assert!(
+            fake.reap_called.load(Ordering::SeqCst),
+            "reap must be called"
+        );
     }
 
     #[test]
@@ -1424,7 +1470,9 @@ mod tests {
         fake.wait_result = false;
         let t: &dyn ProcessTerminator = &fake;
 
-        let exited = t.wait_timeout(Duration::from_secs(1)).expect("wait_timeout");
+        let exited = t
+            .wait_timeout(Duration::from_secs(1))
+            .expect("wait_timeout");
         assert!(!exited, "fake returns exited=false when wait_result=false");
     }
 
@@ -1437,7 +1485,9 @@ mod tests {
         assert!(fake.graceful_called.load(Ordering::SeqCst));
 
         // After graceful_shutdown, wait briefly
-        let _ = t.wait_timeout(Duration::from_millis(100)).expect("wait_timeout");
+        let _ = t
+            .wait_timeout(Duration::from_millis(100))
+            .expect("wait_timeout");
 
         // If not exited, force terminate
         t.force_terminate().expect("force_terminate");

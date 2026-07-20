@@ -416,13 +416,25 @@ mod tests {
     #[test]
     fn resolve_session_shell_returns_non_empty() {
         let shell = resolve_session_shell();
-        assert!(!shell.is_empty(), "resolve_session_shell must return a shell name");
+        assert!(
+            !shell.is_empty(),
+            "resolve_session_shell must return a shell name"
+        );
     }
 
     #[test]
     fn resolve_session_shell_returns_known_shell() {
         let shell = resolve_session_shell();
-        let known = ["bash", "zsh", "fish", "pwsh", "powershell", "cmd", "git-bash", "sh"];
+        let known = [
+            "bash",
+            "zsh",
+            "fish",
+            "pwsh",
+            "powershell",
+            "cmd",
+            "git-bash",
+            "sh",
+        ];
         assert!(
             known.contains(&shell.as_str()),
             "resolve_session_shell returned unknown shell: {shell}"

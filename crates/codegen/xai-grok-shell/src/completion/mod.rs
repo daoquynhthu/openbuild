@@ -13,7 +13,12 @@ pub struct Token {
 
 impl Token {
     pub fn new(value: String, start: usize, end: usize, quote: QuoteStyle) -> Self {
-        Self { value, start, end, quote }
+        Self {
+            value,
+            start,
+            end,
+            quote,
+        }
     }
 
     /// Re-compute `end` after `value` has been mutated.

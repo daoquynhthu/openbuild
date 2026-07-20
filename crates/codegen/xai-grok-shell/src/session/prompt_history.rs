@@ -88,8 +88,8 @@ pub fn truncate_if_needed(cwd: &str) -> io::Result<()> {
 
     let mut bytes = Vec::new();
     for entry in to_keep {
-        let mut line = serde_json::to_vec(entry)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let mut line =
+            serde_json::to_vec(entry).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
         line.push(b'\n');
         bytes.extend(line);
     }

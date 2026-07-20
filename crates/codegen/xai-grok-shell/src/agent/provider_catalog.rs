@@ -976,7 +976,9 @@ mod tests {
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
             let _ = axum::serve(listener, app)
-                .with_graceful_shutdown(async { shutdown_rx.await.ok(); })
+                .with_graceful_shutdown(async {
+                    shutdown_rx.await.ok();
+                })
                 .await;
         });
         let url = format!("http://{addr}/v1/models");
@@ -1104,15 +1106,15 @@ mod tests {
         let (shutdown_b, shutdown_rx_b) = tokio::sync::oneshot::channel::<()>();
         let app_b = axum::Router::new().route(
             "/v1/models",
-            axum::routing::get(|| async {
-                axum::Json(serde_json::json!({"data": []}))
-            }),
+            axum::routing::get(|| async { axum::Json(serde_json::json!({"data": []})) }),
         );
         let listener_b = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr_b = listener_b.local_addr().unwrap();
         tokio::spawn(async move {
             let _ = axum::serve(listener_b, app_b)
-                .with_graceful_shutdown(async { shutdown_rx_b.await.ok(); })
+                .with_graceful_shutdown(async {
+                    shutdown_rx_b.await.ok();
+                })
                 .await;
         });
 
@@ -1136,7 +1138,9 @@ mod tests {
         let addr_a = listener_a.local_addr().unwrap();
         tokio::spawn(async move {
             let _ = axum::serve(listener_a, app_a)
-                .with_graceful_shutdown(async { shutdown_rx_a.await.ok(); })
+                .with_graceful_shutdown(async {
+                    shutdown_rx_a.await.ok();
+                })
                 .await;
         });
 
@@ -1420,7 +1424,9 @@ mod tests {
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
             let _ = axum::serve(listener, app)
-                .with_graceful_shutdown(async { shutdown_rx.await.ok(); })
+                .with_graceful_shutdown(async {
+                    shutdown_rx.await.ok();
+                })
                 .await;
         });
         let base_url = format!("http://{addr}");
@@ -1432,24 +1438,29 @@ mod tests {
         defaults.base_url = base_url;
         defaults.model_list_endpoint = Some(url.clone());
 
-        svc.refresh_all(core::slice::from_ref(&pid), |p| {
-            if p == &ProviderId::new("test") {
-                Some((url.clone(), defaults.clone()))
-            } else {
-                None
-            }
-        }, Duration::from_secs(300)).await;
+        svc.refresh_all(
+            core::slice::from_ref(&pid),
+            |p| {
+                if p == &ProviderId::new("test") {
+                    Some((url.clone(), defaults.clone()))
+                } else {
+                    None
+                }
+            },
+            Duration::from_secs(300),
+        )
+        .await;
 
         // Wait briefly for the spawned task to complete
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         let snap = svc.snapshot().await;
         let entry = snap.providers.get(&pid).unwrap();
-        assert_eq!(entry.state, ProviderCatalogState::Failed("forbidden (HTTP 403)".into()));
         assert_eq!(
-            entry.error_summary.as_deref(),
-            Some("forbidden (HTTP 403)")
+            entry.state,
+            ProviderCatalogState::Failed("forbidden (HTTP 403)".into())
         );
+        assert_eq!(entry.error_summary.as_deref(), Some("forbidden (HTTP 403)"));
 
         let _ = shutdown_tx.send(());
     }
@@ -1545,7 +1556,10 @@ mod tests {
         );
 
         let restored: ModelCatalogSnapshot = serde_json::from_str(&json).unwrap();
-        let entry = restored.providers.get(&ProviderId::new("stale-provider")).unwrap();
+        let entry = restored
+            .providers
+            .get(&ProviderId::new("stale-provider"))
+            .unwrap();
         assert_eq!(entry.state, ProviderCatalogState::Stale);
         assert_eq!(
             entry.fetched_at,
@@ -1590,7 +1604,10 @@ mod tests {
         assert_eq!(loaded.catalog_revision, 7);
         let entry = loaded.providers.get(&ProviderId::new("test")).unwrap();
         assert_eq!(entry.state, ProviderCatalogState::Fresh);
-        assert_eq!(entry.fetched_at, Some(UNIX_EPOCH + Duration::from_secs(999)));
+        assert_eq!(
+            entry.fetched_at,
+            Some(UNIX_EPOCH + Duration::from_secs(999))
+        );
     }
 
     #[tokio::test]
@@ -1661,7 +1678,9 @@ mod tests {
         );
 
         // Old disk content must still reflect revision 1
-        let loaded = ProviderCatalogService::load_snapshot(&valid_path).await.unwrap();
+        let loaded = ProviderCatalogService::load_snapshot(&valid_path)
+            .await
+            .unwrap();
         assert_eq!(loaded.catalog_revision, 1, "disk revision must stay at 1");
         assert!(loaded.providers.contains_key(&ProviderId::new("original")));
     }

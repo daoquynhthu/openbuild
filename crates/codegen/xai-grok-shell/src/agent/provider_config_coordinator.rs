@@ -22,7 +22,8 @@ pub struct ProviderConfigPatch {
 /// Only the `[provider.<id>]` section is modified; all other sections,
 /// comments, and ordering are preserved.
 pub fn apply_toml_patch(config: &str, patch: &ProviderConfigPatch) -> Result<String, String> {
-    let mut doc: toml_edit::DocumentMut = config.parse()
+    let mut doc: toml_edit::DocumentMut = config
+        .parse()
         .map_err(|e| format!("TOML parse error: {e}"))?;
 
     let provider_table = doc
@@ -75,7 +76,9 @@ pub enum ConfigApplyError {
     FileChanged,
     #[error("failed to write: {0}")]
     WriteError(String),
-    #[error("consistency emergency: file modified by third party after atomic write — runtime state preserved, disk content preserved")]
+    #[error(
+        "consistency emergency: file modified by third party after atomic write — runtime state preserved, disk content preserved"
+    )]
     ConsistencyEmergency,
 }
 
@@ -119,15 +122,21 @@ impl ProviderConfigCoordinator {
     pub async fn apply_external_file(&self) -> Result<ConfigApplyOutcome, ConfigApplyError> {
         let _lock = self.update_lock.lock().await;
 
-        let content = std::fs::read_to_string(&self.config_path)
-            .map_err(|e| ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display())))?;
-        let raw_toml: toml::Value = toml::from_str(&content)
-            .map_err(|e| ConfigApplyError::ParseError(format!("{}: {e}", self.config_path.display())))?;
+        let content = std::fs::read_to_string(&self.config_path).map_err(|e| {
+            ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display()))
+        })?;
+        let raw_toml: toml::Value = toml::from_str(&content).map_err(|e| {
+            ConfigApplyError::ParseError(format!("{}: {e}", self.config_path.display()))
+        })?;
 
-        let parsed = xai_grok_provider::config::parse_provider_toml(&raw_toml)
-            .map_err(|diags| {
+        let parsed =
+            xai_grok_provider::config::parse_provider_toml(&raw_toml).map_err(|diags| {
                 ConfigApplyError::ParseError(
-                    diags.into_iter().map(|d| d.to_string()).collect::<Vec<_>>().join("; "),
+                    diags
+                        .into_iter()
+                        .map(|d| d.to_string())
+                        .collect::<Vec<_>>()
+                        .join("; "),
                 )
             })?;
 
@@ -138,7 +147,11 @@ impl ProviderConfigCoordinator {
         );
 
         if !diags.is_empty() {
-            let msg = diags.into_iter().map(|d| d.to_string()).collect::<Vec<_>>().join("; ");
+            let msg = diags
+                .into_iter()
+                .map(|d| d.to_string())
+                .collect::<Vec<_>>()
+                .join("; ");
             return Err(ConfigApplyError::ResolveError(msg));
         }
 
@@ -148,7 +161,9 @@ impl ProviderConfigCoordinator {
             .rebuild_from_resolved(&resolved)
             .map_err(|e| ConfigApplyError::CommitError(e.to_string()))?;
 
-        Ok(ConfigApplyOutcome::Applied { new_revision: revision })
+        Ok(ConfigApplyOutcome::Applied {
+            new_revision: revision,
+        })
     }
 
     /// Apply a typed patch and save atomically with compare-and-swap.
@@ -163,8 +178,9 @@ impl ProviderConfigCoordinator {
         let _lock = self.update_lock.lock().await;
 
         // Step 1: Read old bytes + compute SHA-256
-        let old_bytes = std::fs::read(&self.config_path)
-            .map_err(|e| ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display())))?;
+        let old_bytes = std::fs::read(&self.config_path).map_err(|e| {
+            ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display()))
+        })?;
         let old_sha = Sha256::digest(&old_bytes);
         let old_content = String::from_utf8(old_bytes)
             .map_err(|e| ConfigApplyError::ParseError(format!("file not valid UTF-8: {e}")))?;
@@ -177,10 +193,14 @@ impl ProviderConfigCoordinator {
         // Step 3: Parse/resolve candidate
         let candidate_toml: toml::Value = toml::from_str(&candidate_content)
             .map_err(|e| ConfigApplyError::ParseError(format!("candidate parse: {e}")))?;
-        let parsed = xai_grok_provider::config::parse_provider_toml(&candidate_toml)
-            .map_err(|diags| {
+        let parsed =
+            xai_grok_provider::config::parse_provider_toml(&candidate_toml).map_err(|diags| {
                 ConfigApplyError::ParseError(
-                    diags.into_iter().map(|d| d.to_string()).collect::<Vec<_>>().join("; "),
+                    diags
+                        .into_iter()
+                        .map(|d| d.to_string())
+                        .collect::<Vec<_>>()
+                        .join("; "),
                 )
             })?;
         let (resolved, diags) = xai_grok_provider::resolution::resolve_with_precedence(
@@ -189,7 +209,11 @@ impl ProviderConfigCoordinator {
             self.resolution_context.cli_overrides.clone(),
         );
         if !diags.is_empty() {
-            let msg = diags.into_iter().map(|d| d.to_string()).collect::<Vec<_>>().join("; ");
+            let msg = diags
+                .into_iter()
+                .map(|d| d.to_string())
+                .collect::<Vec<_>>()
+                .join("; ");
             return Err(ConfigApplyError::ResolveError(msg));
         }
 
@@ -205,8 +229,9 @@ impl ProviderConfigCoordinator {
         if let Some(ref hook) = *self.pre_cas_hook.lock().unwrap() {
             hook();
         }
-        let current_bytes = std::fs::read(&self.config_path)
-            .map_err(|e| ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display())))?;
+        let current_bytes = std::fs::read(&self.config_path).map_err(|e| {
+            ConfigApplyError::FileReadError(format!("{}: {e}", self.config_path.display()))
+        })?;
         let current_sha = Sha256::digest(&current_bytes);
         if current_sha != old_sha {
             return Err(ConfigApplyError::FileChanged);
@@ -268,7 +293,13 @@ mod tests {
 
     #[tokio::test]
     async fn save_patch_updates_runtime_identity_for_new_session() {
-        let dir = std::env::temp_dir().join(format!("save-patch-session-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "save-patch-session-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
@@ -311,7 +342,13 @@ mod tests {
 
     #[tokio::test]
     async fn apply_external_file_valid_config_increments_revision() {
-        let dir = std::env::temp_dir().join(format!("coord-test-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "coord-test-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n\n[provider.openai]\nenabled = true\nkind = \"openai_compatible\"\nprofile = \"openai\"\nbase_url = \"https://api.openai.com/v1\"\napi_key = \"sk-openai-test\"\n";
@@ -333,9 +370,16 @@ mod tests {
 
         let rev_before = rt.registry.snapshot().revision;
         let result = coord.apply_external_file().await;
-        assert!(result.is_ok(), "apply_external_file should succeed: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "apply_external_file should succeed: {:?}",
+            result
+        );
         let rev_after = rt.registry.snapshot().revision;
-        assert!(rev_after > rev_before, "revision should increase: {rev_after} > {rev_before}");
+        assert!(
+            rev_after > rev_before,
+            "revision should increase: {rev_after} > {rev_before}"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -364,11 +408,23 @@ base_url = "https://api.openai.com/v1"
         let result = apply_toml_patch(config, &patch).unwrap();
 
         // xai section should have new values
-        assert!(result.contains(r#"api_key = "new-key""#), "xai api_key should be updated");
-        assert!(result.contains("enabled = false"), "xai enabled should be updated");
+        assert!(
+            result.contains(r#"api_key = "new-key""#),
+            "xai api_key should be updated"
+        );
+        assert!(
+            result.contains("enabled = false"),
+            "xai enabled should be updated"
+        );
         // openai section should be unchanged
-        assert!(result.contains(r#"kind = "openai_compatible""#), "openai section should be preserved");
-        assert!(result.contains(r#"base_url = "https://api.openai.com/v1""#), "openai base_url should be preserved");
+        assert!(
+            result.contains(r#"kind = "openai_compatible""#),
+            "openai section should be preserved"
+        );
+        assert!(
+            result.contains(r#"base_url = "https://api.openai.com/v1""#),
+            "openai base_url should be preserved"
+        );
         // After patching, the document should still be valid TOML
         let parsed: toml::Value = toml::from_str(&result).unwrap();
         assert_eq!(
@@ -399,15 +455,30 @@ theme = "dark"
         };
         let result = apply_toml_patch(config, &patch).unwrap();
 
-        assert!(result.contains(r#"[models]"#), "models section should be preserved");
-        assert!(result.contains(r#"default = "xai/grok-latest""#), "models content should be preserved");
+        assert!(
+            result.contains(r#"[models]"#),
+            "models section should be preserved"
+        );
+        assert!(
+            result.contains(r#"default = "xai/grok-latest""#),
+            "models content should be preserved"
+        );
         assert!(result.contains(r#"[ui]"#), "ui section should be preserved");
-        assert!(result.contains(r#"theme = "dark""#), "ui content should be preserved");
+        assert!(
+            result.contains(r#"theme = "dark""#),
+            "ui content should be preserved"
+        );
     }
 
     #[tokio::test]
     async fn save_patch_happy_path() {
-        let dir = std::env::temp_dir().join(format!("save-patch-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "save-patch-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
@@ -438,14 +509,23 @@ theme = "dark"
 
         // File should contain the new key
         let saved = std::fs::read_to_string(&config_path).unwrap();
-        assert!(saved.contains(r#"api_key = "new-key""#), "file should contain new api_key");
+        assert!(
+            saved.contains(r#"api_key = "new-key""#),
+            "file should contain new api_key"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]
     async fn save_patch_resolve_diagnostics_returns_error() {
-        let dir = std::env::temp_dir().join(format!("save-patch-diag-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "save-patch-diag-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
@@ -486,7 +566,13 @@ theme = "dark"
 
     #[tokio::test]
     async fn save_patch_cas_conflict_detects_external_edit() {
-        let dir = std::env::temp_dir().join(format!("save-patch-cas-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "save-patch-cas-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
@@ -529,19 +615,34 @@ theme = "dark"
 
         // File should have the externally written key, not the patch key
         let file_after = std::fs::read_to_string(&config_path).unwrap();
-        assert!(file_after.contains(r#"api_key = "external-key""#), "external edit should be preserved");
-        assert!(!file_after.contains(r#"api_key = "new-key""#), "patch should NOT be written");
+        assert!(
+            file_after.contains(r#"api_key = "external-key""#),
+            "external edit should be preserved"
+        );
+        assert!(
+            !file_after.contains(r#"api_key = "new-key""#),
+            "patch should NOT be written"
+        );
 
         // Revision unchanged
         let rev_after = rt.registry.snapshot().revision;
-        assert_eq!(rev_after, rev_before, "revision must not change on CAS conflict");
+        assert_eq!(
+            rev_after, rev_before,
+            "revision must not change on CAS conflict"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]
     async fn save_patch_writer_failure_preserves_old_file_and_revision() {
-        let dir = std::env::temp_dir().join(format!("save-patch-write-fail-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "save-patch-write-fail-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
@@ -563,11 +664,15 @@ theme = "dark"
         // the directory with a regular file (preventing temp file creation).
         let dir_for_hook = dir.clone();
         let dir_for_cleanup = dir.clone();
-        coord.pre_cas_hook.lock().unwrap().replace(Box::new(move || {
-            // Remove the directory and replace it with a regular file
-            let _ = std::fs::remove_dir_all(&dir_for_hook);
-            let _ = std::fs::write(&dir_for_hook, "not a directory");
-        }));
+        coord
+            .pre_cas_hook
+            .lock()
+            .unwrap()
+            .replace(Box::new(move || {
+                // Remove the directory and replace it with a regular file
+                let _ = std::fs::remove_dir_all(&dir_for_hook);
+                let _ = std::fs::write(&dir_for_hook, "not a directory");
+            }));
 
         let mut fields = IndexMap::new();
         fields.insert("api_key".into(), toml_edit::Value::from("new-key"));
@@ -588,7 +693,13 @@ theme = "dark"
 
     #[tokio::test]
     async fn save_patch_commit_failure_rolls_back_file() {
-        let dir = std::env::temp_dir().join(format!("save-patch-rollback-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "save-patch-rollback-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
@@ -609,10 +720,14 @@ theme = "dark"
         // After prepare/CAS but before commit, increment the registry revision
         // to make commit reject the stale prepared batch.
         let rt_for_hook = Arc::clone(&rt);
-        coord.pre_commit_hook.lock().unwrap().replace(Box::new(move || {
-            // Bump the registry revision by doing an empty rebuild
-            let _ = rt_for_hook.registry.rebuild(&IndexMap::new());
-        }));
+        coord
+            .pre_commit_hook
+            .lock()
+            .unwrap()
+            .replace(Box::new(move || {
+                // Bump the registry revision by doing an empty rebuild
+                let _ = rt_for_hook.registry.rebuild(&IndexMap::new());
+            }));
 
         let mut fields = IndexMap::new();
         fields.insert("api_key".into(), toml_edit::Value::from("new-key"));
@@ -628,14 +743,23 @@ theme = "dark"
         // File should be rolled back to original content (the hook's write was
         // overwritten by rollback; the original file content should be restored)
         let file_after = std::fs::read_to_string(&config_path).unwrap();
-        assert_eq!(file_after, file_before, "file should be rolled back to original");
+        assert_eq!(
+            file_after, file_before,
+            "file should be rolled back to original"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]
     async fn concurrent_save_patches_serialize_and_increment_revision() {
-        let dir = std::env::temp_dir().join(format!("save-patch-concurrent-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "save-patch-concurrent-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
@@ -648,7 +772,11 @@ theme = "dark"
             legacy_migration: None,
             cli_overrides: None,
         });
-        let coord = Arc::new(ProviderConfigCoordinator::new(Arc::clone(&rt), config_path.clone(), ctx));
+        let coord = Arc::new(ProviderConfigCoordinator::new(
+            Arc::clone(&rt),
+            config_path.clone(),
+            ctx,
+        ));
 
         let rev_before = rt.registry.snapshot().revision;
 
@@ -662,14 +790,20 @@ theme = "dark"
         tokio::spawn(async move {
             let mut fields = IndexMap::new();
             fields.insert("api_key".into(), toml_edit::Value::from("key-a"));
-            let patch = ProviderConfigPatch { provider_id: "xai".into(), fields };
+            let patch = ProviderConfigPatch {
+                provider_id: "xai".into(),
+                fields,
+            };
             let _ = tx_a.send(coord_a.save_patch(&patch).await);
         });
 
         tokio::spawn(async move {
             let mut fields = IndexMap::new();
             fields.insert("api_key".into(), toml_edit::Value::from("key-b"));
-            let patch = ProviderConfigPatch { provider_id: "xai".into(), fields };
+            let patch = ProviderConfigPatch {
+                provider_id: "xai".into(),
+                fields,
+            };
             let _ = tx_b.send(coord_b.save_patch(&patch).await);
         });
 
@@ -680,18 +814,31 @@ theme = "dark"
         assert!(result_b.is_ok(), "second concurrent save should succeed");
 
         let rev_after = rt.registry.snapshot().revision;
-        assert_eq!(rev_after, rev_before + 2, "revision should increment by 2 for 2 saves");
+        assert_eq!(
+            rev_after,
+            rev_before + 2,
+            "revision should increment by 2 for 2 saves"
+        );
 
         // File content should reflect the last successful write (key-b wins)
         let file_content = std::fs::read_to_string(&config_path).unwrap();
-        assert!(file_content.contains(r#"api_key = "key-b""#), "last write should win");
+        assert!(
+            file_content.contains(r#"api_key = "key-b""#),
+            "last write should win"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]
     async fn apply_external_file_invalid_config_keeps_old_revision() {
-        let dir = std::env::temp_dir().join(format!("coord-test-invalid-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "coord-test-invalid-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         let _ = std::fs::create_dir_all(&dir);
         let config_path = dir.join("config.toml");
         let config_content = r#"
@@ -711,9 +858,15 @@ kind = "nonexistent"
 
         let rev_before = rt.registry.snapshot().revision;
         let result = coord.apply_external_file().await;
-        assert!(result.is_err(), "apply_external_file should fail for invalid config");
+        assert!(
+            result.is_err(),
+            "apply_external_file should fail for invalid config"
+        );
         let rev_after = rt.registry.snapshot().revision;
-        assert_eq!(rev_after, rev_before, "revision must not change on invalid config");
+        assert_eq!(
+            rev_after, rev_before,
+            "revision must not change on invalid config"
+        );
 
         let _ = std::fs::remove_dir_all(&dir);
     }
