@@ -1350,7 +1350,7 @@ mod replace_system_prompt_tests;
 #[cfg(test)]
 #[path = "acp_session_tests/support.rs"]
 mod support;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/usage_categories_tests.rs"]
 mod usage_categories_tests;
 #[cfg(all(test, not(target_os = "windows")))]
