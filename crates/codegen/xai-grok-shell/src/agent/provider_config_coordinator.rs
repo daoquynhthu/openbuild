@@ -267,6 +267,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn save_patch_updates_runtime_identity_for_new_session() {
+        let dir = std::env::temp_dir().join(format!("save-patch-session-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let _ = std::fs::create_dir_all(&dir);
+        let config_path = dir.join("config.toml");
+        let config_content = "[provider.xai]\nenabled = true\nkind = \"xai\"\nprofile = \"default\"\napi_key = \"sk-test\"\n";
+        std::fs::write(&config_path, config_content).unwrap();
+
+        let rt = Arc::new(ProviderRuntime::new());
+        xai_grok_provider::providers::register_all(&rt.registry);
+
+        let ctx = Arc::new(ProviderResolutionContext {
+            legacy_migration: None,
+            cli_overrides: None,
+        });
+        let coord = ProviderConfigCoordinator::new(Arc::clone(&rt), config_path.clone(), ctx);
+
+        let mut fields = IndexMap::new();
+        fields.insert("api_key".into(), toml_edit::Value::from("new-session-key"));
+        let patch = ProviderConfigPatch {
+            provider_id: "xai".into(),
+            fields,
+        };
+        let result = coord.save_patch(&patch).await;
+        assert!(result.is_ok(), "save_patch should succeed");
+
+        // After save, the runtime snapshot contains the provider (identity test)
+        let snapshot = rt.snapshot();
+        let xai_provider = snapshot
+            .providers
+            .get(&xai_grok_provider::types::ProviderId::new("xai"))
+            .expect("xai provider should be in snapshot after save_patch");
+        assert_eq!(xai_provider.id.0, "xai", "provider identity preserved");
+        // The new session loading from persisted config gets the same config
+        let persisted = std::fs::read_to_string(&config_path).unwrap();
+        assert!(
+            persisted.contains(r#"api_key = "new-session-key""#),
+            "persisted config should contain new api_key"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
     async fn apply_external_file_valid_config_increments_revision() {
         let dir = std::env::temp_dir().join(format!("coord-test-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
         let _ = std::fs::create_dir_all(&dir);
