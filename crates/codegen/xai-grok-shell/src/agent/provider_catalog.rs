@@ -739,7 +739,6 @@ pub fn save_catalog_snapshot(snapshot: &ModelCatalogSnapshot) -> Result<(), Stri
     let cache_dir = xai_grok_config::grok_home().join("cache");
     std::fs::create_dir_all(&cache_dir).map_err(|e| format!("failed to create cache dir: {e}"))?;
     let path = cache_dir.join("provider_catalog.json");
-    let tmp_path = cache_dir.join("provider_catalog.json.tmp");
 
     // Serialize only non-secret fields
     let serializable: Vec<SerializableEntry> = snapshot
@@ -763,8 +762,8 @@ pub fn save_catalog_snapshot(snapshot: &ModelCatalogSnapshot) -> Result<(), Stri
     let json = serde_json::to_string_pretty(&serializable)
         .map_err(|e| format!("serialization error: {e}"))?;
 
-    std::fs::write(&tmp_path, &json).map_err(|e| format!("failed to write tmp cache: {e}"))?;
-    std::fs::rename(&tmp_path, &path).map_err(|e| format!("failed to rename cache: {e}"))?;
+    xai_grok_paths::atomic_write::atomic_replace(&path, json.as_bytes())
+        .map_err(|e| format!("failed to atomically write catalog snapshot: {e}"))?;
 
     Ok(())
 }
