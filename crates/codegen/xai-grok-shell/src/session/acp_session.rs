@@ -550,7 +550,7 @@ impl PreparedToolCall {
             .unwrap_or(&self.tool_name)
     }
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 pub(crate) use crate::session::streaming_capture::STREAMING_CAPTURE_MAX_BYTES;
 pub(crate) use crate::session::streaming_capture::StreamingTurnCapture;
 /// Spawn-time metadata for a subagent, kept by `subagent_id` so the `SubagentStop` event
@@ -2017,27 +2017,27 @@ mod managed_gateway_tool_tests {
         assert!(!names.contains("slack__search"));
     }
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/goal/goal_backoff_tests.rs"]
 mod goal_backoff_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/goal/goal_classifier_e2e_tests.rs"]
 mod goal_classifier_e2e_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/goal/goal_planner_e2e_tests.rs"]
 mod goal_planner_e2e_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/goal/goal_strategist_e2e_tests.rs"]
 mod goal_strategist_e2e_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/goal/goal_summarizer_e2e_tests.rs"]
 mod goal_summarizer_e2e_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/interjection_tests.rs"]
 mod interjection_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/recap_display_only_tests.rs"]
 mod recap_display_only_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/reminder_policy_tests.rs"]
 mod reminder_policy_tests;

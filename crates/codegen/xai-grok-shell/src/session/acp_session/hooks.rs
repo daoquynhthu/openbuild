@@ -329,7 +329,7 @@ impl SessionActor {
     }
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

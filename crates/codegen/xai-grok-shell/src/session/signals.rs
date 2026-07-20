@@ -1861,7 +1861,7 @@ pub fn spawn_signals_actor_with_interval(sync_interval: Duration) -> SessionSign
     handle
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

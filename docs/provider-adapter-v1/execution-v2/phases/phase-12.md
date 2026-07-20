@@ -717,4 +717,62 @@
 - Failure class: 
 - First causal error: 
 - Fingerprint: 
+- Status: COMPLETED
+
+### P12-SC-foundation: shell completion foundation — separate logic from shell invocation
+
+- Description: extract tokenization, candidate ranking, replacement range, and
+  escaping into shell-independent helpers so they can be unit-tested without
+  a bash/GitBash/PS process. Add ShellCompletionAdapter trait.
+- Status: NOT_STARTED
+
+### P12-SC-001: tab tokenization isolated from shell type
+
+- Description: tokenize() helper that splits input into tokens shell-agnostically
+- Status: NOT_STARTED
+
+### P12-SC-002: candidate ranking isolated from shell type
+
+- Description: score() helper that ranks completion candidates
+- Status: NOT_STARTED
+
+### P12-SC-003: replacement range calculation isolated from shell type
+
+- Description: apply_replacement() helper for computing text replacement range
+- Status: NOT_STARTED
+
+### P12-SC-004: escaping isolated from shell type
+
+- Description: escape() helper for shell-agnostic argument escaping
+- Status: NOT_STARTED
+
+### P12-SC-PowerShell: PowerShell completion adapter
+
+- Description: implement ShellCompletionAdapter for PowerShell. Test spaces,
+  quotes, Unicode, path separators, drive/UNC paths. Use argument arrays.
+- Status: NOT_STARTED
+
+### P12-SC-cmd: cmd.exe completion adapter
+
+- Description: implement ShellCompletionAdapter for cmd.exe. Test argument
+  escaping, sequential operators, paths with spaces, Unicode, exit code.
+- Status: NOT_STARTED
+
+### P12-ACP-support: ACP support module foundation
+
+- Description: acp_session_tests/support.rs compiles on Windows. /tmp paths
+  fixed, OnceLock cfg removed, SamplerConfig fields added.
+- Status: COMPLETED
+
+### P12-ACPA-001: ACP Windows adapter — IPC process path test
+
+- Description: write Windows-specific adapter tests for ACP NamedPipe (Windows)
+  vs Unix socket paths, process handle vs process group id.
+- Status: NOT_STARTED
+
+### P12-PERSIST-001: session persistence — head_fields_tests
+
+- File: xai-grok-shell/src/session/persistence.rs:1061
+- Description: enable head_fields_tests on Windows by fixing platform
+  dependencies. Use P11 atomic/path API.
 - Status: NOT_STARTED

@@ -2118,7 +2118,7 @@ impl SessionActor {
         );
     }
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod inline_auto_compact_flow_tests {
     use super::super::support::*;
     use super::super::*;

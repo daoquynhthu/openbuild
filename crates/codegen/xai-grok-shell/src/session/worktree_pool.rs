@@ -1761,7 +1761,7 @@ async fn remove_worktree_registration(path: &Path) {
 
 // Tests
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use serial_test::serial;
