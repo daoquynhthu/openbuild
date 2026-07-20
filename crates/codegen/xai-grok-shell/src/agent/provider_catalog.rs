@@ -201,8 +201,7 @@ pub fn derive_model_list_url(
         .unwrap_or(defaults.base_url.as_str());
     let base = base.trim_end_matches('/');
     if defaults.model_list_format == xai_grok_provider::types::ModelListFormat::OllamaTags {
-        // Ollama has a separate /api/tags endpoint
-        "http://localhost:11434/api/tags".into()
+        format!("{base}/api/tags")
     } else {
         format!("{base}/models")
     }
@@ -1111,6 +1110,44 @@ mod tests {
             total >= 6,
             "all 6 providers must have been refreshed, got {total}"
         );
+    }
+
+    // P9-006: derive_model_list_url
+    #[test]
+    fn derive_ollama_url_uses_base_url_override() {
+        let mut defaults = dummy_defaults();
+        defaults.model_list_format = ModelListFormat::OllamaTags;
+        defaults.base_url = "http://localhost:11434".into();
+        let url = derive_model_list_url(&defaults, Some("http://ollama.corp:11434"));
+        assert_eq!(url, "http://ollama.corp:11434/api/tags");
+    }
+
+    #[test]
+    fn derive_ollama_url_falls_back_to_defaults() {
+        let mut defaults = dummy_defaults();
+        defaults.model_list_format = ModelListFormat::OllamaTags;
+        defaults.base_url = "http://localhost:11434".into();
+        let url = derive_model_list_url(&defaults, None);
+        assert_eq!(url, "http://localhost:11434/api/tags");
+    }
+
+    #[test]
+    fn derive_openai_url_uses_base_url_override() {
+        let mut defaults = dummy_defaults();
+        defaults.model_list_format = ModelListFormat::OpenAiCompatible;
+        defaults.base_url = "https://api.openai.com/v1".into();
+        let url = derive_model_list_url(&defaults, Some("https://custom.example.com"));
+        assert_eq!(url, "https://custom.example.com/models");
+    }
+
+    #[test]
+    fn derive_openai_url_uses_explicit_endpoint() {
+        let mut defaults = dummy_defaults();
+        defaults.model_list_format = ModelListFormat::OpenAiCompatible;
+        defaults.base_url = "https://api.openai.com/v1".into();
+        defaults.model_list_endpoint = Some("https://custom.example.com/my-models".into());
+        let url = derive_model_list_url(&defaults, None);
+        assert_eq!(url, "https://custom.example.com/my-models");
     }
 
     // P9-005: HTTP status classification
