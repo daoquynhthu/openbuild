@@ -607,9 +607,19 @@ impl ProviderCatalogService {
         parse: fn(&serde_json::Value, &ProviderDefaults) -> Vec<ModelEntryConfig>,
         defaults: &ProviderDefaults,
     ) -> Result<Vec<ModelEntryConfig>, String> {
-        let response = self
-            .http_client
-            .get(url)
+        // P9-006: apply provider auth and extra headers
+        let mut req = self.http_client.get(url);
+        for (k, v) in &defaults.extra_headers {
+            req = req.header(k.as_str(), v.as_str());
+        }
+        let auth_value = defaults
+            .env_key
+            .iter()
+            .find_map(|key| std::env::var(key).ok().filter(|v| !v.is_empty()));
+        if let Some(token) = auth_value {
+            req = req.header("Authorization", format!("Bearer {token}"));
+        }
+        let response = req
             .send()
             .await
             .map_err(|e| format!("HTTP request failed: {e}"))?;
