@@ -857,7 +857,9 @@ mod tests {
         let mut child = cmd.spawn().expect("spawn child");
         group.attach(&child).expect("attach child to group");
 
-        group.kill().expect("kill ProcessGroup");
+        // Use ProcessTerminator contract (P12-002): force_terminate
+        let terminator: &dyn ProcessTerminator = &group;
+        terminator.force_terminate().expect("force_terminate via ProcessTerminator");
 
         let status = tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
             .await
@@ -973,5 +975,32 @@ mod tests {
         let group = ProcessGroup::new().expect("create group");
         let result = (&group as &dyn ProcessTerminator).force_terminate();
         assert!(result.is_ok(), "force_terminate on unattached group must succeed");
+    }
+
+    /// ProcessTerminator::force_terminate terminates attached child (P12-003).
+    #[tokio::test]
+    async fn terminator_force_terminates_attached_child() {
+        let mut cmd = if cfg!(windows) {
+            let mut c = tokio::process::Command::new("cmd");
+            c.args(["/C", "ping", "-n", "60", "127.0.0.1"]);
+            c
+        } else {
+            let mut c = tokio::process::Command::new("sleep");
+            c.arg("60");
+            c
+        };
+        new_process_group(&mut cmd);
+        let mut group = ProcessGroup::new().expect("create ProcessGroup");
+        let mut child = cmd.spawn().expect("spawn child");
+        group.attach(&child).expect("attach child to group");
+
+        let terminator: &dyn ProcessTerminator = &group;
+        terminator.force_terminate().expect("force_terminate");
+
+        let status = tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
+            .await
+            .expect("child should exit within 5s")
+            .expect("wait ok");
+        assert!(!status.success(), "terminated child should not exit successfully");
     }
 }
