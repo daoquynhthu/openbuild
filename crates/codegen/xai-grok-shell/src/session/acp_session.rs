@@ -438,7 +438,7 @@ fn managed_gateway_error_to_tool_error(
         }
     }
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod managed_gateway_error_tests {
     use super::*;
     fn status_error(code: u16, message: &str) -> crate::session::managed_mcp::ManagedMcpFetchError {
