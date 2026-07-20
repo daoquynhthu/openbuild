@@ -1069,6 +1069,27 @@ mod tests {
     }
 
     // P9-002: HTTP client policy tests
+    #[test]
+    fn parser_selection_by_format_not_url() {
+        // OpenAI body should NOT be parseable by Ollama parser
+        let openai_body = serde_json::json!({"data": [{"id": "gpt-4"}]});
+        let defaults = dummy_defaults();
+        let ollama_result = parse_ollama_tags_models(&openai_body, &defaults);
+        assert!(
+            ollama_result.is_empty(),
+            "Ollama parser should not match OpenAI body"
+        );
+
+        // Ollama body should NOT be parseable by OpenAI parser
+        let ollama_body = serde_json::json!({"models": [{"name": "llama3"}]});
+        let openai_result =
+            parse_openai_compatible_provider_models(&ollama_body, "https://example.com/v1");
+        assert!(
+            openai_result.is_empty(),
+            "OpenAI parser should not match Ollama body"
+        );
+    }
+
     #[tokio::test]
     async fn redirect_cross_origin_is_rejected() {
         use std::error::Error;
