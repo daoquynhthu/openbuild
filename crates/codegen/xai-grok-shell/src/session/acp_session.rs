@@ -1544,7 +1544,7 @@ mod managed_gateway_descriptor_tests {
 #[cfg(test)]
 #[path = "acp_session_tests/fs_injection_regression_tests.rs"]
 mod fs_injection_regression_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/interjection_actor_tests.rs"]
 mod interjection_actor_tests;
 #[cfg(all(test, not(target_os = "windows")))]
