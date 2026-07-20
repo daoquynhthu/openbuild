@@ -46,6 +46,50 @@ mod process_scope;
 pub use process_scope::{ProcessScope, global_process_scope};
 
 // ---------------------------------------------------------------------------
+// ShutdownIntent — platform-agnostic shutdown signal (P12-004)
+// ---------------------------------------------------------------------------
+
+/// Platform-agnostic shutdown reason. The business layer receives
+/// [`ShutdownIntent`] and decides what to do; platform adapters translate
+/// Ctrl-C (Windows), console close (Windows), or SIGINT/SIGTERM (Unix) into
+/// this enum so shared session tests never depend on a specific signal API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShutdownIntent {
+    /// User pressed Ctrl-C (SIGINT on Unix, Ctrl-C on Windows).
+    Interrupt,
+    /// Termination request (SIGTERM on Unix, console close on Windows).
+    Terminate,
+    /// Console/tty was closed (Windows-specific: `CTRL_CLOSE_EVENT`).
+    ConsoleClose,
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    use super::*;
+
+    #[test]
+    fn shutdown_intent_equality() {
+        assert_eq!(ShutdownIntent::Interrupt, ShutdownIntent::Interrupt);
+        assert_eq!(ShutdownIntent::Terminate, ShutdownIntent::Terminate);
+        assert_eq!(ShutdownIntent::ConsoleClose, ShutdownIntent::ConsoleClose);
+        assert_ne!(ShutdownIntent::Interrupt, ShutdownIntent::Terminate);
+    }
+
+    #[test]
+    fn shutdown_intent_debug() {
+        let s = format!("{:?}", ShutdownIntent::Interrupt);
+        assert!(s.contains("Interrupt"), "Debug output should contain variant name: {s}");
+    }
+
+    #[test]
+    fn shutdown_intent_clone() {
+        let a = ShutdownIntent::Interrupt;
+        let b = a;
+        assert_eq!(a, b);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // TTY detach — pre_exec building block
 // ---------------------------------------------------------------------------
 
@@ -235,6 +279,7 @@ pub trait ProcessTerminator: Send + Sync {
 /// [`ProcessTerminator`] trait.
 pub struct ManagedProcess {
     group: ProcessGroup,
+    #[allow(dead_code)]
     child: tokio::process::Child,
 }
 
@@ -246,6 +291,7 @@ impl ManagedProcess {
 }
 
 impl ManagedProcess {
+    #[allow(dead_code)]
     async fn wait_child(&mut self, timeout: Duration) -> io::Result<bool> {
         match tokio::time::timeout(timeout, self.child.wait()).await {
             Ok(Ok(_)) => Ok(true),
@@ -254,6 +300,7 @@ impl ManagedProcess {
         }
     }
 
+    #[allow(dead_code)]
     async fn reap_child(&mut self) -> io::Result<()> {
         self.child.wait().await?;
         Ok(())
@@ -306,6 +353,12 @@ pub struct FakeProcessTerminator {
 
 impl FakeProcessTerminator {
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl Default for FakeProcessTerminator {
+    fn default() -> Self {
         Self {
             graceful_called: Arc::new(AtomicBool::new(false)),
             force_called: Arc::new(AtomicBool::new(false)),
@@ -1073,7 +1126,8 @@ mod tests {
             c.args(["/C", "ver"]);
             c
         } else {
-            let mut c = tokio::process::Command::new("true");
+            #[allow(clippy::let_and_return, clippy::unnecessary_mut_passed)]
+            let c = tokio::process::Command::new("true");
             c
         };
         new_process_group(&mut cmd);
