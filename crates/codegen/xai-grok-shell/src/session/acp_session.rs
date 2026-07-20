@@ -1774,73 +1774,73 @@ mod auth_error_no_retry_tests;
 /// Regression coverage for the auto-wake suppression sweep + shutdown
 /// drain. These exercise the helpers added to fix the trailing
 /// `<system-reminder>` chat history bug.
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/auto_wake_suppression_tests.rs"]
 mod auto_wake_suppression_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/between_turn_completion_tests.rs"]
 mod between_turn_completion_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/build_tool_parse_error_message_tests.rs"]
 mod build_tool_parse_error_message_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/cancel_running_task_tests.rs"]
 mod cancel_running_task_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/feedback_turn_lookup_tests.rs"]
 mod feedback_turn_lookup_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/goal/goal_reminder_subagent_rules_tests.rs"]
 mod goal_reminder_subagent_rules_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/idle_resume_tests.rs"]
 mod idle_resume_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/inline_auto_compact_flow_tests.rs"]
 mod inline_auto_compact_flow_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/laziness/laziness_debug_tests.rs"]
 mod laziness_debug_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/laziness/laziness_detector_tests.rs"]
 mod laziness_detector_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/laziness/laziness_integration_tests.rs"]
 mod laziness_integration_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/load_user_prompts_tests.rs"]
 mod load_user_prompts_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/media_gen_auth_retry_tests.rs"]
 mod media_gen_auth_retry_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/memory_config_tests.rs"]
 mod memory_config_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/parallel_dispatch_tests.rs"]
 mod parallel_dispatch_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/prompt_context_persistence_tests.rs"]
 mod prompt_context_persistence_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/reactive_managed_reauth_e2e_tests.rs"]
 mod reactive_managed_reauth_e2e_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/reactive_managed_reauth_tests.rs"]
 mod reactive_managed_reauth_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/session_thread_tests.rs"]
 mod session_thread_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/turn/turn_end_guard_tests.rs"]
 mod turn_end_guard_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/wait_for_mcp_prefix_tests.rs"]
 mod wait_for_mcp_prefix_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 #[path = "acp_session_tests/web_search_e2e_tests.rs"]
 mod web_search_e2e_tests;
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod managed_gateway_tool_tests {
     use super::*;
     use xai_grok_tools::types::output::{MCPOutput, ToolOutput};
