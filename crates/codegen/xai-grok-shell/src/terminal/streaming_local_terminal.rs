@@ -1185,7 +1185,7 @@ async fn run_output_collector(
     }
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::terminal::DEFAULT_OUTPUT_BYTE_LIMIT;
@@ -1250,6 +1250,7 @@ mod tests {
         assert!(statuses.contains(&acp::ToolCallStatus::Completed));
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_kill_returns_signal() {
         let session_id = format!("s1-kill-{}", std::process::id());
@@ -1462,6 +1463,7 @@ mod tests {
     /// Verify that process group kill still works after switching from
     /// ProcessGroup::leader() to ProcessSession. A parent shell spawns
     /// a background child; killing the terminal should reap both.
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_process_group_kill_with_session() {
         tokio::task::LocalSet::new()
