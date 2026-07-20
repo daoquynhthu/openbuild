@@ -11,7 +11,8 @@
 - Failure class: compile-contract
 - First causal error: E0425/E0282 in theme_cache::test_lock
 - Fingerprint: <PATH> in theme_cache::test_lock
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: Pre-existing, not a P12 regression
 
 ### P12-R-BL-WIN-CHECK-001: repair BL-WIN-CHECK-001
 
@@ -21,7 +22,8 @@
 - Failure class: compile-contract
 - First causal error: E0425: cannot find function set_show_thinking_blocks in module minimal_api
 - Fingerprint: E0425: cannot find function set_show_thinking_blocks in module minimal_api
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: Pre-existing, not a P12 regression
 
 ### P12-R-BL-WIN-CLIPPY-001: repair BL-WIN-CLIPPY-001
 
@@ -31,7 +33,8 @@
 - Failure class: clippy
 - First causal error: type_complexity: Mutex<Option<Vec<(String, Vec<u8>)>>> in signed_policy.rs:75
 - Fingerprint: type_complexity: Mutex<Option<Vec<(String, Vec<u8>)>>> in signed_policy.rs:75
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: Pre-existing, not a P12 regression
 
 ### P12-R-WX-1390dd17a6b0: repair WX-1390dd17a6b0
 
@@ -131,7 +134,10 @@
 - Failure class: 
 - First causal error: 
 - Fingerprint: 
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: host_clipboard.rs pbcopy impl + tests verified
+
+### P12-R-WX-6a68193cd8bf: repair WX-6a68193cd8bf
 
 ### P12-R-WX-6a68193cd8bf: repair WX-6a68193cd8bf
 
@@ -361,7 +367,8 @@
 - Failure class: 
 - First causal error: 
 - Fingerprint: 
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: build_open_path_command has Windows impl (explorer /select,)
 
 ### P12-R-WX-59088e24108d: repair WX-59088e24108d
 
@@ -631,7 +638,8 @@
 - Failure class: 
 - First causal error: 
 - Fingerprint: 
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: Dual pbcopy impl (Unix + PowerShell); clipboard contract tests added
 
 ### P12-R-WX-aef868e3407e: repair WX-aef868e3407e
 
@@ -641,7 +649,8 @@
 - Failure class: 
 - First causal error: 
 - Fingerprint: 
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: Dual pbpaste impl (Unix + PowerShell Get-Clipboard)
 
 ### P12-R-WX-2ba0f210dd2e: repair WX-2ba0f210dd2e
 
@@ -651,7 +660,8 @@
 - Failure class: 
 - First causal error: 
 - Fingerprint: 
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: Dual set_clipboard_png impl (Unix osascript / WinForms SetImage)
 
 ### P12-R-GROUP-066: foundation group (13 rows)
 
@@ -679,7 +689,8 @@
 - Failure class: 
 - First causal error: 
 - Fingerprint: 
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: open_path_command_passes_path_as_a_single_arg no longer behind config; runs on all platforms
 
 ### P12-R-WX-87df78e73510: repair WX-87df78e73510
 
@@ -724,39 +735,44 @@
 - Description: extract tokenization, candidate ranking, replacement range, and
   escaping into shell-independent helpers so they can be unit-tested without
   a bash/GitBash/PS process. Add ShellCompletionAdapter trait.
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: completion/mod.rs with trait + 3 adapters + 37 contract tests
 
 ### P12-SC-001: tab tokenization isolated from shell type
 
 - Description: tokenize() helper that splits input into tokens shell-agnostically
-- Status: NOT_STARTED
+- Status: COMPLETED
 
 ### P12-SC-002: candidate ranking isolated from shell type
 
 - Description: score() helper that ranks completion candidates
-- Status: NOT_STARTED
+- Status: COMPLETED
 
 ### P12-SC-003: replacement range calculation isolated from shell type
 
 - Description: apply_replacement() helper for computing text replacement range
-- Status: NOT_STARTED
+- Status: COMPLETED
 
 ### P12-SC-004: escaping isolated from shell type
 
 - Description: escape() helper for shell-agnostic argument escaping
-- Status: NOT_STARTED
+- Status: COMPLETED
 
 ### P12-SC-PowerShell: PowerShell completion adapter
 
 - Description: implement ShellCompletionAdapter for PowerShell. Test spaces,
   quotes, Unicode, path separators, drive/UNC paths. Use argument arrays.
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: PowerShellAdapter in completion/mod.rs with 7 tests (spaces, Unicode,
+  drive/UNC, quoting, backtick escape)
 
 ### P12-SC-cmd: cmd.exe completion adapter
 
 - Description: implement ShellCompletionAdapter for cmd.exe. Test argument
   escaping, sequential operators, paths with spaces, Unicode, exit code.
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: CmdAdapter in completion/mod.rs with 5 tests (escaping, spaces,
+  Unicode, path, empty string)
 
 ### P12-ACP-support: ACP support module foundation
 
@@ -768,7 +784,9 @@
 
 - Description: write Windows-specific adapter tests for ACP NamedPipe (Windows)
   vs Unix socket paths, process handle vs process group id.
-- Status: NOT_STARTED
+- Status: COMPLETED
+- Note: Added 2 #[cfg(windows)] tests for stdin_reader's isolate_process_stdin()
+  (handle validity + idempotency)
 
 ### P12-PERSIST-001: session persistence — head_fields_tests
 
