@@ -11,8 +11,9 @@
 
 ## Status Summary
 - CLOSED: 8 (host_clipboard ×3, link_opener ×3, osc8 ×2 — Windows impl verified)
-- CLASSIFIED: 95 (needs implementation or step 3 verification)
-- RESOLVED_IN_P11_P12_13: 63 (cfg guard removed from source — re-scan confirmed)
+- CONFIRMED: 32 (step 3 verified — production code works cross-platform, test fixtures use Unix paths)
+- RESOLVED_IN_P11_P12_13: 84 (cfg guard removed from source — re-scan confirmed)
+- REMAINING_NEED_FIX: 42 (MISSING_WINDOWS_IMPLEMENTATION or PLATFORM_ADAPTER_CONTRACT — needs implementation)
 
 | ID | file | line | symbol/test | cfg expression | classification | owner phase | repair task | rationale evidence | status |
 |---|---|---|---|---|---|---|---|---|---|

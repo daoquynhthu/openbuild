@@ -121,6 +121,30 @@ PLATFORM_ADAPTER_CONTRACT. They need per-entry step 3 verification
 |--------|-------------|------------|
 | CROSS_PLATFORM_CONTRACT | 116 | 114 |
 | MISSING_WINDOWS_IMPLEMENTATION | 12 | 14 |
-| CLOSED | 0 | 6 |
-| Misclassification found | — | 2 (osc8) |
-| Step 3 verification needed | 0 | ~50 |
+| CLOSED | 0 | 8 |
+| Misclassification found | — | 2 (osc8) ✅ fixed |
+| Step 3 verification | 0 | 32 → all CONFIRMED CROSS_PLATFORM |
+| cfg already removed by P11-13 | 0 | 84 entries — ledger needs status update |
+
+## 7. Step 3 Verification Results (32 entries, 2026-07-20)
+
+All 32 remaining `CROSS_PLATFORM_CONTRACT` entries were individually verified.
+**Result:** All 32 are correctly classified. The `#[cfg(not(target_os = "windows"))]` guards
+exist only because test fixtures use Unix-style hardcoded paths (`/Users/alice/...`,
+`/tmp`). The production code under test is fully cross-platform in all 32 cases.
+
+### Verification by Group
+
+| Group | Entries | Verdict | Evidence |
+|-------|---------|---------|----------|
+| Pager scrollback render tests | 9 | ✅ CONFIRMED | Production `render_with_scratch()` is cross-platform. Tests use `/Users/...` fixture paths. |
+| Pager overlay/view tests | 3 | ✅ CONFIRMED | Production overlay rendering is cross-platform. Fixture paths. |
+| Pager dispatch/event tests | 4 | ✅ CONFIRMED | Production dispatch logic is cross-platform. Fixture data. |
+| Tools implementations | 14 | ✅ CONFIRMED | All use cross-platform crates (`ignore`, `globset`, `which`, `tempfile`, `reqwest`). |
+| Other (tool_paths, key, registry, resource) | 2 | ✅ CONFIRMED | `tool_paths` operates on strings; `key.rs` has paired `#[cfg(windows)]` impl. |
+
+### Ledger Status Action Required
+
+- **84 entries**: source code no longer has cfg guard (removed by Phase 11-13). Ledger status should be updated to `RESOLVED`.
+- **32 entries**: verified correct. Ledger status should remain `CLASSIFIED` unless/until test fixtures are updated.
+- **2 entries (osc8)**: reclassified to `MISSING_WINDOWS_IMPLEMENTATION` and FIXED in P13-002.
