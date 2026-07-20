@@ -104,8 +104,8 @@ pub struct ConfigReloader {
     experimental_memory: bool,
     /// Whether --no-memory was passed at startup. Persists across config reloads.
     no_memory: bool,
-    /// Optional provider runtime for transactional config rebuild.
-    provider_runtime: Option<Arc<ProviderRuntime>>,
+    /// Provider config coordinator for transactional config rebuild.
+    coordinator: Option<Arc<crate::agent::provider_config_coordinator::ProviderConfigCoordinator>>,
 }
 
 impl ConfigReloader {
@@ -118,7 +118,7 @@ impl ConfigReloader {
         config_update_tx: mpsc::UnboundedSender<ConfigUpdate>,
         experimental_memory: bool,
         no_memory: bool,
-        provider_runtime: Option<Arc<ProviderRuntime>>,
+        coordinator: Option<Arc<crate::agent::provider_config_coordinator::ProviderConfigCoordinator>>,
     ) -> Self {
         Self {
             last_auth_key_hash: initial_auth_key_hash,
@@ -130,7 +130,7 @@ impl ConfigReloader {
             config_update_tx,
             experimental_memory,
             no_memory,
-            provider_runtime,
+            coordinator,
         }
     }
 
@@ -421,51 +421,21 @@ impl ConfigReloader {
         let new_provider_table = new_global.get("provider");
         if old_provider_table != new_provider_table {
             info!("provider config change detected");
-            if let Some(ref runtime) = self.provider_runtime {
-                // Step 1: Parse new configs (already done by reloader)
-                // Step 2: Resolve provider configs from TOML
-                let toml_parsed = xai_grok_provider::config::parse_provider_toml(&new_global);
-                let (toml_configs, _diags) = match toml_parsed {
-                    Ok(p) => {
-                        let v = p
-                            .entries
-                            .into_iter()
-                            .map(|(id, cfg)| (id.0, cfg))
-                            .collect::<Vec<_>>();
-                        (v, vec![])
-                    }
-                    Err(d) => (vec![], d),
-                };
-                let mut config_map: IndexMap<ProviderId, ProviderConfig> = IndexMap::new();
-                for (id_str, cfg) in toml_configs {
-                    let pid = ProviderId::new(id_str);
-                    config_map.insert(pid, cfg);
-                }
-                // Step 4: Validate existing model references against candidate
-                if let Err(e) = validate_provider_model_refs(&new_global, &config_map) {
-                    error!(
-                        error = %e,
-                        "provider model reference validation failed — \
-                         retaining previous configuration"
-                    );
-                    return Ok(());
-                }
-                // Step 3+5: Build candidate snapshot and atomically publish
-                // (ProviderRuntime::rebuild is async — spawn a blocking task)
-                let runtime = runtime.clone();
+            if let Some(ref coordinator) = self.coordinator {
                 let tx = self.config_update_tx.clone();
+                let coord = Arc::clone(coordinator);
                 tokio::task::spawn(async move {
-                    match runtime.rebuild(&config_map).await {
-                        Ok(rev) => {
-                            info!(revision = rev, "provider registry rebuilt");
-                            // Step 6-7: Signal catalog refresh and model rebuild
+                    match coord.apply_external_file().await {
+                        Ok(outcome) => {
+                            if let crate::agent::provider_config_coordinator::ConfigApplyOutcome::Applied { new_revision } = outcome {
+                                info!(revision = new_revision, "provider registry rebuilt via coordinator");
+                            }
                             let _ = tx.send(ConfigUpdate::ProvidersChanged);
                         }
                         Err(e) => {
-                            // Step 8: On failure, retain previous state
                             error!(
                                 error = %e,
-                                "provider rebuild failed — retaining previous configuration"
+                                "coordinator apply failed — retaining previous configuration"
                             );
                         }
                     }

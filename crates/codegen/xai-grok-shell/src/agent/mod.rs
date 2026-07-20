@@ -14,6 +14,7 @@ pub mod models;
 pub mod mvp_agent;
 pub mod provider_bootstrap;
 pub mod provider_catalog;
+pub mod provider_config_coordinator;
 pub mod provider_resolution;
 pub mod provider_runtime;
 pub(crate) mod proxy;

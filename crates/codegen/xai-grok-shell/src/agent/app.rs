@@ -1466,6 +1466,22 @@ pub async fn run_leader(
                 }
                 let initial_config = crate::config::load_effective_config()
                     .unwrap_or_else(|_| toml::Value::Table(toml::map::Map::new()));
+                let coordinator = agent_config.provider_runtime.as_ref().map(|rt| {
+                    let config_path = grok_home::grok_home().join("config.toml");
+                    let resolution_context = Arc::new(
+                        crate::agent::provider_config_coordinator::ProviderResolutionContext {
+                            legacy_migration: None,
+                            cli_overrides: None,
+                        },
+                    );
+                    Arc::new(
+                        crate::agent::provider_config_coordinator::ProviderConfigCoordinator::new(
+                            Arc::clone(rt),
+                            config_path,
+                            resolution_context,
+                        ),
+                    )
+                });
                 let reloader = crate::config::reloader::ConfigReloader::new(
                     grok_home::grok_home(),
                     initial_auth_key_hash,
@@ -1475,7 +1491,7 @@ pub async fn run_leader(
                     config_update_tx,
                     agent_config.cli_experimental_memory,
                     agent_config.cli_no_memory,
-                    agent_config.provider_runtime.clone(), // identity injected for P6-010
+                    coordinator,
                 );
                 tokio::spawn(reloader.run(events_rx, cancel_clone.clone()));
                 Some(watcher)
