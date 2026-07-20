@@ -1,12 +1,18 @@
 # Windows Test Exclusion Ledger
 # Generated: classify_exclusions.py (classification run)
-# Total: 166 entries
+# Re-audited: 2026-07-20 (Phase 2 redo — systematic decision tree verification)
+# Total: 166 entries (68 remaining in code, 98 resolved by Phase 11-12)
 
 ## Classification Summary
-- CROSS_PLATFORM_CONTRACT: 116
-- MISSING_WINDOWS_IMPLEMENTATION: 12
-- PLATFORM_ADAPTER_CONTRACT: 37
-- UNIX_ONLY_FEATURE: 1
+- CROSS_PLATFORM_CONTRACT: 114 (was 116; 2 reclassified → MISSING_WINDOWS_IMPLEMENTATION)
+- MISSING_WINDOWS_IMPLEMENTATION: 14 (was 12; +2 from osc8)
+- PLATFORM_ADAPTER_CONTRACT: 37 (unchanged)
+- UNIX_ONLY_FEATURE: 1 (unchanged)
+
+## Status Summary
+- CLOSED: 6 (host_clipboard ×3, link_opener ×3 — Windows impl verified)
+- CLASSIFIED: 97 (needs implementation or step 3 verification)
+- RESOLVED_IN_P11_P12: 63 (cfg guard removed from source — re-scan confirmed)
 
 | ID | file | line | symbol/test | cfg expression | classification | owner phase | repair task | rationale evidence | status |
 |---|---|---|---|---|---|---|---|---|---|
@@ -26,8 +32,8 @@
 | WX-65b2447d2225 | codegen/xai-grok-pager-render/src/prompt_images.rs | 2604 | quoted_path_with_internal_backslash_escape | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-65b2447d2225 | Prompt image path parsing — tests use Unix paths, need platform fixture | CLASSIFIED |
 | WX-28210254fa3b | codegen/xai-grok-pager-render/src/prompt_images.rs | 2622 | file_url_with_localhost_host | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-28210254fa3b | Prompt image path parsing — tests use Unix paths, need platform fixture | CLASSIFIED |
 | WX-e117e63be834 | codegen/xai-grok-pager-render/src/prompt_images.rs | 2940 | dropped_path_percent_encoded_question_round_trips | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-e117e63be834 | Prompt image path parsing — tests use Unix paths, need platform fixture | CLASSIFIED |
-| WX-8c252e126d78 | codegen/xai-grok-pager-render/src/render/osc8.rs | 169 | tool_path_file_url_with_home | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-8c252e126d78 | Link rendering tests use Unix paths, need platform fixture | CLASSIFIED |
-| WX-92e46d827d1e | codegen/xai-grok-pager-render/src/render/osc8.rs | 526 | tests | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-92e46d827d1e | Link rendering tests use Unix paths, need platform fixture | CLASSIFIED |
+| WX-8c252e126d78 | codegen/xai-grok-pager-render/src/render/osc8.rs | 169 | tool_path_file_url_with_home | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P13 | P13-R-WX-8c252e126d78 | Phase 2 redo: scan_lines_for_url_overlays regex only matches Unix /abs/paths; Windows C:\ UNC never detected. Production scanner needs Windows path regex before tests can run | CLASSIFIED |
+| WX-92e46d827d1e | codegen/xai-grok-pager-render/src/render/osc8.rs | 526 | tests | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P13 | P13-R-WX-92e46d827d1e | Phase 2 redo: mod tests gated because production scanner (scan_lines_for_url_overlays) cannot detect Windows paths — same root cause as WX-8c252e126d78 | CLASSIFIED |
 | WX-f0b780e12b95 | codegen/xai-grok-pager-render/src/render/tool_paths.rs | 213 | tests | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P11 | P11-R-WX-f0b780e12b95 | Link rendering tests use Unix paths, need platform fixture | CLASSIFIED |
 | WX-1093270461cd | codegen/xai-grok-pager/src/app/agent_view/selection.rs | 1459 | active_child_copy_uses_child_scrollback_cwd | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-1093270461cd | Pager tests for `active_child_copy_uses_child_scrollback_cwd` — platform adapter needed | CLASSIFIED |
 | WX-0b0512bee54d | codegen/xai-grok-pager/src/app/agent_view/shell_completion.rs | 186 | history_item | not(target_os = "windows") | PLATFORM_ADAPTER_CONTRACT | P13 | P13-R-WX-0b0512bee54d | Shell completion tests for `history_item` — completion logic adapter needed | CLASSIFIED |

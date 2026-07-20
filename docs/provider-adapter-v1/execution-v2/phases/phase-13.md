@@ -425,7 +425,7 @@
 
 ### P13-R-GROUP-043: foundation group (14 rows)
 
-- WX-92e46d827d1e: 
+- WX-92e46d827d1e: osc8.rs mod tests — scanner missing Windows path regex
 - WX-c381c305c402: 
 - WX-35540a896440: 
 - WX-2b4d701d3e40: 
@@ -439,8 +439,10 @@
 - WX-3696eb0db290: 
 - WX-e55894161814: 
 - WX-6728599de8d6: 
-- Fingerprint: 
+- Fingerprint: scan_lines_for_url_overlays regex only matches Unix /abs/paths
 - Status: NOT_STARTED
+- Phase 2 redo: WX-92e46d827d1e reclassified CROSS_PLATFORM → MISSING_WINDOWS_IMPLEMENTATION
+  Other rows likely same root cause; verify per-entry in P13 execution.
 
 ### P13-R-WX-cacfede9f117: repair WX-cacfede9f117
 
@@ -461,6 +463,9 @@
 - First causal error: 
 - Fingerprint: 
 - Status: NOT_STARTED
+- Phase 2 redo: reclassified from CROSS_PLATFORM_CONTRACT to MISSING_WINDOWS_IMPLEMENTATION
+- Root cause: scan_lines_for_url_overlays regex only matches Unix /abs/paths
+- Fix: add Windows path regex (C:\... and \\UNC\...) to file_path_regex() in osc8.rs
 
 ### P13-R-WX-aeecacf22636: repair WX-aeecacf22636
 
