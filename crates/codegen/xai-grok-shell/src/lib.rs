@@ -17,6 +17,7 @@ pub mod bundle;
 pub mod claude_import;
 pub mod claude_import_state;
 pub mod cli_models;
+pub mod completion;
 pub mod config;
 pub use xai_grok_shell_base::cpu_profile;
 pub use xai_grok_shell_base::env;
