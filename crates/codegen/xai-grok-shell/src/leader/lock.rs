@@ -326,7 +326,7 @@ impl Drop for LeaderLock {
     }
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
@@ -338,6 +338,7 @@ mod tests {
         )
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn override_socket_path_wins_over_ws_url_derivation() {
         let root = Path::new("/home/u/.grok");
@@ -356,6 +357,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn no_override_falls_back_to_ws_url_derivation() {
         let root = Path::new("/home/u/.grok");
@@ -367,6 +369,7 @@ mod tests {
         assert_eq!(resolve_lock_path(None, root, ""), root.join("leader.lock"));
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn lock_path_for_socket_swaps_extension() {
         assert_eq!(
@@ -399,6 +402,7 @@ mod tests {
         assert!(!lock2.try_acquire().unwrap()); // Should return false, not error
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn write_and_read_pid() {
         let temp = TempDir::new().unwrap();
