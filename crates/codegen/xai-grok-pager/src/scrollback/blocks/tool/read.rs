@@ -620,7 +620,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn header_link_url_is_absolute_for_collapsed_and_expanded() {
         let abs = "/Users/me/project/src/main.rs";

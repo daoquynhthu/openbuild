@@ -1637,7 +1637,6 @@ mod tests {
         assert!(header.selection_text.is_none());
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn header_link_url_is_absolute_file_url_for_all_surfaces() {
         let abs = "/Users/me/project/src/foo.rs";

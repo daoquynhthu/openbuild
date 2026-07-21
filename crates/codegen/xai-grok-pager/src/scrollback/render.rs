@@ -1015,6 +1015,36 @@ mod tests {
         ScrollbackEntry::new(RenderBlock::agent_message(text))
     }
 
+    /// Build a `file://` URL from a Unix-style path, matching what the
+    /// production scanner produces on each platform.
+    fn file_url(unix_path: &str) -> String {
+        // Ensure the path is absolute — prepend `/` if needed — so
+        // `url::Url::from_file_path` succeeds on all platforms.
+        let abs = if unix_path.starts_with('/') {
+            unix_path.to_string()
+        } else {
+            format!("/{unix_path}")
+        };
+        let path = std::path::PathBuf::from(&abs);
+        #[cfg(windows)]
+        let converted = {
+            let s = path.to_string_lossy();
+            if (s.starts_with('/') || s.starts_with('\\')) && !s.contains(':') {
+                let drive = std::env::current_dir()
+                    .map(|c| c.to_string_lossy()[..2].to_string())
+                    .unwrap_or_else(|_| "C:".into());
+                std::path::PathBuf::from(format!("{drive}{}", path.display()))
+            } else {
+                path
+            }
+        };
+        #[cfg(not(windows))]
+        let converted = path;
+        url::Url::from_file_path(&converted)
+            .expect("valid file URL")
+            .to_string()
+    }
+
     /// Compute EntryLayoutInfo for a set of entries (heights + gap_after).
     /// Uses default appearance. Gap rule: all stubs are groupable+expanded → gap=1.
     fn compute_layouts(
@@ -2534,7 +2564,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn markdown_wrapped_session_media_path_fully_linkified() {
         // Regression: imagine-tool prose whose long session path soft-wraps
@@ -2550,7 +2579,7 @@ mod tests {
         let viewport = Rect::new(0, 0, 40, 20);
         let result = render_with_scratch(&entries, viewport, 0, None);
 
-        let expected_url = url::Url::from_file_path(path).unwrap();
+        let expected_url = file_url(path);
         let path_links: Vec<_> = result
             .link_overlay
             .links()
@@ -2619,7 +2648,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn collapsed_block_header_file_path_is_scanned() {
         // File paths in the command header line should be linkified even
@@ -2640,9 +2668,11 @@ mod tests {
             .iter()
             .map(|l| &*l.url)
             .collect();
+        let expected_prefix = file_url("Users/foo/project")
+            .trim_end_matches("project")
+            .to_string();
         assert!(
-            urls.iter()
-                .any(|u| u.starts_with("file:///Users/foo/project")),
+            urls.iter().any(|u| u.starts_with(&expected_prefix)),
             "file path in collapsed header should be linkified, got: {urls:?}"
         );
     }
@@ -2736,7 +2766,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn collapse_header_entry_does_not_leak_links_but_visible_group_entries_do() {
         // Smallest shape the truncation fold can produce for an expanded
@@ -2816,16 +2845,16 @@ mod tests {
             .iter()
             .map(|l| (l.screen_row, l.url.to_string()))
             .collect();
+        let hidden_url = file_url("Users/foo/hidden");
+        let visible_url = file_url("Users/foo/visible/file.txt");
         assert!(
-            links
-                .iter()
-                .all(|(_, url)| !url.contains("/Users/foo/hidden")),
+            links.iter().all(|(_, url)| !url.contains(&hidden_url)),
             "collapse-header entry's hidden line must not be linkified, got: {links:?}"
         );
         assert!(
             links
                 .iter()
-                .any(|(row, url)| *row == 1 && url.contains("/Users/foo/visible/file.txt")),
+                .any(|(row, url)| *row == 1 && url.contains(&visible_url)),
             "visible group entry below the collapse header must still be linkified, got: {links:?}"
         );
     }
@@ -3413,7 +3442,6 @@ mod tests {
 
     /// Collapsed Edit header: after bullet prepend the path is span 2, and the
     /// OSC8 overlay must cover path cols only (not the verb or bullet).
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn tool_header_link_url_overlay_covers_path_after_bullet() {
         use crate::appearance::ToolBullet;
@@ -3512,7 +3540,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn long_read_header_link_is_clipped_to_offset_content_area() {
         let path = "/outside/a/very/long/path/that/is/clipped/main.rs";
@@ -3533,7 +3560,6 @@ mod tests {
         assert_eq!(link.col_end, content.right());
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn explicit_tool_link_clips_before_u16_conversion() {
         let path = format!("/outside/{}.rs", "x".repeat(70_000));

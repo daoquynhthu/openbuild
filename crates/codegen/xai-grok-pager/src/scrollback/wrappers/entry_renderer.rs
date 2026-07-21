@@ -1481,7 +1481,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn background_block_gutter_uses_block_background_fill() {
         // Background blocks own the gutter via the existing full-area fill, so
