@@ -87,7 +87,6 @@ fn gh_available() -> bool {
     which::which("gh").is_ok()
 }
 
-#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,12 +109,17 @@ mod tests {
         // No gh in this dir yet.
         assert!(which::which_in("gh", Some(dir.path()), dir.path()).is_err());
         // Create an executable `gh`.
-        let gh = dir.path().join("gh");
-        std::fs::write(&gh, b"#!/bin/sh\nexit 0\n").unwrap();
-        #[cfg(unix)]
+        #[cfg(not(target_os = "windows"))]
         {
+            let gh = dir.path().join("gh");
+            std::fs::write(&gh, b"#!/bin/sh\nexit 0\n").unwrap();
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&gh, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let gh = dir.path().join("gh.bat");
+            std::fs::write(&gh, b"@exit /b 0\n").unwrap();
         }
         assert!(which::which_in("gh", Some(dir.path()), dir.path()).is_ok());
     }
