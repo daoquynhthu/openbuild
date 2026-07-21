@@ -148,15 +148,25 @@
 - P13-03: Cross-platform audit — no `canonicalize` usage, path operations use cross-platform utilities
 - P13-06: Migration docs — `docs/provider-adapter-v1/migration.md`, `troubleshooting.md`, `rollback.md`
 
+### V2 Closure Plan (execution-v2 phase-13.md)
+
+- P13-004: scrollback render tests — removed cfg guard from 9 functions in render.rs/edit.rs/read.rs/entry_renderer.rs. All 65 scrollback + 3 bolt-on tests pass on Windows. Commit `b29cc35`
+- P13-005: shortcuts/help/overlay — removed cfg guard from btw_overlay.rs:733. All 15 btw_overlay + 64 shortcuts_help tests pass. Commit `19f80d3`
+- P13-006/007: opencode grep + glob — removed cfg guards. All 129 opencode tests pass.
+- P13-008: opencode bash — removed cfg guard from bash/mod.rs:458, fixed `output_file_path` test with `PathBuf::join`. All 23 bash tests pass. Commit `b96e8eb`
+- P13-009: skills/resources/tool-registry — removed cfg guards from 3 files (discovery.rs:924, resources.rs:915, registry/types.rs:2158). Fixed 5 display-cwd path assertions with `#[cfg(windows)]`, removed `deploy_app` (unimplemented stub). All 40+66+55 tests pass. Commit `b7b1f1d`
+
 ### Current State
 - `cargo check --workspace`: passes
-- `cargo clippy -p xai-grok-pager -p xai-grok-pager-bin --all-targets -- -D warnings`: passes
-- `cargo test -p xai-grok-provider`: 104 passed, 0 failed
+- `cargo clippy -p xai-grok-tools -- -D warnings`: passes
+- `cargo test -p xai-grok-tools --lib`: 2147 passed, 0 failed
+- Ledger RESOLVED_IN_P11_P12_13: 100 (up from 97)
 
 ### Remaining
-- P13-02: Fast PR vs full release gate separation (workflow-level)
-- P13-04: Packaging smoke test (CI-specific)
-- P13-05: Optional live smoke workflow (CI-specific, requires secrets)
+- P13-002: Fast PR vs full release gate separation (workflow-level)
+- P13-004: Packaging smoke test (CI-specific) — possibly superseded by V2 plan
+- P13-005: Optional live smoke workflow (CI-specific, requires secrets) — possibly superseded by V2 plan
+- V2 plan Phase 13 remaining: P13-R-GROUP-043 (14 rows, PARTIALLY_COMPLETED), P13-R-GROUP-048 (3 rows, PARTIALLY_COMPLETED)
 
 ## Provider Adapter V1 — Phase 14: Cleanup, Final Static Audit, and Release Candidate Cut — 2026-07-18
 
