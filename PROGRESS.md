@@ -391,7 +391,18 @@ All 12 P13 tasks resolved:
 - Replaced manual field mapping (auth_scheme, api_backend, extra_headers, etc.) with the `From` impl
 - Added `SensitiveHeaderMap::from_index_map()` convenience constructor
 - Removed `ApiBackend` import (no longer needed)
-- All 201 provider tests pass ✅
+- All provider unit + integration tests pass ✅
+
+### P8-010A: Bearer precedence and format through prepare_sampler_config
+- Added 7 new `#[tokio::test]` end-to-end tests in `prepared.rs`:
+  - `bearer_request_override_produces_authorization_header`
+  - `bearer_provider_inline_falls_back_correctly`
+  - `bearer_env_reader_used_when_inline_absent`
+  - `bearer_precedence_request_override_beats_inline`
+  - `header_merge_preserves_static_headers`
+  - `request_overrides_win_over_static_headers`
+  - `prepare_sampler_config_preserves_protocol_and_url`
+- All 12 prepared::tests pass ✅
 
 ### P8-007: Header merge layer ordering fix
 - Fixed `prepare_sampler_config`: Layer 3 (provider extra) no longer incorrectly duplicates Layer 2 (route static)

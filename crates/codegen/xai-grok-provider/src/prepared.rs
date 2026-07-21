@@ -507,4 +507,128 @@ mod tests {
             .as_str()
             .contains("127.0.0.1:1/v1/chat/completions"));
     }
+
+    // ── P8-010B: Header auth (x-api-key / Anthropic-style) ──
+
+    #[tokio::test]
+    async fn header_auth_request_override_produces_correct_header() {
+        let val = SecretValue::new("sk-ant-override".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::header(
+            "x-api-key",
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("must resolve with request override");
+        let header = config.headers.inner().get("x-api-key");
+        assert!(
+            header.is_some(),
+            "must produce x-api-key header for Header auth"
+        );
+        assert_eq!(header.unwrap().to_str().unwrap(), "sk-ant-override");
+    }
+
+    #[tokio::test]
+    async fn header_auth_provider_inline_falls_back_correctly() {
+        let inline = SecretValue::new("sk-ant-inline".to_string());
+        let ctx = RequestCredential {
+            request_override: None,
+            model_inline: None,
+            provider_inline: Some(&inline),
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::header(
+            "x-api-key",
+            vec![CredentialCandidate::ProviderInline],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("must resolve with provider inline");
+        let header = config.headers.inner().get("x-api-key").unwrap();
+        assert_eq!(header.to_str().unwrap(), "sk-ant-inline");
+    }
+
+    #[tokio::test]
+    async fn header_auth_precedence_request_override_beats_inline() {
+        let request_val = SecretValue::new("sk-ant-request".to_string());
+        let inline_val = SecretValue::new("sk-ant-inline".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&request_val),
+            model_inline: Some(&inline_val),
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::header(
+            "x-api-key",
+            vec![
+                CredentialCandidate::RequestOverride,
+                CredentialCandidate::ModelInline,
+            ],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("must resolve with request override");
+        let header = config.headers.inner().get("x-api-key").unwrap();
+        assert_eq!(
+            header.to_str().unwrap(),
+            "sk-ant-request",
+            "request override must beat inline for header auth"
+        );
+    }
+
+    // ── P8-010D: OpenCode/Ollama no-auth path ──
+
+    #[tokio::test]
+    async fn no_auth_produces_no_authorization_header() {
+        let execution = dummy_execution(AuthPolicy::None);
+        let config = prepare_sampler_config(&execution, &empty_credential(), &[])
+            .await
+            .expect("AuthPolicy::None must always succeed");
+        let headers = config.headers.inner();
+        let has_auth = headers.contains_key("authorization");
+        assert!(!has_auth, "no-auth must not produce Authorization header");
+    }
+
+    #[tokio::test]
+    async fn no_auth_with_request_override_still_omits_auth() {
+        let val = SecretValue::new("sk-should-not-appear".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::None);
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("AuthPolicy::None must always succeed");
+        let has_auth = config.headers.inner().contains_key("authorization");
+        assert!(
+            !has_auth,
+            "no-auth must ignore credential candidates"
+        );
+    }
+
+    #[tokio::test]
+    async fn no_auth_static_headers_are_still_preserved() {
+        let mut execution = dummy_execution(AuthPolicy::None);
+        execution.static_headers.insert(
+            "x-custom".to_string(),
+            "custom-value".to_string(),
+        );
+        let config = prepare_sampler_config(&execution, &empty_credential(), &[])
+            .await
+            .expect("AuthPolicy::None must succeed");
+        let custom = config.headers.inner().get("x-custom");
+        assert_eq!(custom.unwrap().to_str().unwrap(), "custom-value");
+    }
 }
