@@ -385,7 +385,8 @@ mod tests {
             &mut out,
         );
 
-        assert!(out.contains("src/main.rs"), "transcript: {out:?}");
+        let normalized = out.replace('\\', "/");
+        assert!(normalized.contains("src/main.rs"), "transcript: {out:?}");
         assert!(
             !out.contains("/alternate/worktree"),
             "session prefix should be elided: {out:?}"

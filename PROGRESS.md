@@ -336,7 +336,7 @@
 - `prompt.rs:3274,3356` — reverted (bash-specific suggestions)
 - `marketplace/git.rs:390` — reverted (Windows file locking difference)
 
-### P13-011..018: Shell crate — remove cfg guards from 8 Group B files
+### P13-011..019: Shell crate — remove cfg guards from all 10 Group B files
 - P13-011: `active_sessions.rs` — module guard removed, 4/5 pass; 1 `#[cfg(not(windows))]` (LockFileEx WouldBlock)
 - P13-012: `leader/lock.rs` — module guard removed, 15/15 pass; 4 `#[cfg(not(windows))]` (Unix paths + read-while-locked)
 - P13-013: `auth/manager/lock.rs` — module guard removed, 5/7 pass; 2 `#[cfg(not(windows))]` (read-while-locked)
@@ -345,7 +345,10 @@
 - P13-016: `extensions/bundle.rs` — module guard removed, 31/32 pass; 1 `#[cfg(not(windows))]` (`HOME` env)
 - P13-017: `config/mod.rs` + `config/tests.rs` — module guard removed, 498/500 pass; 2 `#[cfg(not(windows))]` (`HOME` + test-interaction)
 - P13-018: `subagent/tests` — module guard removed, `tmp_abs_path()` helper replaces 25 `/tmp` refs
+- P13-019: `extensions/suggest/file_provider.rs` + `path_provider.rs` — module guards removed, 16 suggest_* tests gated per-test (production `suggest()` returns empty on Windows per POSIX-only shell_token); fixed `scan_deduplicates_across_dirs` path separator; all 173 suggest tests pass
+- P13-020: xai-grok-pager-minimal - BL-WIN-TEST-001/CHECK-001 already resolved by prior cfg guard work (compile); fixed 2 test failures (`transcript_uses_owning_session_cwd_for_tool_paths`, `committed_renderer_uses_owning_session_cwd_for_tool_paths`) with path-separator normalization; 61/61 tests pass
 
 ### Key results
 - RESOLVED_IN_P11_P12_13 = 106 entries (from 104)
 - CROSS_PLATFORM_CONTRACT entries reduced to ~9 still in code
+- Phase 13 BL cards all verifiably resolved (BL-WIN-TEST-001, BL-WIN-CHECK-001 compile on Windows; BL-WIN-CLIPPY-001 passes clippy -D warnings)

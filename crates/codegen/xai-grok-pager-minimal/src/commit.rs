@@ -1016,7 +1016,8 @@ mod tests {
                 text.push_str(buf[(x, y)].symbol());
             }
         }
-        assert!(text.contains("src/main.rs"), "rendered text: {text:?}");
+        let normalized = text.replace('\\', "/");
+        assert!(normalized.contains("src/main.rs"), "rendered text: {text:?}");
         assert!(
             !text.contains("/alternate/worktree"),
             "session prefix should be elided: {text:?}"
