@@ -337,4 +337,174 @@ mod tests {
         let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
         assert!(result.is_ok(), "optional header with no candidates must succeed");
     }
+
+    // ── P8-010A: Bearer credential precedence and format ──
+    //
+    // Full chain through prepare_sampler_config: auth resolution → header merge → final config.
+
+    #[tokio::test]
+    async fn bearer_request_override_produces_authorization_header() {
+        let val = SecretValue::new("sk-override".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("must resolve with request override");
+        let auth = config.headers.inner().get("authorization");
+        assert!(auth.is_some(), "must produce authorization header");
+        assert_eq!(
+            auth.unwrap().to_str().unwrap(),
+            "Bearer sk-override",
+            "must format Bearer token correctly"
+        );
+    }
+
+    #[tokio::test]
+    async fn bearer_provider_inline_falls_back_correctly() {
+        let inline = SecretValue::new("sk-inline".to_string());
+        let ctx = RequestCredential {
+            request_override: None,
+            model_inline: None,
+            provider_inline: Some(&inline),
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::ProviderInline],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("must resolve with provider inline");
+        let auth = config.headers.inner().get("authorization").unwrap();
+        assert_eq!(auth.to_str().unwrap(), "Bearer sk-inline");
+    }
+
+    #[tokio::test]
+    async fn bearer_env_reader_used_when_inline_absent() {
+        let ctx = RequestCredential {
+            request_override: None,
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|k| {
+                assert_eq!(k, "MY_API_KEY");
+                Ok(Some(SecretValue::new("sk-from-env".to_string())))
+            },
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::ProviderEnvironment(vec![
+                "MY_API_KEY".into(),
+            ])],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("must resolve from env reader");
+        let auth = config.headers.inner().get("authorization").unwrap();
+        assert_eq!(auth.to_str().unwrap(), "Bearer sk-from-env");
+    }
+
+    #[tokio::test]
+    async fn bearer_precedence_request_override_beats_inline() {
+        let request_val = SecretValue::new("sk-request".to_string());
+        let inline_val = SecretValue::new("sk-inline".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&request_val),
+            model_inline: Some(&inline_val),
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![
+                CredentialCandidate::RequestOverride,
+                CredentialCandidate::ModelInline,
+            ],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("must resolve with request override");
+        let auth = config.headers.inner().get("authorization").unwrap();
+        assert_eq!(
+            auth.to_str().unwrap(),
+            "Bearer sk-request",
+            "request override must beat inline"
+        );
+    }
+
+    #[tokio::test]
+    async fn header_merge_preserves_static_headers() {
+        let mut execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+        execution.static_headers.insert(
+            "x-custom".to_string(),
+            "custom-value".to_string(),
+        );
+
+        let val = SecretValue::new("sk-key".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let config = result.expect("must succeed");
+        let custom = config.headers.inner().get("x-custom");
+        assert!(custom.is_some(), "static headers must be preserved");
+        assert_eq!(custom.unwrap().to_str().unwrap(), "custom-value");
+    }
+
+    #[tokio::test]
+    async fn request_overrides_win_over_static_headers() {
+        let mut execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+        execution.static_headers.insert(
+            "x-custom".to_string(),
+            "original".to_string(),
+        );
+
+        let val = SecretValue::new("sk-key".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let result = prepare_sampler_config(&execution, &ctx, &[("x-custom", "override")]).await;
+        let config = result.expect("must succeed");
+        let custom = config.headers.inner().get("x-custom");
+        assert_eq!(
+            custom.unwrap().to_str().unwrap(),
+            "override",
+            "request overrides must win over static headers"
+        );
+    }
+
+    #[tokio::test]
+    async fn prepare_sampler_config_preserves_protocol_and_url() {
+        let execution = dummy_execution(AuthPolicy::None);
+        let config = prepare_sampler_config(&execution, &empty_credential(), &[])
+            .await
+            .expect("no-auth must succeed");
+        assert_eq!(config.protocol_id, "chat_completions");
+        assert_eq!(config.model_id.0, "test-model");
+        assert!(config
+            .request_url
+            .as_str()
+            .contains("127.0.0.1:1/v1/chat/completions"));
+    }
 }
