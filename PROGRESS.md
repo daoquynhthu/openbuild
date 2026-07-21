@@ -309,3 +309,33 @@
 - Workspace classifier tests cross-platform ✅
 - Watcher + atomic_replace contract test added ✅
 - A-16 atomic write (catalog + session + config paths) ✅
+
+## Phase 13: Pager Render, Images, Tools, Remaining Platform Closure — 2026-07-21
+
+### P13-009: Remove cfg guards from discovery, resources, registry
+- `discovery.rs:924` — removed cfg guard, normalized with `replace('\\', '/')` — 40 pass
+- `resources.rs:915` — removed cfg guard, `#[cfg(windows)]` expected values for display-cwd rewrite — 66 pass
+- `registry/types.rs:2158` — removed cfg guard + removed `deploy_app` (unimplemented stub) — 55 pass
+
+### P13-009b: Enter plan mode, grep (grok_build), read_file
+- `enter_plan_mode`, `grep/mod.rs`, `read_file/mod.rs` — removed cfg guards, fixed path assertions + IsADirectory test — 33+35+89 pass
+
+### P13-009c: Web_fetch error/client/overflow
+- Removed cfg guards from error.rs, client.rs, overflow.rs — fixed `which_in` test (`gh.bat`) and path assertions — 4+30+85 pass
+
+### P13-009d: Bash, foreign_sessions, image_describe, event_loop
+- `bash/mod.rs` — 141/144 pass (3 ignored — real bash commands)
+- `foreign_sessions` — path normalisation
+- `image_describe` — path normalisation
+- `event_loop.rs:3116` — NOT_AN_EXCLUSION (production code)
+- 2418 lib tests pass
+
+### P13-010: tool_paths + gitignore
+- `tool_paths.rs` — removed cfg guard, normalized path assertions with `.replace('\\', "/")` — 15/15 pass
+- `gitignore.rs` — removed cfg guard, tempdir-based absolute path — 20/20 pass
+- `prompt.rs:3274,3356` — reverted (bash-specific suggestions)
+- `marketplace/git.rs:390` — reverted (Windows file locking difference)
+
+### Key results
+- RESOLVED_IN_P11_P12_13 = 106 entries (from 104)
+- CROSS_PLATFORM_CONTRACT entries reduced to ~9 still in code
