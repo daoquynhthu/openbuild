@@ -455,7 +455,7 @@ impl xai_tool_runtime::Tool for BashTool {
     }
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::tool_metadata::test_ctx;
@@ -788,9 +788,14 @@ mod tests {
         .await
         .unwrap();
 
+        let expected = PathBuf::from("/sessions/abc")
+            .join("terminal")
+            .join("my-call-42.log")
+            .to_string_lossy()
+            .to_string();
         match result {
             BashToolOutput::Bash(bash) => {
-                assert_eq!(bash.output_file, "/sessions/abc/terminal/my-call-42.log");
+                assert_eq!(bash.output_file, expected);
             }
             BashToolOutput::BackgroundTaskStarted(_) => panic!("Expected foreground output"),
         }
