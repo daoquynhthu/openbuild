@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 use xai_grok_provider::auth::AuthPolicy;
+use xai_grok_provider::headers::SensitiveHeaderMap;
 use xai_grok_provider::model::{GenerationOptions, ModelLimits};
+use xai_grok_provider::prepared::PreparedSamplerConfig;
 use xai_grok_provider::registry::RegistrySnapshot;
 use xai_grok_provider::resolution::ResolvedModelExecution;
 use xai_grok_provider::route::Route;
 use xai_grok_provider::types::{ModelId, ProviderId, RouteId};
 use xai_grok_sampler::SamplerConfig;
-use xai_grok_sampling_types::ApiBackend;
 
 use super::config::ModelEntry;
 use super::provider_catalog::ModelCatalogSnapshot;
@@ -205,46 +206,37 @@ pub fn resolve_model_execution(
 
 /// Temporary migration adapter: converts `ResolvedModelExecution` → `SamplerConfig`.
 ///
-/// This function does NOT resolve credentials or populate auth headers.
-/// It only transfers fields that are safe to expose without request-time
-/// credential resolution. Auth header construction is Phase 8's job.
+/// Delegates to `PreparedSamplerConfig::into()` for field mapping (P8-011).
+/// This function is deprecated; new callers should use
+/// `resolve_model_execution → prepare_sampler_config → PreparedSamplerConfig → Sampler`.
 #[deprecated(note = "removed in P8-011; use prepare_sampler_config instead")]
 pub fn execution_to_unprepared_sampler_config_for_migration(
     execution: &ResolvedModelExecution,
     api_key: Option<&str>,
 ) -> SamplerConfig {
-    let auth_scheme = match &execution.auth_policy {
-        AuthPolicy::None => xai_grok_sampler::AuthScheme::None,
-        AuthPolicy::Bearer { .. } => xai_grok_sampler::AuthScheme::Bearer,
-        AuthPolicy::Header { name, .. } if name == "x-api-key" => {
-            xai_grok_sampler::AuthScheme::XApiKey
+    let mut headers = execution.static_headers.clone();
+    if let Some(key) = api_key {
+        let (name, value) = match &execution.auth_policy {
+            AuthPolicy::Bearer { .. } => ("authorization", format!("Bearer {key}")),
+            AuthPolicy::Header { name, .. } => (name.as_str(), key.to_string()),
+            AuthPolicy::None => ("", String::new()),
+        };
+        if !name.is_empty() {
+            headers.insert(name.to_string(), value);
         }
-        _ => xai_grok_sampler::AuthScheme::Bearer,
-    };
-    let protocol_str: &str = &execution.protocol_id.0;
-    let api_backend = match protocol_str {
-        "chat_completions" => ApiBackend::ChatCompletions,
-        "responses" => ApiBackend::Responses,
-        "messages" => ApiBackend::Messages,
-        _ => ApiBackend::ChatCompletions,
-    };
-    SamplerConfig {
-        api_key: api_key.map(|s| s.to_string()),
-        model: execution.model_id.0.clone(),
-        base_url: execution.request_url.to_string(),
-        request_url: Some(execution.request_url.to_string()),
-        endpoint_path: None,
-        endpoint_query: None,
-        api_backend,
-        protocol_id: Some(execution.protocol_id.to_string().into()),
-        auth_scheme,
-        extra_headers: execution.static_headers.clone(),
-        context_window: execution.limits.context.unwrap_or(0),
-        max_completion_tokens: execution.generation.max_tokens,
-        temperature: execution.generation.temperature,
-        top_p: execution.generation.top_p,
-        ..Default::default()
     }
+
+    let prepared = PreparedSamplerConfig {
+        provider_id: execution.provider_id.clone(),
+        route_id: execution.route_id.clone(),
+        protocol_id: execution.protocol_id.to_string(),
+        request_url: execution.request_url.clone(),
+        headers: SensitiveHeaderMap::from_index_map(&headers),
+        model_id: execution.model_id.clone(),
+        generation: execution.generation.clone(),
+        limits: execution.limits.clone(),
+    };
+    prepared.into()
 }
 
 /// A legacy (unqualified) xAI model reference that can be migrated to

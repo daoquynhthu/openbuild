@@ -15,6 +15,21 @@ impl SensitiveHeaderMap {
         Self(headers)
     }
 
+    /// Convenience conversion from `IndexMap<String, String>`.
+    /// Converts each entry into an HTTP header, silently skipping invalid entries.
+    pub fn from_index_map(map: &indexmap::IndexMap<String, String>) -> Self {
+        let mut headers = http::HeaderMap::new();
+        for (name, value) in map {
+            if let (Ok(n), Ok(v)) = (
+                http::HeaderName::from_bytes(name.as_bytes()),
+                http::HeaderValue::from_str(value),
+            ) {
+                headers.insert(n, v);
+            }
+        }
+        Self(headers)
+    }
+
     pub fn into_inner(self) -> http::HeaderMap {
         self.0
     }

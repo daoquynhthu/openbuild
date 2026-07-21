@@ -386,6 +386,13 @@ All 12 P13 tasks resolved:
 - `cargo test -p xai-grok-provider -- prepared::tests`: 5 passed ✅
 - `cargo test -p xai-grok-provider --test request_inspection`: 8 passed ✅
 
+### P8-011: Delegate migration function through PreparedSamplerConfig
+- `execution_to_unprepared_sampler_config_for_migration` now constructs `PreparedSamplerConfig` with auth headers merged, then calls `.into()` → `SamplerConfig`
+- Replaced manual field mapping (auth_scheme, api_backend, extra_headers, etc.) with the `From` impl
+- Added `SensitiveHeaderMap::from_index_map()` convenience constructor
+- Removed `ApiBackend` import (no longer needed)
+- All 201 provider tests pass ✅
+
 ### P8-007: Header merge layer ordering fix
 - Fixed `prepare_sampler_config`: Layer 3 (provider extra) no longer incorrectly duplicates Layer 2 (route static)
 - Uses explicit empty `IndexMap` for provider extra with comment explaining it's reserved for future separate tracking
