@@ -108,7 +108,7 @@
 - Fix: removed #[cfg(not(target_os = "windows"))] guard. Test uses Unix path
   /Users/test/... which is matched by the Unix regex pattern in the scanner
   (works on all platforms). All 15 btw_overlay tests pass on Windows.
-- Commit: <pending>
+- Commit: 19f80d3
 
 ### P13-R-WX-e117e63be834: repair WX-e117e63be834
 
