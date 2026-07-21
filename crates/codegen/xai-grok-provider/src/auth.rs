@@ -60,16 +60,6 @@ pub enum CredentialCandidate {
     Session(SessionKind),
 }
 
-/// Declarative credential source (legacy — replaced by `CredentialCandidate`).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CredentialSource {
-    Inline,
-    Environment(Vec<String>),
-    Session,
-    Public,
-    None,
-}
-
 /// Declarative authentication policy for a route (P8).
 /// Provider constructors set this; the shell runtime resolves it.
 #[derive(Debug, Clone)]
@@ -125,41 +115,41 @@ impl AuthPolicy {
     }
 }
 
-/// Resolved credential with the key material.
-/// This struct is deliberately NOT Clone/Debug to avoid leaking secrets.
-#[derive(Default)]
-pub struct ResolvedCredential {
-    pub value: Option<String>,
-}
-
-/// Resolve a CredentialSource at runtime.
-/// Returns an error if required credentials are missing.
-pub fn resolve_credential_source(
-    source: &CredentialSource,
-) -> Result<ResolvedCredential, ProviderError> {
-    match source {
-        CredentialSource::Inline => Ok(ResolvedCredential { value: None }),
-        CredentialSource::Environment(keys) => {
-            for key in keys {
-                if let Ok(val) = std::env::var(key)
-                    && !val.is_empty()
-                {
-                    return Ok(ResolvedCredential { value: Some(val) });
+/// Resolve candidates using the legacy env/session-only path (no request context).
+/// Candidates that require request-time values (RequestOverride, Inline) are skipped.
+fn resolve_candidates_legacy(
+    candidates: &[CredentialCandidate],
+) -> Option<String> {
+    for candidate in candidates {
+        match candidate {
+            CredentialCandidate::RequestOverride
+            | CredentialCandidate::ModelInline
+            | CredentialCandidate::ProviderInline => continue,
+            CredentialCandidate::ModelEnvironment(keys)
+            | CredentialCandidate::ProviderEnvironment(keys)
+            | CredentialCandidate::BuiltinEnvironment(keys) => {
+                for key in keys {
+                    if let Ok(val) = std::env::var(key)
+                        && !val.is_empty()
+                    {
+                        return Some(val);
+                    }
                 }
             }
-            Ok(ResolvedCredential { value: None })
+            CredentialCandidate::Session(_) => {
+                if let Ok(val) = std::env::var("XAI_SESSION_TOKEN")
+                    && !val.is_empty()
+                {
+                    return Some(val);
+                }
+            }
         }
-        CredentialSource::Session => match std::env::var("XAI_SESSION_TOKEN") {
-            Ok(val) if !val.is_empty() => Ok(ResolvedCredential { value: Some(val) }),
-            _ => Ok(ResolvedCredential { value: None }),
-        },
-        CredentialSource::Public => Ok(ResolvedCredential { value: None }),
-        CredentialSource::None => Ok(ResolvedCredential { value: None }),
     }
+    None
 }
 
 /// Apply an AuthPolicy to produce headers at request time.
-/// Legacy version — resolves CredentialSource directly.
+/// Legacy version — resolves using env/session only.
 /// P8 callers should use `prepare_sampler_config` instead.
 pub fn apply_auth_policy(
     policy: &AuthPolicy,
@@ -171,26 +161,17 @@ pub fn apply_auth_policy(
             candidates,
             required,
         } => {
-            let source = candidates_to_source(candidates);
-            match source {
-                Some(source) => {
-                    let cred = resolve_credential_source(&source)?;
-                    match cred.value {
-                        Some(token) => {
-                            let mut headers = existing.clone();
-                            headers.insert("Authorization".into(), format!("Bearer {token}"));
-                            Ok(headers)
-                        }
-                        None if *required => Err(ProviderError::MissingCredential(
-                            "Bearer credential not resolved".into(),
-                        )),
-                        None => Ok(existing.clone()),
-                    }
+            let value = resolve_candidates_legacy(candidates);
+            match (value, required) {
+                (Some(v), _) => {
+                    let mut headers = existing.clone();
+                    headers.insert("Authorization".into(), format!("Bearer {v}"));
+                    Ok(headers)
                 }
-                None if *required => Err(ProviderError::MissingCredential(
-                    "no Bearer candidates configured".into(),
+                (None, true) => Err(ProviderError::MissingCredential(
+                    "Bearer credential not resolved".into(),
                 )),
-                None => Ok(existing.clone()),
+                (None, false) => Ok(existing.clone()),
             }
         }
         AuthPolicy::Header {
@@ -198,43 +179,20 @@ pub fn apply_auth_policy(
             candidates,
             required,
         } => {
-            let source = candidates_to_source(candidates);
-            match source {
-                Some(source) => {
-                    let cred = resolve_credential_source(&source)?;
-                    match cred.value {
-                        Some(value) => {
-                            let mut headers = existing.clone();
-                            headers.insert(name.clone(), value);
-                            Ok(headers)
-                        }
-                        None if *required => Err(ProviderError::MissingCredential(format!(
-                            "header credential for {name} not resolved"
-                        ))),
-                        None => Ok(existing.clone()),
-                    }
+            let value = resolve_candidates_legacy(candidates);
+            match (value, required) {
+                (Some(v), _) => {
+                    let mut headers = existing.clone();
+                    headers.insert(name.clone(), v);
+                    Ok(headers)
                 }
-                None if *required => Err(ProviderError::MissingCredential(format!(
-                    "no candidates for header {name}"
+                (None, true) => Err(ProviderError::MissingCredential(format!(
+                    "header credential for {name} not resolved"
                 ))),
-                None => Ok(existing.clone()),
+                (None, false) => Ok(existing.clone()),
             }
         }
     }
-}
-
-fn candidates_to_source(candidates: &[CredentialCandidate]) -> Option<CredentialSource> {
-    candidates.first().map(|candidate| match candidate {
-        CredentialCandidate::RequestOverride
-        | CredentialCandidate::ModelInline
-        | CredentialCandidate::ProviderInline => CredentialSource::Inline,
-        CredentialCandidate::ModelEnvironment(keys)
-        | CredentialCandidate::ProviderEnvironment(keys)
-        | CredentialCandidate::BuiltinEnvironment(keys) => {
-            CredentialSource::Environment(keys.clone())
-        }
-        CredentialCandidate::Session(_) => CredentialSource::Session,
-    })
 }
 
 /// Input to an [`AuthFn::apply`] call. Carries request metadata and
@@ -491,18 +449,6 @@ mod tests {
     }
 
     #[test]
-    fn credential_source_public_vs_none() {
-        assert_eq!(CredentialSource::Public, CredentialSource::Public);
-        assert_ne!(CredentialSource::Public, CredentialSource::None);
-    }
-
-    #[test]
-    fn credential_source_resolve_inline_none() {
-        let result = resolve_credential_source(&CredentialSource::Inline).unwrap();
-        assert!(result.value.is_none());
-    }
-
-    #[test]
     fn bearer_auth_sets_header() {
         let auth = Credential::optional(Some("sk-test".into()), "api_key").bearer();
         let headers = auth.apply(&test_input()).unwrap();
@@ -663,12 +609,4 @@ mod tests {
         assert_eq!(value, "Bearer sk-override");
     }
 
-    #[test]
-    fn public_is_distinct_from_none_for_auth() {
-        assert_ne!(
-            CredentialSource::Public,
-            CredentialSource::None,
-            "Public must be distinct from None"
-        );
-    }
 }
