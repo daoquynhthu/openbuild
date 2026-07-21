@@ -243,6 +243,31 @@ pub fn test_prepared_config(model_id: &str, base_url: &str) -> PreparedSamplerCo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use url::Url;
+
+    fn dummy_execution(auth: AuthPolicy) -> ResolvedModelExecution {
+        ResolvedModelExecution {
+            provider_id: ProviderId::new("test"),
+            route_id: RouteId::new("test-chat"),
+            protocol_id: "chat_completions".into(),
+            request_url: Url::parse("http://127.0.0.1:1/v1/chat/completions").unwrap(),
+            static_headers: IndexMap::new(),
+            auth_policy: auth,
+            model_id: ModelId::new("test-model"),
+            generation: GenerationOptions::default(),
+            limits: ModelLimits::default(),
+        }
+    }
+
+    fn empty_credential() -> RequestCredential<'static> {
+        RequestCredential {
+            request_override: None,
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        }
+    }
 
     #[test]
     fn test_prepared_config_creates_valid_config() {
@@ -250,5 +275,62 @@ mod tests {
         assert_eq!(cfg.model_id.0, "gpt-4o");
         assert_eq!(cfg.protocol_id, "chat_completions");
         assert!(cfg.request_url.as_str().contains("api.test.com"));
+    }
+
+    const CANARY: &str = "sk-canary-leak-check";
+
+    // ── P8-010F: Missing credential failure matrix ──
+    //
+    // All failures must occur before any HTTP send.
+    // Error messages must not contain the canary secret.
+
+    #[tokio::test]
+    async fn missing_required_bearer_credential_fails_before_http_send() {
+        let execution = dummy_execution(AuthPolicy::bearer(vec![], true));
+        let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
+        assert!(result.is_err(), "required bearer with no candidates must error");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("required Bearer credential"),
+            "error must describe the missing credential: {err}"
+        );
+        assert!(
+            !err.contains(CANARY),
+            "error must not contain canary secret: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_required_header_credential_fails_before_http_send() {
+        let execution = dummy_execution(AuthPolicy::header("x-api-key", vec![], true));
+        let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
+        assert!(result.is_err(), "required header with no candidates must error");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("x-api-key"),
+            "error must describe the missing header credential: {err}"
+        );
+        assert!(
+            !err.contains(CANARY),
+            "error must not contain canary secret: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn optional_bearer_without_candidates_succeeds() {
+        let execution = dummy_execution(AuthPolicy::bearer(vec![], false));
+        let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
+        assert!(result.is_ok(), "optional bearer with no candidates must succeed");
+        let config = result.unwrap();
+        // No auth header should be present
+        let auth_value = config.headers.inner().get("authorization");
+        assert!(auth_value.is_none(), "no authorization header expected");
+    }
+
+    #[tokio::test]
+    async fn optional_header_without_candidates_succeeds() {
+        let execution = dummy_execution(AuthPolicy::header("x-api-key", vec![], false));
+        let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
+        assert!(result.is_ok(), "optional header with no candidates must succeed");
     }
 }

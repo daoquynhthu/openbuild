@@ -371,3 +371,17 @@ All 12 P13 tasks resolved:
 ### Key results
 - `cargo check -p xai-grok-provider --lib`: clean ✅
 - `cargo clippy -p xai-grok-provider --lib`: clean ✅
+
+### P8-010F: Missing credential failure matrix
+- Added 4 `#[tokio::test]` tests in `prepared.rs`:
+  - `missing_required_bearer_credential_fails_before_http_send`
+  - `missing_required_header_credential_fails_before_http_send`
+  - `optional_bearer_without_candidates_succeeds`
+  - `optional_header_without_candidates_succeeds`
+- All exercise `prepare_sampler_config` directly (the only P8 production entry point)
+- Each verifies:
+  - required credential without candidates → typed hard error
+  - optional credential without candidates → success (no auth header)
+  - error message does not contain canary secret
+- `cargo test -p xai-grok-provider -- prepared::tests`: 5 passed ✅
+- `cargo test -p xai-grok-provider --test request_inspection`: 8 passed ✅
