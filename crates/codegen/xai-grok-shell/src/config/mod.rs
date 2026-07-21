@@ -1796,5 +1796,5 @@ pub fn remove_hooks_path_from_file(
     )?;
     Ok(())
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests;

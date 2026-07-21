@@ -2254,6 +2254,7 @@ fn discover_personas_inline_takes_precedence() {
         Some("Inline strict"),
     );
 }
+#[cfg(not(target_os = "windows"))]
 #[test]
 fn bundled_personas_and_roles_have_lowest_priority_in_resolve_order() {
     let tmp = tempfile::TempDir::new().unwrap();
@@ -2845,7 +2846,13 @@ fn validate_hooks_path_rejects_relative_path() {
 }
 #[test]
 fn validate_hooks_path_rejects_outside_grok_home() {
-    let result = validate_hooks_path("/tmp/evil-hooks");
+    let root = std::env::current_dir()
+        .ok()
+        .and_then(|p| p.ancestors().last().map(|r| r.to_path_buf()))
+        .unwrap_or_else(|| std::path::PathBuf::from("/"));
+    let result = validate_hooks_path(
+        root.join("tmp").join("evil-hooks").to_str().unwrap()
+    );
     assert!(result.is_err());
     let msg = result.unwrap_err().to_string();
     assert!(
