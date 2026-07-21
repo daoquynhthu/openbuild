@@ -2,6 +2,8 @@
 //!
 //! Production chain: `ResolvedModelExecution → prepare_sampler_config → PreparedSamplerConfig → Sampler`.
 
+use indexmap::IndexMap;
+
 use crate::auth::{AuthPolicy, CredentialCandidate, SecretValue};
 use crate::headers::SensitiveHeaderMap;
 use crate::model::{GenerationOptions, ModelLimits};
@@ -20,6 +22,54 @@ pub struct PreparedSamplerConfig {
     pub model_id: ModelId,
     pub generation: GenerationOptions,
     pub limits: ModelLimits,
+}
+
+/// Bridge conversion for P8-011: `PreparedSamplerConfig` → `SamplerConfig`.
+///
+/// This conversion preserves the resolved auth headers from the prepared config
+/// and infers the `auth_scheme` from the header contents. The resulting
+/// `SamplerConfig` can be passed to `SamplingClient::new`.
+impl From<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig {
+    fn from(prepared: PreparedSamplerConfig) -> Self {
+        let protocol_id = prepared.protocol_id.clone();
+        let api_backend = match protocol_id.as_str() {
+            "chat_completions" => xai_grok_sampler::ApiBackend::ChatCompletions,
+            "responses" => xai_grok_sampler::ApiBackend::Responses,
+            "messages" => xai_grok_sampler::ApiBackend::Messages,
+            _ => xai_grok_sampler::ApiBackend::ChatCompletions,
+        };
+
+        let mut extra_headers = IndexMap::new();
+        let mut auth_scheme = xai_grok_sampler::AuthScheme::None;
+        for (name, value) in prepared.headers.inner().iter() {
+            if let Ok(v) = value.to_str() {
+                let n = name.as_str().to_lowercase();
+                if n == "authorization" {
+                    if v.starts_with("Bearer ") {
+                        auth_scheme = xai_grok_sampler::AuthScheme::Bearer;
+                    }
+                } else if n == "x-api-key" {
+                    auth_scheme = xai_grok_sampler::AuthScheme::XApiKey;
+                }
+                extra_headers.insert(name.as_str().to_string(), v.to_string());
+            }
+        }
+
+        Self {
+            model: prepared.model_id.0,
+            base_url: prepared.request_url.to_string(),
+            request_url: Some(prepared.request_url.to_string()),
+            api_backend,
+            protocol_id: Some(protocol_id.into()),
+            auth_scheme,
+            extra_headers,
+            context_window: prepared.limits.context.unwrap_or(0),
+            max_completion_tokens: prepared.generation.max_tokens,
+            temperature: prepared.generation.temperature,
+            top_p: prepared.generation.top_p,
+            ..Default::default()
+        }
+    }
 }
 
 /// Errors during request preparation.

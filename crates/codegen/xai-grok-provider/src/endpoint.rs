@@ -101,6 +101,16 @@ pub struct EndpointPatch<Body> {
 }
 
 impl<Body> Endpoint<Body> {
+    /// Construct an Endpoint from its fields.
+    /// Provided as a public constructor because the struct is `#[non_exhaustive]`.
+    pub fn new(
+        base_url: Option<String>,
+        path: EndpointPart<Body>,
+        query: Option<std::collections::HashMap<String, String>>,
+    ) -> Self {
+        Self { base_url, path, query }
+    }
+
     /// Return the default path string (Static variant) or empty string for Dynamic.
     pub fn path_for_default(&self) -> String {
         match &self.path {

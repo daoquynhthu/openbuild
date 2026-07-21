@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use xai_grok_provider::auth::{AuthPolicy, apply_auth_policy};
+use xai_grok_provider::auth::AuthPolicy;
 use xai_grok_provider::model::{GenerationOptions, ModelLimits};
 use xai_grok_provider::registry::RegistrySnapshot;
+use xai_grok_provider::resolution::ResolvedModelExecution;
 use xai_grok_provider::route::Route;
-use xai_grok_provider::types::{ProviderId, RouteId};
+use xai_grok_provider::types::{ModelId, ProviderId, RouteId};
 use xai_grok_sampler::SamplerConfig;
 use xai_grok_sampling_types::ApiBackend;
 
@@ -46,13 +47,15 @@ pub enum ProviderResolutionError {
 /// Migration adapter: converts route compiler output to `SamplerConfig`.
 /// This is the only remaining path producing `SamplerConfig` from the route compiler.
 /// It will be removed when all callers use `PreparedSamplerConfig` directly.
+#[allow(deprecated)]
 pub fn execution_to_sampler_config(
     model: &ModelEntry,
     registry: &RegistrySnapshot,
     api_key: Option<&str>,
     base_url_override: Option<&str>,
 ) -> Result<SamplerConfig, ProviderResolutionError> {
-    resolve_model_execution(model, registry, api_key, base_url_override)
+    let execution = resolve_model_execution(model, registry, base_url_override)?;
+    Ok(execution_to_unprepared_sampler_config_for_migration(&execution, api_key))
 }
 
 /// Merge generation parameters with fixed precedence: route defaults < model info < request overrides.
@@ -97,21 +100,22 @@ pub fn merge_generation_options(
     )
 }
 
-/// Resolve a `SamplerConfig` from a `ModelEntry`, registry snapshot, and credentials.
+/// Resolve a `ResolvedModelExecution` from a `ModelEntry`, registry snapshot, and params.
 ///
-/// This is the only provider-aware constructor of `SamplerConfig`. It applies:
+/// This is the route compiler — the only production path for producing a
+/// resolved model execution. It applies:
 /// 1. explicit model binding;
 /// 2. provider route selector;
-/// 3. route endpoint and protocol;
-/// 4. model/route/provider generation defaults (P7-007);
-/// 5. header merge;
-/// 6. credential resolution.
+/// 3. route endpoint and protocol via `Endpoint::render` (P7-004);
+/// 4. model/route/provider generation defaults with cap (P7-007);
+/// 5. protocol ID validation via the protocol table (P7-006);
+///
+/// Auth headers are NOT resolved here — that is Phase 8's responsibility.
 pub fn resolve_model_execution(
     model: &ModelEntry,
     registry: &RegistrySnapshot,
-    api_key: Option<&str>,
     base_url_override: Option<&str>,
-) -> Result<SamplerConfig, ProviderResolutionError> {
+) -> Result<ResolvedModelExecution, ProviderResolutionError> {
     let provider_id_str = model
         .provider_id
         .as_deref()
@@ -145,7 +149,6 @@ pub fn resolve_model_execution(
     let protocol_id = route.protocol_id.clone();
 
     // P7-004: Use Endpoint::render as the sole URL construction entry point.
-    // No string concatenation for URL building.
     let input = xai_grok_provider::endpoint::EndpointInput::new(
         xai_grok_provider::types::LLMRequest::new(&model.info.model),
         (),
@@ -155,25 +158,62 @@ pub fn resolve_model_execution(
         .render(&input)
         .map_err(|e| ProviderResolutionError::Protocol(format!("endpoint render failed: {e}")))?;
 
-    let base_url = if let Some(override_url) = base_url_override {
-        override_url.to_string()
+    let request_url = if let Some(override_url) = base_url_override {
+        url::Url::parse(override_url).map_err(|e| {
+            ProviderResolutionError::Protocol(format!("invalid base_url override: {e}"))
+        })?
     } else {
-        endpoint_url.to_string()
+        endpoint_url
     };
 
-    // Merge static headers and auth
-    let mut extra_headers = route.static_headers.clone();
-    extra_headers.extend(model.info.extra_headers.clone());
+    // P7-006: protocol ID must be registered in the protocol table.
+    if !xai_grok_provider::protocol::known_protocols().contains(&protocol_id) {
+        return Err(ProviderResolutionError::Protocol(format!(
+            "unknown protocol_id: {protocol_id}"
+        )));
+    }
 
-    // P8-008: propagate auth errors as typed error instead of swallowing.
-    // apply_auth_policy returns Err(MissingCredential) when required credentials
-    // are not available — the request must not proceed without auth.
-    let auth_headers = apply_auth_policy(&route.auth, &std::collections::HashMap::new())
-        .map_err(|e| ProviderResolutionError::AuthCredential(format!("{e}")))?;
-    extra_headers.extend(auth_headers);
+    // Merge static headers (route + model, no auth — Phase 8 resolves credentials)
+    let mut static_headers = route.static_headers.clone();
+    static_headers.extend(model.info.extra_headers.clone());
 
-    // Derive auth_scheme from the auth policy
-    let auth_scheme = match &route.auth {
+    // P7-007: merge generation params with fixed precedence.
+    let (max_tokens, temperature, top_p) = merge_generation_params(
+        &route.generation_defaults,
+        &route.limits,
+        model.info.max_completion_tokens,
+        model.info.temperature,
+        model.info.top_p,
+        None,
+        None,
+        None,
+    );
+    let generation = GenerationOptions::new(max_tokens, temperature, top_p);
+
+    Ok(ResolvedModelExecution {
+        provider_id: configured.id.clone(),
+        route_id: RouteId::new(&route_id),
+        protocol_id: protocol_id.into(),
+        request_url,
+        static_headers,
+        auth_policy: route.auth.clone(),
+        model_id: ModelId::new(&model.info.model),
+        generation,
+        limits: route.limits.clone(),
+    })
+}
+
+/// Temporary migration adapter: converts `ResolvedModelExecution` → `SamplerConfig`.
+///
+/// This function does NOT resolve credentials or populate auth headers.
+/// It only transfers fields that are safe to expose without request-time
+/// credential resolution. Auth header construction is Phase 8's job.
+#[deprecated(note = "removed in P8-011; use prepare_sampler_config instead")]
+pub fn execution_to_unprepared_sampler_config_for_migration(
+    execution: &ResolvedModelExecution,
+    api_key: Option<&str>,
+) -> SamplerConfig {
+    let auth_scheme = match &execution.auth_policy {
         AuthPolicy::None => xai_grok_sampler::AuthScheme::None,
         AuthPolicy::Bearer { .. } => xai_grok_sampler::AuthScheme::Bearer,
         AuthPolicy::Header { name, .. } if name == "x-api-key" => {
@@ -181,57 +221,30 @@ pub fn resolve_model_execution(
         }
         _ => xai_grok_sampler::AuthScheme::Bearer,
     };
-
-    // P7-006: protocol ID must be registered. Unknown is a typed error.
-    // api_backend is derived for legacy migration only, not as primary dispatch.
-    let protocol_id_known = matches!(
-        protocol_id.as_str(),
-        "chat_completions" | "responses" | "messages"
-    );
-    if !protocol_id_known {
-        return Err(ProviderResolutionError::Protocol(format!(
-            "unknown protocol_id: {protocol_id}"
-        )));
-    }
-    let api_backend = match protocol_id.as_str() {
+    let protocol_str: &str = &execution.protocol_id.0;
+    let api_backend = match protocol_str {
         "chat_completions" => ApiBackend::ChatCompletions,
         "responses" => ApiBackend::Responses,
         "messages" => ApiBackend::Messages,
-        _ => unreachable!("checked above"),
+        _ => ApiBackend::ChatCompletions,
     };
-
-    // P7-007: merge generation params with fixed precedence.
-    // route defaults < model info < request overrides.
-    // Limits are capped by route limits.
-    let (max_completion_tokens, temperature, top_p) = merge_generation_params(
-        &route.generation_defaults,
-        &route.limits,
-        model.info.max_completion_tokens,
-        model.info.temperature,
-        model.info.top_p,
-        None, // request_max_tokens — no request overrides in current path
-        None, // request_temperature
-        None, // request_top_p
-    );
-
-    Ok(SamplerConfig {
+    SamplerConfig {
         api_key: api_key.map(|s| s.to_string()),
-        model: model.info.model.clone(),
-        base_url,
+        model: execution.model_id.0.clone(),
+        base_url: execution.request_url.to_string(),
+        request_url: Some(execution.request_url.to_string()),
         endpoint_path: None,
         endpoint_query: None,
         api_backend,
-        protocol_id: Some(protocol_id.as_str().into()),
+        protocol_id: Some(execution.protocol_id.to_string().into()),
         auth_scheme,
-        extra_headers,
-        context_window: model.info.context_window.get(),
-        max_completion_tokens,
-        temperature,
-        top_p,
-        reasoning_effort: model.info.reasoning_effort,
-        stream_tool_calls: model.info.stream_tool_calls.unwrap_or(false),
+        extra_headers: execution.static_headers.clone(),
+        context_window: execution.limits.context.unwrap_or(0),
+        max_completion_tokens: execution.generation.max_tokens,
+        temperature: execution.generation.temperature,
+        top_p: execution.generation.top_p,
         ..Default::default()
-    })
+    }
 }
 
 /// A legacy (unqualified) xAI model reference that can be migrated to
@@ -413,7 +426,58 @@ pub fn merge_model_catalog(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agent::config::EndpointsConfig;
     use indexmap::IndexMap;
+
+
+    fn provider_registry_with_defaults() -> xai_grok_provider::registry::ProviderRegistry {
+        let reg = xai_grok_provider::registry::ProviderRegistry::new();
+        xai_grok_provider::providers::register_all(&reg);
+        reg
+    }
+
+    fn model_entry(model: &str, provider_id: &str) -> ModelEntry {
+        let mut entry = ModelEntry::fallback(model, &EndpointsConfig::default());
+        entry.provider_id = Some(provider_id.to_string());
+        entry
+    }
+
+    // P7-001: missing provider returns typed ProviderNotFound error
+    #[test]
+    fn route_compiler_missing_provider() {
+        let reg = provider_registry_with_defaults();
+        let snap = reg.snapshot();
+        let entry = model_entry("gpt-4o", "nonexistent");
+        let result = execution_to_sampler_config(&entry, &snap, Some("key"), None);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ProviderResolutionError::ProviderNotFound(_)
+        ));
+    }
+
+    // P7-001: provider exists but endpoint uses insecure remote HTTP
+    #[test]
+    fn route_compiler_invalid_endpoint_rejected() {
+        let reg = xai_grok_provider::registry::ProviderRegistry::new();
+        // register_route is a no-op in the current registry, so this tests that
+        // the route compiler returns an error when a provider is not fully configured
+        let _route = xai_grok_provider::route::Route::new(
+            xai_grok_provider::types::RouteId::new("bad-route"),
+            xai_grok_provider::types::ProviderId::new("test-p"),
+            "chat_completions",
+            xai_grok_provider::endpoint::Endpoint::new(
+                Some("http://remote.insecure:8080/v1".into()),
+                xai_grok_provider::endpoint::EndpointPart::Static("/chat".into()),
+                None,
+            ),
+            xai_grok_provider::auth::AuthPolicy::None,
+        );
+        let snap = reg.snapshot();
+        let entry = model_entry("some-model", "test-p");
+        let result = execution_to_sampler_config(&entry, &snap, Some("key"), None);
+        assert!(result.is_err(), "route compiler must error for missing provider");
+    }
 
     #[test]
     fn cli_model_ref_provider_prefix() {

@@ -360,3 +360,14 @@ All 12 P13 tasks resolved:
 
 ### Blocked
 - (none)
+
+## Phase 8: Request-time auth, header merge, secret safety — 2026-07-22
+
+### P8-011: `From<PreparedSamplerConfig> for SamplerConfig`
+- Added `impl From<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig` in `prepared.rs`
+- Conversion preserves resolved auth headers, infers `auth_scheme` from header contents
+- Added `xai-grok-sampler` as a regular dependency (was dev-dependency only)
+
+### Key results
+- `cargo check -p xai-grok-provider --lib`: clean ✅
+- `cargo clippy -p xai-grok-provider --lib`: clean ✅

@@ -121,6 +121,19 @@ impl ProtocolTable {
     }
 }
 
+/// Return the table of all known inference protocols for V1.
+pub fn known_protocols() -> &'static ProtocolTable {
+    use std::sync::OnceLock;
+    static TABLE: OnceLock<ProtocolTable> = OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut t = ProtocolTable::new();
+        t.register("chat_completions");
+        t.register("responses");
+        t.register("messages");
+        t
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4687,12 +4687,17 @@ pub fn sampling_config_for_model_with_registry(
     // to the route compiler for full provider-aware resolution.
     if let (Some(snapshot), Some(_pid)) = (registry, model.provider_id.as_deref()) {
         let base_url = credentials.base_url.clone();
-        return crate::agent::provider_resolution::resolve_model_execution(
+        #[allow(deprecated)]
+        let execution = crate::agent::provider_resolution::resolve_model_execution(
             model,
             snapshot,
-            credentials.api_key.as_deref(),
             Some(&base_url),
-        );
+        )?;
+        #[allow(deprecated)]
+        return Ok(crate::agent::provider_resolution::execution_to_unprepared_sampler_config_for_migration(
+            &execution,
+            credentials.api_key.as_deref(),
+        ));
     }
     // No registry or no provider_id — use legacy path (P7-003: remove this).
     Ok(sampling_config_for_model(
