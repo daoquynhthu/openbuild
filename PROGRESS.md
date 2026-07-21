@@ -336,6 +336,16 @@
 - `prompt.rs:3274,3356` — reverted (bash-specific suggestions)
 - `marketplace/git.rs:390` — reverted (Windows file locking difference)
 
+### P13-011..018: Shell crate — remove cfg guards from 8 Group B files
+- P13-011: `active_sessions.rs` — module guard removed, 4/5 pass; 1 `#[cfg(not(windows))]` (LockFileEx WouldBlock)
+- P13-012: `leader/lock.rs` — module guard removed, 15/15 pass; 4 `#[cfg(not(windows))]` (Unix paths + read-while-locked)
+- P13-013: `auth/manager/lock.rs` — module guard removed, 5/7 pass; 2 `#[cfg(not(windows))]` (read-while-locked)
+- P13-014: `agent/config.rs` inline tests — module guard removed, 297/302 pass; 5 `#[cfg(not(windows))]` (credential needs `XAI_API_KEY`)
+- P13-015: `folder_trust.rs` — module guard removed, 38/41 pass; 3 `#[cfg(not(windows))]` (`HOME` env)
+- P13-016: `extensions/bundle.rs` — module guard removed, 31/32 pass; 1 `#[cfg(not(windows))]` (`HOME` env)
+- P13-017: `config/mod.rs` + `config/tests.rs` — module guard removed, 498/500 pass; 2 `#[cfg(not(windows))]` (`HOME` + test-interaction)
+- P13-018: `subagent/tests` — module guard removed, `tmp_abs_path()` helper replaces 25 `/tmp` refs
+
 ### Key results
 - RESOLVED_IN_P11_P12_13 = 106 entries (from 104)
 - CROSS_PLATFORM_CONTRACT entries reduced to ~9 still in code

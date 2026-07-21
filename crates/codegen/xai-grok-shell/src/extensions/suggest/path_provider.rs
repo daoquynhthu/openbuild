@@ -181,7 +181,7 @@ fn scan_path_from(path_var: &str) -> Vec<String> {
     executables
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -400,7 +400,8 @@ mod tests {
             }
         }
 
-        let path_var = format!("{}:{}", bin1.to_str().unwrap(), bin2.to_str().unwrap());
+        let sep = if cfg!(windows) { ';' } else { ':' };
+        let path_var = format!("{}{sep}{}", bin1.to_str().unwrap(), bin2.to_str().unwrap());
         let result = scan_path_from(&path_var);
         assert_eq!(result, vec!["shared_cmd"]);
     }
