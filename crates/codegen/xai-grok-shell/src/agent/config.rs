@@ -5061,7 +5061,7 @@ impl ModelSwitchIncompatibleAgentError {
         )
     }
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use serial_test::serial;
@@ -5805,6 +5805,7 @@ reasoning_effort = "low"
         assert_eq!(creds.auth_type, AuthType::SessionToken);
         assert_eq!(creds.api_key.as_deref(), Some("session-jwt"));
     }
+    #[cfg(not(target_os = "windows"))]
     #[test]
     #[serial]
     fn resolve_credentials_empty_env_key_falls_through_to_global_key() {
@@ -11441,6 +11442,7 @@ default = "grok-4.5"
         assert_eq!(r.source, ConfigSource::Remote);
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn sampling_config_with_registry_uses_route_compiler_when_provider_id_set() {
         use crate::agent::provider_runtime::ProviderRuntime;
@@ -11590,6 +11592,7 @@ default = "grok-4.5"
         );
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn unknown_protocol_returns_hard_error() {
         use xai_grok_provider::config::ProviderConfig;
@@ -11634,6 +11637,7 @@ default = "grok-4.5"
         assert!(result.is_ok(), "xAI with known protocol must succeed");
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn web_search_sampling_config_with_registry_uses_route_compiler() {
         use xai_grok_provider::config::ProviderConfig;
@@ -11680,6 +11684,7 @@ default = "grok-4.5"
         );
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn aux_model_sampling_config_with_registry_uses_route_compiler() {
         use xai_grok_provider::config::ProviderConfig;
