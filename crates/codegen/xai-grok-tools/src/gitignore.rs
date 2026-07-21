@@ -102,21 +102,24 @@ mod tests {
 
     /// Regression: running outside a git repo panicked with
     /// "path is expected to be under the root" (ignore crate assert).
-    #[cfg(not(target_os = "windows"))]
     #[test]
     fn regression_no_panic_on_absolute_path_without_git_root() {
         let gi = build_gitignore(Path::new("."), &["node_modules/", "*.log"]);
-        let abs_path = Path::new("/Users/someone/home/AGENTS.md");
+
+        // Build an absolute path outside the gitignore root.
+        let tmp = tempfile::tempdir().unwrap();
+        let abs_root = dunce::canonicalize(tmp.path()).unwrap();
+        let abs_path = abs_root.parent().unwrap().join("nonexistent").join("file.md");
 
         // Proves the raw crate panics with these inputs.
         assert!(
             std::panic::catch_unwind(|| {
-                gi.matched_path_or_any_parents(abs_path, false);
+                gi.matched_path_or_any_parents(&abs_path, false);
             })
             .is_err()
         );
 
         // Our wrapper guards against it.
-        assert!(!is_ignored(&gi, abs_path, None));
+        assert!(!is_ignored(&gi, &abs_path, None));
     }
 }

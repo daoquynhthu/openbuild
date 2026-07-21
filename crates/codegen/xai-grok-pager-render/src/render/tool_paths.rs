@@ -210,7 +210,6 @@ pub fn path_for_tool_surface(
 }
 
 #[cfg(test)]
-#[cfg(not(target_os = "windows"))]
 mod tests {
     use super::*;
 
@@ -286,34 +285,37 @@ mod tests {
     #[test]
     fn expanded_surface_normalizes_and_classifies_against_cwd() {
         let cwd = Path::new("/Users/me/project");
+        fn norm(s: String) -> String {
+            s.replace('\\', "/")
+        }
         assert_eq!(
-            path_for_tool_surface(
+            norm(path_for_tool_surface(
                 "/Users/me/project/src/main.rs",
                 ToolPathSurface::Expanded,
                 Some(cwd),
                 None,
                 0
-            ),
+            )),
             "src/main.rs"
         );
         assert_eq!(
-            path_for_tool_surface(
+            norm(path_for_tool_surface(
                 "src/./nested/../main.rs",
                 ToolPathSurface::Expanded,
                 Some(cwd),
                 None,
                 0
-            ),
+            )),
             "src/main.rs"
         );
         assert_eq!(
-            path_for_tool_surface(
+            norm(path_for_tool_surface(
                 "../outside.rs",
                 ToolPathSurface::Expanded,
                 Some(cwd),
                 None,
                 0
-            ),
+            )),
             "/Users/me/outside.rs"
         );
     }
@@ -351,12 +353,19 @@ mod tests {
 
     #[test]
     fn expanded_outside_cwd_stays_normalized_target() {
-        let cwd = Path::new("/Users/me/project");
-        let got =
-            path_for_tool_surface("/etc/hosts", ToolPathSurface::Expanded, Some(cwd), None, 0);
+        let cwd = std::env::current_dir().unwrap();
+        let parent = cwd.parent().unwrap();
+        let outside = parent.join("sibling/file.txt");
+        let got = path_for_tool_surface(
+            &outside.to_string_lossy(),
+            ToolPathSurface::Expanded,
+            Some(&cwd),
+            None,
+            0,
+        );
         assert!(Path::new(&got).is_absolute(), "got {got}");
-        assert!(got.ends_with("hosts"), "got {got}");
-        assert!(!got.starts_with("/Users/me/project"), "got {got}");
+        assert!(got.ends_with("file.txt"), "got {got}");
+        assert!(!got.starts_with(&cwd.to_string_lossy().replace('\\', "/")), "got {got}");
     }
 
     #[test]
@@ -364,7 +373,8 @@ mod tests {
         let cwd = Path::new("/Users/me/.grok/worktrees/foo");
         let path = "/Users/me/.grok/worktrees/foo/crates/x/a.rs";
         assert_eq!(
-            path_for_tool_surface(path, ToolPathSurface::Expanded, Some(cwd), None, 0),
+            path_for_tool_surface(path, ToolPathSurface::Expanded, Some(cwd), None, 0)
+                .replace('\\', "/"),
             "crates/x/a.rs"
         );
     }
@@ -379,7 +389,8 @@ mod tests {
                 Some(cwd),
                 None,
                 0
-            ),
+            )
+            .replace('\\', "/"),
             "/Users/me/project/src/main.rs"
         );
         let relative = resolve_tool_path("src/../main.rs", None);
