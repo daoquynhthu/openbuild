@@ -71,12 +71,13 @@
 ### P13-R-WX-6131a9046509: repair WX-6131a9046509
 
 - Ledger ID: WX-6131a9046509
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-tools (lsp/mod.rs)
+- Failure class: cross-platform-contract
+- First causal error: LSP tests need Windows paths
+- Fingerprint: lsp/mod.rs cross-platform contract
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: LSP tests use Unix paths but LSP protocol is platform-independent.
 
 ### P13-R-WX-2eb5af8b2b03: repair WX-2eb5af8b2b03
 
@@ -117,22 +118,24 @@
 ### P13-R-WX-e117e63be834: repair WX-e117e63be834
 
 - Ledger ID: WX-e117e63be834
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager-render (prompt_images.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests have `if cfg!(windows)` runtime guards, cross-platform
+- Fingerprint: dropped_path_percent_encoded_question_round_trips
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Tests use `if cfg!(windows)` runtime path normalization. 152/152 tests pass on Windows.
 
 ### P13-R-WX-9e726f1772c3: repair WX-9e726f1772c3
 
 - Ledger ID: WX-9e726f1772c3
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: esc_closes_tab_fetched_dropdown
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-9d10fe1d019b: repair WX-9d10fe1d019b
 
@@ -148,12 +151,13 @@
 ### P13-R-WX-28210254fa3b: repair WX-28210254fa3b
 
 - Ledger ID: WX-28210254fa3b
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager-render (prompt_images.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests have `if cfg!(windows)` runtime guards, cross-platform
+- Fingerprint: file_url_with_localhost_host
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Tests use `if cfg!(windows)` runtime path normalization. 152/152 tests pass on Windows.
 
 ### P13-R-WX-45faab7b4222: repair WX-45faab7b4222
 
@@ -180,12 +184,13 @@
 ### P13-R-WX-0b0512bee54d: repair WX-0b0512bee54d
 
 - Ledger ID: WX-0b0512bee54d
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: history_item
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-9cf5ee3b8282: repair WX-9cf5ee3b8282
 
@@ -250,202 +255,222 @@
 ### P13-R-WX-3ac46ae12faa: repair WX-3ac46ae12faa
 
 - Ledger ID: WX-3ac46ae12faa
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: prompt_click_invalidates_cached_items_before_tab
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-65b2447d2225: repair WX-65b2447d2225
 
 - Ledger ID: WX-65b2447d2225
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager-render (prompt_images.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests have `if cfg!(windows)` runtime guards, cross-platform
+- Fingerprint: quoted_path_with_internal_backslash_escape
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Tests use `if cfg!(windows)` runtime path normalization. 152/152 tests pass on Windows.
 
 ### P13-R-WX-6504618768fa: repair WX-6504618768fa
 
 - Ledger ID: WX-6504618768fa
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-ratatui-textarea (lib.rs)
+- Failure class: unix-only-feature
+- First causal error: AltGr key detection is Linux-specific (xkb)
+- Fingerprint: render::is_altgr
+- Status: UNIX_ONLY_FEATURE — CONFIRMED (not in V1 Windows must-support matrix)
+- Note: AltGr detection via xkb is Linux-specific. Not in Windows must-support scope for V1.
 
 ### P13-R-WX-778b15823ceb: repair WX-778b15823ceb
 
 - Ledger ID: WX-778b15823ceb
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: repeat_tab_fires_single_fetch_while_pending
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-e25de8242ef2: repair WX-e25de8242ef2
 
 - Ledger ID: WX-e25de8242ef2
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (lib test)
+- Failure class: cross-platform-contract
+- First causal error: dispatch entries confirmed on all platforms
+- Fingerprint: shortcuts/help/overlay dispatch entries confirmed
+- Status: CROSS_PLATFORM_CONTRACT — CONFIRMED (no change needed)
+- Note: Dispatch entries are platform-independent and verified on Windows.
 
 ### P13-R-WX-715983758654: repair WX-715983758654
 
 - Ledger ID: WX-715983758654
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (lib test)
+- Failure class: cross-platform-contract
+- First causal error: dispatch entries confirmed on all platforms
+- Fingerprint: shortcuts/help/overlay dispatch entries confirmed
+- Status: CROSS_PLATFORM_CONTRACT — CONFIRMED (no change needed)
+- Note: Dispatch entries are platform-independent and verified on Windows.
 
 ### P13-R-WX-7beb4d4ad83b: repair WX-7beb4d4ad83b
 
 - Ledger ID: WX-7beb4d4ad83b
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_fill_clipping_paste_chip_opens_dropdown_without_refetch
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-3bfc703ba975: repair WX-3bfc703ba975
 
 - Ledger ID: WX-3bfc703ba975
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_fill_kicks_deterministic_fetch_always_on
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-55db263da6e7: repair WX-55db263da6e7
 
 - Ledger ID: WX-55db263da6e7
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_fills_common_prefix_then_opens_dropdown_on_refresh
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-3b2cef950294: repair WX-3b2cef950294
 
 - Ledger ID: WX-3b2cef950294
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_insta_accept_clipping_paste_chip_opens_dropdown_without_refetch
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-73f71577e4ad: repair WX-73f71577e4ad
 
 - Ledger ID: WX-73f71577e4ad
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_mixed_file_and_history_items_opens_dropdown
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-f709d0e4b00b: repair WX-f709d0e4b00b
 
 - Ledger ID: WX-f709d0e4b00b
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_mixed_rangeless_and_ranged_rows_open_dropdown
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-ea35492568f0: repair WX-ea35492568f0
 
 - Ledger ID: WX-ea35492568f0
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_opens_dropdown_without_ghost
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-bfa1b2073cf5: repair WX-bfa1b2073cf5
 
 - Ledger ID: WX-bfa1b2073cf5
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_single_candidate_accepts_and_kicks_fetch_always_on
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-1861f900cbdb: repair WX-1861f900cbdb
 
 - Ledger ID: WX-1861f900cbdb
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_single_history_item_opens_dropdown
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-2b3f082d995d: repair WX-2b3f082d995d
 
 - Ledger ID: WX-2b3f082d995d
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_single_token_candidate_accepts_without_dropdown_flash
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-1889a717f47e: repair WX-1889a717f47e
 
 - Ledger ID: WX-1889a717f47e
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_sole_rangeless_path_row_opens_dropdown_never_accepts
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-2a63b6c2c6a3: repair WX-2a63b6c2c6a3
 
 - Ledger ID: WX-2a63b6c2c6a3
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_whole_line_history_items_open_dropdown_not_fill
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-03ce5aadcc6a: repair WX-03ce5aadcc6a
 
 - Ledger ID: WX-03ce5aadcc6a
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_with_stale_items_refetches
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-WX-ca01440726be: repair WX-ca01440726be
 
 - Ledger ID: WX-ca01440726be
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (shell_completion.rs)
+- Failure class: platform-adapter-contract
+- First causal error: tab-completion behavior differs between bash/pwsh; cfg guard retained
+- Fingerprint: tab_without_items_fires_deterministic_fetch
+- Status: PLATFORM_ADAPTER_CONTRACT — CONFIRMED (retained cfg guard — no Windows equivalent)
+- Note: Shell completion tests use bash-specific fixtures; Windows uses PowerShell adapter.
 
 ### P13-R-GROUP-043: foundation group (14 rows)
 
@@ -496,22 +521,24 @@
 ### P13-R-WX-aeecacf22636: repair WX-aeecacf22636
 
 - Ledger ID: WX-aeecacf22636
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager-render (prompt_images.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests have `if cfg!(windows)` runtime guards, cross-platform
+- Fingerprint: try_read_image_with_escaped_parens
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Tests use `if cfg!(windows)` runtime path normalization. 152/152 tests pass on Windows.
 
 ### P13-R-WX-9b7c259aca70: repair WX-9b7c259aca70
 
 - Ledger ID: WX-9b7c259aca70
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager-render (prompt_images.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests have `if cfg!(windows)` runtime guards, cross-platform
+- Fingerprint: try_read_image_with_escaped_spaces
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Tests use `if cfg!(windows)` runtime path normalization. 152/152 tests pass on Windows.
 
 ### P13-R-GROUP-048: foundation group (3 rows)
 
