@@ -36,12 +36,15 @@
 ### P13-R-WX-b5bdbeebf180: repair WX-b5bdbeebf180
 
 - Ledger ID: WX-b5bdbeebf180
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (lib test)
+- Failure class: cross-platform-contract
+- First causal error: PASTE_LONG_HELP const has platform-specific text (Win/Mac/Linux)
+- Fingerprint: #[cfg(all(not(windows), not(macos)))] on third const variant
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Windows has its own PASTE_LONG_HELP at line 101. The test
+  build_entries_includes_paste (line 1809) runs on all platforms without
+  cfg guard and passes on Windows. Correct cross-platform contract.
 
 ### P13-R-WX-1093270461cd: repair WX-1093270461cd
 
@@ -96,12 +99,16 @@
 ### P13-R-WX-fc78f4c9e7be: repair WX-fc78f4c9e7be
 
 - Ledger ID: WX-fc78f4c9e7be
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (lib test)
+- Failure class: cfg-guard
+- First causal error: #[cfg(not(target_os = "windows"))] on test using Unix path
+- Fingerprint: done_state_scans_file_paths_like_scrollback guarded by cfg
+- Status: COMPLETED
+- Fix: removed #[cfg(not(target_os = "windows"))] guard. Test uses Unix path
+  /Users/test/... which is matched by the Unix regex pattern in the scanner
+  (works on all platforms). All 15 btw_overlay tests pass on Windows.
+- Commit: <pending>
 
 ### P13-R-WX-e117e63be834: repair WX-e117e63be834
 
@@ -206,12 +213,16 @@
 ### P13-R-WX-f3884462acf3: repair WX-f3884462acf3
 
 - Ledger ID: WX-f3884462acf3
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (lib test)
+- Failure class: cross-platform-contract
+- First causal error: ALT+V assertion differs per platform
+- Fingerprint: #[cfg(not(target_os = "windows"))] on !item.keys.any(|k| k == Alt+V)
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Windows uses Alt+V as paste fallback (assert at line 1843);
+  non-Windows does not (assert at line 1846). Both are inside
+  build_entries_includes_paste which runs unguarded on all platforms.
+  Correct cross-platform contract.
 
 ### P13-R-WX-e94be1cc9d3e: repair WX-e94be1cc9d3e
 
