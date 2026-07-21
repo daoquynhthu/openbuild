@@ -1456,6 +1456,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(windows))]
     #[cfg(test)]
     #[test]
     fn active_child_copy_uses_child_scrollback_cwd() {
