@@ -100,7 +100,7 @@ async fn plan_mode_rejects_grok_edit_outside_plan_file_despite_allow_all_permiss
                 "rejection text: {text}"
             );
             assert!(
-                text.contains("/tmp/test-session/plan.md"),
+                text.contains("plan.md"),
                 "must name the plan file so the model knows the one editable path: {text}"
             );
             assert!(

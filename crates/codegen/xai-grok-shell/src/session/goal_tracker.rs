@@ -1396,7 +1396,7 @@ mod tests {
     use super::*;
 
     fn make_tracker() -> GoalTracker {
-        GoalTracker::new(PathBuf::from("/tmp/test-goal-session"))
+        GoalTracker::new(std::env::temp_dir().join("test-goal-session"))
     }
 
     fn activate_tracker(t: &mut GoalTracker) {
@@ -1572,10 +1572,10 @@ mod tests {
 
     #[test]
     fn plan_path_is_session_scoped() {
-        let t = GoalTracker::new(PathBuf::from("/tmp/plan-path-session-xyz"));
+        let t = GoalTracker::new(std::env::temp_dir().join("plan-path-session-xyz"));
         assert_eq!(
             t.plan_path(),
-            PathBuf::from("/tmp/plan-path-session-xyz/goal/plan.md"),
+            std::env::temp_dir().join("plan-path-session-xyz/goal/plan.md"),
         );
     }
 
@@ -1589,12 +1589,16 @@ mod tests {
     #[test]
     fn plan_file_round_trips_through_serde_when_some() {
         let mut o = make_base_orchestration();
-        let path = PathBuf::from("/tmp/plan-rt-session/goal/plan.md");
+        let path = std::env::temp_dir().join("plan-rt-session/goal/plan.md");
         o.plan_file = Some(path.clone());
 
         let json = serde_json::to_string(&o).unwrap();
+        let expected = format!(
+            "\"plan_file\":{}",
+            serde_json::to_string(&path).unwrap()
+        );
         assert!(
-            json.contains("\"plan_file\":\"/tmp/plan-rt-session/goal/plan.md\""),
+            json.contains(&expected),
             "plan_file must appear on the wire as a string: {json}",
         );
 
@@ -2075,7 +2079,10 @@ mod tests {
         let _ = t.record_not_achieved_streak();
         let _ = t.record_not_achieved_streak();
         let _ = t.claim_strategist_fire(|_, _| true);
-        t.record_strategy_recommendation("/tmp/goal/strategy.md".into(), "split it".into());
+        t.record_strategy_recommendation(
+            std::env::temp_dir().join("goal/strategy.md").to_string_lossy().to_string(),
+            "split it".into(),
+        );
 
         t.reset_strategist_state();
 
@@ -2094,7 +2101,10 @@ mod tests {
         let seed = |t: &mut GoalTracker| {
             let _ = t.record_not_achieved_streak();
             let _ = t.claim_strategist_fire(|_, _| true);
-            t.record_strategy_recommendation("/tmp/s.md".into(), "do X".into());
+            t.record_strategy_recommendation(
+                std::env::temp_dir().join("s.md").to_string_lossy().to_string(),
+                "do X".into(),
+            );
         };
         let assert_clean = |t: &GoalTracker| {
             let o = t.snapshot().unwrap();
@@ -2131,14 +2141,12 @@ mod tests {
     fn strategy_recommendation_record_round_trip() {
         let mut t = make_tracker();
         activate_tracker(&mut t);
-        t.record_strategy_recommendation(
-            "/tmp/goal/strategy.md".into(),
-            "split the monolith".into(),
-        );
+        let p = std::env::temp_dir().join("goal/strategy.md").to_string_lossy().to_string();
+        t.record_strategy_recommendation(p.clone(), "split the monolith".into());
         let o = t.snapshot().unwrap();
         assert_eq!(
             o.last_strategy_path.as_deref(),
-            Some("/tmp/goal/strategy.md")
+            Some(p.as_str())
         );
         assert_eq!(
             o.last_strategy_recommendation.as_deref(),
@@ -2627,7 +2635,7 @@ mod tests {
         orchestration.current_subagent_id = Some("sub-old".into());
         orchestration.current_subagent_role = Some("planner".into());
 
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp/test"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir().join("test"), orchestration);
         let o = t.snapshot().unwrap();
         assert_eq!(o.phase, GoalPhase::Idle);
         assert_eq!(o.status, GoalStatus::UserPaused);
@@ -2641,7 +2649,7 @@ mod tests {
         let mut orchestration = make_base_orchestration();
         orchestration.phase = GoalPhase::Executing;
 
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         assert_eq!(t.snapshot().unwrap().phase, GoalPhase::Idle);
         assert_eq!(t.snapshot().unwrap().status, GoalStatus::UserPaused);
     }
@@ -2653,7 +2661,7 @@ mod tests {
         orchestration.status = GoalStatus::InfraPaused;
         orchestration.pause_message = Some("Turn failed: upstream unavailable".into());
 
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         let o = t.snapshot().unwrap();
         assert_eq!(o.phase, GoalPhase::Idle);
         assert_eq!(o.status, GoalStatus::InfraPaused);
@@ -2667,10 +2675,10 @@ mod tests {
     #[test]
     fn from_snapshot_preserves_plan_file_some() {
         let mut orchestration = make_base_orchestration();
-        let path = PathBuf::from("/tmp/from-snapshot-session/goal/plan.md");
+        let path = std::env::temp_dir().join("from-snapshot-session/goal/plan.md");
         orchestration.plan_file = Some(path.clone());
 
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         assert_eq!(t.snapshot().unwrap().plan_file, Some(path));
     }
 
@@ -2682,7 +2690,7 @@ mod tests {
         let scratch = implementer_scratch_dir(&orchestration.verifier_id);
         assert!(!scratch.exists(), "fresh verifier_id ⇒ no dir yet");
 
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         assert!(
             scratch.is_dir(),
             "restore must recreate {} like create_goal does",
@@ -2704,7 +2712,7 @@ mod tests {
             orchestration.status = status;
             let scratch = implementer_scratch_dir(&orchestration.verifier_id);
 
-            let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+            let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
             assert!(
                 !scratch.exists(),
                 "terminal status {status:?} must not recreate {}",
@@ -2725,7 +2733,7 @@ mod tests {
             let mut orchestration = make_base_orchestration();
             orchestration.verifier_id = bad.to_string();
 
-            let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+            let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
             let vid = &t.snapshot().unwrap().verifier_id;
             assert_ne!(vid, bad, "non-canonical id must be replaced");
             assert_eq!(vid.len(), 12);
@@ -2735,7 +2743,7 @@ mod tests {
         // A canonical id is kept verbatim.
         let orchestration = make_base_orchestration();
         let original = orchestration.verifier_id.clone();
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         assert_eq!(t.snapshot().unwrap().verifier_id, original);
         let _ = std::fs::remove_dir_all(goal_scratch_root(&original));
     }
@@ -2762,7 +2770,7 @@ mod tests {
         }"#;
         let snapshot: GoalOrchestration =
             serde_json::from_str(FORWARD_VERSION).expect("forward-version snapshot must parse");
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), snapshot);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), snapshot);
         assert_eq!(
             t.status(),
             Some(GoalStatus::UserPaused),
@@ -2779,7 +2787,7 @@ mod tests {
         let mut orchestration = make_base_orchestration();
         orchestration.skeptic0_session_id = Some("child-from-before-restart".into());
 
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         assert!(
             t.snapshot().unwrap().skeptic0_session_id.is_none(),
             "restore must cold-spawn the next panel",
@@ -2812,7 +2820,7 @@ mod tests {
     #[test]
     fn from_snapshot_idle_active_sets_active_since() {
         let orchestration = make_base_orchestration(); // Idle + Active
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         assert_eq!(t.snapshot().unwrap().status, GoalStatus::Active);
         assert!(t.active_since.is_some());
     }
@@ -2822,7 +2830,7 @@ mod tests {
         let mut orchestration = make_base_orchestration();
         orchestration.status = GoalStatus::Complete;
 
-        let t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         assert_eq!(t.snapshot().unwrap().status, GoalStatus::Complete);
         assert!(t.active_since.is_none());
     }
@@ -2833,7 +2841,7 @@ mod tests {
         orchestration.phase = GoalPhase::Executing;
         orchestration.elapsed_ms = 5000;
 
-        let mut t = GoalTracker::from_snapshot(PathBuf::from("/tmp"), orchestration);
+        let mut t = GoalTracker::from_snapshot(std::env::temp_dir(), orchestration);
         assert_eq!(t.status(), Some(GoalStatus::UserPaused));
         assert!(t.active_since.is_none());
 
@@ -2951,7 +2959,9 @@ mod tests {
         o.classifier_runs_attempted = 2;
         o.classifier_max_runs = Some(3);
         o.last_classifier_verdict = Some(GoalClassifierVerdict::NotAchieved);
-        o.last_classifier_details_path = Some("/tmp/goal-classifier-abc.md".to_string());
+        o.last_classifier_details_path = Some(
+            std::env::temp_dir().join("goal-classifier-abc.md").to_string_lossy().to_string(),
+        );
         o.last_classifier_at = Some("2026-05-24T12:00:00Z".to_string());
         o.last_classifier_gaps = Some("- [skeptic 0, high] still on fire".to_string());
         o.skeptic0_session_id = Some("0190abcd-skeptic0".to_string());
@@ -2968,7 +2978,7 @@ mod tests {
         );
         assert_eq!(
             restored.last_classifier_details_path.as_deref(),
-            Some("/tmp/goal-classifier-abc.md")
+            Some(std::env::temp_dir().join("goal-classifier-abc.md").to_string_lossy().to_string().as_str())
         );
         assert_eq!(
             restored.last_classifier_at.as_deref(),
@@ -3156,7 +3166,7 @@ mod tests {
             let mut t = make_tracker();
             activate_tracker(&mut t);
             t.snapshot_mut().unwrap().plan_baseline_file =
-                Some(PathBuf::from("/tmp/sess/goal/plan.baseline.md"));
+                Some(std::env::temp_dir().join("sess/goal/plan.baseline.md"));
             let applied = match ending {
                 "complete" => t.complete(),
                 _ => t.budget_limit(),
@@ -3608,10 +3618,10 @@ mod tests {
 
     #[test]
     fn plan_baseline_path_is_session_scoped_sibling_of_plan() {
-        let t = GoalTracker::new(PathBuf::from("/tmp/plan-baseline-session-xyz"));
+        let t = GoalTracker::new(std::env::temp_dir().join("plan-baseline-session-xyz"));
         assert_eq!(
             t.plan_baseline_path(),
-            PathBuf::from("/tmp/plan-baseline-session-xyz/goal/plan.baseline.md"),
+            std::env::temp_dir().join("plan-baseline-session-xyz/goal/plan.baseline.md"),
         );
     }
 
@@ -3628,16 +3638,21 @@ mod tests {
     #[test]
     fn plan_baseline_file_round_trips_through_serde() {
         let mut o = make_base_orchestration();
-        o.plan_baseline_file = Some(PathBuf::from("/tmp/sess/goal/plan.baseline.md"));
+        let path = std::env::temp_dir().join("sess/goal/plan.baseline.md");
+        o.plan_baseline_file = Some(path.clone());
         let json = serde_json::to_string(&o).unwrap();
+        let expected = format!(
+            "\"plan_baseline_file\":{}",
+            serde_json::to_string(&path).unwrap()
+        );
         assert!(
-            json.contains("\"plan_baseline_file\":\"/tmp/sess/goal/plan.baseline.md\""),
+            json.contains(&expected),
             "plan_baseline_file must appear on the wire: {json}",
         );
         let restored: GoalOrchestration = serde_json::from_str(&json).unwrap();
         assert_eq!(
             restored.plan_baseline_file.as_deref(),
-            Some(std::path::Path::new("/tmp/sess/goal/plan.baseline.md")),
+            Some(path.as_path()),
         );
 
         let none = make_base_orchestration();

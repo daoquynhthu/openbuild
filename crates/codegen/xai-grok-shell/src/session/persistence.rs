@@ -1003,7 +1003,7 @@ mod is_hidden_tests {
             ..Summary::new(
                 &Info {
                     id: acp::SessionId::new("test"),
-                    cwd: "/tmp".into(),
+                    cwd: std::env::temp_dir().to_string_lossy().to_string(),
                 },
                 default_model_id(),
             )
@@ -1067,7 +1067,7 @@ mod head_fields_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1104,7 +1104,7 @@ mod head_fields_tests {
         let summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1132,7 +1132,7 @@ mod generated_title_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1175,7 +1175,7 @@ mod generated_title_tests {
         let summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1190,7 +1190,7 @@ mod generated_title_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1233,7 +1233,7 @@ mod generated_title_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1247,7 +1247,7 @@ mod generated_title_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1262,7 +1262,7 @@ mod generated_title_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1279,7 +1279,7 @@ mod generated_title_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1327,7 +1327,7 @@ mod generated_title_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -1346,7 +1346,7 @@ mod generated_title_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -2748,7 +2748,7 @@ mod agent_name_persistence_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -2786,7 +2786,7 @@ mod agent_name_persistence_tests {
         let summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -2803,7 +2803,7 @@ mod agent_name_persistence_tests {
         let mut summary = Summary::new(
             &Info {
                 id: acp::SessionId::new("test"),
-                cwd: "/tmp".into(),
+                cwd: std::env::temp_dir().to_string_lossy().to_string(),
             },
             default_model_id(),
         )
@@ -2826,7 +2826,7 @@ mod agent_name_persistence_tests {
             let mut summary = Summary::new(
                 &Info {
                     id: acp::SessionId::new("test"),
-                    cwd: "/tmp".into(),
+                    cwd: std::env::temp_dir().to_string_lossy().to_string(),
                 },
                 default_model_id(),
             )

@@ -11,6 +11,9 @@ pub(crate) const HARNESS_VERIFIES_SENTENCE: &str =
 /// Plan-aware seed-todos instruction (`goal_plan_block.md`).
 pub(crate) const PLAN_SEED_TODOS_PHRASE: &str =
     "Seed todos from the plan's acceptance criteria via";
+pub(crate) fn test_tmp_dir() -> std::path::PathBuf {
+    std::env::temp_dir()
+}
 #[cfg(test)]
 pub(crate) fn noop_observability_bridge() -> xai_computer_hub_sdk::ObservabilityBridge {
     xai_computer_hub_sdk::ObservabilityBridge::new(
@@ -83,14 +86,14 @@ async fn test_agent_from_config(
     let ctx = SessionContext {
         backend,
         fs,
-        cwd: std::path::PathBuf::from("/tmp"),
+        cwd: std::env::temp_dir(),
         session_folder: std::env::temp_dir().join("grok-test"),
         session_env: std::sync::Arc::new(std::collections::HashMap::new()),
         notification_handle: ToolNotificationHandle::noop(),
         owner_session_id: None,
         parent_scheduler_handle: None,
         skills: vec![],
-        state_path: std::path::PathBuf::from("/tmp/tool_state.json"),
+        state_path: std::env::temp_dir().join("tool_state.json"),
         memory_backend: None,
         web_search_config: Default::default(),
         web_fetch_config: Default::default(),
@@ -340,7 +343,7 @@ pub(crate) async fn create_test_actor_ex(
         hook_load_errors: std::cell::RefCell::new(Vec::new()),
         plugin_registry: std::cell::RefCell::new(None),
         plugin_registry_handle: None,
-        events: crate::session::events::EventTracker::new(std::path::Path::new("/tmp")),
+        events: crate::session::events::EventTracker::new(&std::env::temp_dir()),
         observability_bridge: noop_observability_bridge(),
         current_turn_number: std::cell::Cell::new(0),
         last_recap_main_turn: std::cell::Cell::new(0),

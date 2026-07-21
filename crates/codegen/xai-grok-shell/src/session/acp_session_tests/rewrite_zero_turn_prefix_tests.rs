@@ -117,7 +117,7 @@ async fn seed_pending_baseline(actor: &SessionActor) {
     let bridge = actor.agent.borrow().tool_bridge().clone();
     bridge
         .seed_skill_discovery(
-            Some(std::path::PathBuf::from("/tmp")),
+            Some(std::env::temp_dir()),
             None,
             vec![regression_skill()],
             None,

@@ -156,7 +156,7 @@ async fn drain_interjection_expands_skill_slash_reference() {
                 .tool_bridge()
                 .clone()
                 .seed_skill_discovery(
-                    Some(std::path::PathBuf::from("/tmp")),
+                    Some(std::env::temp_dir()),
                     None,
                     vec![skill],
                     None,

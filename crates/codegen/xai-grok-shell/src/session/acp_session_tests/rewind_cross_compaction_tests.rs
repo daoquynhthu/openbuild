@@ -243,19 +243,19 @@ async fn run_file_counts_scenario() {
     let (persistence_tx, _persistence_rx) = tokio::sync::mpsc::unbounded_channel();
     let actor = create_test_actor(0, 200_000, 80, gateway_tx, persistence_tx).await;
 
-    let cwd = Path::new("/tmp");
+    let cwd = std::env::temp_dir();
     // Prompt 0 has two distinct file snapshots; prompt 1 has one.
     actor
         .file_state_tracker
-        .add_before_snapshot_for_prompt(0, Path::new("/tmp/a.rs"), cwd, Some("a".into()))
+        .add_before_snapshot_for_prompt(0, &cwd.join("a.rs"), &cwd, Some("a".into()))
         .await;
     actor
         .file_state_tracker
-        .add_before_snapshot_for_prompt(0, Path::new("/tmp/b.rs"), cwd, Some("b".into()))
+        .add_before_snapshot_for_prompt(0, &cwd.join("b.rs"), &cwd, Some("b".into()))
         .await;
     actor
         .file_state_tracker
-        .add_before_snapshot_for_prompt(1, Path::new("/tmp/c.rs"), cwd, Some("c".into()))
+        .add_before_snapshot_for_prompt(1, &cwd.join("c.rs"), &cwd, Some("c".into()))
         .await;
 
     let counts = actor.rewind_file_counts().await;

@@ -1110,6 +1110,10 @@ fn file_toolset_override_invalid_config_returns_error() {
     assert!(err.is_err());
     assert!(err.unwrap_err().contains("unknown"));
 }
+fn test_base_dir() -> std::path::PathBuf {
+    std::env::temp_dir()
+}
+
 /// Helper: creates a real SessionHandle with the given model, yolo, and client id.
 /// Requires a tokio runtime for SessionSignalsHandle::new().
 fn make_test_handle(
@@ -1117,13 +1121,14 @@ fn make_test_handle(
     yolo: bool,
     client_id: Option<&str>,
 ) -> crate::session::SessionHandle {
+    let base = test_base_dir();
     let (cmd_tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let (persistence_tx, _persistence_rx) = tokio::sync::mpsc::unbounded_channel();
     let (hunk_event_tx, _hunk_event_rx) = tokio::sync::mpsc::unbounded_channel();
     let hunk_cancel = tokio_util::sync::CancellationToken::new();
     let hunk_tracker_handle = xai_hunk_tracker::HunkTrackerActor::spawn(
         "test".to_string(),
-        std::path::PathBuf::from("/tmp"),
+        base.clone(),
         hunk_event_tx,
         xai_hunk_tracker::TrackingMode::AllDirty,
         hunk_cancel,
@@ -1137,7 +1142,7 @@ fn make_test_handle(
         )),
         info: crate::session::info::Info {
             id: acp::SessionId::new("test"),
-            cwd: "/tmp".to_string(),
+            cwd: base.to_string_lossy().to_string(),
         },
         max_turns: None,
         hunk_tracker_handle,
@@ -1153,10 +1158,8 @@ fn make_test_handle(
         upload_queue: Arc::new(OnceLock::new()),
         upload_failures_since_success: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         tool_context: crate::tools::ToolContext::new_local_context(
-            xai_grok_paths::AbsPathBuf::new(std::path::PathBuf::from("/tmp")).unwrap(),
-            std::sync::Arc::new(xai_grok_workspace::file_system::LocalFs::new(
-                std::path::PathBuf::from("/tmp"),
-            )),
+            xai_grok_paths::AbsPathBuf::new(base.clone()).unwrap(),
+            std::sync::Arc::new(xai_grok_workspace::file_system::LocalFs::new(base.clone())),
             std::sync::Arc::new(crate::terminal::LocalTerminalRunner),
         ),
         model_id: acp::ModelId::new(model),
@@ -1166,7 +1169,7 @@ fn make_test_handle(
         code_nav_enabled: false,
         ask_user_question_enabled: true,
         plan_mode: std::sync::Arc::new(parking_lot::Mutex::new(
-            crate::session::plan_mode::PlanModeTracker::new(std::path::PathBuf::from("/tmp")),
+            crate::session::plan_mode::PlanModeTracker::new(base),
         )),
         force_compact: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         permission_handle: xai_grok_workspace::permission::PermissionHandle::allow_all(),

@@ -51,7 +51,7 @@ pub(super) async fn make_replay_send_update_fixture() -> ReplaySendUpdateFixture
         }
     });
     let (persistence_tx, persistence_rx) = mpsc::unbounded_channel::<PersistenceMsg>();
-    let cwd = AbsPathBuf::new(std::path::PathBuf::from("/tmp")).unwrap();
+    let cwd = AbsPathBuf::new(std::env::temp_dir()).unwrap();
     let fs = Arc::new(MockFs::new(cwd.to_path_buf()));
     let terminal = Arc::new(DummyTerminal {});
     let (hunk_tx, _hunk_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -225,7 +225,7 @@ pub(super) async fn make_replay_send_update_fixture() -> ReplaySendUpdateFixture
         hook_load_errors: std::cell::RefCell::new(Vec::new()),
         plugin_registry: std::cell::RefCell::new(None),
         plugin_registry_handle: None,
-        events: crate::session::events::EventTracker::new(std::path::Path::new("/tmp")),
+        events: crate::session::events::EventTracker::new(&std::env::temp_dir()),
         observability_bridge: noop_observability_bridge(),
         current_turn_number: std::cell::Cell::new(0),
         last_recap_main_turn: std::cell::Cell::new(0),
@@ -1220,7 +1220,7 @@ async fn reasoning_only_doomloop_turn_captures_every_generation_as_segments() {
                 event_rx,
                 None,
                 codebase_indexes,
-                std::path::PathBuf::from("/tmp"),
+                std::env::temp_dir(),
                 crate::session::fs_watch::FsWatchCapabilities::none(),
             ));
             let (respond_to, capture_rx) = tokio::sync::oneshot::channel();

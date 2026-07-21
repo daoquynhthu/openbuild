@@ -2150,7 +2150,7 @@ mod inline_auto_compact_flow_tests {
         gateway_tx: mpsc::UnboundedSender<xai_acp_lib::AcpClientMessage>,
         persistence_tx: mpsc::UnboundedSender<PersistenceMsg>,
     ) -> SessionActor {
-        let cwd = AbsPathBuf::new(std::path::PathBuf::from("/tmp")).unwrap();
+        let cwd = AbsPathBuf::new(std::env::temp_dir()).unwrap();
         let fs = Arc::new(MockFs::new(cwd.to_path_buf()));
         let terminal = Arc::new(DummyTerminal {});
         let (hunk_tx, _hunk_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -2348,7 +2348,7 @@ mod inline_auto_compact_flow_tests {
             hook_load_errors: std::cell::RefCell::new(Vec::new()),
             plugin_registry: std::cell::RefCell::new(None),
             plugin_registry_handle: None,
-            events: crate::session::events::EventTracker::new(std::path::Path::new("/tmp")),
+            events: crate::session::events::EventTracker::new(&std::env::temp_dir()),
             observability_bridge: noop_observability_bridge(),
             current_turn_number: std::cell::Cell::new(0),
             last_recap_main_turn: std::cell::Cell::new(0),

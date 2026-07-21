@@ -2460,13 +2460,14 @@ mod tests {
             skeptic_overrides: Vec::new(),
             events: None,
         };
+        let details_path = std::env::temp_dir().join("details.md");
         let handle = tokio::spawn(async move {
             let _ = spawner
                 .spawn_classifier(
                     "clf-id",
                     0,
                     role_prompt("prompt"),
-                    Path::new("/tmp/details.md"),
+                    &details_path,
                     Some("prior-child"),
                 )
                 .await;
@@ -2516,6 +2517,7 @@ mod tests {
             ],
             events: None,
         };
+        let details_path = std::env::temp_dir().join("details.md");
         let handle = tokio::spawn(async move {
             // Skeptic 0 with a resume id: even on the cold path it carries
             // skeptic_overrides[0].
@@ -2524,7 +2526,7 @@ mod tests {
                     "clf-0",
                     0,
                     role_prompt("prompt"),
-                    Path::new("/tmp/details.md"),
+                    &details_path,
                     Some("prior-child"),
                 )
                 .await;
@@ -2580,13 +2582,14 @@ mod tests {
             skeptic_overrides: vec![RoleSpawnOverride::default()],
             events: None,
         };
+        let details_path = std::env::temp_dir().join("d.md");
         let handle = tokio::spawn(async move {
             let _ = spawner
                 .spawn_classifier(
                     "clf-x",
                     0,
                     role_prompt("prompt"),
-                    Path::new("/tmp/d.md"),
+                    &details_path,
                     None,
                 )
                 .await;
@@ -2670,16 +2673,17 @@ mod tests {
             Err(PathValidationError::OutsideAllowedPrefix),
             "bare /tmp is NOT special-cased — only the temp root is allowed",
         );
+        let tmp = std::env::temp_dir();
         assert!(
             validate_details_path_in_root(
-                Path::new("/tmp/grok-goal-abc/goal-classifier-abc-1.md"),
-                Path::new("/tmp"),
+                &tmp.join("grok-goal-abc/goal-classifier-abc-1.md"),
+                &tmp,
             )
             .is_ok(),
             "with a /tmp temp root (Linux), scratch-rooted paths are accepted",
         );
         assert_eq!(
-            validate_details_path_in_root(Path::new("/var/log/foo.md"), Path::new("/tmp")),
+            validate_details_path_in_root(Path::new("/var/log/foo.md"), &tmp),
             Err(PathValidationError::OutsideAllowedPrefix),
         );
     }
@@ -2695,7 +2699,7 @@ mod tests {
     #[test]
     fn validate_details_path_rejects_traversal() {
         assert_eq!(
-            validate_details_path(Path::new("/tmp/../etc/passwd")),
+            validate_details_path(&std::env::temp_dir().join("../etc/passwd")),
             Err(PathValidationError::UnsafeComponent),
         );
     }
@@ -2703,7 +2707,7 @@ mod tests {
     #[test]
     fn validate_details_path_rejects_nul() {
         assert_eq!(
-            validate_details_path(Path::new("/tmp/foo\0bar.md")),
+            validate_details_path(&std::env::temp_dir().join("foo\0bar.md")),
             Err(PathValidationError::UnsafeComponent),
         );
     }
@@ -2711,11 +2715,11 @@ mod tests {
     #[test]
     fn validate_details_path_rejects_unresolved_substitution() {
         assert_eq!(
-            validate_details_path(Path::new("/tmp/${HOME}/file.md")),
+            validate_details_path(&std::env::temp_dir().join("${HOME}/file.md")),
             Err(PathValidationError::UnresolvedSubstitution),
         );
         assert_eq!(
-            validate_details_path(Path::new("/tmp/goal-{verifier_id}-1.md")),
+            validate_details_path(&std::env::temp_dir().join("goal-{verifier_id}-1.md")),
             Err(PathValidationError::UnresolvedSubstitution),
         );
     }
@@ -6248,13 +6252,14 @@ mod tests {
             skeptic_overrides: Vec::new(),
             events: None,
         };
+        let class_path = std::env::temp_dir().join("goal-classifier-test-1.md");
         let spawn_task = tokio::spawn(async move {
             spawner
                 .spawn_classifier(
                     "classifier-id",
                     0,
                     role_prompt("prompt"),
-                    Path::new("/tmp/goal-classifier-test-1.md"),
+                    &class_path,
                     None,
                 )
                 .await
@@ -6534,7 +6539,7 @@ mod tests {
         let victim = victim_dir.path().join("victim.md");
         tokio::fs::write(&victim, "precious").await.unwrap();
         // Attacker plants a symlink at the predictable bare-/tmp name.
-        let legacy = PathBuf::from(format!("/tmp/goal-classifier-{vid}-1.md"));
+        let legacy = std::env::temp_dir().join(format!("goal-classifier-{vid}-1.md"));
         std::os::unix::fs::symlink(&victim, &legacy).unwrap();
         let _cleanup = CleanupOnDrop {
             symlink: legacy.clone(),

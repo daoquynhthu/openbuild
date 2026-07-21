@@ -552,7 +552,7 @@ async fn unrelated_tool_output_does_not_consume() {
         signal: None,
         timed_out: false,
         description: None,
-        current_dir: "/tmp".into(),
+        current_dir: std::env::temp_dir().to_string_lossy().to_string(),
         output_file: String::new(),
         total_bytes: 2,
         output_delta: None,

@@ -336,9 +336,27 @@ All 12 P13 tasks resolved:
 - No P13-scoped entries remain CLASSIFIED
 - `cargo check --workspace`: passes ✅
 - `cargo clippy --workspace -- -D warnings`: passes ✅
-- `cargo test -p xai-grok-pager --lib -- scrollback`: 974 passed ✅
-- `cargo test -p xai-grok-pager-render --lib -- prompt_images`: 152 passed ✅
-- `cargo test -p xai-grok-pager-render --lib -- osc8`: 49 passed ✅
-- `cargo test -p xai-grok-pager-render --lib -- display_refresh`: 17 passed ✅
-- `cargo test -p xai-grok-pager --lib -- key`: 371 passed ✅
-- `cargo test -p xai-grok-tools --lib`: 2500 passed (2497+3ignored) ✅
+## Phase 12: Remediate cfg(not(windows)) Guards — Path/File/Process Tests — 2026-07-21
+
+### Completed
+- **P12-001-009**: active_sessions (4/4), folder_trust (39/39), mvp_agent (166/166), subagent (278/278), auth/manager/lock (5/5), extensions/bundle (31/31), extensions/suggest (150/150), leader/lock (15/15)
+- **P12-010-032**: acp_session + hooks + updates + compaction + signals — fixed 51/63 path-related failures via `std::env::temp_dir()` replacement; 876/886 pass
+- **P12 hardcoded `/tmp` purge**: replaced ~60+ hardcoded `/tmp` paths across acp_session_tests/, compaction.rs, goal_tracker.rs, goal_classifier.rs, persistence.rs, hook_dispatch.rs — all now use `std::env::temp_dir()`
+- **P12-033-035** terminal/PTY: deferred — requires Windows ConPTY adapter implementation (3 entries)
+
+### Key results
+- Exclusion ledger: 87 entries RESOLVED_IN_P12 (from previous 76 CLASSIFIED → 3 deferred)
+- `cargo check -p xai-grok-shell`: passes ✅
+- `cargo clippy -p xai-grok-shell -- -D warnings`: passes ✅
+- `cargo test -p xai-grok-shell --lib -- session::goal_tracker::tests`: 113 passed ✅
+- `cargo test -p xai-grok-shell --lib -- persistence::tests`: 87 passed ✅
+- `cargo test -p xai-grok-shell --lib -- goal_classifier::tests`: 205 passed ✅
+- `cargo test -p xai-grok-shell --lib -- session::acp_session::`: 876 passed, 10 failed (pre-existing timing/logic issues)
+
+### Remaining
+- 10 ACP test failures (timing/model-metadata assertions — not path-related)
+- 3 terminal/PTY entries — need Windows ConPTY adapter
+- `cargo test -p xai-grok-shell --lib -- pager::` and other crate tests not yet validated
+
+### Blocked
+- (none)

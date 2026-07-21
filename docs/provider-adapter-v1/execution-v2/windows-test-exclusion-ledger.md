@@ -1,7 +1,7 @@
 # Windows Test Exclusion Ledger
 # Generated: classify_exclusions.py (classification run)
 # Re-audited: 2026-07-20 (Phase 2 redo — systematic decision tree verification)
-# Total: 166 entries (12 remaining CLASSIFIED P12, 127 resolved, 27 CONFIRMED/CLOSED/NOT_AN_EXCLUSION)
+# Total: 166 entries (76 remaining CLASSIFIED P12, 32 resolved, 56 CONFIRMED/CLOSED)
 
 ## Classification Summary
 - CROSS_PLATFORM_CONTRACT: 116 (was 116; 2 reclassified from MISSING_WINDOWS_IMPLEMENTATION)
@@ -13,8 +13,8 @@
 - CLOSED: 10 (host_clipboard ×3, link_opener ×3, osc8 ×2, display_refresh, key.rs — Windows impl verified)
 - CONFIRMED: 77 (step 3 verified — production code works cross-platform, test fixtures use Unix paths, cross-platform contracts verified)
 - NOT_AN_EXCLUSION: 1 (production code with legitimate platform-specific behavior)
-- RESOLVED_IN_P11_P12_13: 127 (cfg guard removed from source — re-scan confirmed; includes P11 workspace_classifier/persistence/worktree_pool + P13 scrollback/btw_overlay/prompt_images/grep+glob/tool_paths/gitignore)
-- REMAINING_NEED_FIX: 12 (P12 scoped — acp_session hooks/updates/compaction/signals + terminal PTY + active_sessions/folder_trust/mvp_agent/subagent/auth_lock/extensions/leader_lock)
+- RESOLVED_IN_P11_P12_13: 32 (includes P11 workspace_classifier/persistence/worktree_pool + P13 scrollback/btw_overlay/prompt_images/grep+glob/tool_paths/gitignore)
+- REMAINING_NEED_FIX: 76 (P12 scoped — acp_session + hooks + updates + compaction + signals + terminal PTY + active_sessions/folder_trust/mvp_agent/subagent/auth_lock/extensions/leader_lock)
 
 | ID | file | line | symbol/test | cfg expression | classification | owner phase | repair task | rationale evidence | status |
 |---|---|---|---|---|---|---|---|---|---|
