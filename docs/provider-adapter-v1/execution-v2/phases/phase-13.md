@@ -11,7 +11,7 @@
 - Failure class: compile-contract
 - First causal error: E0425/E0282 in theme_cache::test_lock
 - Fingerprint: <PATH> in theme_cache::test_lock
-- Status: NOT_STARTED
+- Status: COMPLETED (fixed in P3, commit 68abd1f)
 
 ### P13-R-BL-WIN-CHECK-001: repair BL-WIN-CHECK-001
 
@@ -21,7 +21,7 @@
 - Failure class: compile-contract
 - First causal error: E0425: cannot find function set_show_thinking_blocks in module minimal_api
 - Fingerprint: E0425: cannot find function set_show_thinking_blocks in module minimal_api
-- Status: NOT_STARTED
+- Status: COMPLETED (fixed in P3, commits cc9102d + 68abd1f)
 
 ### P13-R-BL-WIN-CLIPPY-001: repair BL-WIN-CLIPPY-001
 
@@ -31,7 +31,7 @@
 - Failure class: clippy
 - First causal error: type_complexity: Mutex<Option<Vec<(String, Vec<u8>)>>> in signed_policy.rs:75
 - Fingerprint: type_complexity: Mutex<Option<Vec<(String, Vec<u8>)>>> in signed_policy.rs:75
-- Status: NOT_STARTED
+- Status: COMPLETED (fixed in P3, commit cc9102d — type alias OverrideKeys)
 
 ### P13-R-WX-b5bdbeebf180: repair WX-b5bdbeebf180
 
