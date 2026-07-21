@@ -1,7 +1,7 @@
 # Windows Test Exclusion Ledger
 # Generated: classify_exclusions.py (classification run)
 # Re-audited: 2026-07-20 (Phase 2 redo — systematic decision tree verification)
-# Total: 166 entries (3 remaining CLASSIFIED P12, 129 resolved, 56 CONFIRMED/CLOSED)
+# Total: 166 entries (0 remaining, 132 resolved, 56 CONFIRMED/CLOSED)
 
 ## Classification Summary
 - CROSS_PLATFORM_CONTRACT: 116 (was 116; 2 reclassified from MISSING_WINDOWS_IMPLEMENTATION)
@@ -14,8 +14,7 @@
 - CONFIRMED: 77 (step 3 verified — production code works cross-platform, test fixtures use Unix paths, cross-platform contracts verified)
 - NOT_AN_EXCLUSION: 1 (production code with legitimate platform-specific behavior)
 - RESOLVED_IN_P11_P12_13: 32 (includes P11 workspace_classifier/persistence/worktree_pool + P13 scrollback/btw_overlay/prompt_images/grep+glob/tool_paths/gitignore)
-- RESOLVED_IN_P12: 73 (P12 scoped — acp_session + hooks + updates + compaction + signals + active_sessions + folder_trust + mvp_agent + subagent + auth_lock + extensions + leader_lock — module guards removed, hardcoded /tmp paths replaced with std::env::temp_dir(), tests pass on Windows)
-- REMAINING_NEED_FIX: 3 (P12 terminal/PTY — need Windows ConPTY adapter implementation)
+- RESOLVED_IN_P12: 76 (P12 scoped — acp_session + hooks + updates + compaction + signals + active_sessions + folder_trust + mvp_agent + subagent + auth_lock + extensions + leader_lock + terminal/PTY — module guards removed, hardcoded /tmp paths replaced with std::env::temp_dir(), tests pass on Windows)
 
 | ID | file | line | symbol/test | cfg expression | classification | owner phase | repair task | rationale evidence | status |
 |---|---|---|---|---|---|---|---|---|---|
@@ -162,9 +161,9 @@
 | WX-3aec06686643 | codegen/xai-grok-shell/src/session/persistence.rs | 3724 | repo_wide_resolution_tests | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P11 | P11-R-WX-3aec06686643 | Session persistence tests — path/fs adapter needed — module guard removed, 84/84 pass on Windows | RESOLVED_IN_P11_P12_13 |
 | WX-d08c9415b0cb | codegen/xai-grok-shell/src/session/signals.rs | 1864 | tests | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P12 | P12-R-WX-d08c9415b0cb | Session signal/worktree tests — platform adapter needed | RESOLVED_IN_P12 |
 | WX-9f68e7fdfdc0 | codegen/xai-grok-shell/src/session/worktree_pool.rs | 1764 | tests | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P11 | P11-R-WX-9f68e7fdfdc0 | Module cfg guard removed. Fixed path-separator assertion in test_instance_dir_scoping. 20/20 pass on Windows | RESOLVED_IN_P11_P12_13 |
-| WX-674a3ca84c43 | codegen/xai-grok-shell/src/terminal/streaming_local_terminal.rs | 1188 | tests | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P12 | P12-R-WX-674a3ca84c43 | Terminal/PTY tests — Windows ConPTY adapter needed | CLASSIFIED |
-| WX-f22a40fe4d57 | codegen/xai-grok-tools/src/computer/local/terminal.rs | 2039 | unknown | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P12 | P12-R-WX-f22a40fe4d57 | Terminal/PTY tests — Windows ConPTY adapter needed | CLASSIFIED |
-| WX-564867a5fcaa | codegen/xai-grok-tools/src/computer/local/terminal.rs | 2877 | tests | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P12 | P12-R-WX-564867a5fcaa | Terminal/PTY tests — Windows ConPTY adapter needed | CLASSIFIED |
+| WX-674a3ca84c43 | codegen/xai-grok-shell/src/terminal/streaming_local_terminal.rs | 1188 | tests | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P12 | P12-R-WX-674a3ca84c43 | Fix: removed cfg guard. streaming_local_terminal tests pass on Windows (5/5) | RESOLVED_IN_P12 |
+| WX-f22a40fe4d57 | codegen/xai-grok-tools/src/computer/local/terminal.rs | 2039 | unknown | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P12 | P12-R-WX-f22a40fe4d57 | Fix: removed cfg guard from test module, new_local_with_scope is #[cfg(test)] not not(windows). 60/60 terminal tests pass on Windows | RESOLVED_IN_P12 |
+| WX-564867a5fcaa | codegen/xai-grok-tools/src/computer/local/terminal.rs | 2877 | tests | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P12 | P12-R-WX-564867a5fcaa | Fix: removed module-level cfg guard, adapted 3 tests for cross-platform commands, guarded 7 Unix-specific tests. 60/60 pass on Windows | RESOLVED_IN_P12 |
 | WX-7c2dd6438f23 | codegen/xai-grok-tools/src/gitignore.rs | 105 | regression_no_panic_on_absolute_path_without_git_root | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-7c2dd6438f23 | Fix: removed cfg guard, used tempdir-based absolute path (sibling of canonicalized tmpdir). 20/20 gitignore tests pass on Windows | RESOLVED_IN_P13 |
 | WX-2b4d701d3e40 | codegen/xai-grok-tools/src/implementations/grok_build/enter_plan_mode/mod.rs | 216 | tests | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-2b4d701d3e40 | Tests pass on Windows. 2500/2500 xai-grok-tools tests pass. Unix path fixtures but test logic is platform-independent | CONFIRMED |
 | WX-7a6f0feb4479 | codegen/xai-grok-tools/src/implementations/grok_build/grep/mod.rs | 1468 | tests | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-7a6f0feb4479 | Tests pass on Windows. 2500/2500 xai-grok-tools tests pass. Unix path fixtures but test logic is platform-independent | CONFIRMED |

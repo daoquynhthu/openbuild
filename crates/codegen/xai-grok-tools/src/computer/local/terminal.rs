@@ -2036,7 +2036,7 @@ impl LocalTerminalBackend {
     /// Test-only: a spawn_local backend that enrolls spawned children into
     /// `scope` instead of the process-global one, so a test can `kill_all()` in
     /// isolation without latching the global scope shared by other tests.
-    #[cfg(all(test, not(target_os = "windows")))]
+    #[cfg(test)]
     pub(crate) fn new_local_with_scope(
         search_shadows: SearchShadowConfig,
         scope: crate::util::ProcessScope,
@@ -2054,7 +2054,7 @@ impl LocalTerminalBackend {
     }
 
     /// Create a backend with a custom completed-task TTL (for testing).
-    #[cfg(all(test, not(target_os = "windows")))]
+    #[cfg(test)]
     pub(crate) fn new_with_completed_task_ttl(ttl: Duration) -> Self {
         Self::new_with_ttl(
             None,
@@ -2069,7 +2069,7 @@ impl LocalTerminalBackend {
     }
 
     /// Backend with a custom foreground budget (test-only).
-    #[cfg(all(test, not(target_os = "windows")))]
+    #[cfg(test)]
     pub(crate) fn new_with_foreground_budget(budget: Duration) -> Self {
         Self::new_with_ttl(
             None,
@@ -2084,7 +2084,7 @@ impl LocalTerminalBackend {
     }
 
     /// Backend with a custom output-file size cap (test-only).
-    #[cfg(all(test, not(target_os = "windows")))]
+    #[cfg(test)]
     pub(crate) fn new_with_output_cap(output_file_cap: u64) -> Self {
         Self::new_with_ttl(
             None,
@@ -2874,7 +2874,6 @@ fn extract_exit_status(status: std::process::ExitStatus) -> ExitStatus {
 // Tests
 // ============================================================================
 
-#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2894,7 +2893,7 @@ mod tests {
 
         TerminalRunRequest {
             command: command.to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_secs(30),
             output_byte_limit: 10000,
@@ -2972,7 +2971,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_millis(200),
             output_byte_limit: 10000,
@@ -3003,7 +3002,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_millis(500),
             output_byte_limit: 10000,
@@ -3065,7 +3064,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             // 1h timeout, far longer than the 300ms budget.
             timeout: Duration::from_secs(3600),
@@ -3135,7 +3134,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             // Short timeout so the test is fast; auto_bg is OFF so the budget
             // must be ignored and the command killed on the timeout instead.
@@ -3182,7 +3181,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_secs(3600),
             output_byte_limit: 10000,
@@ -3233,7 +3232,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             // ~800ms kill/auto-bg timeout — short budget is disabled.
             timeout: Duration::from_millis(800),
@@ -3284,7 +3283,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "yes".to_string(), // floods stdout forever
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             // Long timeout: the SIZE guard, not the timeout, must fire.
             timeout: Duration::from_secs(30),
@@ -3312,6 +3311,8 @@ mod tests {
         let _ = tokio::fs::remove_file(&output_file).await;
     }
 
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn test_stderr_captured() {
         let backend = LocalTerminalBackend::new();
@@ -3343,7 +3344,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "echo 'line1'; echo 'line2'; echo 'line3'".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_secs(30),
             output_byte_limit: 10000,
@@ -3379,7 +3380,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "echo background_test && sleep 0.1".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_secs(30),
             output_byte_limit: 10000,
@@ -3419,7 +3420,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_secs(300),
             output_byte_limit: 10000,
@@ -3456,9 +3457,15 @@ mod tests {
         let backend = LocalTerminalBackend::new();
         let tmp = tempfile::TempDir::new().unwrap();
 
+        let command = if cfg!(target_os = "windows") {
+            "1..3 | ForEach-Object { Write-Output \"chunk_$_\"; Start-Sleep -Milliseconds 150 }"
+        } else {
+            "for i in 1 2 3; do echo chunk_$i; sleep 0.15; done"
+        };
+
         let request = TerminalRunRequest {
             // Command that produces output over time (not all at once)
-            command: "for i in 1 2 3; do echo chunk_$i; sleep 0.15; done".to_string(),
+            command: command.to_string(),
             working_directory: tmp.path().to_path_buf(),
             env: HashMap::new(),
             timeout: Duration::from_secs(5),
@@ -3530,10 +3537,16 @@ mod tests {
         let backend = LocalTerminalBackend::new();
         let tmp = tempfile::TempDir::new().unwrap();
 
+        let command = if cfg!(target_os = "windows") {
+            "1..60 | ForEach-Object { Write-Output (\"LINE{0:D3}-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\" -f $_); Start-Sleep -Milliseconds 30 }"
+        } else {
+            "for i in $(seq 1 60); do printf 'LINE%03d-XXXXXXXXXXXXXXXXXXXX\\n' \"$i\"; sleep 0.03; done"
+        };
+
         let request = TerminalRunRequest {
             // ~1.8 KB of ASCII over ~1.8s; far exceeds the 200-char limit so
             // truncation fires early and keeps firing on the shrinking tail.
-            command: "for i in $(seq 1 60); do printf 'LINE%03d-XXXXXXXXXXXXXXXXXXXX\\n' \"$i\"; sleep 0.03; done".to_string(),
+            command: command.to_string(),
             working_directory: tmp.path().to_path_buf(),
             env: HashMap::new(),
             timeout: Duration::from_secs(10),
@@ -3786,7 +3799,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_millis(200),
             output_byte_limit: 10000,
@@ -3819,7 +3832,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "echo before_kill; sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_secs(30),
             output_byte_limit: 10000,
@@ -3863,7 +3876,7 @@ mod tests {
 
         let request = TerminalRunRequest {
             command: "echo before_timeout; sleep 60".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_secs(2),
             output_byte_limit: 10000,
@@ -3892,7 +3905,7 @@ mod tests {
         let backend = LocalTerminalBackend::new();
         let request = TerminalRunRequest {
             command: "sleep 300 &\nsleep 1\necho done".to_string(),
-            working_directory: PathBuf::from("/tmp"),
+            working_directory: std::env::temp_dir(),
             env: HashMap::new(),
             timeout: Duration::from_secs(30),
             output_byte_limit: 10000,
@@ -4112,6 +4125,10 @@ mod tests {
     /// in `self.processes` for `COMPLETED_TASK_TTL`; if the actor kept the `Arc`
     /// that long, a `kill_all()` on exit could `killpg` a pid the OS recycled.
     /// Asserts the injected scope's live-group count goes 1 -> 0 across the reap.
+    ///
+    /// Unix-only: on Windows the group is a JobObject HANDLE (no recyclable pid),
+    /// so the Arc is released when the `ProcessState` is removed (line 1286).
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn reaped_background_child_leaves_scope_empty() {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -4130,7 +4147,8 @@ mod tests {
             // live_count below so we can observe the `1` end of the transition.
             // The actor's first poll tick fires right after spawn, and `true`
             // could already be reaped by then, making the `== 1` check racy.
-            let mut bg_req = make_request("sleep 1");
+            let sleep_cmd = if cfg!(target_os = "windows") { "Start-Sleep -Seconds 1" } else { "sleep 1" };
+            let mut bg_req = make_request(sleep_cmd);
             bg_req.tool_call_id = "bg-reap-1".to_string();
             let bg = backend
                 .run_background(bg_req)
@@ -4167,6 +4185,8 @@ mod tests {
     // ================================================================
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    #[tokio::test]
     async fn test_persistent_shell_cd_persists() {
         let backend = LocalTerminalBackend::with_persistent_shell();
 
@@ -4184,6 +4204,8 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn test_persistent_shell_env_var_persists() {
         let backend = LocalTerminalBackend::with_persistent_shell();
@@ -4207,6 +4229,8 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    #[tokio::test]
     async fn test_persistent_shell_clears_gpg_tty() {
         // GPG_TTY must be forced empty on the live path even when supplied via the request env.
         let backend = LocalTerminalBackend::with_persistent_shell();
@@ -4226,6 +4250,8 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    #[tokio::test]
     async fn test_persistent_shell_function_persists() {
         let backend = LocalTerminalBackend::with_persistent_shell();
 
@@ -4244,6 +4270,8 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn test_persistent_shell_variable_capture() {
         let backend = LocalTerminalBackend::with_persistent_shell();
@@ -4265,6 +4293,8 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn test_non_persistent_shell_no_state() {
         // Verify the default (non-persistent) mode doesn't carry state.
