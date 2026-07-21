@@ -414,7 +414,12 @@ All 12 P13 tasks resolved:
 - Fixed hidden bug: `(ctx.session_resolver)().filter(|_| has_sess)` called the closure unconditionally; changed to short-circuit guard so session resolver is NOT invoked when `Session` candidate absent
 ### P8-010E: Extra headers isolation through prepare_sampler_config
 - Added 5 tests: `header_isolation_two_independent_calls_differ`, `invalid_header_name_in_request_overrides_rejected`, `invalid_header_value_in_request_overrides_rejected`, `conflict_between_static_header_and_auth_header_rejected`, `same_static_and_auth_header_value_allowed`
-- All 28 prepared::tests pass ✅
+### P8-002: Remove old CredentialSource/Inline/Public types
+- Removed `CredentialSource` enum, `ResolvedCredential` struct, `resolve_credential_source` fn, `candidates_to_source` fn from `auth.rs`
+- Rewrote `apply_auth_policy` to use direct env/session resolution (`resolve_candidates_legacy`) instead of going through `CredentialSource`
+- Removed `resolve_shell_credential` from `xai-grok-shell/src/auth/provider_adapter.rs` (was dead code)
+- Removed 3 dead tests (credential_source_public_vs_none, credential_source_resolve_inline_none, public_is_distinct_from_none_for_auth)
+- `cargo check -p xai-grok-provider -p xai-grok-shell` clean, `cargo clippy` clean
 
 ### P8-007: Header merge layer ordering fix
 - Fixed `prepare_sampler_config`: Layer 3 (provider extra) no longer incorrectly duplicates Layer 2 (route static)
