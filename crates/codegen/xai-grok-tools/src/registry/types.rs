@@ -2155,12 +2155,11 @@ mod tests {
     /// tool description is fully rendered -- no unresolved MiniJinja vars,
     /// no stale `{max_*}` placeholders, no empty tool-name references from
     /// missing conditional guards.
-    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn full_toolset_descriptions_render_cleanly() {
         use crate::implementations::grok_build::{
-            DEPLOY_APP_TOOL_NAME, IMAGE_GEN_TOOL_NAME, IMAGE_TO_VIDEO_TOOL_NAME,
-            REFERENCE_TO_VIDEO_TOOL_NAME, SCHEDULER_CREATE_TOOL_NAME, SCHEDULER_DELETE_TOOL_NAME,
+            IMAGE_GEN_TOOL_NAME, IMAGE_TO_VIDEO_TOOL_NAME, REFERENCE_TO_VIDEO_TOOL_NAME,
+            SCHEDULER_CREATE_TOOL_NAME, SCHEDULER_DELETE_TOOL_NAME,
         };
         let builder = ToolRegistryBuilder::new();
         let config = ToolServerConfig {
@@ -2181,7 +2180,6 @@ mod tests {
                 "web_fetch",
                 "lsp",
                 IMAGE_GEN_TOOL_NAME,
-                DEPLOY_APP_TOOL_NAME,
                 IMAGE_TO_VIDEO_TOOL_NAME,
                 REFERENCE_TO_VIDEO_TOOL_NAME,
                 "monitor",

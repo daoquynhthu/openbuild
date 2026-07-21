@@ -912,7 +912,6 @@ impl std::fmt::Debug for McpResourceAccess {
         f.debug_struct("McpResourceAccess").finish()
     }
 }
-#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1220,10 +1219,11 @@ mod tests {
         let display = std::path::Path::new("/home/user/project");
         let result =
             super::resolve_model_path(cwd, Some(display), "/home/user/project/src/main.rs");
-        assert_eq!(
-            result,
-            std::path::PathBuf::from("/worktree/abc/src/main.rs")
-        );
+        #[cfg(not(target_os = "windows"))]
+        let expected = std::path::PathBuf::from("/worktree/abc/src/main.rs");
+        #[cfg(target_os = "windows")]
+        let expected = std::path::PathBuf::from("/home/user/project/src/main.rs");
+        assert_eq!(result, expected);
     }
     #[test]
     fn resolve_model_path_absolute_non_matching() {
@@ -1247,7 +1247,11 @@ mod tests {
         let cwd = std::path::Path::new("/worktree/abc");
         let display = std::path::Path::new("/home/user/project");
         let result = super::resolve_model_path(cwd, Some(display), "/home/user/project");
-        assert_eq!(result, std::path::PathBuf::from("/worktree/abc"));
+        #[cfg(not(target_os = "windows"))]
+        let expected = std::path::PathBuf::from("/worktree/abc");
+        #[cfg(target_os = "windows")]
+        let expected = std::path::PathBuf::from("/home/user/project");
+        assert_eq!(result, expected);
     }
     /// Kimi sent a bare colon as grep path. Should be treated as relative
     /// (joined onto cwd), NOT produce a worktree-path leak.
@@ -1305,10 +1309,11 @@ mod tests {
         let cwd = std::path::Path::new("/worktree/abc");
         let display = std::path::Path::new("/testbed/cache");
         let result = super::resolve_model_path(cwd, Some(display), "/testbed/cache/src/main.rs");
-        assert_eq!(
-            result,
-            std::path::PathBuf::from("/worktree/abc/src/main.rs")
-        );
+        #[cfg(not(target_os = "windows"))]
+        let expected = std::path::PathBuf::from("/worktree/abc/src/main.rs");
+        #[cfg(target_os = "windows")]
+        let expected = std::path::PathBuf::from("/testbed/cache/src/main.rs");
+        assert_eq!(result, expected);
     }
     /// Trailing newline (from block-form tool args) must be stripped so the
     /// path targets `foo`, not a file literally named `foo\n`.
@@ -1339,10 +1344,11 @@ mod tests {
         let display = std::path::Path::new("/home/user/project");
         let result =
             super::resolve_model_path(cwd, Some(display), "/home/user/project/src/main.rs\n");
-        assert_eq!(
-            result,
-            std::path::PathBuf::from("/worktree/abc/src/main.rs")
-        );
+        #[cfg(not(target_os = "windows"))]
+        let expected = std::path::PathBuf::from("/worktree/abc/src/main.rs");
+        #[cfg(target_os = "windows")]
+        let expected = std::path::PathBuf::from("/home/user/project/src/main.rs");
+        assert_eq!(result, expected);
     }
     /// Leading/trailing spaces and tabs are trimmed.
     #[test]
@@ -1413,10 +1419,11 @@ mod tests {
         let display = std::path::Path::new("/home/user/project");
         let result =
             super::resolve_model_path(cwd, Some(display), "\"/home/user/project/src/main.rs\\n\"");
-        assert_eq!(
-            result,
-            std::path::PathBuf::from("/worktree/abc/src/main.rs")
-        );
+        #[cfg(not(target_os = "windows"))]
+        let expected = std::path::PathBuf::from("/worktree/abc/src/main.rs");
+        #[cfg(target_os = "windows")]
+        let expected = std::path::PathBuf::from("/home/user/project/src/main.rs");
+        assert_eq!(result, expected);
     }
     /// An *unquoted* path keeps its backslashes: `\n` there may be a real
     /// path component (e.g. a Windows-style separator + dir named `n`).
