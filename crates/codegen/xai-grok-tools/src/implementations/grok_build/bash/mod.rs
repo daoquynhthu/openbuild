@@ -2212,7 +2212,6 @@ impl xai_tool_runtime::Tool for BashTool {
 // Tests
 // ───────────────────────────────────────────────────────────────────────────
 
-#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2700,6 +2699,7 @@ mod tests {
 
     /// Absent `WorkspaceViewerContext` extension = no Progress emitted;
     /// terminal still surfaces.
+    #[cfg_attr(target_os = "windows", ignore)]
     #[tokio::test]
     async fn bash_streaming_progress_suppressed_when_gate_off() {
         use futures::StreamExt;
@@ -2748,6 +2748,7 @@ mod tests {
 
     /// Gate ON (via `test_ctx`): ≥1 `bash_output_chunk` then exactly
     /// one `Terminal(Ok(Foreground))`, in order.
+    #[cfg_attr(target_os = "windows", ignore)]
     #[tokio::test]
     async fn bash_streaming_progress() {
         use futures::StreamExt;
@@ -2796,6 +2797,7 @@ mod tests {
     /// byte limit mid-stream, deltas KEEP arriving after truncation, the
     /// reported `total_bytes` stays monotonic and consistent with the delta
     /// lengths, and `truncated` is surfaced.
+    #[cfg_attr(target_os = "windows", ignore)]
     #[tokio::test]
     async fn bash_streaming_progress_survives_truncation() {
         use futures::StreamExt;
