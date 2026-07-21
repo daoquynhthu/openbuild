@@ -10497,7 +10497,6 @@ hooks = true
         });
         assert!(cfg.path_not_found_hints);
     }
-    #[cfg(not(target_os = "windows"))]
     #[test]
     #[serial]
     fn resolve_runtime_fields_idempotent() {

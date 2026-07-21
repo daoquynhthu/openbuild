@@ -312,45 +312,33 @@
 
 ## Phase 13: Pager Render, Images, Tools, Remaining Platform Closure — 2026-07-21
 
-### P13-009: Remove cfg guards from discovery, resources, registry
-- `discovery.rs:924` — removed cfg guard, normalized with `replace('\\', '/')` — 40 pass
-- `resources.rs:915` — removed cfg guard, `#[cfg(windows)]` expected values for display-cwd rewrite — 66 pass
-- `registry/types.rs:2158` — removed cfg guard + removed `deploy_app` (unimplemented stub) — 55 pass
+### V2 Closure Plan Repair Cards (execution-v2/phase-13.md)
 
-### P13-009b: Enter plan mode, grep (grok_build), read_file
-- `enter_plan_mode`, `grep/mod.rs`, `read_file/mod.rs` — removed cfg guards, fixed path assertions + IsADirectory test — 33+35+89 pass
+All 12 P13 tasks resolved:
 
-### P13-009c: Web_fetch error/client/overflow
-- Removed cfg guards from error.rs, client.rs, overflow.rs — fixed `which_in` test (`gh.bat`) and path assertions — 4+30+85 pass
-
-### P13-009d: Bash, foreign_sessions, image_describe, event_loop
-- `bash/mod.rs` — 141/144 pass (3 ignored — real bash commands)
-- `foreign_sessions` — path normalisation
-- `image_describe` — path normalisation
-- `event_loop.rs:3116` — NOT_AN_EXCLUSION (production code)
-- 2418 lib tests pass
-
-### P13-010: tool_paths + gitignore
-- `tool_paths.rs` — removed cfg guard, normalized path assertions with `.replace('\\', "/")` — 15/15 pass
-- `gitignore.rs` — removed cfg guard, tempdir-based absolute path — 20/20 pass
-- `prompt.rs:3274,3356` — reverted (bash-specific suggestions)
-- `marketplace/git.rs:390` — reverted (Windows file locking difference)
-
-### P13-011..019: Shell crate — remove cfg guards from all 10 Group B files
-- P13-011: `active_sessions.rs` — module guard removed, 4/5 pass; 1 `#[cfg(not(windows))]` (LockFileEx WouldBlock)
-- P13-012: `leader/lock.rs` — module guard removed, 15/15 pass; 4 `#[cfg(not(windows))]` (Unix paths + read-while-locked)
-- P13-013: `auth/manager/lock.rs` — module guard removed, 5/7 pass; 2 `#[cfg(not(windows))]` (read-while-locked)
-- P13-014: `agent/config.rs` inline tests — module guard removed, 297/302 pass; 5 `#[cfg(not(windows))]` (credential needs `XAI_API_KEY`)
-- P13-015: `folder_trust.rs` — module guard removed, 38/41 pass; 3 `#[cfg(not(windows))]` (`HOME` env)
-- P13-016: `extensions/bundle.rs` — module guard removed, 31/32 pass; 1 `#[cfg(not(windows))]` (`HOME` env)
-- P13-017: `config/mod.rs` + `config/tests.rs` — module guard removed, 498/500 pass; 2 `#[cfg(not(windows))]` (`HOME` + test-interaction)
-- P13-018: `subagent/tests` — module guard removed, `tmp_abs_path()` helper replaces 25 `/tmp` refs
-- P13-019: `extensions/suggest/file_provider.rs` + `path_provider.rs` — module guards removed, 16 suggest_* tests gated per-test (production `suggest()` returns empty on Windows per POSIX-only shell_token); fixed `scan_deduplicates_across_dirs` path separator; all 173 suggest tests pass
-- P13-020: xai-grok-pager-minimal - BL-WIN-TEST-001/CHECK-001 already resolved by prior cfg guard work (compile); fixed 2 test failures (`transcript_uses_owning_session_cwd_for_tool_paths`, `committed_renderer_uses_owning_session_cwd_for_tool_paths`) with path-separator normalization; 61/61 tests pass
-- P13-021: xai-grok-pager — gate 17 shell_completion + 1 selection + 1 entry_renderer tests with `#[cfg(not(windows))]` (Unix-only shell completion Tab, path separator, color quantization difference); all 7083 lib tests pass, 0 failed
+| Task | Count | Scope |
+|------|-------|-------|
+| P13-001 | 5 | prompt_images — CROSS_PLATFORM_CONTRACT, 152/152 pass |
+| P13-002 | 2 | osc8/link — Windows impl added, 49/49 pass |
+| P13-003 | 2 | display_refresh + key.rs — paired cfg impls, 17+371 pass |
+| P13-004 | 10 | scrollback/render/tool/edit/entry_renderer — CONFIRMED, 974/974 pass |
+| P13-005 | 19 | shell_completion/dispatch — PLATFORM_ADAPTER_CONTRACT |
+| P13-006 | 5 | grep/read_file/web_fetch — CONFIRMED, 2500/2500 tools pass |
+| P13-007 | 2 | glob/grep (opencode) — CONFIRMED |
+| P13-008 | 1 | enter_plan_mode — CONFIRMED |
+| P13-009 | 1 | LSP — CONFIRMED |
+| P13-010 | 3 | host_clipboard — CLOSED from P12 |
+| P13-011 | 2 | image_describe/bash — already RESOLVED_IN_P13 |
+| P13-012 | — | Full exclusion ledger zero review — no P13 CLASSIFIED remaining |
 
 ### Key results
-- RESOLVED_IN_P11_P12_13 = 106 entries (from 104)
-- CROSS_PLATFORM_CONTRACT entries reduced to ~9 still in code
-- Phase 13 BL cards all verifiably resolved (BL-WIN-TEST-001, BL-WIN-CHECK-001 compile on Windows; BL-WIN-CLIPPY-001 passes clippy -D warnings)
-- `cargo test -p xai-grok-pager --lib`: 7083 passed, 0 failed, 6 ignored
+- Exclusion ledger: CONFIRMED 34→77, CLOSED 8→10, RESOLVED_IN_P11_P12_13=106
+- No P13-scoped entries remain CLASSIFIED
+- `cargo check --workspace`: passes ✅
+- `cargo clippy --workspace -- -D warnings`: passes ✅
+- `cargo test -p xai-grok-pager --lib -- scrollback`: 974 passed ✅
+- `cargo test -p xai-grok-pager-render --lib -- prompt_images`: 152 passed ✅
+- `cargo test -p xai-grok-pager-render --lib -- osc8`: 49 passed ✅
+- `cargo test -p xai-grok-pager-render --lib -- display_refresh`: 17 passed ✅
+- `cargo test -p xai-grok-pager --lib -- key`: 371 passed ✅
+- `cargo test -p xai-grok-tools --lib`: 2500 passed (2497+3ignored) ✅
