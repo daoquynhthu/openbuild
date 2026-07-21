@@ -1,19 +1,19 @@
 # Implementation Plan — Model Adapter Layer (Historical)
 
-> **⚠️ HISTORICAL — SUPERSEDED**
+> **⚠️ 作废 — 以 V2 计划为准**
 >
-> This file is preserved as a historical record. The provider-adapter V1 production
-> closure is now governed by `docs/openbuild_provider_adapter_production_v1_plan_2026-07-17.md`,
-> which supersedes all prior execution sequences in this document.
+> 本文件保留为历史记录。Provider Adapter V1 生产闭环的**唯一执行权威**是：
+> `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md`
 >
-> **Do not use this file for execution decisions.**
+> **禁止使用本文件进行任何执行决策。**
 >
-> ---
+> 其他已作废的计划文档包括（不限于）：
+> - `docs/openbuild_provider_adapter_production_v1_plan_2026-07-17.md` — V1 计划，仅历史参考
+> - `docs/provider-adapter-v1/execution-v2/phases/phase-*.md` — 分阶段卡片，已由 V2 计划吸收或取代
+> - `PROGRESS.md` — 仅作为历史进度记录，不得作为完成声明
+> - `ISSUE.md` — 仅作为历史审计记录
 >
-> **参考架构文档**: `docs/model-adapter-architecture.md`
-> **目标分支**: `feat/provider-adapter`
->
-> 本文档是施工的唯一路线图。所有实现工作必须严格遵循此计划推进。
+> 详见 V2 计划 §1 文档权威顺序。
 
 ---
 
