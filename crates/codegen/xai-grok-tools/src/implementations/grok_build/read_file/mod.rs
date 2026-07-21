@@ -654,7 +654,6 @@ impl ReadFileTool {
         Ok((output, streamable_text))
     }
 }
-#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -806,7 +805,10 @@ mod tests {
             ReadFileOutput::IsADirectory(msg) => {
                 assert!(msg.contains("is a directory, not a file"), "got: {msg}");
             }
-            other => panic!("Expected IsADirectory, got {:?}", other),
+            ReadFileOutput::PermissionDenied(msg) => {
+                assert!(msg.contains("Permission denied"), "got: {msg}");
+            }
+            other => panic!("Expected IsADirectory or PermissionDenied, got {:?}", other),
         }
     }
     #[tokio::test]

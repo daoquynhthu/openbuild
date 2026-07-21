@@ -213,7 +213,6 @@ async fn probe_or_create_empty_plan_file(
     }
 }
 
-#[cfg(not(target_os = "windows"))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -629,7 +628,10 @@ mod tests {
         let EnterPlanModeOutput::Entered {
             ref plan_file_path, ..
         } = result;
-        assert_eq!(plan_file_path, "/workspace/my-project/.grok/plan.md");
+        assert!(
+            std::path::Path::new(plan_file_path).ends_with(".grok/plan.md"),
+            "expected plan_file_path to contain .grok/plan.md, got {plan_file_path}"
+        );
     }
 
     #[tokio::test]
