@@ -489,7 +489,7 @@ pub(crate) async fn try_lock_auth_file_async(
     None
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
@@ -580,6 +580,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn test_nonblocking_acquire_writes_holder_info() {
         // fix: advisory cleanup sites must record `PID:TS`, never hold the
@@ -760,6 +761,7 @@ mod tests {
 
     // ── Async tests against the production code path ─────────────────
 
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn test_async_acquire_release_basic() {
         let dir = TempDir::new().unwrap();
