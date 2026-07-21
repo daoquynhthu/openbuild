@@ -208,7 +208,7 @@ fn is_pid_alive(pid: u32) -> bool {
     }
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
@@ -258,6 +258,7 @@ mod tests {
         assert_eq!(list_in(dir.path()).unwrap().len(), 10);
     }
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn try_unregister_skips_if_locked() {
         let dir = TempDir::new().unwrap();
