@@ -11,9 +11,9 @@
 
 ## Status Summary
 - CLOSED: 8 (host_clipboard ×3, link_opener ×3, osc8 ×2 — Windows impl verified)
-- CONFIRMED: 32 (step 3 verified — production code works cross-platform, test fixtures use Unix paths)
-- RESOLVED_IN_P11_P12_13: 84 (cfg guard removed from source — re-scan confirmed)
-- REMAINING_NEED_FIX: 42 (MISSING_WINDOWS_IMPLEMENTATION or PLATFORM_ADAPTER_CONTRACT — needs implementation)
+- CONFIRMED: 34 (step 3 verified — production code works cross-platform, test fixtures use Unix paths, cross-platform contracts verified)
+- RESOLVED_IN_P11_P12_13: 97 (cfg guard removed from source — re-scan confirmed; includes P13 scrollback/btw_overlay/prompt_images/grep+glob)
+- REMAINING_NEED_FIX: 35 (MISSING_WINDOWS_IMPLEMENTATION or PLATFORM_ADAPTER_CONTRACT — needs implementation)
 
 | ID | file | line | symbol/test | cfg expression | classification | owner phase | repair task | rationale evidence | status |
 |---|---|---|---|---|---|---|---|---|---|
@@ -69,9 +69,9 @@
 | WX-4c8f87fe37e5 | codegen/xai-grok-pager/src/scrollback/render.rs | 3515 | long_read_header_link_is_clipped_to_offset_content_area | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-4c8f87fe37e5 | Pager tests for `long_read_header_link_is_clipped_to_offset_content_area` — platform adapter needed | CLASSIFIED |
 | WX-9d10fe1d019b | codegen/xai-grok-pager/src/scrollback/render.rs | 3536 | explicit_tool_link_clips_before_u16_conversion | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-9d10fe1d019b | Pager tests for `explicit_tool_link_clips_before_u16_conversion` — platform adapter needed | CLASSIFIED |
 | WX-4dee6ae9647f | codegen/xai-grok-pager/src/scrollback/wrappers/entry_renderer.rs | 1484 | background_block_gutter_uses_block_background_fill | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-4dee6ae9647f | Pager tests for `background_block_gutter_uses_block_background_fill` — platform adapter needed | CLASSIFIED |
-| WX-fc78f4c9e7be | codegen/xai-grok-pager/src/views/btw_overlay.rs | 733 | done_state_scans_file_paths_like_scrollback | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-fc78f4c9e7be | Pager tests for `done_state_scans_file_paths_like_scrollback` — platform adapter needed | CLASSIFIED |
-| WX-b5bdbeebf180 | codegen/xai-grok-pager/src/views/shortcuts_help.rs | 107 | PASTE_LONG_HELP | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-b5bdbeebf180 | Pager tests for `PASTE_LONG_HELP` — platform adapter needed | CLASSIFIED |
-| WX-f3884462acf3 | codegen/xai-grok-pager/src/views/shortcuts_help.rs | 1845 | paste_is_dimmed | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-f3884462acf3 | Pager tests for `paste_is_dimmed` — platform adapter needed | CLASSIFIED |
+| WX-fc78f4c9e7be | codegen/xai-grok-pager/src/views/btw_overlay.rs | 733 | done_state_scans_file_paths_like_scrollback | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-fc78f4c9e7be | Fix: removed cfg guard. Test uses Unix path matched by scanner regex on all platforms. All 15 btw_overlay tests pass on Windows | RESOLVED_IN_P13 |
+| WX-b5bdbeebf180 | codegen/xai-grok-pager/src/views/shortcuts_help.rs | 107 | PASTE_LONG_HELP | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-b5bdbeebf180 | Step 3 verified: platform-specific help text const (Win/Mac/Linux variants). Test build_entries_includes_paste runs unguarded and passes on Windows | CONFIRMED |
+| WX-f3884462acf3 | codegen/xai-grok-pager/src/views/shortcuts_help.rs | 1845 | paste_is_dimmed | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-f3884462acf3 | Step 3 verified: Alt+V paste assertion differs per platform (Windows uses Alt+V fallback, non-Windows doesn't). Correct cross-platform contract | CONFIRMED |
 | WX-5949fac7edb3 | codegen/xai-grok-plugin-marketplace/src/git.rs | 390 | cache_lease_blocks_concurrent_reclone_during_scan | not(target_os = "windows") | PLATFORM_ADAPTER_CONTRACT | P11 | P11-R-WX-5949fac7edb3 | Tests for `cache_lease_blocks_concurrent_reclone_during_scan` — platform behavior adapter needed | CLASSIFIED |
 | WX-6362e9ae82f7 | codegen/xai-grok-shell/src/active_sessions.rs | 211 | tests | not(target_os = "windows") | PLATFORM_ADAPTER_CONTRACT | P12 | P12-R-WX-6362e9ae82f7 | Tests for `tests` — platform behavior adapter needed | CLASSIFIED |
 | WX-37b4e7a0b594 | codegen/xai-grok-shell/src/agent/config.rs | 5051 | tests | not(target_os = "windows") | PLATFORM_ADAPTER_CONTRACT | P11 | P11-R-WX-37b4e7a0b594 | Tests for `tests` — platform behavior adapter needed | CLASSIFIED |
