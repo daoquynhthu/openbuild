@@ -409,7 +409,10 @@ All 12 P13 tasks resolved:
 ### P8-010D: No-auth through prepare_sampler_config
 - Added 3 tests: `no_auth_produces_no_authorization_header`, `no_auth_with_request_override_still_omits_auth`, `no_auth_static_headers_are_still_preserved`
 
-- All 18 prepared::tests pass ✅
+### P8-010C: xAI session resolver through prepare_sampler_config
+- Added 5 tests: `session_used_only_when_explicit_candidates_missing`, `session_fills_when_all_explicit_candidates_absent`, `session_returning_none_fails_when_required`, `session_not_used_when_session_candidate_absent`, `optional_session_not_used_when_session_candidate_absent`
+- Fixed hidden bug: `(ctx.session_resolver)().filter(|_| has_sess)` called the closure unconditionally; changed to short-circuit guard so session resolver is NOT invoked when `Session` candidate absent
+- All 23 prepared::tests pass ✅
 
 ### P8-007: Header merge layer ordering fix
 - Fixed `prepare_sampler_config`: Layer 3 (provider extra) no longer incorrectly duplicates Layer 2 (route static)
