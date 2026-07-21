@@ -636,6 +636,149 @@ mod tests {
         assert_eq!(custom.unwrap().to_str().unwrap(), "custom-value");
     }
 
+    // ── P8-010E: Extra headers isolation, invalid headers, mandatory conflicts ──
+
+    #[tokio::test]
+    async fn header_isolation_two_independent_calls_differ() {
+        let val_a = SecretValue::new("sk-a".to_string());
+        let val_b = SecretValue::new("sk-b".to_string());
+        let ctx_a = RequestCredential {
+            request_override: Some(&val_a),
+            ..empty_credential()
+        };
+        let ctx_b = RequestCredential {
+            request_override: Some(&val_b),
+            ..empty_credential()
+        };
+
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+
+        let cfg_a = prepare_sampler_config(&execution, &ctx_a, &[])
+            .await
+            .expect("config A must resolve");
+        let cfg_b = prepare_sampler_config(&execution, &ctx_b, &[])
+            .await
+            .expect("config B must resolve");
+
+        let auth_a = cfg_a
+            .headers
+            .inner()
+            .get("authorization")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let auth_b = cfg_b
+            .headers
+            .inner()
+            .get("authorization")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(auth_a, "Bearer sk-a");
+        assert_eq!(auth_b, "Bearer sk-b");
+        assert_ne!(
+            auth_a, auth_b,
+            "two independent calls must produce different headers"
+        );
+    }
+
+    #[tokio::test]
+    async fn invalid_header_name_in_request_overrides_rejected() {
+        let val = SecretValue::new("sk-key".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            ..empty_credential()
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[("bad name", "value")]).await;
+        assert!(result.is_err(), "invalid header name must be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("invalid header"),
+            "error must describe invalid header: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn invalid_header_value_in_request_overrides_rejected() {
+        let val = SecretValue::new("sk-key".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            ..empty_credential()
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+        let result =
+            prepare_sampler_config(&execution, &ctx, &[("x-custom", "bad\x00value")]).await;
+        assert!(result.is_err(), "invalid header value must be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("invalid header"),
+            "error must describe invalid header: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn conflict_between_static_header_and_auth_header_rejected() {
+        let mut execution = dummy_execution(AuthPolicy::header(
+            "x-api-key",
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+        execution
+            .static_headers
+            .insert("x-api-key".to_string(), "static-value".to_string());
+
+        let val = SecretValue::new("auth-value".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            ..empty_credential()
+        };
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        assert!(
+            result.is_err(),
+            "conflicting static vs auth header must be rejected"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("header conflict"),
+            "error must describe header conflict: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn same_static_and_auth_header_value_allowed() {
+        let mut execution = dummy_execution(AuthPolicy::header(
+            "x-api-key",
+            vec![CredentialCandidate::RequestOverride],
+            true,
+        ));
+        execution
+            .static_headers
+            .insert("x-api-key".to_string(), "same-value".to_string());
+
+        let val = SecretValue::new("same-value".to_string());
+        let ctx = RequestCredential {
+            request_override: Some(&val),
+            ..empty_credential()
+        };
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        assert!(
+            result.is_ok(),
+            "matching static and auth header values must be allowed"
+        );
+    }
+
     // ── P8-010C: xAI session resolver tests ──
     //
     // Session must only be used when ALL explicit candidates are exhausted.
