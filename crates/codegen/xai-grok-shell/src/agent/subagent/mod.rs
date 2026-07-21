@@ -2838,5 +2838,5 @@ pub(crate) fn reconcile_orphaned_subagents(
         }
     }
 }
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod tests;

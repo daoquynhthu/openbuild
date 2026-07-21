@@ -3,6 +3,14 @@ use super::*;
 use crate::test_support::lsp_runtime::{
     DummyLspDispatch, ctx_with_toggle, make_request, test_gateway,
 };
+fn tmp_abs_path() -> &'static std::path::Path {
+    static TMP: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    TMP.get_or_init(|| {
+        let cwd = std::env::current_dir().expect("tmp_abs_path cwd");
+        let root = cwd.ancestors().last().expect("tmp_abs_path root");
+        root.join("tmp")
+    })
+}
 /// Invariant: resolving a subagent applies the parent session's
 /// `--tools`/`--disallowed-tools`/`--permission-mode` — driven through
 /// `resolve_agent_definition` so the spawn path can't skip them.
@@ -1053,9 +1061,9 @@ fn dummy_tracker(
     use crate::session::signals::SessionSignalsHandle;
     use std::sync::atomic::AtomicBool;
     let gateway = test_gateway();
-    let cwd = xai_grok_paths::AbsPathBuf::new(PathBuf::from("/tmp")).unwrap();
+    let cwd = xai_grok_paths::AbsPathBuf::new(tmp_abs_path().to_path_buf()).unwrap();
     let fs: Arc<dyn xai_grok_workspace::file_system::AsyncFileSystem> = Arc::new(
-        xai_grok_workspace::file_system::LocalFs::new(PathBuf::from("/tmp")),
+        xai_grok_workspace::file_system::LocalFs::new(tmp_abs_path().to_path_buf()),
     );
     let terminal: Arc<dyn crate::terminal::AsyncTerminalRunner> = Arc::new(
         crate::terminal::TerminalRunner::new(
@@ -1086,7 +1094,7 @@ fn dummy_tracker(
         ),
         info: Info {
             id: acp::SessionId::new(subagent_id),
-            cwd: "/tmp".into(),
+            cwd: tmp_abs_path().to_string_lossy().to_string(),
         },
         max_turns: None,
         hunk_tracker_handle: xai_hunk_tracker::HunkTrackerHandle::noop(),
@@ -1107,7 +1115,7 @@ fn dummy_tracker(
         code_nav_enabled: false,
         ask_user_question_enabled: true,
         plan_mode: Arc::new(
-            parking_lot::Mutex::new(PlanModeTracker::new(PathBuf::from("/tmp"))),
+            parking_lot::Mutex::new(PlanModeTracker::new(tmp_abs_path().to_path_buf())),
         ),
         force_compact: Arc::new(AtomicBool::new(false)),
         permission_handle: xai_grok_workspace::permission::PermissionHandle::allow_all(),
@@ -1895,14 +1903,14 @@ async fn bootstrap_no_fork_is_new() {
     let ctx = ctx_with_toggle(HashMap::new());
     let child = SessionInfo {
         id: acp::SessionId::new("child-boot"),
-        cwd: "/tmp".into(),
+        cwd: tmp_abs_path().to_string_lossy().to_string(),
     };
     let out = bootstrap_initial_context(
             &req,
             None,
             &ctx,
             &child,
-            Path::new("/tmp"),
+            tmp_abs_path(),
             "m",
             128_000,
         )
@@ -1924,14 +1932,14 @@ async fn bootstrap_fork_without_parent_fails_open() {
     ctx.parent_session_info = None;
     let child = SessionInfo {
         id: acp::SessionId::new("child-boot2"),
-        cwd: "/tmp".into(),
+        cwd: tmp_abs_path().to_string_lossy().to_string(),
     };
     let out = bootstrap_initial_context(
             &req,
             None,
             &ctx,
             &child,
-            Path::new("/tmp"),
+            tmp_abs_path(),
             "m",
             128_000,
         )
@@ -1964,14 +1972,14 @@ async fn bootstrap_fork_live_parent_chat_state_is_forked_with_marker() {
     ctx.parent_session_info = None;
     let child = SessionInfo {
         id: acp::SessionId::new("child-boot-live"),
-        cwd: "/tmp".into(),
+        cwd: tmp_abs_path().to_string_lossy().to_string(),
     };
     let out = bootstrap_initial_context(
             &req,
             None,
             &ctx,
             &child,
-            Path::new("/tmp"),
+            tmp_abs_path(),
             "m",
             128_000,
         )
@@ -2168,7 +2176,7 @@ async fn handle_subagent_request_valid_cwd_passes_validation() {
     let coordinator = std::cell::RefCell::new(SubagentCoordinator::new());
     let gateway = test_gateway();
     let (mut request, result_rx) = make_request("explore");
-    request.cwd = Some("/tmp".into());
+    request.cwd = Some(tmp_abs_path().to_string_lossy().to_string());
     let local = tokio::task::LocalSet::new();
     local
         .run_until(async {
@@ -2210,7 +2218,7 @@ async fn handle_subagent_request_quoted_cwd_passes_validation() {
 }
 fn make_validation_ctx(toggle: HashMap<String, bool>) -> SubagentValidationContext {
     SubagentValidationContext {
-        parent_cwd: PathBuf::from("/tmp"),
+        parent_cwd: tmp_abs_path().to_path_buf(),
         subagent_toggle: toggle,
         ..Default::default()
     }

@@ -302,7 +302,7 @@ fn compaction_no_prefix_passes_through() {
 fn resumable_source_returns_none_for_unknown_id() {
     let coordinator = SubagentCoordinator::new();
     assert!(
-        coordinator.resumable_source_for("unknown", "parent", Path::new("/tmp"))
+        coordinator.resumable_source_for("unknown", "parent", tmp_abs_path())
         .is_none()
     );
 }
@@ -311,7 +311,7 @@ fn resumable_source_returns_none_for_active_subagent() {
     let coordinator = SubagentCoordinator::new();
     assert!(! coordinator.is_active("active-id"));
     assert!(
-        coordinator.resumable_source_for("active-id", "parent", Path::new("/tmp"))
+        coordinator.resumable_source_for("active-id", "parent", tmp_abs_path())
         .is_none()
     );
 }
@@ -349,7 +349,7 @@ fn resumable_source_returns_info_for_completed_subagent() {
             },
         );
     let info = coordinator
-        .resumable_source_for("sub-resume", "parent-1", Path::new("/tmp"))
+        .resumable_source_for("sub-resume", "parent-1", tmp_abs_path())
         .expect("should find completed subagent");
     assert_eq!(info.subagent_id, "sub-resume");
     assert_eq!(info.child_session_id, "child-resume");
@@ -375,7 +375,7 @@ fn resumable_source_survives_move_to_completed_with_metadata() {
             },
         );
     let info = coordinator
-        .resumable_source_for("sub-moved", "", Path::new("/tmp"))
+        .resumable_source_for("sub-moved", "", tmp_abs_path())
         .expect("should find moved subagent");
     assert_eq!(info.subagent_id, "sub-moved");
     assert_eq!(info.child_cwd, "");
@@ -611,13 +611,13 @@ async fn set_completed_snapshot_ref_updates_in_memory_entry() {
             },
         );
     let before = coordinator
-        .resumable_source_for("sa-mem", "session-A", Path::new("/tmp"))
+        .resumable_source_for("sa-mem", "session-A", tmp_abs_path())
         .unwrap();
     assert!(before.snapshot_ref.is_none());
     coordinator
         .set_completed_snapshot_ref("sa-mem", "refs/grok/subagents/sa-mem".into());
     let after = coordinator
-        .resumable_source_for("sa-mem", "session-A", Path::new("/tmp"))
+        .resumable_source_for("sa-mem", "session-A", tmp_abs_path())
         .unwrap();
     assert_eq!(after.snapshot_ref.as_deref(), Some("refs/grok/subagents/sa-mem"));
 }
@@ -627,7 +627,7 @@ fn set_completed_snapshot_ref_unknown_id_is_noop() {
     let mut coordinator = SubagentCoordinator::new();
     coordinator.set_completed_snapshot_ref("ghost", "refs/grok/subagents/ghost".into());
     assert!(
-        coordinator.resumable_source_for("ghost", "session-A", Path::new("/tmp"))
+        coordinator.resumable_source_for("ghost", "session-A", tmp_abs_path())
         .is_none()
     );
 }
@@ -749,7 +749,7 @@ async fn completion_snapshot_sequence_persists_ref_then_removes_worktree() {
     let reread: SubagentMeta = serde_json::from_str(&data).unwrap();
     assert_eq!(reread.snapshot_ref.as_deref(), Some(ref_name));
     let src = coordinator
-        .resumable_source_for("glue-1", "session-A", Path::new("/tmp"))
+        .resumable_source_for("glue-1", "session-A", tmp_abs_path())
         .unwrap();
     assert_eq!(src.snapshot_ref.as_deref(), Some(ref_name));
     assert!(! wt.exists(), "worktree dir should be removed after the sequence");
@@ -781,7 +781,7 @@ async fn gate_on_completion_clears_model_facing_worktree_path_but_resume_retains
     let listed = coordinator.completed.get("disp-1").expect("completed entry");
     assert_eq!(None, listed.result.worktree_path);
     let src = coordinator
-        .resumable_source_for("disp-1", "session-A", Path::new("/tmp"))
+        .resumable_source_for("disp-1", "session-A", tmp_abs_path())
         .unwrap();
     assert_eq!(Some(wt), src.worktree_path);
     assert_eq!(Some("refs/grok/subagents/disp-1"), src.snapshot_ref.as_deref());
@@ -874,7 +874,7 @@ async fn completion_gate_off_preserves_and_records_no_ref() {
     );
     let coordinator = coordinator_with_completed("glue-off");
     let src = coordinator
-        .resumable_source_for("glue-off", "session-A", Path::new("/tmp"))
+        .resumable_source_for("glue-off", "session-A", tmp_abs_path())
         .unwrap();
     assert!(src.snapshot_ref.is_none(), "gate off must not record a snapshot ref");
 }
@@ -1354,11 +1354,11 @@ fn resumable_source_rejects_cross_session_lookup() {
             },
         );
     assert!(
-        coordinator.resumable_source_for("sub-other", "session-A", Path::new("/tmp"))
+        coordinator.resumable_source_for("sub-other", "session-A", tmp_abs_path())
         .is_some()
     );
     assert!(
-        coordinator.resumable_source_for("sub-other", "session-B", Path::new("/tmp"))
+        coordinator.resumable_source_for("sub-other", "session-B", tmp_abs_path())
         .is_none(), "should reject resume from a different parent session"
     );
 }
