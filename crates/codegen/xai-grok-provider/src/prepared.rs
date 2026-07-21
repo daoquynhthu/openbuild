@@ -224,8 +224,11 @@ fn resolve_candidates_system_order(
             return Some(v.inner().to_string());
         }
     }
-    if let Some(v) = (ctx.session_resolver)().filter(|_| has_sess) {
-        return Some(v.inner().to_string());
+    #[allow(clippy::collapsible_if)]
+    if has_sess {
+        if let Some(v) = (ctx.session_resolver)() {
+            return Some(v.inner().to_string());
+        }
     }
     None
 }
@@ -247,6 +250,7 @@ pub fn test_prepared_config(model_id: &str, base_url: &str) -> PreparedSamplerCo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::SessionKind;
     use url::Url;
 
     fn dummy_execution(auth: AuthPolicy) -> ResolvedModelExecution {
@@ -630,5 +634,155 @@ mod tests {
             .expect("AuthPolicy::None must succeed");
         let custom = config.headers.inner().get("x-custom");
         assert_eq!(custom.unwrap().to_str().unwrap(), "custom-value");
+    }
+
+    // ── P8-010C: xAI session resolver tests ──
+    //
+    // Session must only be used when ALL explicit candidates are exhausted.
+
+    #[tokio::test]
+    async fn session_used_only_when_explicit_candidates_missing() {
+        let request_val = SecretValue::new("sk-request".to_string());
+        let session_val = SecretValue::new("sk-session".to_string());
+
+        // Session resolver is called but should NOT be used because request_override wins
+        let session_resolver_called = std::sync::atomic::AtomicBool::new(false);
+        let ctx = RequestCredential {
+            request_override: Some(&request_val),
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| {
+                session_resolver_called.store(true, std::sync::atomic::Ordering::SeqCst);
+                Some(session_val.clone())
+            },
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![
+                CredentialCandidate::RequestOverride,
+                CredentialCandidate::Session(SessionKind::Xai),
+            ],
+            true,
+        ));
+        let config = prepare_sampler_config(&execution, &ctx, &[])
+            .await
+            .expect("must resolve from request_override");
+        let auth = config.headers.inner().get("authorization").unwrap();
+        assert_eq!(
+            auth.to_str().unwrap(),
+            "Bearer sk-request",
+            "request override must be used, not session"
+        );
+        assert!(
+            !session_resolver_called.load(std::sync::atomic::Ordering::SeqCst),
+            "session resolver must not be called when earlier candidate succeeds"
+        );
+    }
+
+    #[tokio::test]
+    async fn session_fills_when_all_explicit_candidates_absent() {
+        let session_val = SecretValue::new("sk-session".to_string());
+        let ctx = RequestCredential {
+            request_override: None,
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| Some(session_val.clone()),
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::Session(SessionKind::Xai)],
+            true,
+        ));
+        let config = prepare_sampler_config(&execution, &ctx, &[])
+            .await
+            .expect("must resolve from session");
+        let auth = config.headers.inner().get("authorization").unwrap();
+        assert_eq!(auth.to_str().unwrap(), "Bearer sk-session");
+    }
+
+    #[tokio::test]
+    async fn session_returning_none_fails_when_required() {
+        let ctx = RequestCredential {
+            request_override: None,
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(
+            vec![CredentialCandidate::Session(SessionKind::Xai)],
+            true,
+        ));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        assert!(
+            result.is_err(),
+            "session returning None with mandatory auth must fail"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("required Bearer credential"),
+            "error must describe missing credential: {err}"
+        );
+        assert!(
+            !err.contains(CANARY),
+            "error must not contain canary secret: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn session_not_used_when_session_candidate_absent() {
+        let session_val = SecretValue::new("sk-session".to_string());
+
+        let session_resolver_called = std::sync::atomic::AtomicBool::new(false);
+        let ctx = RequestCredential {
+            request_override: None,
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| {
+                session_resolver_called.store(true, std::sync::atomic::Ordering::SeqCst);
+                Some(session_val.clone())
+            },
+        };
+        // No Session candidate in the list
+        let execution = dummy_execution(AuthPolicy::bearer(vec![], true));
+        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        assert!(
+            result.is_err(),
+            "mandatory auth with no candidates must fail even if session resolver present"
+        );
+        assert!(
+            !session_resolver_called.load(std::sync::atomic::Ordering::SeqCst),
+            "session resolver must not be called when Session candidate is absent"
+        );
+    }
+
+    #[tokio::test]
+    async fn optional_session_not_used_when_session_candidate_absent() {
+        let session_val = SecretValue::new("sk-session".to_string());
+
+        let session_resolver_called = std::sync::atomic::AtomicBool::new(false);
+        let ctx = RequestCredential {
+            request_override: None,
+            model_inline: None,
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| {
+                session_resolver_called.store(true, std::sync::atomic::Ordering::SeqCst);
+                Some(session_val.clone())
+            },
+        };
+        let execution = dummy_execution(AuthPolicy::bearer(vec![], false));
+        let config = prepare_sampler_config(&execution, &ctx, &[])
+            .await
+            .expect("optional auth with no candidates must succeed");
+        assert!(
+            config.headers.inner().get("authorization").is_none(),
+            "no auth header expected"
+        );
+        assert!(
+            !session_resolver_called.load(std::sync::atomic::Ordering::SeqCst),
+            "session resolver must not be called when Session candidate is absent"
+        );
     }
 }
