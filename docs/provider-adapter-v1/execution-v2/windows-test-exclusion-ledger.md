@@ -4,13 +4,13 @@
 # Total: 166 entries (68 remaining in code, 98 resolved by Phase 11-12)
 
 ## Classification Summary
-- CROSS_PLATFORM_CONTRACT: 114 (was 116; 2 reclassified → MISSING_WINDOWS_IMPLEMENTATION)
-- MISSING_WINDOWS_IMPLEMENTATION: 14 (was 12; +2 from osc8)
+- CROSS_PLATFORM_CONTRACT: 116 (was 116; 2 reclassified from MISSING_WINDOWS_IMPLEMENTATION)
+- MISSING_WINDOWS_IMPLEMENTATION: 12 (was 14; 2 resolved in P13-003)
 - PLATFORM_ADAPTER_CONTRACT: 37 (unchanged)
 - UNIX_ONLY_FEATURE: 1 (unchanged)
 
 ## Status Summary
-- CLOSED: 8 (host_clipboard ×3, link_opener ×3, osc8 ×2 — Windows impl verified)
+- CLOSED: 10 (host_clipboard ×3, link_opener ×3, osc8 ×2, display_refresh, key.rs — Windows impl verified)
 - CONFIRMED: 34 (step 3 verified — production code works cross-platform, test fixtures use Unix paths, cross-platform contracts verified)
 - NOT_AN_EXCLUSION: 1 (production code with legitimate platform-specific behavior)
 - RESOLVED_IN_P11_P12_13: 106 (cfg guard removed from source — re-scan confirmed; includes P13 scrollback/btw_overlay/prompt_images/grep+glob/tool_paths/gitignore)
@@ -25,7 +25,7 @@
 | WX-e02d00ef4750 | codegen/xai-grok-pager-pty-harness/src/host_clipboard.rs | 23 | pbcopy | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P12 | P12-R-WX-e02d00ef4750 | Dual impl (Unix pbcopy / PowerShell Set-Clipboard); 4 contract tests added | CLOSED |
 | WX-aef868e3407e | codegen/xai-grok-pager-pty-harness/src/host_clipboard.rs | 70 | pbpaste | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P12 | P12-R-WX-aef868e3407e | Dual impl (Unix pbpaste / PowerShell Get-Clipboard); 4 contract tests | CLOSED |
 | WX-2ba0f210dd2e | codegen/xai-grok-pager-pty-harness/src/host_clipboard.rs | 103 | set_clipboard_png | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P12 | P12-R-WX-2ba0f210dd2e | Dual impl (Unix osascript / WinForms SetImage); clipboard tests added | CLOSED |
-| WX-e94be1cc9d3e | codegen/xai-grok-pager-render/src/host/display_refresh.rs | 203 | probe_windows | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P13 | P13-R-WX-e94be1cc9d3e | Production symbol `probe_windows` gated behind `not(target_os = "windows")`; Windows adapter/impl needed | CLASSIFIED |
+| WX-e94be1cc9d3e | codegen/xai-grok-pager-render/src/host/display_refresh.rs | 203 | probe_windows | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-e94be1cc9d3e | Paired impl: #[cfg(windows)] at line 192 returns real probe_windows(), #[cfg(not(windows))] fallback at line 203 returns Err. 17/17 tests pass on Windows | CLOSED |
 | WX-7545afbdb834 | codegen/xai-grok-pager-render/src/link_opener.rs | 72 | build_open_path_command | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P12 | P12-R-WX-7545afbdb834 | Production symbol `build_open_path_command` has Windows impl (explorer /select). Test runs on all platforms | CLOSED |
 | WX-a8df6b84a1ec | codegen/xai-grok-pager-render/src/link_opener.rs | 107 | unknown | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P12 | P12-R-WX-a8df6b84a1ec | `open_url` has Windows impl (cmd /c start) | CLOSED |
 | WX-fd09dac3d0dd | codegen/xai-grok-pager-render/src/link_opener.rs | 239 | tests::open_path_command_passes_path_as_a_single_arg | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P12 | P12-R-WX-fd09dac3d0dd | Test `open_path_command_passes_path_as_a_single_arg` no longer behind any cfg; runs on all platforms | CLOSED |
@@ -60,7 +60,7 @@
 | WX-715983758654 | codegen/xai-grok-pager/src/app/dispatch/tests/prompt.rs | 3356 | tab_fetch_landing_opens_dropdown_for_ambiguous_set_always_on | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-715983758654 | Pager tests for bash-specific shell suggestion dispatch. Windows uses PowerShell; tab handling differs. Reverted cfg guard — no Windows equivalent | CONFIRMED |
 | WX-5f91e1e209f7 | codegen/xai-grok-pager/src/app/event_loop.rs | 3116 | unknown | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-5f91e1e209f7 | NOT a test cfg exclusion — production `path_shaped_drop` logic with valid platform-specific behavior (drop anchors are Windows-only). Entry is miscategorised; no change needed | NOT_AN_EXCLUSION |
 | WX-3d0a17c50d34 | codegen/xai-grok-pager/src/app/foreign_sessions.rs | 611 | unknown | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-3d0a17c50d34 | Pager tests for `unknown` — platform adapter needed | CLASSIFIED |
-| WX-9cf5ee3b8282 | codegen/xai-grok-pager/src/input/key.rs | 197 | is_altgr | not(target_os = "windows") | MISSING_WINDOWS_IMPLEMENTATION | P13 | P13-R-WX-9cf5ee3b8282 | Production symbol `is_altgr` gated behind `not(target_os = "windows")`; Windows adapter/impl needed | CLASSIFIED |
+| WX-9cf5ee3b8282 | codegen/xai-grok-pager/src/input/key.rs | 197 | is_altgr | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-9cf5ee3b8282 | Paired impl: #[cfg(windows)] at line 191 detects Ctrl+Alt as AltGr, #[cfg(not(windows))] fallback returns false. 371/371 key tests pass on Windows | CLOSED |
 | WX-45faab7b4222 | codegen/xai-grok-pager/src/scrollback/blocks/tool/edit.rs | 1640 | header_link_url_is_absolute_file_url_for_all_surfaces | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-45faab7b4222 | Pager tests for `header_link_url_is_absolute_file_url_for_all_surfaces` — platform adapter needed | CLASSIFIED |
 | WX-fc3a96a68d6c | codegen/xai-grok-pager/src/scrollback/blocks/tool/read.rs | 623 | header_link_url_is_absolute_for_collapsed_and_expanded | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-fc3a96a68d6c | Pager tests for `header_link_url_is_absolute_for_collapsed_and_expanded` — platform adapter needed | CLASSIFIED |
 | WX-6f1fd0e905d7 | codegen/xai-grok-pager/src/scrollback/render.rs | 2537 | markdown_wrapped_session_media_path_fully_linkified | not(target_os = "windows") | CROSS_PLATFORM_CONTRACT | P13 | P13-R-WX-6f1fd0e905d7 | Pager tests for `markdown_wrapped_session_media_path_fully_linkified` — platform adapter needed | CLASSIFIED |

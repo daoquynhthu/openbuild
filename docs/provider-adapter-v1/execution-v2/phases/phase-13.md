@@ -183,12 +183,14 @@
 ### P13-R-WX-9cf5ee3b8282: repair WX-9cf5ee3b8282
 
 - Ledger ID: WX-9cf5ee3b8282
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (input/key.rs)
+- Failure class: cross-platform-contract
+- First causal error: is_altgr has paired #[cfg(windows)] / #[cfg(not(windows))] impls
+- Fingerprint: #[cfg(not(target_os = "windows"))] on non-Windows fallback
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Windows impl at line 191 detects Ctrl+Alt as AltGr; non-Windows fallback returns false.
+  371/371 key tests pass on Windows. Correct paired platform contract.
 
 ### P13-R-WX-4c8f87fe37e5: repair WX-4c8f87fe37e5
 
@@ -227,12 +229,14 @@
 ### P13-R-WX-e94be1cc9d3e: repair WX-e94be1cc9d3e
 
 - Ledger ID: WX-e94be1cc9d3e
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager-render (host/display_refresh.rs)
+- Failure class: cross-platform-contract
+- First causal error: probe_windows has paired #[cfg(windows)] / #[cfg(not(windows))] impls
+- Fingerprint: #[cfg(not(target_os = "windows"))] on non-Windows fallback
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: Windows impl at line 192 calls windows_primary_display_refresh_hz() via EnumDisplaySettingsW.
+  17/17 display_refresh tests pass on Windows. Correct paired platform contract.
 
 ### P13-R-WX-3ac46ae12faa: repair WX-3ac46ae12faa
 
