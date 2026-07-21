@@ -402,7 +402,14 @@ All 12 P13 tasks resolved:
   - `header_merge_preserves_static_headers`
   - `request_overrides_win_over_static_headers`
   - `prepare_sampler_config_preserves_protocol_and_url`
-- All 12 prepared::tests pass ✅
+
+### P8-010B: Header auth (x-api-key) through prepare_sampler_config
+- Added 3 tests: `header_auth_request_override_produces_correct_header`, `header_auth_provider_inline_falls_back_correctly`, `header_auth_precedence_request_override_beats_inline`
+
+### P8-010D: No-auth through prepare_sampler_config
+- Added 3 tests: `no_auth_produces_no_authorization_header`, `no_auth_with_request_override_still_omits_auth`, `no_auth_static_headers_are_still_preserved`
+
+- All 18 prepared::tests pass ✅
 
 ### P8-007: Header merge layer ordering fix
 - Fixed `prepare_sampler_config`: Layer 3 (provider extra) no longer incorrectly duplicates Layer 2 (route static)
