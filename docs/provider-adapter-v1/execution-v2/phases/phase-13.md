@@ -49,22 +49,24 @@
 ### P13-R-WX-1093270461cd: repair WX-1093270461cd
 
 - Ledger ID: WX-1093270461cd
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (selection.rs)
+- Failure class: cross-platform-contract
+- First causal error: test uses Unix paths but scanner/renderer is universal
+- Fingerprint: active_child_copy_uses_child_scrollback_cwd
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback+selection tests pass on Windows. Correct cross-platform contract.
 
 ### P13-R-WX-4dee6ae9647f: repair WX-4dee6ae9647f
 
 - Ledger ID: WX-4dee6ae9647f
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (entry_renderer.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: background_block_gutter_uses_block_background_fill
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-6131a9046509: repair WX-6131a9046509
 
@@ -79,22 +81,24 @@
 ### P13-R-WX-2eb5af8b2b03: repair WX-2eb5af8b2b03
 
 - Ledger ID: WX-2eb5af8b2b03
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (scrollback/render.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: collapse_header_entry_does_not_leak_links_but_visible_group_entries_do
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-d64c93ec1e1b: repair WX-d64c93ec1e1b
 
 - Ledger ID: WX-d64c93ec1e1b
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (scrollback/render.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: collapsed_block_header_file_path_is_scanned
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-fc78f4c9e7be: repair WX-fc78f4c9e7be
 
@@ -133,12 +137,13 @@
 ### P13-R-WX-9d10fe1d019b: repair WX-9d10fe1d019b
 
 - Ledger ID: WX-9d10fe1d019b
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (scrollback/render.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: explicit_tool_link_clips_before_u16_conversion
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-28210254fa3b: repair WX-28210254fa3b
 
@@ -153,22 +158,24 @@
 ### P13-R-WX-45faab7b4222: repair WX-45faab7b4222
 
 - Ledger ID: WX-45faab7b4222
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (tool/edit.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: header_link_url_is_absolute_file_url_for_all_surfaces
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-fc3a96a68d6c: repair WX-fc3a96a68d6c
 
 - Ledger ID: WX-fc3a96a68d6c
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (tool/read.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: header_link_url_is_absolute_for_collapsed_and_expanded
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-0b0512bee54d: repair WX-0b0512bee54d
 
@@ -195,22 +202,24 @@
 ### P13-R-WX-4c8f87fe37e5: repair WX-4c8f87fe37e5
 
 - Ledger ID: WX-4c8f87fe37e5
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (scrollback/render.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: long_read_header_link_is_clipped_to_offset_content_area
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-6f1fd0e905d7: repair WX-6f1fd0e905d7
 
 - Ledger ID: WX-6f1fd0e905d7
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (scrollback/render.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: markdown_wrapped_session_media_path_fully_linkified
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-f3884462acf3: repair WX-f3884462acf3
 
@@ -462,12 +471,13 @@
 ### P13-R-WX-cacfede9f117: repair WX-cacfede9f117
 
 - Ledger ID: WX-cacfede9f117
-- Platform: 
-- Package: 
-- Failure class: 
-- First causal error: 
-- Fingerprint: 
-- Status: NOT_STARTED
+- Platform: all
+- Package: xai-grok-pager (scrollback/render.rs)
+- Failure class: cross-platform-contract
+- First causal error: tests use Unix paths but scanner/renderer is universal
+- Fingerprint: tool_header_link_url_overlay_covers_path_after_bullet
+- Status: CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
+- Note: 974/974 scrollback tests pass on Windows.
 
 ### P13-R-WX-8c252e126d78: repair WX-8c252e126d78
 
@@ -506,7 +516,7 @@
 ### P13-R-GROUP-048: foundation group (3 rows)
 
 - WX-5f91e1e209f7: miscategorised — production code, NOT an exclusion
-- WX-3d0a17c50d34: 57a9647
+- WX-3d0a17c50d34: 57a9647 — foreign_sessions.rs — cross-platform-contract — tests use Unix paths but scanner/renderer is universal — CROSS_PLATFORM_CONTRACT — VERIFIED (no change needed)
 - WX-ba4e60319b06: b7b1f1d
-- Fingerprint: 
+- Fingerprint: foreign_sessions cross-platform contract
 - Status: COMPLETED
