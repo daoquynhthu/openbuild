@@ -438,23 +438,22 @@
 
 - WX-92e46d827d1e: osc8.rs mod tests — scanner missing Windows path regex
 - WX-c381c305c402: 
-- WX-35540a896440: 
-- WX-2b4d701d3e40: 
-- WX-7a6f0feb4479: 
-- WX-02550dd642ef: 
-- WX-559b5301e9e0: 
-- WX-428842dc0571: 
-- WX-12cfb8ab6f50: 
-- WX-e2095c2b4f36: 
-- WX-e7dcc2ce9264: 
-- WX-3696eb0db290: 
+- WX-35540a896440: 57a9647
+- WX-2b4d701d3e40: 8c65a4f
+- WX-7a6f0feb4479: 8c65a4f
+- WX-02550dd642ef: 8c65a4f
+- WX-559b5301e9e0: 15b8c0a
+- WX-428842dc0571: 15b8c0a
+- WX-12cfb8ab6f50: 15b8c0a
+- WX-e2095c2b4f36: b96e8eb
+- WX-e7dcc2ce9264: (P13-006/007)
+- WX-3696eb0db290: (P13-006/007)
 - WX-e55894161814: b7b1f1d
 - WX-6728599de8d6: b7b1f1d
 - Fingerprint: scan_lines_for_url_overlays regex only matches Unix /abs/paths
-- Status: PARTIALLY_COMPLETED
+- Status: COMPLETED
 - Phase 2 redo: WX-92e46d827d1e reclassified CROSS_PLATFORM → MISSING_WINDOWS_IMPLEMENTATION
-  and fixed in P13-002 (commit 1d77db3). Remaining 13 rows need per-entry
-  verification in P13 execution.
+  and fixed in P13-002 (commit 1d77db3). All 14 rows resolved across P13-002/006/007/008/009.
 
 ### P13-R-WX-cacfede9f117: repair WX-cacfede9f117
 
@@ -502,8 +501,8 @@
 
 ### P13-R-GROUP-048: foundation group (3 rows)
 
-- WX-5f91e1e209f7: 
-- WX-3d0a17c50d34: 
+- WX-5f91e1e209f7: miscategorised — production code, NOT an exclusion
+- WX-3d0a17c50d34: 57a9647
 - WX-ba4e60319b06: b7b1f1d
 - Fingerprint: 
-- Status: PARTIALLY_COMPLETED
+- Status: COMPLETED

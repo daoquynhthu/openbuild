@@ -155,18 +155,21 @@
 - P13-006/007: opencode grep + glob — removed cfg guards. All 129 opencode tests pass.
 - P13-008: opencode bash — removed cfg guard from bash/mod.rs:458, fixed `output_file_path` test with `PathBuf::join`. All 23 bash tests pass. Commit `b96e8eb`
 - P13-009: skills/resources/tool-registry — removed cfg guards from 3 files (discovery.rs:924, resources.rs:915, registry/types.rs:2158). Fixed 5 display-cwd path assertions with `#[cfg(windows)]`, removed `deploy_app` (unimplemented stub). All 40+66+55 tests pass. Commit `b7b1f1d`
+- P13-009b: enter_plan_mode/grep/read_file (grok_build) — removed cfg guards, fixed path assertions and `IsADirectory` test. All 33+35+89 pass. Commit `8c65a4f`
+- P13-009c: web_fetch (3 files) — removed cfg guards, fixed which_in test (gh.bat for Windows), fixed path assertions (component-by-component join). All 119 pass. Commit `15b8c0a`
+- P13-009d: bash/mod (141/144 pass, 3 ignored — real bash cmds), foreign_sessions (path normalisation), image_describe (path normalisation). event_loop.rs = NOT an exclusion (production code). Commit `57a9647`
 
 ### Current State
 - `cargo check --workspace`: passes
 - `cargo clippy -p xai-grok-tools -- -D warnings`: passes
-- `cargo test -p xai-grok-tools --lib`: 2147 passed, 0 failed
-- Ledger RESOLVED_IN_P11_P12_13: 100 (up from 97)
+- `cargo test -p xai-grok-tools --lib`: 2418 passed, 0 failed
+- Ledger RESOLVED_IN_P11_P12_13: 104 (up from 97), NOT_AN_EXCLUSION: 1
+- GROUP-043 (14 rows): COMPLETED
+- GROUP-048 (3 rows): COMPLETED
 
-### Remaining
-- P13-002: Fast PR vs full release gate separation (workflow-level)
-- P13-004: Packaging smoke test (CI-specific) — possibly superseded by V2 plan
-- P13-005: Optional live smoke workflow (CI-specific, requires secrets) — possibly superseded by V2 plan
-- V2 plan Phase 13 remaining: P13-R-GROUP-043 (14 rows, PARTIALLY_COMPLETED), P13-R-GROUP-048 (3 rows, PARTIALLY_COMPLETED)
+### Remaining (Phase 13 V2 plan)
+- P13-R-WX entries outside GROUPs: prompt.rs (2), key.rs (1), edit.rs (1), key/keyboard.rs (1), key/bindings.rs (2), base64_image.rs (1), render/mod.rs (1), render/blocks/render_test.rs (3), render/image.rs (1), layout.rs (1), osc8.rs scanner tests (1), LSP subscribe_uri (1), terminal (5), etc.
+- Total ~50+ remaining WX entries across pager, tools, shell crates
 
 ## Provider Adapter V1 — Phase 14: Cleanup, Final Static Audit, and Release Candidate Cut — 2026-07-18
 
