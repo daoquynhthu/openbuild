@@ -118,13 +118,17 @@ pub async fn prepare_sampler_config(
         override_map.insert(n, v);
     }
 
-    // Merge all headers
+    // Merge all headers in priority order.
+    // Layer 2 (route static) already includes route-mandatory + provider-level extra headers
+    // baked in by the route compiler. Layer 3 (provider extra) is empty until
+    // ResolvedModelExecution carries them separately.
+    let provider_extra: indexmap::IndexMap<String, String> = indexmap::IndexMap::new();
     let merged = merge_headers(
-        &[], // transport-required
-        &execution.static_headers,
-        &execution.static_headers, // route static = provider extra in current model
-        auth_header.as_ref().map(|(n, v)| (n.as_str(), v.as_str())),
-        &override_map,
+        &[], // Layer 1: transport-required
+        &execution.static_headers, // Layer 2: route static headers
+        &provider_extra,           // Layer 3: provider extra headers (reserved)
+        auth_header.as_ref().map(|(n, v)| (n.as_str(), v.as_str())), // Layer 4: auth
+        &override_map, // Layer 5: request overrides
     )
     .map_err(|e| RequestPreparationError::HeaderConflict(e.to_string()))?;
 

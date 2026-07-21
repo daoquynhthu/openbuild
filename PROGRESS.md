@@ -385,3 +385,8 @@ All 12 P13 tasks resolved:
   - error message does not contain canary secret
 - `cargo test -p xai-grok-provider -- prepared::tests`: 5 passed ✅
 - `cargo test -p xai-grok-provider --test request_inspection`: 8 passed ✅
+
+### P8-007: Header merge layer ordering fix
+- Fixed `prepare_sampler_config`: Layer 3 (provider extra) no longer incorrectly duplicates Layer 2 (route static)
+- Uses explicit empty `IndexMap` for provider extra with comment explaining it's reserved for future separate tracking
+- `cargo check`, `clippy`, `test` all pass ✅
