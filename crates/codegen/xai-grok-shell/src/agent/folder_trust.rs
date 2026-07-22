@@ -653,7 +653,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[test]
     #[serial_test::serial]
     fn revoke_on_unrecordable_home_root_records_no_deny() {
@@ -689,7 +689,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[test]
     #[serial_test::serial]
     fn envrc_gate_drops_untrusted_then_loads_when_store_trusted() {
@@ -1497,7 +1497,7 @@ mod tests {
         assert!(lt, "store-trusted launch dir must be allowed");
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[test]
     #[serial_test::serial]
     fn local_build_is_inert_launch_trust_auto_trusts() {

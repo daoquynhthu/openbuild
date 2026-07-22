@@ -2254,7 +2254,7 @@ fn discover_personas_inline_takes_precedence() {
         Some("Inline strict"),
     );
 }
-#[cfg(not(target_os = "windows"))]
+#[cfg(unix)]
 #[test]
 fn bundled_personas_and_roles_have_lowest_priority_in_resolve_order() {
     let tmp = tempfile::TempDir::new().unwrap();

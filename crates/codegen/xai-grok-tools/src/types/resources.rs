@@ -1219,9 +1219,9 @@ mod tests {
         let display = std::path::Path::new("/home/user/project");
         let result =
             super::resolve_model_path(cwd, Some(display), "/home/user/project/src/main.rs");
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(unix)]
         let expected = std::path::PathBuf::from("/worktree/abc/src/main.rs");
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         let expected = std::path::PathBuf::from("/home/user/project/src/main.rs");
         assert_eq!(result, expected);
     }
@@ -1247,9 +1247,9 @@ mod tests {
         let cwd = std::path::Path::new("/worktree/abc");
         let display = std::path::Path::new("/home/user/project");
         let result = super::resolve_model_path(cwd, Some(display), "/home/user/project");
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(unix)]
         let expected = std::path::PathBuf::from("/worktree/abc");
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         let expected = std::path::PathBuf::from("/home/user/project");
         assert_eq!(result, expected);
     }
@@ -1309,9 +1309,9 @@ mod tests {
         let cwd = std::path::Path::new("/worktree/abc");
         let display = std::path::Path::new("/testbed/cache");
         let result = super::resolve_model_path(cwd, Some(display), "/testbed/cache/src/main.rs");
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(unix)]
         let expected = std::path::PathBuf::from("/worktree/abc/src/main.rs");
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         let expected = std::path::PathBuf::from("/testbed/cache/src/main.rs");
         assert_eq!(result, expected);
     }
@@ -1344,9 +1344,9 @@ mod tests {
         let display = std::path::Path::new("/home/user/project");
         let result =
             super::resolve_model_path(cwd, Some(display), "/home/user/project/src/main.rs\n");
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(unix)]
         let expected = std::path::PathBuf::from("/worktree/abc/src/main.rs");
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         let expected = std::path::PathBuf::from("/home/user/project/src/main.rs");
         assert_eq!(result, expected);
     }
@@ -1419,9 +1419,9 @@ mod tests {
         let display = std::path::Path::new("/home/user/project");
         let result =
             super::resolve_model_path(cwd, Some(display), "\"/home/user/project/src/main.rs\\n\"");
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(unix)]
         let expected = std::path::PathBuf::from("/worktree/abc/src/main.rs");
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         let expected = std::path::PathBuf::from("/home/user/project/src/main.rs");
         assert_eq!(result, expected);
     }

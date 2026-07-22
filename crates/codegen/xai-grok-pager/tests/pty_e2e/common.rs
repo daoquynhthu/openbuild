@@ -267,7 +267,7 @@ pub(crate) const MCP_MENU_LOAD_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Configured servers list with a status badge even when never connected.
 pub(crate) fn seed_mcp_server_config(content: &ContentController) {
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     let command = "/bin/cat";
     #[cfg(windows)]
     let command = "cmd.exe";

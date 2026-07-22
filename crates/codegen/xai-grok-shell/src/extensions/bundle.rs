@@ -584,7 +584,7 @@ mod tests {
         let handle = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         (format!("{base}/v1"), seen_headers, handle)
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[test]
     #[serial]
     fn status_reports_no_cache_when_manifest_missing() {

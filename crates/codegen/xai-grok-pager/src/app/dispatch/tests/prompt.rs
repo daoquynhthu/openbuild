@@ -3271,7 +3271,7 @@ fn suggestions_landing_after_bash_exit_are_dropped() {
 /// OFF: Tab fires a deterministic fetch, and the landing response runs the
 /// terminal Tab semantics — a single file candidate splices in place
 /// immediately and the drill-down refetch rides out with the dispatch.
-#[cfg(not(target_os = "windows"))]
+#[cfg(unix)]
 #[test]
 fn tab_fetch_landing_insta_accepts_single_candidate_always_on() {
     use crate::views::suggestion_controller::{
@@ -3353,7 +3353,7 @@ fn tab_fetch_landing_insta_accepts_single_candidate_always_on() {
 /// dropdown (and installs no ghost) — the user picks with arrows + Tab.
 /// History rows model an OLD shell (new shells honor `tokenOnly` and send
 /// none on Tab fetches); whole-line sets must keep plain-open semantics.
-#[cfg(not(target_os = "windows"))]
+#[cfg(unix)]
 #[test]
 fn tab_fetch_landing_opens_dropdown_for_ambiguous_set_always_on() {
     use crate::views::suggestion_controller::{

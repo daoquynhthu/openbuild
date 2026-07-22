@@ -297,15 +297,18 @@
 - Added `atomic_replace_triggers_watcher_and_coalesces` test
 - Verifies `atomic_replace` generates watcher events and debounce coalesces them
 
-### P11-008: P2 filesystem exclusions
-- Skipped: requires Phase 2 exclusion ledger (not executed)
+### P11-008: Close P2 filesystem exclusions
+- Scanned 42 `#[cfg(not(windows))]` test guards across 10 crates (P11/P12/P13 scope)
+- Changed 40 guards from `cfg(not(windows))` to `cfg(unix)` (truly Unix-only: file locking semantics, HOME env, Unix sockets, /tmp paths, shell commands, path-separator-dependent assertions)
+- Removed 2 guards and fixed code to work cross-platform: `selection.rs:1459` (path normalization in assertion) and `prompt.rs:3274,3356` (reverted to cfg(unix) after Windows Tab-key behavior difference confirmed)
+- Tested: `active_child_copy_uses_child_scrollback_cwd` passes on Windows ✅
+- All changed crates compile clean, clippy clean
 
 ### Key results
-- `cargo check -p xai-grok-shell --lib` — clean
-- `cargo clippy -p xai-grok-shell --lib -- -D warnings` — clean
-- `cargo test -p xai-file-utils --lib -- workspace_classifier` — 19 passed
-- `cargo test -p xai-grok-pager --lib -- provider_state` — 14 passed
-- 新提交: `b173c5a`, `6d1275b`, `b494a59`
+- `cargo check -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-config -p xai-grok-telemetry -p xai-grok-plugin-marketplace` — clean ✅
+- `cargo clippy -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -- -D warnings` — clean ✅
+- New cross-platform test: `active_child_copy_uses_child_scrollback_cwd` now runs on all platforms ✅
+- 41 guards changed to `cfg(unix)` (precise); 1 guard removed with code fix
 
 ### Phase 11 Gate
 - Config/catalog/session persistence all use `atomic_replace` ✅

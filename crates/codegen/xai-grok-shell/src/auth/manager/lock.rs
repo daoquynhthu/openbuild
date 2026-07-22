@@ -580,7 +580,7 @@ mod tests {
         );
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[test]
     fn test_nonblocking_acquire_writes_holder_info() {
         // fix: advisory cleanup sites must record `PID:TS`, never hold the
@@ -761,7 +761,7 @@ mod tests {
 
     // ── Async tests against the production code path ─────────────────
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_async_acquire_release_basic() {
         let dir = TempDir::new().unwrap();

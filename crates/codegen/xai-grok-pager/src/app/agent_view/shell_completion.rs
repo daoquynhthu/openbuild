@@ -184,7 +184,7 @@ mod shell_suggestion_key_tests {
     }
 
     /// Whole-line history item (insert_text doubles as the span replacement).
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     fn history_item(line: &str, range: std::ops::Range<usize>) -> CompletionItemParsed {
         CompletionItemParsed {
             display: line.to_owned(),
@@ -336,7 +336,7 @@ mod shell_suggestion_key_tests {
     /// (pure path/file completions never carry one). Two candidates with no
     /// shared prefix beyond the typed token = the plain-open path (a single
     /// candidate insta-accepts instead — see the terminal-Tab tests below).
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_opens_dropdown_without_ghost() {
@@ -360,7 +360,7 @@ mod shell_suggestion_key_tests {
 
     /// Tab in bash mode with no fetched candidates fires a deterministic
     /// fetch — no env flag, no AI, dropdown-scale limit.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_without_items_fires_deterministic_fetch() {
@@ -390,7 +390,7 @@ mod shell_suggestion_key_tests {
 
     /// Repeat Tab while the armed fetch is still in flight is a no-op: one
     /// RPC, one landing that runs the Tab semantics once.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn repeat_tab_fires_single_fetch_while_pending() {
@@ -412,7 +412,7 @@ mod shell_suggestion_key_tests {
 
     /// Items outdated by an edit (stale generation) refetch instead of
     /// completing over the old candidate set.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_with_stale_items_refetches() {
@@ -465,7 +465,7 @@ mod shell_suggestion_key_tests {
 
     /// Exactly one token candidate: Tab accepts it immediately — no
     /// dropdown flash — and the accept re-fetch keeps the pipeline alive.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_single_token_candidate_accepts_without_dropdown_flash() {
@@ -481,7 +481,7 @@ mod shell_suggestion_key_tests {
 
     /// The same insta-accept with the pipeline OFF: the refetch kick is a
     /// direct deterministic fetch instead of a debounce.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_single_candidate_accepts_and_kicks_fetch_always_on() {
@@ -505,7 +505,7 @@ mod shell_suggestion_key_tests {
 
     /// A single HISTORY item keeps the plain dropdown-open behavior:
     /// terminal Tab semantics apply to token completions only.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_single_history_item_opens_dropdown() {
@@ -523,7 +523,7 @@ mod shell_suggestion_key_tests {
     /// shells send `insertText: "grep"`, no range) must never insta-accept
     /// — its whole-line fallback would replace `ls | gr` with `grep`. Tab
     /// plain-opens instead, sole match or not.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_sole_rangeless_path_row_opens_dropdown_never_accepts() {
@@ -538,7 +538,7 @@ mod shell_suggestion_key_tests {
 
     /// Any rangeless row in a MIXED set (legacy PATH row next to a ranged
     /// file row) forces plain-open too — no insta-accept, no fill.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_mixed_rangeless_and_ranged_rows_open_dropdown() {
@@ -557,7 +557,7 @@ mod shell_suggestion_key_tests {
     /// A MIXED set (any non-token item alongside file/path rows) disables
     /// terminal-Tab semantics wholesale: no insta-accept, no fill — Tab
     /// plain-opens so the user sees every candidate, history included.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_mixed_file_and_history_items_opens_dropdown() {
@@ -575,7 +575,7 @@ mod shell_suggestion_key_tests {
 
     /// Whole-line history sets never prefix-fill (half a history line is
     /// not a command) — Tab plain-opens.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_whole_line_history_items_open_dropdown_not_fill() {
@@ -595,7 +595,7 @@ mod shell_suggestion_key_tests {
     /// the first Tab fills the common prefix in place (no dropdown) and
     /// re-fetches; when the refreshed items land, the second Tab opens the
     /// dropdown.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_fills_common_prefix_then_opens_dropdown_on_refresh() {
@@ -645,7 +645,7 @@ mod shell_suggestion_key_tests {
 
     /// The fill's refetch with the pipeline OFF is a direct deterministic
     /// fetch (no debounce to ride on).
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_fill_kicks_deterministic_fetch_always_on() {
@@ -704,7 +704,7 @@ mod shell_suggestion_key_tests {
     /// draft change. The declined fill now degrades to opening the
     /// dropdown: candidates visible, nothing fetched, chip intact, and the
     /// second Tab rides the normal open-dropdown handling.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_fill_clipping_paste_chip_opens_dropdown_without_refetch() {
@@ -737,7 +737,7 @@ mod shell_suggestion_key_tests {
     /// Same hole on the insta-accept arm: committing would consume the
     /// sole candidate and THEN decline the splice, leaving every Tab to
     /// refetch the same set. The probe degrades to showing the candidate.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn tab_insta_accept_clipping_paste_chip_opens_dropdown_without_refetch() {
@@ -881,7 +881,7 @@ mod shell_suggestion_key_tests {
 
     /// Esc closes a dropdown the Tab-armed landing opened (the always-on
     /// dismissal path), and the draft survives.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn esc_closes_tab_fetched_dropdown() {
@@ -938,7 +938,7 @@ mod shell_suggestion_key_tests {
     /// with no text change, so it must invalidate cached completion items
     /// exactly like a typed edit — the next Tab fetches for the token under
     /// the clicked cursor instead of completing the old one.
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[cfg(test)]
     #[test]
     fn prompt_click_invalidates_cached_items_before_tab() {

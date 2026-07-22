@@ -204,7 +204,7 @@ mod tests {
         ));
     }
 
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[test]
     fn non_windows_does_not_retry_windows_raw_error_numbers() {
         assert!(!is_transient_write_lock_error(

@@ -1038,7 +1038,7 @@ mod tests {
                 path
             }
         };
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         let converted = path;
         url::Url::from_file_path(&converted)
             .expect("valid file URL")

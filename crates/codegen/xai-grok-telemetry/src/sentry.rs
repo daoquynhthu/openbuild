@@ -409,7 +409,7 @@ mod tests {
         assert_eq!(s.scrub("opened /Users/bob/x"), "opened ~/x");
     }
 
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     #[test]
     fn unix_match_is_case_sensitive() {
         let out = redact_username_segments("/Users/Alice/proj", &["alice".to_owned()]);

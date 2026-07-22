@@ -522,7 +522,7 @@ mod tests {
         // does. `cmd` resolves via PATHEXT on Windows, `sh` lives on $PATH on Unix.
         #[cfg(windows)]
         let present = "cmd";
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         let present = "sh";
         assert!(is_command_available(present));
         assert!(!is_command_available(

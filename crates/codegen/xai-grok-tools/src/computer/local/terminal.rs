@@ -3311,8 +3311,7 @@ mod tests {
         let _ = tokio::fs::remove_file(&output_file).await;
     }
 
-    #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_stderr_captured() {
         let backend = LocalTerminalBackend::new();
@@ -4128,7 +4127,7 @@ mod tests {
     ///
     /// Unix-only: on Windows the group is a JobObject HANDLE (no recyclable pid),
     /// so the Arc is released when the `ProcessState` is removed (line 1286).
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[test]
     fn reaped_background_child_leaves_scope_empty() {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -4184,8 +4183,7 @@ mod tests {
     // Persistent shell tests
     // ================================================================
 
-    #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_persistent_shell_cd_persists() {
         let backend = LocalTerminalBackend::with_persistent_shell();
@@ -4204,8 +4202,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_persistent_shell_env_var_persists() {
         let backend = LocalTerminalBackend::with_persistent_shell();
@@ -4228,8 +4225,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_persistent_shell_clears_gpg_tty() {
         // GPG_TTY must be forced empty on the live path even when supplied via the request env.
@@ -4249,8 +4245,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_persistent_shell_function_persists() {
         let backend = LocalTerminalBackend::with_persistent_shell();
@@ -4270,8 +4265,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_persistent_shell_variable_capture() {
         let backend = LocalTerminalBackend::with_persistent_shell();
@@ -4293,8 +4287,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_non_persistent_shell_no_state() {
         // Verify the default (non-persistent) mode doesn't carry state.

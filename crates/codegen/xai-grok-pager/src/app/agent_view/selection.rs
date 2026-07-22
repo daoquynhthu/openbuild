@@ -1456,8 +1456,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(windows))]
-    #[cfg(test)]
     #[test]
     fn active_child_copy_uses_child_scrollback_cwd() {
         use crate::scrollback::block::RenderBlock;
@@ -1562,7 +1560,7 @@ mod tests {
             anchor_content_width: Some(content_width),
         };
         assert_eq!(
-            parent.reconstruct_drag_copy(&drag),
+            parent.reconstruct_drag_copy(&drag).map(|(t, k)| (t.replace('\\', "/"), k)),
             Some(("src/lib.rs".to_string(), SelectionKind::Linear))
         );
     }
