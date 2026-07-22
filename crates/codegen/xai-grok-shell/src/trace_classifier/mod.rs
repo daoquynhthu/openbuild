@@ -1155,7 +1155,7 @@ async fn build_sampler_client(
     let prepared = xai_grok_provider::prepared::prepare_sampler_config(
         &execution,
         &credentials,
-        &[],
+        &xai_grok_provider::headers::RequestHeaderOverrides::new(),
     ).await.map_err(|e| anyhow!("prepare sampler config: {e}"))?;
 
     xai_grok_sampler::SamplingClient::from_prepared(prepared).map_err(|e| anyhow!("build SamplingClient: {e}"))

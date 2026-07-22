@@ -5,6 +5,34 @@
 
 use crate::error::ProviderError;
 
+/// Typed wrapper for request header overrides passed to `prepare_sampler_config`.
+///
+/// Provides HTTP-level validation at construction time. Plan §line 1489.
+#[derive(Debug, Default)]
+pub struct RequestHeaderOverrides(http::HeaderMap);
+
+impl RequestHeaderOverrides {
+    pub fn new() -> Self {
+        Self(http::HeaderMap::new())
+    }
+
+    pub fn from_slice(pairs: &[(&str, &str)]) -> Result<Self, ProviderError> {
+        let mut map = http::HeaderMap::new();
+        for (name, value) in pairs {
+            let n = http::HeaderName::from_bytes(name.as_bytes())
+                .map_err(|_| ProviderError::InvalidHeader(name.to_string()))?;
+            let v = http::HeaderValue::from_str(value)
+                .map_err(|_| ProviderError::InvalidHeader(value.to_string()))?;
+            map.insert(n, v);
+        }
+        Ok(Self(map))
+    }
+
+    pub fn inner(&self) -> &http::HeaderMap {
+        &self.0
+    }
+}
+
 /// Header map that redacts values in Debug/Display.
 /// Does not implement Serialize/Deserialize.
 #[derive(Clone)]

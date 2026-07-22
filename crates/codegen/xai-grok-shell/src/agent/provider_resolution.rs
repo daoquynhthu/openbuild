@@ -69,7 +69,8 @@ pub fn execution_to_sampler_config(
     );
     let rt = tokio::runtime::Runtime::new()
         .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
-    let prepared = rt.block_on(prepare_sampler_config(&execution, &creds, &[]))
+    let headers = xai_grok_provider::headers::RequestHeaderOverrides::new();
+    let prepared = rt.block_on(prepare_sampler_config(&execution, &creds, &headers))
         .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
     Ok(xai_grok_sampler::SamplerConfig::from(prepared))
 }

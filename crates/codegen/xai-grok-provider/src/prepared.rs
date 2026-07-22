@@ -5,7 +5,7 @@
 use indexmap::IndexMap;
 
 use crate::auth::{AuthPolicy, RequestCredentialContext};
-use crate::headers::SensitiveHeaderMap;
+use crate::headers::{RequestHeaderOverrides, SensitiveHeaderMap};
 use crate::model::{GenerationOptions, ModelLimits};
 use crate::protocol::ProtocolId;
 use crate::resolution::ResolvedModelExecution;
@@ -93,22 +93,15 @@ pub enum RequestPreparationError {
 pub async fn prepare_sampler_config(
     execution: &ResolvedModelExecution,
     credentials: &RequestCredentialContext<'_>,
-    request_headers: &[(&str, &str)],
+    request_headers: &RequestHeaderOverrides,
 ) -> Result<PreparedSamplerConfig, RequestPreparationError> {
     use crate::headers::merge_headers;
 
     // Resolve auth header from policy candidates (system-fixed priority order)
     let auth_header = resolve_auth_from_policy(&execution.auth_policy, credentials).await?;
 
-    // Build request override header map
-    let mut override_map = http::HeaderMap::new();
-    for (name, value) in request_headers {
-        let n = http::HeaderName::from_bytes(name.as_bytes())
-            .map_err(|_| RequestPreparationError::InvalidHeader(name.to_string()))?;
-        let v = http::HeaderValue::from_str(value)
-            .map_err(|_| RequestPreparationError::InvalidHeader(value.to_string()))?;
-        override_map.insert(n, v);
-    }
+    // Request overrides are pre-validated by RequestHeaderOverrides
+    let override_map = request_headers.inner();
 
     // Merge all headers in priority order.
     // Layer 2 (route static) already includes route-mandatory + provider-level extra headers
@@ -120,7 +113,7 @@ pub async fn prepare_sampler_config(
         &execution.static_headers, // Layer 2: route static headers
         &provider_extra,           // Layer 3: provider extra headers (reserved)
         auth_header.as_ref().map(|(n, v)| (n.as_ref(), v.as_ref())), // Layer 4: auth
-        &override_map, // Layer 5: request overrides
+        override_map, // Layer 5: request overrides
     )
     .map_err(|e| RequestPreparationError::HeaderConflict(e.to_string()))?;
 
@@ -291,6 +284,14 @@ mod tests {
         }
     }
 
+    fn no_headers() -> RequestHeaderOverrides {
+        RequestHeaderOverrides::new()
+    }
+
+    fn header_override(pairs: &[(&str, &str)]) -> RequestHeaderOverrides {
+        RequestHeaderOverrides::from_slice(pairs).unwrap()
+    }
+
     #[test]
     fn test_prepared_config_creates_valid_config() {
         let cfg = test_prepared_config("gpt-4o", "https://api.test.com");
@@ -309,7 +310,7 @@ mod tests {
     #[tokio::test]
     async fn missing_required_bearer_credential_fails_before_http_send() {
         let execution = dummy_execution(AuthPolicy::bearer(vec![], true));
-        let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
+        let result = prepare_sampler_config(&execution, &empty_credential(), &no_headers()).await;
         assert!(result.is_err(), "required bearer with no candidates must error");
         let err = result.unwrap_err().to_string();
         assert!(
@@ -325,7 +326,7 @@ mod tests {
     #[tokio::test]
     async fn missing_required_header_credential_fails_before_http_send() {
         let execution = dummy_execution(AuthPolicy::header(http::HeaderName::from_static("x-api-key"), vec![], true));
-        let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
+        let result = prepare_sampler_config(&execution, &empty_credential(), &no_headers()).await;
         assert!(result.is_err(), "required header with no candidates must error");
         let err = result.unwrap_err().to_string();
         assert!(
@@ -341,7 +342,7 @@ mod tests {
     #[tokio::test]
     async fn optional_bearer_without_candidates_succeeds() {
         let execution = dummy_execution(AuthPolicy::bearer(vec![], false));
-        let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
+        let result = prepare_sampler_config(&execution, &empty_credential(), &no_headers()).await;
         assert!(result.is_ok(), "optional bearer with no candidates must succeed");
         let config = result.unwrap();
         // No auth header should be present
@@ -352,7 +353,7 @@ mod tests {
     #[tokio::test]
     async fn optional_header_without_candidates_succeeds() {
         let execution = dummy_execution(AuthPolicy::header(http::HeaderName::from_static("x-api-key"), vec![], false));
-        let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
+        let result = prepare_sampler_config(&execution, &empty_credential(), &no_headers()).await;
         assert!(result.is_ok(), "optional header with no candidates must succeed");
     }
 
@@ -374,7 +375,7 @@ mod tests {
             vec![CredentialCandidate::RequestOverride],
             true,
         ));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("must resolve with request override");
         let auth = config.headers.inner().get("authorization");
         assert!(auth.is_some(), "must produce authorization header");
@@ -399,7 +400,7 @@ mod tests {
             vec![CredentialCandidate::ProviderInline],
             true,
         ));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("must resolve with provider inline");
         let auth = config.headers.inner().get("authorization").unwrap();
         assert_eq!(auth.to_str().unwrap(), "Bearer sk-inline");
@@ -421,7 +422,7 @@ mod tests {
             ])],
             true,
         ));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("must resolve from env reader");
         let auth = config.headers.inner().get("authorization").unwrap();
         assert_eq!(auth.to_str().unwrap(), "Bearer sk-from-env");
@@ -445,7 +446,7 @@ mod tests {
             ],
             true,
         ));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("must resolve with request override");
         let auth = config.headers.inner().get("authorization").unwrap();
         assert_eq!(
@@ -474,7 +475,7 @@ mod tests {
             environment: &TestEnv,
             session: &TestSession,
         };
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("must succeed");
         let custom = config.headers.inner().get("x-custom");
         assert!(custom.is_some(), "static headers must be preserved");
@@ -500,7 +501,7 @@ mod tests {
             environment: &TestEnv,
             session: &TestSession,
         };
-        let result = prepare_sampler_config(&execution, &ctx, &[("x-custom", "override")]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &header_override(&[("x-custom", "override")])).await;
         let config = result.expect("must succeed");
         let custom = config.headers.inner().get("x-custom");
         assert_eq!(
@@ -513,7 +514,7 @@ mod tests {
     #[tokio::test]
     async fn prepare_sampler_config_preserves_protocol_and_url() {
         let execution = dummy_execution(AuthPolicy::None);
-        let config = prepare_sampler_config(&execution, &empty_credential(), &[])
+        let config = prepare_sampler_config(&execution, &empty_credential(), &no_headers())
             .await
             .expect("no-auth must succeed");
         assert_eq!(config.protocol_id, "chat_completions");
@@ -541,7 +542,7 @@ mod tests {
             vec![CredentialCandidate::RequestOverride],
             true,
         ));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("must resolve with request override");
         let header = config.headers.inner().get("x-api-key");
         assert!(
@@ -566,7 +567,7 @@ mod tests {
             vec![CredentialCandidate::ProviderInline],
             true,
         ));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("must resolve with provider inline");
         let header = config.headers.inner().get("x-api-key").unwrap();
         assert_eq!(header.to_str().unwrap(), "sk-ant-inline");
@@ -591,7 +592,7 @@ mod tests {
             ],
             true,
         ));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("must resolve with request override");
         let header = config.headers.inner().get("x-api-key").unwrap();
         assert_eq!(
@@ -606,7 +607,7 @@ mod tests {
     #[tokio::test]
     async fn no_auth_produces_no_authorization_header() {
         let execution = dummy_execution(AuthPolicy::None);
-        let config = prepare_sampler_config(&execution, &empty_credential(), &[])
+        let config = prepare_sampler_config(&execution, &empty_credential(), &no_headers())
             .await
             .expect("AuthPolicy::None must always succeed");
         let headers = config.headers.inner();
@@ -625,7 +626,7 @@ mod tests {
             session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::None);
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("AuthPolicy::None must always succeed");
         let has_auth = config.headers.inner().contains_key("authorization");
         assert!(
@@ -641,7 +642,7 @@ mod tests {
             "x-custom".to_string(),
             "custom-value".to_string(),
         );
-        let config = prepare_sampler_config(&execution, &empty_credential(), &[])
+        let config = prepare_sampler_config(&execution, &empty_credential(), &no_headers())
             .await
             .expect("AuthPolicy::None must succeed");
         let custom = config.headers.inner().get("x-custom");
@@ -668,10 +669,10 @@ mod tests {
             true,
         ));
 
-        let cfg_a = prepare_sampler_config(&execution, &ctx_a, &[])
+        let cfg_a = prepare_sampler_config(&execution, &ctx_a, &no_headers())
             .await
             .expect("config A must resolve");
-        let cfg_b = prepare_sampler_config(&execution, &ctx_b, &[])
+        let cfg_b = prepare_sampler_config(&execution, &ctx_b, &no_headers())
             .await
             .expect("config B must resolve");
 
@@ -699,18 +700,9 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn invalid_header_name_in_request_overrides_rejected() {
-        let val = SecretValue::new("sk-key".to_string());
-        let ctx = RequestCredentialContext {
-            request_override: Some(&val),
-            ..empty_credential()
-        };
-        let execution = dummy_execution(AuthPolicy::bearer(
-            vec![CredentialCandidate::RequestOverride],
-            true,
-        ));
-        let result = prepare_sampler_config(&execution, &ctx, &[("bad name", "value")]).await;
+    #[test]
+    fn invalid_header_name_in_request_overrides_rejected() {
+        let result = RequestHeaderOverrides::from_slice(&[("bad name", "value")]);
         assert!(result.is_err(), "invalid header name must be rejected");
         let err = result.unwrap_err().to_string();
         assert!(
@@ -719,19 +711,9 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn invalid_header_value_in_request_overrides_rejected() {
-        let val = SecretValue::new("sk-key".to_string());
-        let ctx = RequestCredentialContext {
-            request_override: Some(&val),
-            ..empty_credential()
-        };
-        let execution = dummy_execution(AuthPolicy::bearer(
-            vec![CredentialCandidate::RequestOverride],
-            true,
-        ));
-        let result =
-            prepare_sampler_config(&execution, &ctx, &[("x-custom", "bad\x00value")]).await;
+    #[test]
+    fn invalid_header_value_in_request_overrides_rejected() {
+        let result = RequestHeaderOverrides::from_slice(&[("x-custom", "bad\x00value")]);
         assert!(result.is_err(), "invalid header value must be rejected");
         let err = result.unwrap_err().to_string();
         assert!(
@@ -756,7 +738,7 @@ mod tests {
             request_override: Some(&val),
             ..empty_credential()
         };
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         assert!(
             result.is_err(),
             "conflicting static vs auth header must be rejected"
@@ -784,7 +766,7 @@ mod tests {
             request_override: Some(&val),
             ..empty_credential()
         };
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         assert!(
             result.is_ok(),
             "matching static and auth header values must be allowed"
@@ -815,7 +797,7 @@ mod tests {
             ],
             true,
         ));
-        let config = prepare_sampler_config(&execution, &ctx, &[])
+        let config = prepare_sampler_config(&execution, &ctx, &no_headers())
             .await
             .expect("must resolve from request_override");
         let auth = config.headers.inner().get("authorization").unwrap();
@@ -844,7 +826,7 @@ mod tests {
             vec![CredentialCandidate::Session(SessionKind::Xai)],
             true,
         ));
-        let config = prepare_sampler_config(&execution, &ctx, &[])
+        let config = prepare_sampler_config(&execution, &ctx, &no_headers())
             .await
             .expect("must resolve from session");
         let auth = config.headers.inner().get("authorization").unwrap();
@@ -864,7 +846,7 @@ mod tests {
             vec![CredentialCandidate::Session(SessionKind::Xai)],
             true,
         ));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         assert!(
             result.is_err(),
             "session returning None with mandatory auth must fail"
@@ -892,7 +874,7 @@ mod tests {
         };
         // No Session candidate in the list
         let execution = dummy_execution(AuthPolicy::bearer(vec![], true));
-        let result = prepare_sampler_config(&execution, &ctx, &[]).await;
+        let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         assert!(
             result.is_err(),
             "mandatory auth with no candidates must fail even if session resolver present"
@@ -914,7 +896,7 @@ mod tests {
             session: &tracking,
         };
         let execution = dummy_execution(AuthPolicy::bearer(vec![], false));
-        let config = prepare_sampler_config(&execution, &ctx, &[])
+        let config = prepare_sampler_config(&execution, &ctx, &no_headers())
             .await
             .expect("optional auth with no candidates must succeed");
         assert!(

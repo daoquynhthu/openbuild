@@ -4712,7 +4712,7 @@ pub async fn sampling_config_for_model_with_registry(
         let prepared = xai_grok_provider::prepared::prepare_sampler_config(
             &execution,
             &creds,
-            &[],
+            &xai_grok_provider::headers::RequestHeaderOverrides::new(),
         )
         .await
         .map_err(|e| {

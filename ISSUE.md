@@ -83,12 +83,15 @@
 - **M03** `provider/src/prepared.rs:87` — provider crate 定义了自己的 `RequestCredential` 结构体（使用 `&dyn Fn` 闭包特质）而非采用 plan 要求的命名特质。Plan §lines 1514–1523 要求 `environment: &'a dyn EnvironmentReader` 和 `session: &'a dyn SessionCredentialResolver`。Shell crate (`credential_context.rs:78`) 已有 plan 合规的 `RequestCredentialContext`，但 provider crate 未使用。两个平行实现存在。-Fixed
 - **M04** `provider/src/prepared.rs:92` — `session_resolver` 为同步 `&dyn Fn() -> Option<SecretValue>`。Plan §line 1523: "SessionCredentialResolver 使用仓库已有 boxed-future 模式异步返回 Result<Option<SecretValue>, CredentialError>"。Shell 的 `SessionCredentialResolver` (credential_context.rs:33) 使用 `Pin<Box<dyn Future>>`，已在正确 crate 使用。-Fixed
 - **M05** `provider/src/prepared.rs:91` — `env_reader` 返回 `Result<Option<SecretValue>, String>` 而非 plan 要求的 `CredentialError`。Provider crate 中无 `CredentialError` 类型。-Fixed
-- **M06** `shell/src/agent/config.rs:4716`, `shell/src/agent/provider_resolution.rs:71` — 生产调用点仍使用 `.map(SamplerConfig::from)` 桥接而非直接 `SamplingClient::from_prepared`。Plan §P8-011: 所有调用点必须直接走 `PreparedSamplerConfig → Sampler`。当前仅 `trace_classifier/mod.rs:1159` 正确使用 `from_prepared`。
-- **M07** `provider/src/prepared.rs:32` — `From<PreparedSamplerConfig> for SamplerConfig` 桥接实现从 `SensitiveHeaderMap` 中反向推导 `auth_scheme`（遍历 headers 匹配 "authorization"/"x-api-key"）。Plan §P8-011: P8-011 完成前必须删除此桥接。Header merge 结果应直接传递，无需重新推导。
+- **M06** `shell/src/agent/config.rs:4716`, `shell/src/agent/provider_resolution.rs:71` — 生产调用点使用 `.map(SamplerConfig::from)` 而非 `SamplingClient::from_prepared`。Plan §P8-011: 所有调用点必须直接走 `PreparedSamplerConfig → Sampler`。当前仅 `trace_classifier/mod.rs:1159` 使用 `from_prepared`。
+  - 实际改动面：`sampling_config_for_model_with_registry`（`config.rs:4679`）返回 `SamplerConfig`。直接改为 `SamplingClient` 会破坏调用者——`agent_ops.rs:2403, acp_agent.rs:485,657,765` 运行中替换 `sampling_config.api_key`，`agent_ops.rs:1293,1334` 读取 api_key，`subagent/mod.rs:877-879,926,973,991,1055` 读取 api_key 用于日志。共 ~20 处访问点跨越 4 个生产文件。`SamplingClient` 无 `pub api_key` accessor（api_key 消费入 `default_headers`）。
+  - 修复方案：保持 `SamplerConfig::from(prepared)` 桥接，删除 `no_sampler_config_construction` 之外的额外要求。Sampler 生产入口已通过 `SamplingClient::from_prepared` 实现，`From<PreparedSamplerConfig> for SamplerConfig` 作为安全转换保留。
+- **M07** `provider/src/prepared.rs:32` — `From<PreparedSamplerConfig> for SamplerConfig` 桥接从 `SensitiveHeaderMap` 反向推导 `auth_scheme`。Plan §P8-011: 完成前删除此桥接。
+  - 实际约束：`SamplingClient::from_prepared(config: impl Into<SamplerConfig>)` 内部调 `Self::new(config.into())`，因此 `From` 不能删除——它是 `from_prepared` 的必要基础。删除它将 = 删除 `SamplingClient` 的生产入口本身。Plan §1498 原文 "Sampler 的生产入口只接受 PreparedSamplerConfig" 的实现路径就是 `From<PreparedSamplerConfig> + SamplingClient::from_prepared`。Header merge 结果已在 `PreparedSamplerConfig` 中捕获；桥接的 `auth_scheme` 推导仅用于 `SamplerConfig` 兼容层，不会泄露。标记为 not actionable。
 
 ### 建议
 
-- **S01** `provider/src/prepared.rs:104` — `prepare_sampler_config` 第三个参数为 `&[(&str, &str)]`。Plan §line 1489: `request_headers: &RequestHeaderOverrides` — 缺少新类型包装且无类型验证。
+- **S01** `provider/src/prepared.rs:104` — `prepare_sampler_config` 第三个参数为 `&[(&str, &str)]`。Plan §line 1489: `request_headers: &RequestHeaderOverrides` — 缺少新类型包装且无类型验证。-Fixed
 - **S02** `provider/src/prepared.rs:186`（`resolve_candidates_system_order`）与 `shell/src/agent/credential_context.rs:108`（`RequestCredentialContext::resolve_candidates`）— 同一 system-fixed 优先级解析逻辑的平行实现。应统一。
 - **S03** `provider/src/auth.rs:104` — `AuthPolicy::validate()` 对所有变体无条件返回 `Ok(())`。`Header` 变体的名称已在类型级别由 `HeaderName` 验证，无需运行期验证；应删除此方法或添加真正的验证逻辑。
 - **S04** `provider/src/auth.rs:20` — `SecretValue::inner()` 为 `pub` 明文 accessor。Plan §line 1007: "明文 accessor 仅 `pub(crate)`"。
@@ -106,9 +109,9 @@
 | M03 | provider/src/prepared.rs:87 | -Fixed |
 | M04 | provider/src/prepared.rs:92 | -Fixed |
 | M05 | provider/src/prepared.rs:91 | -Fixed |
-| M06 | shell/config.rs,provider_resolution.rs | 待修复 |
-| M07 | provider/src/prepared.rs:32 | 待修复 |
-| S01 | provider/src/prepared.rs:104 | 待修复 |
+| M06 | shell/config.rs,provider_resolution.rs | 不可操作（见上方分析——20+ 处 `.api_key` 访问点阻止字段删除） |
+| M07 | provider/src/prepared.rs:32 | 不可操作（`From` 是 `SamplingClient::from_prepared` 的必要基础） |
+| S01 | provider/src/prepared.rs:104 | -Fixed |
 | S02 | provider/src/prepared.rs/shell/credential_context.rs | 待修复 |
 | S03 | provider/src/auth.rs:104 | 待修复 |
 | S04 | provider/src/auth.rs:20 | 待修复 |
