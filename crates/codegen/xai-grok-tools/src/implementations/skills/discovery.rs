@@ -859,7 +859,7 @@ pub fn discover_skills_for_paths(
     let mut skill_files: Vec<(PathBuf, SkillScope)> = Vec::new();
     let mut seen_canonical_paths = HashSet::new();
 
-    let cwd_canonical = dunce::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let cwd_canonical = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
 
     for file_path in file_paths {
         let start_dir = if file_path.is_dir() {
@@ -873,7 +873,7 @@ pub fn discover_skills_for_paths(
 
         let mut current = Some(start_dir);
         while let Some(dir) = current {
-            let dir_canonical = dunce::canonicalize(&dir).unwrap_or_else(|_| dir.clone());
+            let dir_canonical = xai_grok_paths::normalize::normalized_absolute(&dir).unwrap_or_else(|_| dir.clone());
 
             if dir_canonical == cwd_canonical {
                 break;
@@ -881,7 +881,7 @@ pub fn discover_skills_for_paths(
 
             if let Some(root) = git_root {
                 let root_canonical =
-                    dunce::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+                    xai_grok_paths::normalize::normalized_absolute(root).unwrap_or_else(|_| root.to_path_buf());
                 if !dir_canonical.starts_with(&root_canonical) {
                     break;
                 }
@@ -899,7 +899,7 @@ pub fn discover_skills_for_paths(
                     .into_iter()
                     .chain(find_command_paths(&config_dir))
                 {
-                    let canonical = dunce::canonicalize(&path).unwrap_or_else(|_| path.clone());
+                    let canonical = xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or_else(|_| path.clone());
                     if seen_canonical_paths.insert(canonical) {
                         skill_files.push((path, SkillScope::Local));
                     }
@@ -1512,7 +1512,7 @@ model: test-model
         let tmp = tempfile::tempdir().unwrap();
         // `discover_skills_for_paths` takes `git_root` explicitly and only uses
         // it as a path boundary, so no real git repo is needed here.
-        let repo = dunce::canonicalize(tmp.path()).unwrap();
+        let repo = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let sub = repo.join("sub");
         std::fs::create_dir_all(&sub).unwrap();
 

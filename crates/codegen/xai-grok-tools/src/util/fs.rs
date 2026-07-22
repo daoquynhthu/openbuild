@@ -22,7 +22,7 @@ pub async fn canonicalize_with_timeout(path: PathBuf) -> PathBuf {
     let path2 = path.clone();
     match tokio::time::timeout(
         FS_SYSCALL_TIMEOUT,
-        spawn_blocking(move || dunce::canonicalize(&path2)),
+        spawn_blocking(move || xai_grok_paths::normalize::normalized_absolute(&path2)),
     )
     .await
     {
@@ -63,7 +63,10 @@ pub async fn canonicalize_with_timeout(path: PathBuf) -> PathBuf {
 /// change the `ErrorKind`-matching semantics at call sites.
 pub(crate) async fn try_canonicalize(path: &Path) -> std::io::Result<PathBuf> {
     let owned = path.to_owned();
-    spawn_blocking(move || dunce::canonicalize(&owned))
+    spawn_blocking(move || {
+        xai_grok_paths::normalize::normalized_absolute(&owned)
+            .map_err(|e| std::io::Error::other(e.to_string()))
+    })
         .await
         .unwrap_or_else(|_| Err(std::io::Error::other("canonicalize task panicked")))
         .map(|p| dunce::simplified(&p).to_path_buf())

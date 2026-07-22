@@ -402,11 +402,11 @@ pub fn resolve_skill_internal_links(body: &str, skill_dir: &std::path::Path) -> 
             continue;
         }
 
-        let canonical = match dunce::canonicalize(&resolved) {
+        let canonical = match xai_grok_paths::normalize::normalized_absolute(&resolved) {
             Ok(p) => p,
             Err(_) => continue,
         };
-        let skill_dir_canonical = match dunce::canonicalize(skill_dir) {
+        let skill_dir_canonical = match xai_grok_paths::normalize::normalized_absolute(skill_dir) {
             Ok(p) => p,
             Err(_) => continue,
         };
