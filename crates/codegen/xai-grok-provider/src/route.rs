@@ -89,7 +89,6 @@ impl Route {
                 "protocol_id must not be empty".into(),
             ));
         }
-        self.auth.validate()?;
         Ok(())
     }
 }

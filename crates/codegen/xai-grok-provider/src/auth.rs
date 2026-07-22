@@ -99,14 +99,6 @@ impl AuthPolicy {
         }
     }
 
-    /// Validate header names against HTTP token rules.
-    /// `HeaderName` guarantees validity at the type level.
-    pub fn validate(&self) -> Result<(), ProviderError> {
-        match self {
-            AuthPolicy::Header { .. } => Ok(()),
-            _ => Ok(()),
-        }
-    }
 }
 
 /// Resolve candidates using the legacy env/session-only path (no request context).
@@ -546,22 +538,6 @@ mod tests {
             result.unwrap_err(),
             ProviderError::MissingCredential(_)
         ));
-    }
-
-    #[test]
-    fn auth_policy_validate_header_name() {
-        let valid = AuthPolicy::header(
-            http::HeaderName::from_static("x-api-key"),
-            vec![CredentialCandidate::ModelEnvironment(vec![
-                "ANTHROPIC_API_KEY".into(),
-            ])],
-            true,
-        );
-        assert!(valid.validate().is_ok());
-
-        // HeaderName enforces validity at the type level — empty and
-        // colon-containing names cannot be constructed, so those test
-        // cases are no longer applicable.
     }
 
     #[test]
