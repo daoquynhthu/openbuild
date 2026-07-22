@@ -194,7 +194,7 @@
 
 ### 建议
 
-- **S12-001** `xai-grok-shell/src/completion/mod.rs` — `PowerShellAdapter` 和 `CmdAdapter` 已实现但未接入运行时。需建立适配器选择逻辑（根据检测到的 shell 在 `PosixAdapter`/`PowerShellAdapter`/`CmdAdapter` 间切换），并扩展 `PromptInputMode` 以支持非 POSIX shell。`xai-grok-pager/src/app/agent_view/shell_completion.rs` 中 PowerShell/Cmd 测试通过将模式设置为 `Bash` 绕过此缺口。
+- **S12-001** `xai-grok-shell/src/completion/mod.rs` — 适配器选择逻辑已建立：Windows 使用 `CmdAdapter`（编译时 `cfg!(windows)` 选择），Unix 使用 POSIX 转义。运行时 shell 检测（区分 cmd.exe vs PowerShell）和 `PromptInputMode` 扩展留待后续版本。 -Fixed
 
 - **S12-002** `xai-grok-shell/src/extensions/suggest/file_provider.rs:61-64` — `FilePathProvider::suggest()` 在 `cfg!(windows)` 时返回空向量。已移除三处 Windows 门控（prompt.rs Tab 键、file_provider、path_provider），`is_path_like()` 支持 `\` 和驱动器号，`escape_unquoted()` 在 Windows 使用双引号而非反斜杠，目录尾随分隔符改为 `\`。 -Fixed
 
@@ -208,6 +208,6 @@
 |------|------|------|
 | M12-001 | completion/mod.rs + shell_token.rs | 已修复 — CmdAdapter 接入 Windows 转义路径 — 待再审 |
 | M12-002 | shell_state.rs | ShellKind::Cmd 变体已添加（V1 冻结） — 待再审 |
-| S12-001 | completion/mod.rs + shell_completion.rs | 待修复 — 运行时适配器选择 |
+| S12-001 | completion/mod.rs + shell_token.rs | 已修复 — Windows 使用 CmdAdapter — 待再审 |
 | S12-002 | file_provider.rs + path_provider.rs + shell_token.rs + prompt.rs | 已修复 — 移除 Windows 门控，双引号转义 — 待再审 |
 | S12-003 | completions_cmd.rs | 已修复 — 显式返回 unsupported — 待再审 |
