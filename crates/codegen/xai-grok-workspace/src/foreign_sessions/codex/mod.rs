@@ -132,7 +132,7 @@ fn existing_rollout_path(root: &ApprovedRoot, value: &str, expected_id: &str) ->
     compressed.push(".zst");
     let approved_prefixes = ["sessions", "archived_sessions"]
         .into_iter()
-        .filter_map(|name| dunce::canonicalize(root.join(name)).ok())
+        .filter_map(|name| xai_grok_paths::normalize::normalized_absolute(&root.join(name)).ok())
         .filter(|path| path.starts_with(root.path()))
         .collect::<Vec<_>>();
     [path, PathBuf::from(compressed)]
@@ -185,7 +185,7 @@ mod fixed_path_tests {
         let approved = ApprovedRoot::new(root.path()).unwrap();
         assert_eq!(
             existing_rollout_path(&approved, &rollout.to_string_lossy(), &id.to_string()),
-            Some(dunce::canonicalize(&rollout).unwrap())
+            Some(xai_grok_paths::normalize::normalized_absolute(&rollout).unwrap())
         );
     }
 }

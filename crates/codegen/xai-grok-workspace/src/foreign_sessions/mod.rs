@@ -130,7 +130,7 @@ where
     if !enabled.claude && !enabled.codex && !enabled.cursor {
         return RecentProbe::Complete(None);
     }
-    let Ok(cwd) = dunce::canonicalize(cwd) else {
+    let Ok(cwd) = xai_grok_paths::normalize::normalized_absolute(cwd) else {
         return RecentProbe::Complete(None);
     };
     let mut candidates = Vec::with_capacity(3);
@@ -188,7 +188,7 @@ where
     if !enabled.claude && !enabled.codex && !enabled.cursor {
         return Vec::new();
     }
-    let canonical_cwd = dunce::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let canonical_cwd = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
     let mut cwd_spellings = vec![canonical_cwd];
     if cwd_spellings[0].as_path() != cwd {
         cwd_spellings.push(cwd.to_path_buf());
@@ -341,7 +341,7 @@ mod tests {
         let now = UNIX_EPOCH + Duration::from_secs(10_000);
         let within = Duration::from_secs(600);
         let root = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(root.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap();
         let enabled = EnabledForeignSessionSources {
             claude: true,
             codex: true,
@@ -419,7 +419,7 @@ mod tests {
         let now = UNIX_EPOCH + Duration::from_secs(10_000);
         let within = Duration::from_secs(600);
         let root = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(root.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap();
         let claude_only = EnabledForeignSessionSources {
             claude: true,
             ..Default::default()
@@ -488,7 +488,7 @@ mod tests {
     fn recent_scan_never_touches_disabled_tool_stores() {
         let now = UNIX_EPOCH + Duration::from_secs(10_000);
         let root = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(root.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap();
         let calls = Cell::new((0, 0, 0));
         let found = most_recent_with(
             &cwd,
@@ -526,7 +526,7 @@ mod tests {
     fn incomplete_enabled_tool_suppresses_cross_tool_winner() {
         let now = UNIX_EPOCH + Duration::from_secs(10_000);
         let root = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(root.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap();
         let result = most_recent_with(
             &cwd,
             EnabledForeignSessionSources {
@@ -555,7 +555,7 @@ mod tests {
         let cwd = root.path().join("repo");
         let child = cwd.join("child");
         std::fs::create_dir_all(&child).unwrap();
-        let expected = dunce::canonicalize(&cwd).unwrap();
+        let expected = xai_grok_paths::normalize::normalized_absolute(&cwd).unwrap();
         let spelled = child.join("..");
         let found = most_recent_with(
             &spelled,
@@ -698,7 +698,7 @@ mod tests {
         let cwd = root.path().join("repo");
         let child = cwd.join("child");
         std::fs::create_dir_all(&child).unwrap();
-        let expected = dunce::canonicalize(&cwd).unwrap();
+        let expected = xai_grok_paths::normalize::normalized_absolute(&cwd).unwrap();
         let spelled = child.join("..");
         let received = RefCell::new(Vec::new());
         scan_with(
@@ -753,7 +753,7 @@ mod tests {
             },
             |_, _| panic!("claude scanner called"),
             |received, _| {
-                assert_eq!(received, dunce::canonicalize(&cwd).unwrap());
+                assert_eq!(received, xai_grok_paths::normalize::normalized_absolute(&cwd).unwrap());
                 assert!(!received.to_string_lossy().starts_with(r"\\?\"));
                 Vec::new()
             },

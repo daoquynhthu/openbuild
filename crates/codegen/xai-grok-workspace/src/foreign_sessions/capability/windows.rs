@@ -33,7 +33,7 @@ pub(super) fn directory_path_matches(path: &Path, expected: &File) -> bool {
 }
 
 pub(super) fn canonical_file_matches(path: &Path, expected: &File) -> bool {
-    let Ok(canonical) = dunce::canonicalize(path) else {
+    let Ok(canonical) = xai_grok_paths::normalize::normalized_absolute(path) else {
         return false;
     };
     if canonical != path {
@@ -54,7 +54,7 @@ pub(super) fn final_handle_path_matches(path: &Path, file: &File) -> bool {
     use std::os::windows::io::AsRawHandle as _;
 
     final_path_from_raw_handle(file.as_raw_handle().cast()).is_some_and(|handle_path| {
-        dunce::canonicalize(path).is_ok_and(|path| path == dunce::simplified(&handle_path))
+        xai_grok_paths::normalize::normalized_absolute(path).is_ok_and(|path| path == dunce::simplified(&handle_path))
     })
 }
 
