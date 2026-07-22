@@ -634,7 +634,7 @@ pub(crate) fn execute(
                 .spawn(async move {
                     let cwd_for_task = requested_cwd.clone();
                     let canonical_cwd = tokio::task::spawn_blocking(move || {
-                            dunce::canonicalize(cwd_for_task).ok()
+                            xai_grok_paths::normalize::normalized_absolute(&cwd_for_task).ok()
                         })
                         .await
                         .unwrap_or_else(|error| {

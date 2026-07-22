@@ -656,7 +656,7 @@ mod tests {
         assert!(!app.accept_foreign_resume_canonical_cwd(
             launch_token,
             &requested_cwd,
-            dunce::canonicalize(&requested_cwd).ok(),
+            xai_grok_paths::normalize::normalized_absolute(&requested_cwd).ok(),
         ));
         assert!(app.foreign_resume_hint().is_none());
     }

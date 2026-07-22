@@ -292,7 +292,7 @@ impl AgentArgs {
     pub fn canonical_plugin_dirs(&self) -> Vec<PathBuf> {
         self.plugin_dirs
             .iter()
-            .filter_map(|p| match dunce::canonicalize(p) {
+            .filter_map(|p| match xai_grok_paths::normalize::normalized_absolute(p) {
                 Ok(canonical) if canonical.is_dir() => Some(canonical),
                 Ok(_) => {
                     eprintln!(
@@ -998,7 +998,7 @@ mod tests {
         assert!(agent.no_leader);
         assert_eq!(
             agent.canonical_plugin_dirs(),
-            vec![dunce::canonicalize(&dir).unwrap()]
+            vec![xai_grok_paths::normalize::normalized_absolute(&dir).unwrap()]
         );
     }
     #[test]
