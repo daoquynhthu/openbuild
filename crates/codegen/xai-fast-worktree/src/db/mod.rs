@@ -277,7 +277,7 @@ impl WorktreeDb {
     pub fn get(&self, id_or_path: &str) -> Result<Option<WorktreeRecord>> {
         if id_or_path.contains('/') {
             let canon = PathBuf::from(id_or_path);
-            let canon = dunce::canonicalize(&canon).unwrap_or(canon);
+            let canon = xai_grok_paths::normalize::normalized_absolute(&canon).unwrap_or(canon);
             queries::get_by_path(&self.conn, &canon)
         } else {
             let by_id = queries::get_by_id(&self.conn, id_or_path)?;
@@ -346,7 +346,7 @@ pub fn resolve_grok_home() -> Result<PathBuf> {
     // tree as trust/hooks even when it is symlinked. The dunce canonicalization
     // must stay in sync with xai_grok_config::default_grok_home();
     // home resolution deliberately differs ($HOME here vs std::env::home_dir()).
-    Ok(dunce::canonicalize(&home).unwrap_or(home).join(".grok"))
+    Ok(xai_grok_paths::normalize::normalized_absolute(&home).unwrap_or(home).join(".grok"))
 }
 
 /// Serializes tests that mutate the process-global `GROK_HOME` env var so they

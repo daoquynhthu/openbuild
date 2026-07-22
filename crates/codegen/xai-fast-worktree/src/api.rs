@@ -862,7 +862,7 @@ fn read_worktree_gitdir(worktree_path: &std::path::Path) -> Option<std::path::Pa
         path.to_path_buf()
     };
     // Canonicalize to clean up any `..` components
-    dunce::canonicalize(&resolved).ok().or(Some(resolved))
+    xai_grok_paths::normalize::normalized_absolute(&resolved).ok().or(Some(resolved))
 }
 
 /// Delete `snapshot_path`, falling back to the delegate's `delete_snapshot`
@@ -1573,7 +1573,7 @@ pub mod gc {
     /// physical paths, so also match the canonicalized worktree path — a
     /// symlinked `$GROK_HOME` or custom worktree path would otherwise never match.
     fn cwd_within(wt_path: &Path, live_cwds: &[PathBuf]) -> bool {
-        let wt_canon = dunce::canonicalize(wt_path).unwrap_or_else(|_| wt_path.to_path_buf());
+        let wt_canon = xai_grok_paths::normalize::normalized_absolute(wt_path).unwrap_or_else(|_| wt_path.to_path_buf());
         live_cwds
             .iter()
             .any(|cwd| cwd.starts_with(wt_path) || cwd.starts_with(&wt_canon))
@@ -3214,7 +3214,7 @@ mod tests {
                 .spawn()
                 .expect("spawn sleep");
             // Wait for the kernel to reflect the child's CWD before GC scans.
-            let want = dunce::canonicalize(&nested).unwrap();
+            let want = xai_grok_paths::normalize::normalized_absolute(&nested).unwrap();
             let link = format!("/proc/{}/cwd", child.id());
             for _ in 0..200 {
                 if std::fs::read_link(&link).is_ok_and(|p| p.starts_with(&want)) {

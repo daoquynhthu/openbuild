@@ -297,7 +297,7 @@ pub fn get_btrfs_mount_point(path: &Path) -> Result<Option<PathBuf>> {
     let mountinfo = std::fs::read_to_string("/proc/self/mountinfo")
         .context("failed to read /proc/self/mountinfo")?;
 
-    let canonical = dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let canonical = xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.to_path_buf());
 
     // Find the longest matching mount point that is btrfs
     let mut best_match: Option<PathBuf> = None;
