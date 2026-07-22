@@ -605,7 +605,7 @@ fn collect_plugin(
     candidates: &mut Vec<DiscoveredPlugin>,
 ) {
     // Canonicalize for dedup
-    let canonical = match dunce::canonicalize(plugin_root) {
+    let canonical = match xai_grok_paths::normalize::normalized_absolute(plugin_root) {
         Ok(c) => c,
         Err(e) => {
             tracing::warn!(
@@ -833,8 +833,8 @@ fn claude_install_visible(
     let Some(cwd) = cwd else {
         return false;
     };
-    let cwd = dunce::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
-    let project = dunce::canonicalize(project).unwrap_or_else(|_| project.to_path_buf());
+    let cwd = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let project = xai_grok_paths::normalize::normalized_absolute(project).unwrap_or_else(|_| project.to_path_buf());
     cwd.starts_with(&project)
 }
 

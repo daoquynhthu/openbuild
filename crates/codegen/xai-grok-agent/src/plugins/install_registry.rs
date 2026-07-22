@@ -94,7 +94,7 @@ fn paths_match_plugin_root(
 ) -> bool {
     installed_plugin_root == plugin_root
         || installed_plugin_root == plugin_canonical_root
-        || dunce::canonicalize(installed_plugin_root)
+        || xai_grok_paths::normalize::normalized_absolute(installed_plugin_root)
             .ok()
             .is_some_and(|canonical| canonical == plugin_root || canonical == plugin_canonical_root)
 }
@@ -538,7 +538,7 @@ mod tests {
         let repo_root = tmp.path().join("repo-a-11111111");
         let plugin_root = repo_root.join("plugins").join("nested");
         std::fs::create_dir_all(&plugin_root).unwrap();
-        let canonical_plugin_root = dunce::canonicalize(&plugin_root).unwrap();
+        let canonical_plugin_root = xai_grok_paths::normalize::normalized_absolute(&plugin_root).unwrap();
         let mut reg = InstallRegistry::empty(tmp.path().to_path_buf());
         reg.insert(
             "repo-a-11111111".to_string(),
