@@ -32,7 +32,7 @@ fn foreign_resume_results_require_launch_token_and_canonical_cwd() {
     else {
         panic!("expected canonicalization effect");
     };
-    let canonical_cwd = dunce::canonicalize(&requested_cwd).unwrap();
+    let canonical_cwd = xai_grok_paths::normalize::normalized_absolute(&requested_cwd).unwrap();
     let effects = dispatch(
         Action::TaskComplete(TaskResult::ForeignResumeCwdCanonicalized {
             requested_cwd: requested_cwd.clone(),
@@ -75,7 +75,7 @@ fn foreign_resume_results_require_launch_token_and_canonical_cwd() {
     else {
         panic!("expected canonicalization effect");
     };
-    let canonical_cwd = dunce::canonicalize(&requested_cwd).unwrap();
+    let canonical_cwd = xai_grok_paths::normalize::normalized_absolute(&requested_cwd).unwrap();
     dispatch(
         Action::TaskComplete(TaskResult::ForeignResumeHintDetected {
             canonical_cwd: canonical_cwd.clone(),
@@ -115,7 +115,7 @@ fn foreign_resume_result_rejects_startup_conflict_before_completion() {
     else {
         panic!("expected canonicalization effect");
     };
-    let canonical_cwd = dunce::canonicalize(&requested_cwd).unwrap();
+    let canonical_cwd = xai_grok_paths::normalize::normalized_absolute(&requested_cwd).unwrap();
     assert!(app.accept_foreign_resume_canonical_cwd(
         launch_token,
         &requested_cwd,

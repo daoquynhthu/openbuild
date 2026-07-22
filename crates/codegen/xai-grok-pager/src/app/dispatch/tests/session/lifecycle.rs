@@ -1590,7 +1590,7 @@ async fn project_selected_creates_session_and_sends_prompt() {
     dispatch(Action::NewSession, &mut app);
     let id = AgentId(0);
     let dir = std::env::temp_dir();
-    let selected = dunce::canonicalize(&dir).unwrap_or(dir);
+    let selected = xai_grok_paths::normalize::normalized_absolute(&dir).unwrap_or(dir);
     let effects = dispatch(
         Action::ProjectSelected {
             path: selected.clone(),

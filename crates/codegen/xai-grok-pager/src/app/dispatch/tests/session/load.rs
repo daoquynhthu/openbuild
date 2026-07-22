@@ -1405,7 +1405,7 @@ async fn dispatch_project_selected_disable_picker_persists() {
     let mut app = project_picker_app();
     dispatch(Action::NewSession, &mut app);
     let dir = std::env::temp_dir();
-    let selected = dunce::canonicalize(&dir).unwrap_or(dir);
+    let selected = xai_grok_paths::normalize::normalized_absolute(&dir).unwrap_or(dir);
     let effects = dispatch(
         Action::ProjectSelected {
             path: selected,

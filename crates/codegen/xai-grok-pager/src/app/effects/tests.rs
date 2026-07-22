@@ -1282,7 +1282,7 @@ async fn foreign_resume_detection_runs_as_task_result() {
         }
         other => panic!("expected ForeignResumeCwdCanonicalized, got {other:?}"),
     }
-    let canonical_cwd = dunce::canonicalize(tempfile::tempdir().unwrap().path())
+    let canonical_cwd = xai_grok_paths::normalize::normalized_absolute(tempfile::tempdir().unwrap().path())
         .unwrap();
     let (quit, _) = execute(
         Effect::DetectForeignResumeHint {
