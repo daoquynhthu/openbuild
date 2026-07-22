@@ -137,24 +137,24 @@
   **已完成迁移的 crate**：
   - `xai-grok-shell` — 全部迁移 ✅（13 个源文件，~28 调用点，4 次提交）
   - `xai-grok-workspace` — 全部迁移 ✅（16 个源文件，~45 调用点，7 次提交）
+  - `xai-grok-pager-render` — 全部迁移 ✅（1 个源文件，17 调用点，1 次提交）
+  - `xai-grok-fsnotify` — 全部迁移 ✅（2 个源文件，~38 调用点，1 次提交，含 +dep）
 
   **待迁移 crate**（按剩余调用点计数）：
 
   | Crate | 剩余调用 | 已有 `xai-grok-paths` 依赖？ | 备注 |
   |-------|---------|---------------------------|------|
+  | `xai-grok-tools` | ~58 | 否 | 12 个文件 |
   | `xai-grok-shared` | ~48 | 需检查 | 含 ~40 调用在 `placeholder_images.rs` 测试代码 |
   | `xai-grok-pager` | ~45 | 否 | 16 个文件 |
-  | `xai-grok-fsnotify` | ~38 | 需检查 | 含 ~29 测试调用 |
   | `xai-grok-agent` | ~34 | 需检查 | 散布调用 |
-  | `xai-grok-pager-render` | 17 | 是 | 单文件（迁移中） |
   | `xai-fast-worktree` | ~16 | 需检查 | |
-  | `xai-grok-tools` | ~58 | 否 | 12 个文件 |
+  | `xai-grok-update` | 8 | 需检查 | |
+  | `xai-grok-memory` | 7 | 需检查 | |
+  | `xai-hunk-tracker` | 6 | 需检查 | |
+  | `xai-grok-sandbox` | 4 | 需检查 | |
   | `xai-codebase-graph` | 2 | 是 | |
   | `xai-grok-config` | 2 | 需检查 | |
-  | `xai-grok-memory` | 7 | 需检查 | |
-  | `xai-grok-sandbox` | 4 | 需检查 | |
-  | `xai-grok-update` | 8 | 需检查 | |
-  | `xai-hunk-tracker` | 6 | 需检查 | |
   | `xai-grok-plugin-marketplace` | 2 | 需检查 | |
   | `xai-grok-pager-bin` | 1 | 需检查 | |
   | `xai-grok-pager-pty-harness` | 1 | 需检查 | |

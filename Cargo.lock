@@ -13985,6 +13985,7 @@ dependencies = [
  "xai-file-utils",
  "xai-grok-config",
  "xai-grok-env",
+ "xai-grok-paths",
  "xai-grok-sandbox",
  "xai-grok-tools-api",
  "xai-grok-version",

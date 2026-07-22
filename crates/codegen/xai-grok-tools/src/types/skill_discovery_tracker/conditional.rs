@@ -106,7 +106,7 @@ fn skill_matches_any(skill: &SkillInfo, touched: &[&Path], cwd: &Path) -> bool {
             .map(Path::to_path_buf)
             .ok()
             .or_else(|| {
-                dunce::canonicalize(t)
+                xai_grok_paths::normalize::normalized_absolute(t)
                     .ok()
                     .and_then(|c| c.strip_prefix(cwd).map(Path::to_path_buf).ok())
             })

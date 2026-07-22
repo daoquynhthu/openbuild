@@ -527,7 +527,7 @@ mod tests {
             let tracker = &mut res.get_or_default::<State<CursorRulesOnReadTracker>>().0;
             tracker
                 .injected_rule_paths
-                .insert(dunce::canonicalize(&rule_path).unwrap());
+                .insert(xai_grok_paths::normalize::normalized_absolute(&rule_path).unwrap());
         }
 
         let reminder =

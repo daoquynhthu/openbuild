@@ -613,10 +613,10 @@ impl GitignoreFilter {
     /// For non-existent files (new file creation), canonicalizes the parent
     /// directory to handle symlinks (e.g., macOS `/var` → `/private/var`).
     pub fn is_ignored(&self, path: &std::path::Path) -> bool {
-        let normalized = dunce::canonicalize(path).unwrap_or_else(|_| {
+        let normalized = xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| {
             path.parent()
                 .and_then(|parent| {
-                    dunce::canonicalize(parent)
+                    xai_grok_paths::normalize::normalized_absolute(parent)
                         .ok()
                         .map(|p| p.join(path.file_name().unwrap_or_default()))
                 })

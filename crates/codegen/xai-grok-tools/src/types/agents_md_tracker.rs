@@ -630,7 +630,7 @@ mod tests {
     async fn check_path_skips_gitignored_agents_md() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
-        let root = dunce::canonicalize(root).unwrap();
+        let root = xai_grok_paths::normalize::normalized_absolute(root).unwrap();
         let build_dir = root.join("build");
         fs::create_dir_all(&build_dir).unwrap();
         fs::write(build_dir.join("AGENTS.md"), "build instructions").unwrap();
@@ -649,7 +649,7 @@ mod tests {
     async fn check_path_does_not_skip_non_gitignored() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
-        let root = dunce::canonicalize(root).unwrap();
+        let root = xai_grok_paths::normalize::normalized_absolute(root).unwrap();
         let src_dir = root.join("src");
         fs::create_dir_all(&src_dir).unwrap();
         fs::write(src_dir.join("AGENTS.md"), "src instructions").unwrap();
