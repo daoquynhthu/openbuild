@@ -743,6 +743,7 @@ impl MockInferenceServer {
         let log_cc = log.clone();
         let log_rs = log.clone();
         let log_msg = log.clone();
+        let log_ollama = log.clone();
         let token_cc = required_token.clone();
         let token_msg = required_token.clone();
         let token_rs = required_token;
@@ -756,6 +757,7 @@ impl MockInferenceServer {
         let delay_cc = chunk_delay.clone();
         let delay_rs = chunk_delay.clone();
         let delay_msg = chunk_delay;
+        let models_ollama = models.clone();
 
         Router::new()
             .route(
@@ -1094,6 +1096,42 @@ impl MockInferenceServer {
             .route(
                 "/v1/storage/limits",
                 get(|| async { StatusCode::NOT_FOUND }),
+            )
+            // Ollama-compatible tags endpoint (P14-001).
+            .route(
+                "/api/tags",
+                get({
+                    let log = log_ollama;
+                    let models = models_ollama;
+                    move || {
+                        let log = log.clone();
+                        let models = models.clone();
+                        async move {
+                            log.record("GET", "/api/tags", None, None, Vec::new());
+                            let models_json = models.read().unwrap().clone();
+                            let ollama_models: Vec<Value> = models_json
+                                .iter()
+                                .map(|m| {
+                                    json!({
+                                        "name": m.get("id").and_then(Value::as_str).unwrap_or("unknown"),
+                                        "modified_at": "2024-01-01T00:00:00Z",
+                                        "size": 1000000000,
+                                        "digest": "sha256:mock",
+                                        "details": {
+                                            "parent_model": "",
+                                            "format": "gguf",
+                                            "family": "llama",
+                                            "families": ["llama"],
+                                            "parameter_size": "7B",
+                                            "quantization_level": "Q4_0"
+                                        }
+                                    })
+                                })
+                                .collect();
+                            Json(json!({ "models": ollama_models }))
+                        }
+                    }
+                }),
             )
             // Body limit: repo-context archives can exceed axum's 2 MB default.
             .layer(axum::extract::DefaultBodyLimit::max(256 * 1024 * 1024))
@@ -1461,5 +1499,26 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status(), 200);
         assert_eq!(chat_stream_text(&resp.text().await.unwrap()), MERMAID_TEXT);
+    }
+
+    #[tokio::test]
+    async fn ollama_tags_endpoint_returns_models() {
+        let server = MockInferenceServer::start_with_models(vec![
+            MockModelEntry::new("llama2"),
+            MockModelEntry::new("mistral"),
+        ])
+        .await
+        .unwrap();
+
+        let resp = reqwest::get(format!("http://{}/api/tags", server.addr))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 200);
+        let body: Value = resp.json().await.unwrap();
+        let models = body["models"].as_array().expect("models array");
+        assert_eq!(models.len(), 2);
+        assert_eq!(models[0]["name"], "llama2");
+        assert_eq!(models[1]["name"], "mistral");
+        assert!(models[0]["details"]["family"].is_string());
     }
 }
