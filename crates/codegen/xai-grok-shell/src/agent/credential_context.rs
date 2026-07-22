@@ -101,8 +101,7 @@ mod tests {
     fn environment_reader_reads_existing_var() {
         let env = TestEnvironment::default().set("MY_KEY", "secret-value");
         let result = env.read("MY_KEY").unwrap();
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().inner(), "secret-value");
+        assert_eq!(result, Some(SecretValue::new("secret-value".to_string())));
     }
 
     #[test]
@@ -210,6 +209,7 @@ mod tests {
         let env = TestEnvironment::default().set("ENV_KEY", "env-val");
         let session = NoopSessionResolver;
         let ctx = RequestCredentialContext::new(Some(&val), None, None, &env, &session);
-        assert_eq!(ctx.request_override.unwrap().inner(), "tok");
+        let expected = SecretValue::new("tok".to_string());
+        assert_eq!(ctx.request_override, Some(&expected));
     }
 }

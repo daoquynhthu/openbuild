@@ -94,7 +94,7 @@
 - **S01** `provider/src/prepared.rs:104` — `prepare_sampler_config` 第三个参数为 `&[(&str, &str)]`。Plan §line 1489: `request_headers: &RequestHeaderOverrides` — 缺少新类型包装且无类型验证。-Fixed
 - **S02** `provider/src/prepared.rs:186`（`resolve_candidates_system_order`）与 `shell/src/agent/credential_context.rs:108`（`RequestCredentialContext::resolve_candidates`）— 同一 system-fixed 优先级解析逻辑的平行实现。应统一。-Fixed（已在 M03-M05 中删除 `resolve_candidates_system_order`，`resolve_candidates` 单一实现）
 - **S03** `provider/src/auth.rs:104` — `AuthPolicy::validate()` 对所有变体无条件返回 `Ok(())`。`Header` 变体的名称已在类型级别由 `HeaderName` 验证，无需运行期验证；应删除此方法或添加真正的验证逻辑。-Fixed
-- **S04** `provider/src/auth.rs:20` — `SecretValue::inner()` 为 `pub` 明文 accessor。Plan §line 1007: "明文 accessor 仅 `pub(crate)`"。
+- **S04** `provider/src/auth.rs:20` — `SecretValue::inner()` 为 `pub` 明文 accessor。Plan §line 1007: "明文 accessor 仅 `pub(crate)`"。-Fixed
 - **S05** `provider/src/route.rs:20` — `Route::protocol_id` 为 `String`。虽不在 Phase 8 强制范围内，但与 `ResolvedModelExecution::protocol_id`（`ProtocolId`）和 `PreparedSamplerConfig::protocol_id`（应为 `ProtocolId`）不一致。建议在 Phase 4/7 路由重构时对齐。
 
 ### 状态汇总
@@ -114,5 +114,5 @@
 | S01 | provider/src/prepared.rs:104 | -Fixed |
 | S02 | provider/src/prepared.rs/shell/credential_context.rs | -Fixed |
 | S03 | provider/src/auth.rs:104 | -Fixed |
-| S04 | provider/src/auth.rs:20 | 待修复 |
+| S04 | provider/src/auth.rs:20 | -Fixed |
 | S05 | provider/src/route.rs:20 | 待修复 |

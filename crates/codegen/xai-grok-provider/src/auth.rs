@@ -8,7 +8,6 @@ pub type AuthHeaderMap = HeaderMap;
 /// Debug/Display output `[REDACTED]`.
 #[derive(Clone)]
 pub struct SecretValue {
-    #[allow(dead_code)]
     inner: String,
 }
 
@@ -17,8 +16,14 @@ impl SecretValue {
         Self { inner: value }
     }
 
-    pub fn inner(&self) -> &str {
+    pub(crate) fn inner(&self) -> &str {
         &self.inner
+    }
+}
+
+impl PartialEq for SecretValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
     }
 }
 
