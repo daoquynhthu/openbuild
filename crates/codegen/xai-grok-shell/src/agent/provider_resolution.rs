@@ -46,23 +46,30 @@ pub enum ProviderResolutionError {
 }
 
 /// Migration adapter: converts route compiler output to `SamplerConfig`.
-/// This is the only remaining path producing `SamplerConfig` from the route compiler.
-/// It will be removed when all callers use `PreparedSamplerConfig` directly.
-#[allow(deprecated)]
+/// Calls `prepare_sampler_config` directly with minimal credential context.
 pub fn execution_to_sampler_config(
     model: &ModelEntry,
     registry: &RegistrySnapshot,
     api_key: Option<&str>,
     base_url_override: Option<&str>,
 ) -> Result<SamplerConfig, ProviderResolutionError> {
+    use xai_grok_provider::prepared::{prepare_sampler_config, RequestCredential};
+    use xai_grok_provider::auth::SecretValue;
+
     let execution = resolve_model_execution(model, registry, base_url_override)?;
+    let model_inline = api_key.map(|k| SecretValue::new(k.to_string()));
+    let creds = RequestCredential {
+        request_override: None,
+        model_inline: model_inline.as_ref(),
+        provider_inline: None,
+        env_reader: &|_| Ok(None),
+        session_resolver: &|| None,
+    };
     let rt = tokio::runtime::Runtime::new()
         .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
-    rt.block_on(execution_to_unprepared_sampler_config_for_migration(
-        &execution,
-        api_key,
-    ))
-    .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))
+    rt.block_on(prepare_sampler_config(&execution, &creds, &[]))
+        .map(xai_grok_sampler::SamplerConfig::from)
+        .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))
 }
 
 /// Merge generation parameters with fixed precedence: route defaults < model info < request overrides.
@@ -208,37 +215,6 @@ pub fn resolve_model_execution(
         generation,
         limits: route.limits.clone(),
     })
-}
-
-/// Temporary migration adapter: converts `ResolvedModelExecution` → `SamplerConfig`.
-///
-/// Delegates to `PreparedSamplerConfig::into()` for field mapping (P8-011).
-/// This function is deprecated; new callers should use
-/// `resolve_model_execution → prepare_sampler_config → PreparedSamplerConfig → Sampler`.
-#[deprecated(note = "removed in P8-011; use prepare_sampler_config instead")]
-/// Migration adapter: converts route compiler output to `SamplerConfig`.
-/// Replaced by direct `prepare_sampler_config` + `.into()` usage.
-/// This function is kept for backward compat during P8-011 transition.
-/// After migration, remove this and all callers should use:
-/// `prepare_sampler_config(&execution, &credentials, &[]).await.into()`
-#[allow(deprecated)]
-pub async fn execution_to_unprepared_sampler_config_for_migration(
-    execution: &ResolvedModelExecution,
-    api_key: Option<&str>,
-) -> Result<SamplerConfig, xai_grok_provider::prepared::RequestPreparationError> {
-    use xai_grok_provider::prepared::{prepare_sampler_config, RequestCredential};
-    use xai_grok_provider::auth::SecretValue;
-
-    let model_inline = api_key.map(|k| SecretValue::new(k.to_string()));
-    let credentials = RequestCredential {
-        request_override: None,
-        model_inline: model_inline.as_ref(),
-        provider_inline: None,
-        env_reader: &|_| Ok(None),
-        session_resolver: &|| None,
-    };
-    let prepared = prepare_sampler_config(execution, &credentials, &[]).await?;
-    Ok(prepared.into())
 }
 
 /// A legacy (unqualified) xAI model reference that can be migrated to
@@ -647,5 +623,89 @@ mod tests {
             None,
         );
         assert_eq!(max_tokens, Some(1000), "no cap when route limit is None");
+    }
+
+    /// Static scan: production code must not construct `SamplerConfig` directly.
+    /// Phase 8 gate requires all production paths go through
+    /// `resolve_model_execution → prepare_sampler_config → PreparedSamplerConfig → Sampler`.
+    /// `#[cfg(test)]` blocks and test-only directories are excluded.
+    #[test]
+    fn no_sampler_config_construction_in_production_sources() {
+        let crate_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let src_dir = crate_dir.join("src");
+        let mut failures = Vec::new();
+        let mut files = Vec::new();
+        collect_rs_files(&src_dir, &mut files);
+        for file_path in &files {
+            let relative = file_path.strip_prefix(&crate_dir).unwrap_or(file_path);
+            // Skip directories that are test-only (gated by #[cfg(test)] with #[path])
+            let rel_str = relative.to_string_lossy().replace('\\', "/");
+            if rel_str.contains("acp_session_tests/") || rel_str.contains("test_support/") {
+                continue;
+            }
+            let content = std::fs::read_to_string(file_path).unwrap_or_default();
+            let lines: Vec<&str> = content.lines().collect();
+            let mut in_test_block = false;
+            let mut brace_depth = 0usize;
+            for (i, line) in lines.iter().enumerate() {
+                let trimmed = line.trim();
+                if trimmed == "#[cfg(test)]" || trimmed.starts_with("#[cfg(test)]") {
+                    in_test_block = true;
+                    continue;
+                }
+                if in_test_block {
+                    if trimmed.starts_with("mod ") && trimmed.ends_with('{') {
+                        brace_depth += 1;
+                        continue;
+                    }
+                    if trimmed.starts_with("mod ") && trimmed.ends_with(';') {
+                        in_test_block = false;
+                        continue;
+                    }
+                    if trimmed == "}" {
+                        if brace_depth > 0 {
+                            brace_depth -= 1;
+                        }
+                        if brace_depth == 0 {
+                            in_test_block = false;
+                        }
+                        continue;
+                    }
+                    if trimmed.starts_with('{') || trimmed.ends_with('{') {
+                        brace_depth += 1;
+                    }
+                    continue;
+                }
+                if trimmed.contains("SamplerConfig {") && !trimmed.starts_with("//") {
+                    failures.push(format!(
+                        "{}:{}: {}",
+                        relative.display(),
+                        i + 1,
+                        trimmed
+                    ));
+                }
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "Production code must not construct SamplerConfig directly.\n\
+             All production paths must use resolve_model_execution → prepare_sampler_config → PreparedSamplerConfig → Sampler.\n\
+             Found {} occurrence(s):\n{}",
+            failures.len(),
+            failures.join("\n")
+        );
+    }
+
+    fn collect_rs_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    collect_rs_files(&path, out);
+                } else if path.extension().map(|e| e == "rs").unwrap_or(false) {
+                    out.push(path);
+                }
+            }
+        }
     }
 }

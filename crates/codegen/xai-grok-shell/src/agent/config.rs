@@ -4696,14 +4696,24 @@ pub async fn sampling_config_for_model_with_registry(
             snapshot,
             Some(&base_url),
         )?;
-        #[allow(deprecated)]
-        let config = {
-            crate::agent::provider_resolution::execution_to_unprepared_sampler_config_for_migration(
-                &execution,
-                credentials.api_key.as_deref(),
-            )
-        }
+        let model_inline = credentials
+            .api_key
+            .as_deref()
+            .map(|k| xai_grok_provider::auth::SecretValue::new(k.to_string()));
+        let creds = xai_grok_provider::prepared::RequestCredential {
+            request_override: None,
+            model_inline: model_inline.as_ref(),
+            provider_inline: None,
+            env_reader: &|_| Ok(None),
+            session_resolver: &|| None,
+        };
+        let config = xai_grok_provider::prepared::prepare_sampler_config(
+            &execution,
+            &creds,
+            &[],
+        )
         .await
+        .map(xai_grok_sampler::SamplerConfig::from)
         .map_err(|e| {
             crate::agent::provider_resolution::ProviderResolutionError::AuthCredential(e.to_string())
         })?;
