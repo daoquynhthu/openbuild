@@ -273,7 +273,7 @@ pub(crate) enum ResolvedAgent {
 pub(crate) fn resolve_agent_arg(agent: &str) -> ResolvedAgent {
     let path = std::path::Path::new(agent);
     if path.exists() && path.is_file() {
-        ResolvedAgent::FilePath(dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()))
+        ResolvedAgent::FilePath(xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.to_path_buf()))
     } else {
         ResolvedAgent::Name(agent.to_string())
     }
@@ -844,7 +844,7 @@ pub async fn run_single_turn(
 
     let cwd = match options.cwd {
         None => std::env::current_dir()?,
-        Some(ref p) => dunce::canonicalize(p)?,
+        Some(ref p) => xai_grok_paths::normalize::normalized_absolute(p)?,
     };
 
     let mut emitter = HeadlessEmitter::new(options.output_format, options.json_schema.is_some());

@@ -139,12 +139,12 @@
   - `xai-grok-workspace` — 全部迁移 ✅（16 个源文件，~45 调用点，7 次提交）
   - `xai-grok-pager-render` — 全部迁移 ✅（1 个源文件，17 调用点，1 次提交）
   - `xai-grok-fsnotify` — 全部迁移 ✅（2 个源文件，~38 调用点，1 次提交，含 +dep）
+  - `xai-grok-tools` — 全部迁移 ✅（12 个源文件，~58 调用点，4 次提交，含 +dep + Path import, fix PathError→io::Error conversion）
 
   **待迁移 crate**（按剩余调用点计数）：
 
   | Crate | 剩余调用 | 已有 `xai-grok-paths` 依赖？ | 备注 |
   |-------|---------|---------------------------|------|
-  | `xai-grok-tools` | ~58 | 否 | 12 个文件 |
   | `xai-grok-shared` | ~48 | 需检查 | 含 ~40 调用在 `placeholder_images.rs` 测试代码 |
   | `xai-grok-pager` | ~45 | 否 | 16 个文件 |
   | `xai-grok-agent` | ~34 | 需检查 | 散布调用 |

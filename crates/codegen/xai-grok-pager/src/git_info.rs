@@ -269,7 +269,7 @@ pub fn worktree_label_index() -> std::collections::HashMap<PathBuf, String> {
         else {
             continue;
         };
-        let key = dunce::canonicalize(&rec.path).unwrap_or(rec.path);
+        let key = xai_grok_paths::normalize::normalized_absolute(&rec.path).unwrap_or(rec.path);
         map.insert(key, label.to_string());
     }
     map

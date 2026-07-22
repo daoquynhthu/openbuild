@@ -8,6 +8,7 @@ authors = ["xAI"]
 [dependencies]
 # TTY safety — detach subprocesses from the controlling terminal
 dunce = { workspace = true }
+xai-grok-paths = { path = "../xai-grok-paths" }
 xai-tty-utils = { workspace = true }
 xai-grok-version = { workspace = true }
 

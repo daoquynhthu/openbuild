@@ -6563,7 +6563,7 @@ pub(crate) mod tests {
         else {
             panic!("expected canonicalization effect");
         };
-        let canonical_cwd = dunce::canonicalize(&requested_cwd).unwrap();
+        let canonical_cwd = xai_grok_paths::normalize::normalized_absolute(&requested_cwd).unwrap();
         assert!(app.accept_foreign_resume_canonical_cwd(
             launch_token,
             &requested_cwd,
