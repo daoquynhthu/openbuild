@@ -551,4 +551,49 @@ All 12 P13 tasks resolved:
 - `cargo clippy -p xai-grok-provider -p xai-grok-shell -- -D warnings`: clean ✅
 - `cargo test -p xai-grok-provider`: 172 passed, 0 failed ✅
 - `cargo test -p xai-grok-shell --lib -- credential_context`: 9/9 pass ✅
-- All S01-S05 items marked `-Fixed` in ISSUE.md ✅
+ - All S01-S05 items marked `-Fixed` in ISSUE.md ✅
+
+## Phase 11: P11-004 (dunce::canonicalize → normalized_absolute) — 2026-07-22
+
+### Complete migration of all 19 consumer crates + shell ext (benches/tests)
+
+| Crate | Files | Sites | Commits |
+|-------|-------|-------|---------|
+| `xai-grok-shell` | 13 | ~28 | 4 |
+| `xai-grok-workspace` | 16 | ~45 | 7 |
+| `xai-grok-pager-render` | 1 | 17 | 1 |
+| `xai-grok-fsnotify` | 2 | ~38 | 1 (+dep) |
+| `xai-grok-tools` | 12 | ~58 | 4 (+dep, Path import, PathError→io::Error fix) |
+| `xai-grok-pager` | 16 | ~45 | 6 (+dep, PathBuf borrow fix) |
+| `xai-grok-shared` | 1 | 49 | 1 (+dep, PathBuf borrow, error kind fix) |
+| `xai-codebase-graph` | 2 | 2 | 1 (had dep) |
+| `xai-grok-config` | 1 | 2 | 1 (+dep) |
+| `xai-grok-plugin-marketplace` | 1 | 2 | 1 (+dep) |
+| `xai-grok-pager-bin` | 1 | 1 | 1 (+dep) |
+| `xai-grok-pager-pty-harness` | 1 | 1 | 1 (+dep) |
+| `xai-grok-sandbox` | 3 | 4 | 1 (+dep) |
+| `xai-hunk-tracker` | 1 | 6 | 1 (+dep) |
+| `xai-grok-memory` | 2 | 7 | 1 (+dep, ?-conversion fix) |
+| `xai-grok-update` | 3 (test) | 8 | 1 (+dev-dep) |
+| `xai-fast-worktree` | 7 | 16 | 2 (+dep) |
+| `xai-grok-agent` | 9 | 34 | 3 (+dep, String→Path, PathError→io::Error fix) |
+| Shell ext (benches/tests) | 2 | 5 | 1 |
+| **Total** | **~93 files** | **~368 sites** | **37 commits** |
+
+### Key fixes applied during migration
+- `PathBuf` → `&Path` borrowing mismatches (6 occurrences across 4 crates)
+- `String`/`&String` → `Path::new()` conversion (4 occurrences across 2 crates)
+- `PathError` → `io::Error` conversion in `map_err` closures (2 crates)
+- `PathError` → `io::Error` in `?` operator / `.kind()` usage (2 crates)
+- Added `xai-grok-paths` dependency to 14 crates (1 already had it)
+
+### Remaining
+- Only 4 `dunce::canonicalize` references left: 1 in `normalize.rs` (the blessed single call site) + 3 in doc comments
+
+### Gate check
+- `cargo check --workspace`: passes ✅
+- `cargo clippy --workspace -- -D warnings`: passes ✅
+- `cargo doc --no-deps`: pre-existing doc-warnings only (unrelated to P11-004) ✅
+
+### S11-001 / S11-002
+- Still blocked by Phase 2 task card ledger (not executed)
