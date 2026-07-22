@@ -329,7 +329,7 @@ fn rollout_paths_must_remain_under_approved_roots() {
             &approved.display().to_string(),
             &approved_id.to_string()
         ),
-        Some(dunce::canonicalize(&approved).unwrap())
+        Some(xai_grok_paths::normalize::normalized_absolute(&approved).unwrap())
     );
     assert_eq!(
         existing_rollout_path(
@@ -337,7 +337,7 @@ fn rollout_paths_must_remain_under_approved_roots() {
             &compressed_plain.display().to_string(),
             &compressed_id.to_string()
         ),
-        Some(dunce::canonicalize(&compressed).unwrap())
+        Some(xai_grok_paths::normalize::normalized_absolute(&compressed).unwrap())
     );
     assert_eq!(
         existing_rollout_path(

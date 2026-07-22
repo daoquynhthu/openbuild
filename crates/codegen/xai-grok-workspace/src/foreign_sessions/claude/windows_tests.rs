@@ -21,8 +21,8 @@ fn fixture() -> Fixture {
     let cwd = root.path().join("repo");
     fs::create_dir_all(&config).unwrap();
     fs::create_dir_all(&cwd).unwrap();
-    let config = dunce::canonicalize(config).unwrap();
-    let cwd = dunce::canonicalize(cwd).unwrap();
+    let config = xai_grok_paths::normalize::normalized_absolute(config).unwrap();
+    let cwd = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap();
     let project = projects::project_dir_path(&config, &cwd).unwrap();
     Fixture {
         _root: root,
