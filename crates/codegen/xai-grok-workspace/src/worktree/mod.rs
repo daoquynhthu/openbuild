@@ -2490,7 +2490,7 @@ fn scan_worktree_dirs_on_disk(main_repo_root: &std::path::Path) -> Vec<String> {
         // Only include directories that look like git worktrees.
         .filter(|e| e.path().join(".git").exists())
         .filter_map(|e| {
-            dunce::canonicalize(e.path())
+            xai_grok_paths::normalize::normalized_absolute(&e.path())
                 .ok()
                 .and_then(|p| p.to_str().map(String::from))
         })
@@ -2749,7 +2749,7 @@ mod tests {
     ) -> (LockedTestEnv, std::path::PathBuf, std::path::PathBuf) {
         // Canonicalize so macOS /var -> /private/var agrees between the stored
         // record path and `db.get`'s canonicalized query path.
-        let root = dunce::canonicalize(temp.path()).unwrap();
+        let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
         let home = root.join("grok-home");
         let wt = home.join("worktrees").join("repo").join("wt");
         std::fs::create_dir_all(&wt).unwrap();

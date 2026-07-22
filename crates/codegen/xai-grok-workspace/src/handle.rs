@@ -1646,7 +1646,7 @@ impl WorkspaceHandle {
     /// Canonicalize a confinement root directory.
     async fn canonicalize_root_dir(root: &std::path::Path) -> WorkspaceResult<PathBuf> {
         let root = root.to_owned();
-        let canonical = tokio::task::spawn_blocking(move || dunce::canonicalize(&root))
+        let canonical = tokio::task::spawn_blocking(move || xai_grok_paths::normalize::normalized_absolute(&root))
             .await
             .map_err(|join_err| {
                 WorkspaceError::HubError(format!("canonicalize task panicked: {join_err}"))
@@ -1716,7 +1716,7 @@ impl WorkspaceHandle {
         let mut check_path = normalized.clone();
         loop {
             let cp = check_path.clone();
-            match tokio::task::spawn_blocking(move || dunce::canonicalize(&cp)).await {
+            match tokio::task::spawn_blocking(move || xai_grok_paths::normalize::normalized_absolute(&cp)).await {
                 Ok(Ok(canonical)) => {
                     let canonical = dunce::simplified(&canonical).to_path_buf();
                     if !canonical.starts_with(canonical_root) {
@@ -1727,8 +1727,9 @@ impl WorkspaceHandle {
                     break;
                 }
                 Ok(Err(e))
-                    if e.kind() == std::io::ErrorKind::NotFound
-                        || e.kind() == std::io::ErrorKind::NotADirectory =>
+                    if matches!(e, xai_grok_paths::normalize::PathError::NotFound(_))
+                        || matches!(&e, xai_grok_paths::normalize::PathError::Filesystem { source, .. }
+                            if source.kind() == std::io::ErrorKind::NotADirectory) =>
                 {
                     if let Ok(md) = tokio::fs::symlink_metadata(&check_path).await
                         && md.file_type().is_symlink()

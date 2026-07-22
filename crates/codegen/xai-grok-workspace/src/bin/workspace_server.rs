@@ -182,7 +182,7 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(EXIT_SERVER_ID_INVALID);
     }
     let cwd = match args.cwd {
-        Some(ref p) => dunce::canonicalize(p)?,
+        Some(ref p) => xai_grok_paths::normalize::normalized_absolute(p)?,
         None => std::env::current_dir()?,
     };
     let _pidfile_guard = if args.daemonize {
