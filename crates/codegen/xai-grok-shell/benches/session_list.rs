@@ -321,11 +321,11 @@ fn create_same_repo_cwds(home: &Path) -> SameRepoTopology {
         .commit(Some("HEAD"), &signature, &signature, "fixture", &tree, &[])
         .expect("create initial git commit");
 
-    let main = dunce::canonicalize(&repo_dir).expect("canonicalize main checkout");
+    let main = xai_grok_paths::normalize::normalized_absolute(&repo_dir).expect("canonicalize main checkout");
     let worktree_base = xai_grok_shell::session::worktree::worktree_base_dir(&main);
     fs::create_dir_all(&worktree_base).expect("create worktree base");
     let canonical_worktree_base =
-        dunce::canonicalize(&worktree_base).expect("canonicalize worktree base");
+        xai_grok_paths::normalize::normalized_absolute(&worktree_base).expect("canonicalize worktree base");
     let mut linked = Vec::with_capacity(LINKED_WORKTREE_COUNT);
     for index in 1..=LINKED_WORKTREE_COUNT {
         let name = format!("session-list-{index:02}");
@@ -333,7 +333,7 @@ fn create_same_repo_cwds(home: &Path) -> SameRepoTopology {
         repo.worktree(&name, &path, None)
             .expect("create linked worktree");
         linked.push((
-            dunce::canonicalize(path)
+            xai_grok_paths::normalize::normalized_absolute(path)
                 .expect("canonicalize linked worktree")
                 .to_string_lossy()
                 .into_owned(),
