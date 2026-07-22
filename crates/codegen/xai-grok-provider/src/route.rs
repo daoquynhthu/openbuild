@@ -6,6 +6,7 @@ use crate::auth::AuthPolicy;
 use crate::endpoint::Endpoint;
 use crate::error::ProviderError;
 use crate::model::{GenerationOptions, Model, ModelLimits};
+use crate::protocol::ProtocolId;
 use crate::types::{ModelId, ProviderId, RouteId};
 
 /// A Route represents one declarative inference endpoint.
@@ -17,7 +18,7 @@ use crate::types::{ModelId, ProviderId, RouteId};
 pub struct Route {
     pub id: RouteId,
     pub provider_id: ProviderId,
-    pub protocol_id: String,
+    pub protocol_id: ProtocolId,
     pub endpoint: Endpoint<()>,
     pub auth: AuthPolicy,
     pub static_headers: IndexMap<String, String>,
@@ -30,7 +31,7 @@ impl Route {
     pub fn new(
         id: RouteId,
         provider_id: ProviderId,
-        protocol_id: impl Into<String>,
+        protocol_id: impl Into<ProtocolId>,
         endpoint: Endpoint<()>,
         auth: AuthPolicy,
     ) -> Self {
@@ -51,7 +52,7 @@ impl Route {
     pub fn make(
         id: impl Into<String>,
         provider_id: Option<ProviderId>,
-        protocol: impl Into<String>,
+        protocol: impl Into<ProtocolId>,
         endpoint: Endpoint<()>,
         auth: AuthPolicy,
     ) -> Self {
@@ -84,7 +85,7 @@ impl Route {
                 "route ID must not be empty".into(),
             ));
         }
-        if self.protocol_id.trim().is_empty() {
+        if self.protocol_id == ProtocolId::default() {
             return Err(ProviderError::UnknownProtocol(
                 "protocol_id must not be empty".into(),
             ));
@@ -123,7 +124,7 @@ mod tests {
         let route = test_route();
         assert_eq!(route.id.0, "test-chat");
         assert_eq!(route.provider_id.0, "openai");
-        assert_eq!(route.protocol_id, "chat_completions");
+        assert_eq!(route.protocol_id, ProtocolId::from("chat_completions"));
     }
 
     #[test]
