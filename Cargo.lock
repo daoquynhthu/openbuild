@@ -14040,6 +14040,7 @@ dependencies = [
  "tokio",
  "tracing",
  "wiremock",
+ "xai-grok-paths",
  "xai-grok-shell",
  "xai-grok-tools",
  "xai-grok-version",

@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn script_path(name: &str) -> Option<PathBuf> {
-    dunce::canonicalize(
+    xai_grok_paths::normalize::normalized_absolute(
         Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../xai-grok-pager/scripts/{name}")),
     )
     .ok()
@@ -102,7 +102,7 @@ fn seed_previous_good(home: &Path, platform: &str) -> PathBuf {
     let link = bin.join("grok");
     let _ = std::fs::remove_file(&link);
     std::os::unix::fs::symlink(format!("../downloads/grok-{platform}"), &link).unwrap();
-    dunce::canonicalize(&prev).unwrap()
+    xai_grok_paths::normalize::normalized_absolute(&prev).unwrap()
 }
 
 /// Re-resolve `$BIN_DIR/grok` from disk and re-run it: the active grok must
@@ -111,7 +111,7 @@ fn assert_active_grok_runs(home: &Path) {
     let link = home.join(".grok").join("bin").join("grok");
     assert!(link.is_symlink(), "grok must remain a symlink");
     let resolved =
-        dunce::canonicalize(&link).unwrap_or_else(|e| panic!("grok symlink dangles: {e}"));
+        xai_grok_paths::normalize::normalized_absolute(&link).unwrap_or_else(|e| panic!("grok symlink dangles: {e}"));
     let name = resolved.file_name().unwrap().to_string_lossy().to_string();
     assert!(
         !name.contains(".tmp"),

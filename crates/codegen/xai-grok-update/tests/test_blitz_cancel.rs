@@ -63,7 +63,7 @@ fn seed_previous_good(home: &Path, version: &str, platform: &str) -> PathBuf {
         let _ = std::fs::remove_file(&link);
         std::os::unix::fs::symlink(&rel, &link).unwrap();
     }
-    dunce::canonicalize(&prev).unwrap()
+    xai_grok_paths::normalize::normalized_absolute(&prev).unwrap()
 }
 
 /// What the active `grok` should resolve to after an install attempt.
@@ -97,7 +97,7 @@ fn assert_link_invariant(
 
     // Resolve from disk. canonicalize fails on a dangling link — that alone
     // would be a brick.
-    let resolved = dunce::canonicalize(&link)
+    let resolved = xai_grok_paths::normalize::normalized_absolute(&link)
         .unwrap_or_else(|e| panic!("active {name} symlink does not resolve: {e}"));
 
     // A `.tmp` file must never be the live target.
@@ -125,7 +125,7 @@ fn assert_link_invariant(
     match expect {
         Expect::NewBinary => assert_eq!(
             resolved,
-            dunce::canonicalize(new_binary).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(new_binary).unwrap(),
             "expected the newly-installed binary to be active for {name}"
         ),
         Expect::PreviousGood => assert_eq!(

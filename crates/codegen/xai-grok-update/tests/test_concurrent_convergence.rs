@@ -51,7 +51,7 @@ use xai_grok_update::version::installed_on_disk_version;
 fn assert_active_binary(home: &Path, version: &str, platform: &str, expected_content: &[u8]) {
     let link = home.join("bin").join("grok");
     assert!(link.is_symlink(), "grok must be a symlink");
-    let resolved = dunce::canonicalize(&link)
+    let resolved = xai_grok_paths::normalize::normalized_absolute(&link)
         .unwrap_or_else(|e| panic!("active grok symlink does not resolve: {e}"));
     assert_eq!(
         resolved.file_name().unwrap().to_string_lossy(),
@@ -485,7 +485,7 @@ async fn concurrent_different_version_installs_do_not_corrupt_each_other() {
 
     // The active symlink points at whichever racer swapped last; it must
     // resolve and run regardless.
-    let resolved = dunce::canonicalize(home.join("bin").join("grok")).unwrap();
+    let resolved = xai_grok_paths::normalize::normalized_absolute(home.join("bin").join("grok")).unwrap();
     assert_eq!(std::fs::read(&resolved).unwrap(), artifact);
     let name = resolved.file_name().unwrap().to_string_lossy().to_string();
     assert!(
