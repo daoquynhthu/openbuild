@@ -168,7 +168,7 @@ fn resolve_skill_path(raw: &str, cwd: &str) -> String {
 
     // canonicalize resolves symlinks and `..` — fall back to the joined path if it fails
     // (e.g. path doesn't exist yet)
-    dunce::canonicalize(&absolute)
+    xai_grok_paths::normalize::normalized_absolute(&absolute)
         .unwrap_or(absolute)
         .to_string_lossy()
         .to_string()
@@ -584,7 +584,7 @@ mod tests {
         let resolved = resolve_skill_path("sub", &tmp.path().to_string_lossy());
         assert_eq!(
             resolved,
-            dunce::canonicalize(&sub).unwrap().to_string_lossy()
+            xai_grok_paths::normalize::normalized_absolute(&sub).unwrap().to_string_lossy()
         );
     }
 
@@ -597,7 +597,7 @@ mod tests {
         let resolved = resolve_skill_path("../..", &cwd.to_string_lossy());
         assert_eq!(
             resolved,
-            dunce::canonicalize(tmp.path()).unwrap().to_string_lossy()
+            xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap().to_string_lossy()
         );
     }
 

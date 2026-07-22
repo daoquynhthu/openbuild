@@ -63,7 +63,7 @@ pub(crate) fn emit_mcp_connection_span(
 /// like macOS `/tmp` vs `/private/tmp`); when both roots match, the deepest
 /// wins, tie (cwd == `$HOME`) → user.
 pub(crate) fn skill_source_label(skill_path: &str, cwd: &str) -> &'static str {
-    let canon = |p: &std::path::Path| dunce::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let canon = |p: &std::path::Path| xai_grok_paths::normalize::normalized_absolute(p).unwrap_or_else(|_| p.to_path_buf());
     let p = canon(std::path::Path::new(skill_path));
     let depth_if_under =
         |base: std::path::PathBuf| p.starts_with(&base).then(|| base.components().count());

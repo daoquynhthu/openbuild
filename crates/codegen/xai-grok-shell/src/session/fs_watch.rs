@@ -39,7 +39,7 @@ pub(crate) fn is_under_hidden_dir(path: &Path, cwd: &Path) -> bool {
     }
     // Spelling mismatch (symlink/relative): retry on canonical roots before
     // giving up — never scan the whole absolute path.
-    if let (Ok(p), Ok(c)) = (dunce::canonicalize(path), dunce::canonicalize(cwd))
+    if let (Ok(p), Ok(c)) = (xai_grok_paths::normalize::normalized_absolute(path), xai_grok_paths::normalize::normalized_absolute(cwd))
         && let Ok(rel) = p.strip_prefix(&c)
     {
         return has_hidden(rel);
@@ -117,7 +117,7 @@ fn fs_event_to_delta(
                 return Some(rel.to_string_lossy().to_string());
             }
             if let (Ok(p_canon), Ok(root_canon)) =
-                (dunce::canonicalize(p), dunce::canonicalize(root))
+                (xai_grok_paths::normalize::normalized_absolute(p), xai_grok_paths::normalize::normalized_absolute(root))
                 && let Ok(rel) = p_canon.strip_prefix(&root_canon)
             {
                 return Some(rel.to_string_lossy().to_string());
