@@ -8,7 +8,7 @@
 //! plugin in a repo does not automatically trust other plugins in the same repo.
 //!
 //! **Trust key**: canonical absolute path of the plugin root directory,
-//! resolved via `dunce::canonicalize()`.
+//! resolved via `xai_grok_paths::normalize::normalized_absolute()`.
 //!
 //! **Trust storage**: `~/.grok/trusted-plugins` (one canonical path per line).
 //!
@@ -62,7 +62,7 @@ impl TrustStore {
     /// Canonicalizes the path before lookup.  Returns `false` if
     /// canonicalization fails (broken symlink, permission error).
     pub fn is_trusted(&self, plugin_root: &Path) -> bool {
-        match dunce::canonicalize(plugin_root) {
+        match xai_grok_paths::normalize::normalized_absolute(plugin_root) {
             Ok(canonical) => self.trusted.contains(&canonical),
             Err(_) => {
                 tracing::warn!(
@@ -80,9 +80,9 @@ impl TrustStore {
     /// If the path is already trusted, this is a no-op and returns `Ok(())`.
     pub fn grant_trust(&mut self, plugin_root: &Path) -> Result<(), TrustError> {
         let canonical =
-            dunce::canonicalize(plugin_root).map_err(|e| TrustError::CanonicalizeFailed {
+            xai_grok_paths::normalize::normalized_absolute(plugin_root).map_err(|e| TrustError::CanonicalizeFailed {
                 path: plugin_root.to_path_buf(),
-                source: e,
+                source: std::io::Error::other(e.to_string()),
             })?;
 
         if self.trusted.contains(&canonical) {
@@ -123,9 +123,9 @@ impl TrustStore {
     /// If the path is not currently trusted, this is a no-op.
     pub fn revoke_trust(&mut self, plugin_root: &Path) -> Result<(), TrustError> {
         let canonical =
-            dunce::canonicalize(plugin_root).map_err(|e| TrustError::CanonicalizeFailed {
+            xai_grok_paths::normalize::normalized_absolute(plugin_root).map_err(|e| TrustError::CanonicalizeFailed {
                 path: plugin_root.to_path_buf(),
-                source: e,
+                source: std::io::Error::other(e.to_string()),
             })?;
 
         if !self.trusted.remove(&canonical) {
@@ -170,7 +170,7 @@ impl TrustStore {
         let Some(home) = dirs::home_dir() else {
             return false;
         };
-        match dunce::canonicalize(plugin_root) {
+        match xai_grok_paths::normalize::normalized_absolute(plugin_root) {
             Ok(canonical) => canonical.starts_with(&home),
             Err(_) => false,
         }
@@ -267,7 +267,7 @@ mod tests {
 
         let plugin_dir = tmp.path().join("real-plugin");
         std::fs::create_dir_all(&plugin_dir).unwrap();
-        let canonical = dunce::canonicalize(&plugin_dir).unwrap();
+        let canonical = xai_grok_paths::normalize::normalized_absolute(&plugin_dir).unwrap();
 
         // Write file with comments and blank lines
         std::fs::write(
@@ -293,7 +293,7 @@ mod tests {
 
         let plugin_dir = tmp.path().join("legacy-plugin");
         std::fs::create_dir_all(&plugin_dir).unwrap();
-        let canonical = dunce::canonicalize(&plugin_dir).unwrap();
+        let canonical = xai_grok_paths::normalize::normalized_absolute(&plugin_dir).unwrap();
         std::fs::write(&trust_file, format!("\\\\?\\{}\n", canonical.display())).unwrap();
 
         let mut store = TrustStore::load_from(trust_file.clone());

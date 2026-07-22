@@ -62,10 +62,10 @@ impl RepoDirChain {
             // symlinked ancestor while keeping raw spelling — do NOT reduce to a
             // 2-call `starts_with` variant (it would mis-handle a mid-chain
             // absolute symlink and reintroduce the over-walk).
-            let root_canonical = dunce::canonicalize(root).unwrap_or_else(|_| root.clone());
+            let root_canonical = xai_grok_paths::normalize::normalized_absolute(root).unwrap_or_else(|_| root.clone());
             let mut current = Some(cwd.to_path_buf());
             while let Some(dir) = current {
-                let dir_canonical = dunce::canonicalize(&dir).unwrap_or_else(|_| dir.clone());
+                let dir_canonical = xai_grok_paths::normalize::normalized_absolute(&dir).unwrap_or_else(|_| dir.clone());
                 let parent = dir.parent().map(|p| p.to_path_buf());
                 dirs.push(dir);
                 if dir_canonical == root_canonical {
@@ -88,7 +88,7 @@ fn is_home_dir(path: &Path) -> bool {
     let Some(home) = dirs::home_dir() else {
         return false;
     };
-    let canon = |p: &Path| dunce::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let canon = |p: &Path| xai_grok_paths::normalize::normalized_absolute(p).unwrap_or_else(|_| p.to_path_buf());
     canon(path) == canon(&home)
 }
 
@@ -160,8 +160,8 @@ mod tests {
         // canonical form so a `/tmp`→`/private/tmp` symlink doesn't fail the test.
         let root = chain.git_root.expect("inside a repo");
         assert_eq!(
-            dunce::canonicalize(&root).unwrap(),
-            dunce::canonicalize(tmp.path()).unwrap()
+            xai_grok_paths::normalize::normalized_absolute(&root).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap()
         );
     }
 
@@ -189,7 +189,7 @@ mod tests {
         // cwd only) instead of spanning the whole home subtree. $HOME is guarded
         // (dirs::home_dir reads it) and canonicalized to match the guard.
         let tmp = tempfile::tempdir().unwrap();
-        let home = dunce::canonicalize(tmp.path()).unwrap();
+        let home = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         git2::Repository::init(&home).unwrap();
         let _home_guard = EnvVarGuard::set("HOME", &home);
         let sub = home.join("proj");
@@ -215,8 +215,8 @@ mod tests {
         let chain = RepoDirChain::resolve(&sub);
         let root = chain.git_root.expect("a non-home git root must be kept");
         assert_eq!(
-            dunce::canonicalize(&root).unwrap(),
-            dunce::canonicalize(repo.path()).unwrap()
+            xai_grok_paths::normalize::normalized_absolute(&root).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(repo.path()).unwrap()
         );
     }
 }
