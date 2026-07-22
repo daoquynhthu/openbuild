@@ -67,7 +67,7 @@ impl Drop for ReadTransactionSqlite {
 
 impl ApprovedRoot {
     pub fn new(path: &Path) -> Option<Self> {
-        let path = dunce::canonicalize(path).ok()?;
+        let path = xai_grok_paths::normalize::normalized_absolute(path).ok()?;
         #[cfg(unix)]
         let directory = unix::open_directory_path(&path)?;
         #[cfg(windows)]
@@ -198,7 +198,7 @@ impl ApprovedRoot {
             } else {
                 self.join(path)
             };
-            let parent = dunce::canonicalize(path.parent()?).ok()?;
+            let parent = xai_grok_paths::normalize::normalized_absolute(path.parent()?).ok()?;
             if !parent.starts_with(&self.path) {
                 return None;
             }
@@ -210,7 +210,7 @@ impl ApprovedRoot {
             {
                 return None;
             }
-            let canonical_path = dunce::canonicalize(&path).ok()?;
+            let canonical_path = xai_grok_paths::normalize::normalized_absolute(&path).ok()?;
             if canonical_path.parent() != Some(parent.as_path())
                 || !canonical_path.starts_with(&self.path)
             {

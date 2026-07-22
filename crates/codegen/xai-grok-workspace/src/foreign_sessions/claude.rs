@@ -191,7 +191,7 @@ fn collect_recent_candidates_windows(
     now: SystemTime,
     within: Duration,
 ) -> Option<(Vec<Candidate>, bool)> {
-    let canonical_project = dunce::canonicalize(project_dir).ok()?;
+    let canonical_project = xai_grok_paths::normalize::normalized_absolute(project_dir).ok()?;
     if canonical_project.as_path() != project_dir
         || !canonical_project.starts_with(config_root.path())
     {
