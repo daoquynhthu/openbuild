@@ -794,7 +794,7 @@ pub async fn git_info(cwd: &Path) -> Result<GitInfoData> {
     let cwd = cwd.to_path_buf();
     tokio::task::spawn_blocking(move || {
         let repo = Repository::discover(&cwd)?;
-        let root = dunce::canonicalize(repo.workdir().unwrap_or_else(|| repo.path()))
+        let root = xai_grok_paths::normalize::normalized_absolute(repo.workdir().unwrap_or_else(|| repo.path()))
             .unwrap_or_else(|_| repo.workdir().unwrap_or_else(|| repo.path()).to_path_buf());
         let current_branch = repo
             .head()
@@ -859,7 +859,7 @@ pub async fn list_branches(git_root: &Path) -> Result<GitBranchListData> {
     let root = git_root.to_path_buf();
     tokio::task::spawn_blocking(move || {
         let repo = Repository::discover(&root)?;
-        let repo_root = dunce::canonicalize(repo.workdir().unwrap_or_else(|| repo.path()))
+        let repo_root = xai_grok_paths::normalize::normalized_absolute(repo.workdir().unwrap_or_else(|| repo.path()))
             .unwrap_or_else(|_| repo.workdir().unwrap_or_else(|| repo.path()).to_path_buf());
         let current_branch = repo
             .head()
@@ -2352,8 +2352,8 @@ pub enum GitRepoResponse {
 ///
 /// Returns `None` when `child` is not under `root` or they are the same path.
 pub fn strip_prefix_canonicalized(child: &Path, root: &Path) -> Option<PathBuf> {
-    let child_canonical = dunce::canonicalize(child).ok();
-    let root_canonical = dunce::canonicalize(root).ok();
+    let child_canonical = xai_grok_paths::normalize::normalized_absolute(child).ok();
+    let root_canonical = xai_grok_paths::normalize::normalized_absolute(root).ok();
     child_canonical
         .as_deref()
         .zip(root_canonical.as_deref())
@@ -2516,8 +2516,8 @@ mod tests {
             .unwrap();
         let metadata = resolve_persisted_session_git_metadata_sync(tmp.path());
         assert_eq!(
-            dunce::canonicalize(Path::new(metadata.git_root_dir.as_deref().unwrap())).unwrap(),
-            dunce::canonicalize(tmp.path()).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(Path::new(metadata.git_root_dir.as_deref().unwrap())).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap(),
         );
         assert_eq!(
             metadata.git_remotes,
@@ -2613,8 +2613,8 @@ mod tests {
         .unwrap();
         let metadata = resolve_persisted_session_git_metadata_sync(&wt_path);
         assert_eq!(
-            dunce::canonicalize(Path::new(metadata.git_root_dir.as_deref().unwrap())).unwrap(),
-            dunce::canonicalize(&wt_path).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(Path::new(metadata.git_root_dir.as_deref().unwrap())).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(&wt_path).unwrap(),
         );
         assert_eq!(
             metadata.git_remotes,
@@ -2722,8 +2722,8 @@ mod tests {
             offset
         );
         assert_eq!(
-            dunce::canonicalize(Path::new(&git_root)).unwrap(),
-            dunce::canonicalize(repo_root).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(Path::new(&git_root)).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(repo_root).unwrap(),
         );
     }
     #[test]
@@ -2740,8 +2740,8 @@ mod tests {
             "offset should be the relative path from git root to the subdir"
         );
         assert_eq!(
-            dunce::canonicalize(Path::new(&git_root)).unwrap(),
-            dunce::canonicalize(repo_root).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(Path::new(&git_root)).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(repo_root).unwrap(),
         );
     }
     #[test]
@@ -2782,8 +2782,8 @@ mod tests {
         git2::Repository::init(tmp.path()).unwrap();
         let root = find_git_root_from_path(tmp.path()).unwrap();
         assert_eq!(
-            dunce::canonicalize(&root).unwrap(),
-            dunce::canonicalize(tmp.path()).unwrap()
+            xai_grok_paths::normalize::normalized_absolute(&root).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap()
         );
     }
     #[test]
@@ -2794,8 +2794,8 @@ mod tests {
         std::fs::create_dir_all(&sub).unwrap();
         let root = find_git_root_from_path(&sub).unwrap();
         assert_eq!(
-            dunce::canonicalize(&root).unwrap(),
-            dunce::canonicalize(tmp.path()).unwrap()
+            xai_grok_paths::normalize::normalized_absolute(&root).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap()
         );
     }
     #[test]
@@ -2810,8 +2810,8 @@ mod tests {
         match discover_git_root(tmp.path()) {
             GitDiscoveryResult::Found(root) => {
                 assert_eq!(
-                    dunce::canonicalize(&root).unwrap(),
-                    dunce::canonicalize(tmp.path()).unwrap()
+                    xai_grok_paths::normalize::normalized_absolute(&root).unwrap(),
+                    xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap()
                 );
             }
             other => panic!("expected Found, got {:?}", std::mem::discriminant(&other)),
@@ -2826,8 +2826,8 @@ mod tests {
         match discover_git_root(&sub) {
             GitDiscoveryResult::Found(root) => {
                 assert_eq!(
-                    dunce::canonicalize(&root).unwrap(),
-                    dunce::canonicalize(tmp.path()).unwrap()
+                    xai_grok_paths::normalize::normalized_absolute(&root).unwrap(),
+                    xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap()
                 );
             }
             other => panic!("expected Found, got {:?}", std::mem::discriminant(&other)),
