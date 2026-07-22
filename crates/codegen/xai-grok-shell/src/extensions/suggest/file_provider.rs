@@ -57,11 +57,6 @@ pub(crate) struct FilePathProvider;
 
 impl FilePathProvider {
     pub async fn suggest(&self, ctx: &SuggestContext) -> Vec<RankedSuggestion> {
-        // shell_token quoting is POSIX-only: cmd/pwsh would misparse the
-        // escaped line, so Windows serves no deterministic completions.
-        if cfg!(windows) {
-            return Vec::new();
-        }
         let tok = match extract_file_context(ctx.prefix()) {
             Some(t) => t,
             None => return Vec::new(),
@@ -124,7 +119,11 @@ fn extract_file_context(prefix: &str) -> Option<CurrentToken> {
 }
 
 fn is_path_like(s: &str) -> bool {
-    s.contains('/') || s == "~"
+    s.contains('/')
+        || s.contains('\\')
+        || s == "~"
+        || s.starts_with('.')
+        || s.len() > 1 && s.as_bytes()[1] == b':'
 }
 
 // ── Directory/prefix split + `~`/`$VAR` expansion (listing only) ────────
@@ -472,11 +471,17 @@ mod tests {
         assert!(is_path_like("../lib"));
         assert!(is_path_like("src/main.rs"));
         assert!(is_path_like("~"));
+        assert!(is_path_like("."));
+        assert!(is_path_like(".."));
         assert!(!is_path_like("hello"));
         assert!(!is_path_like(""));
-        assert!(!is_path_like("."));
-        assert!(!is_path_like(".."));
         assert!(!is_path_like("~user"));
+        // Windows paths
+        assert!(is_path_like("C:\\Users"));
+        assert!(is_path_like("D:\\"));
+        assert!(is_path_like(".\\src"));
+        assert!(is_path_like("..\\parent"));
+        assert!(is_path_like("dir\\sub"));
     }
 
     // --- split_token + expansion ---

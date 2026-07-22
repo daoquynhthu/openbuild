@@ -196,7 +196,7 @@
 
 - **S12-001** `xai-grok-shell/src/completion/mod.rs` — `PowerShellAdapter` 和 `CmdAdapter` 已实现但未接入运行时。需建立适配器选择逻辑（根据检测到的 shell 在 `PosixAdapter`/`PowerShellAdapter`/`CmdAdapter` 间切换），并扩展 `PromptInputMode` 以支持非 POSIX shell。`xai-grok-pager/src/app/agent_view/shell_completion.rs` 中 PowerShell/Cmd 测试通过将模式设置为 `Bash` 绕过此缺口。
 
-- **S12-002** `xai-grok-shell/src/extensions/suggest/file_provider.rs:61-64` — `FilePathProvider::suggest()` 在 `cfg!(windows)` 时返回空向量，注释 "shell_token quoting is POSIX-only"。V2 计划 §1880 要求交互补全使用 cmd quoting/replacement contract，但当前 Windows 上文件路径补全完全被禁用。需使用 `ShellCompletionAdapter` 实现 Windows 文件补全。
+- **S12-002** `xai-grok-shell/src/extensions/suggest/file_provider.rs:61-64` — `FilePathProvider::suggest()` 在 `cfg!(windows)` 时返回空向量。已移除三处 Windows 门控（prompt.rs Tab 键、file_provider、path_provider），`is_path_like()` 支持 `\` 和驱动器号，`escape_unquoted()` 在 Windows 使用双引号而非反斜杠，目录尾随分隔符改为 `\`。 -Fixed
 
 - **S12-003** V2 计划 §1880 要求 "`grok completions cmd` 必须显式返回 unsupported"。`completions_cmd.rs` 现在接受 `String`、解析已知 shell、为 `cmd`/`pwsh` 返回显式 unsupported 消息。有两个测试验证此行为。 -Fixed
 
@@ -209,5 +209,5 @@
 | M12-001 | completion/mod.rs | 待修复 — 适配器未接入运行时 |
 | M12-002 | shell_state.rs | ShellKind::Cmd 变体已添加（V1 冻结） — 待再审 |
 | S12-001 | completion/mod.rs + shell_completion.rs | 待修复 — 运行时适配器选择 |
-| S12-002 | file_provider.rs | 待修复 — Windows 文件补全禁用 |
+| S12-002 | file_provider.rs + path_provider.rs + shell_token.rs + prompt.rs | 已修复 — 移除 Windows 门控，双引号转义 — 待再审 |
 | S12-003 | completions_cmd.rs | 已修复 — 显式返回 unsupported — 待再审 |

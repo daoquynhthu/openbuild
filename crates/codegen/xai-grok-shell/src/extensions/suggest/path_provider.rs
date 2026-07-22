@@ -14,11 +14,6 @@ pub(crate) struct PathProvider;
 
 impl PathProvider {
     pub async fn suggest(&self, ctx: &SuggestContext) -> Vec<RankedSuggestion> {
-        // shell_token quoting is POSIX-only: cmd/pwsh would misparse the
-        // escaped line, so Windows serves no deterministic completions.
-        if cfg!(windows) {
-            return Vec::new();
-        }
         let tok = match extract_command_token(ctx.prefix()) {
             Some(t) => t,
             None => return Vec::new(),
@@ -310,12 +305,22 @@ mod tests {
 
     /// Metacharacter executable names insert as ONE word — accepting
     /// `zz;echo PWNED` must never put a second command on the line.
+    #[cfg(not(windows))]
     #[test]
     fn filter_escapes_metacharacter_executable_names() {
         let exes = vec!["zz;echo PWNED".into()];
         let results = filter_executables(&tok("zz"), (0, 2), &exes);
         assert_eq!(results[0].display, "zz;echo PWNED");
         assert_eq!(results[0].insert_text, "zz\\;echo\\ PWNED");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn filter_escapes_metacharacter_executable_names_windows() {
+        let exes = vec!["zz;echo PWNED".into()];
+        let results = filter_executables(&tok("zz"), (0, 2), &exes);
+        assert_eq!(results[0].display, "zz;echo PWNED");
+        assert_eq!(results[0].insert_text, "\"zz;echo PWNED\"");
     }
 
     /// A quoted command prefix completes inside its quote style.

@@ -274,7 +274,9 @@ pub(super) fn build_insert_token(
                 out.push('"');
             }
             out.push_str(&escape_double_quoted(name));
-            if !is_dir {
+            // On Windows, always close the quote — the `\` path separator
+            // after an open quote would be interpreted as an escape (`\"`).
+            if cfg!(windows) || !is_dir {
                 out.push('"');
             }
         }
@@ -289,7 +291,7 @@ pub(super) fn build_insert_token(
         }
     }
     if is_dir {
-        out.push('/');
+        out.push(if cfg!(windows) { '\\' } else { '/' });
     }
     out
 }
@@ -331,6 +333,24 @@ fn escape_unquoted(name: &str) -> String {
     if name.chars().any(char::is_control) {
         return format!("'{}'", escape_single_quoted(name));
     }
+    if cfg!(windows) {
+        // cmd.exe uses `\` as a path separator, not an escape char.
+        // Only double-quote when the name actually needs quoting.
+        if !name.is_empty() && needs_quoting(name) {
+            let mut out = String::with_capacity(name.len() + 2);
+            out.push('"');
+            for c in name.chars() {
+                if c == '"' {
+                    out.push_str("\"\"");
+                } else {
+                    out.push(c);
+                }
+            }
+            out.push('"');
+            return out;
+        }
+        return name.to_owned();
+    }
     let mut out = String::with_capacity(name.len());
     for c in name.chars() {
         if needs_backslash(c) {
@@ -339,6 +359,22 @@ fn escape_unquoted(name: &str) -> String {
         out.push(c);
     }
     out
+}
+
+fn needs_quoting(name: &str) -> bool {
+    name.contains(' ')
+        || name.contains('\t')
+        || name.contains('"')
+        || name.contains('|')
+        || name.contains('&')
+        || name.contains(';')
+        || name.contains('<')
+        || name.contains('>')
+        || name.contains('^')
+        || name.contains('%')
+        || name.contains('!')
+        || name.contains('(')
+        || name.contains(')')
 }
 
 fn escape_double_quoted(name: &str) -> String {
@@ -481,12 +517,22 @@ mod tests {
 
     // --- escaping / insert-token construction ---
 
+    #[cfg(not(windows))]
     #[test]
     fn escape_unquoted_space_and_specials() {
         assert_eq!(escape_unquoted("My File.txt"), "My\\ File.txt");
         assert_eq!(escape_unquoted("a\"b'c"), "a\\\"b\\'c");
         assert_eq!(escape_unquoted("a$b"), "a\\$b");
         assert_eq!(escape_unquoted("plain.txt"), "plain.txt");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn escape_unquoted_windows_uses_double_quotes() {
+        assert_eq!(escape_unquoted("My File.txt"), "\"My File.txt\"");
+        assert_eq!(escape_unquoted("a\"b'c"), "\"a\"\"b'c\"");
+        assert_eq!(escape_unquoted("plain.txt"), "plain.txt");
+        assert_eq!(escape_unquoted(""), "");
     }
 
     #[test]
@@ -505,6 +551,7 @@ mod tests {
         assert_eq!(escape_single_quoted("it's"), "it'\\''s");
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn insert_token_backslash_style_dir_stays_open() {
         let tok = parse_current_token("cat No");
@@ -518,9 +565,24 @@ mod tests {
         );
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn insert_token_double_quote_style_dir_stays_open() {
+        let tok = parse_current_token("cat No");
+        assert_eq!(
+            build_insert_token(&tok, "", "Notes Archive", true),
+            "\"Notes Archive\"\\"
+        );
+        assert_eq!(
+            build_insert_token(&tok, "", "My File.txt", false),
+            "\"My File.txt\""
+        );
+    }
+
     /// Open double quote: files close it, directories keep it open for
     /// drill-down (bash behavior). Slashless tokens have an empty raw dir —
     /// the still-open quote sits inside the replaced component (reopen path).
+    #[cfg(not(windows))]
     #[test]
     fn insert_token_preserves_open_double_quote() {
         let tok = parse_current_token("cat \"My Fi");
@@ -535,12 +597,39 @@ mod tests {
         );
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn insert_token_preserves_open_double_quote_windows() {
+        let tok = parse_current_token("cat \"My Fi");
+        assert_eq!(
+            build_insert_token(&tok, "", "My File.txt", false),
+            "\"My File.txt\""
+        );
+        let tok = parse_current_token("cat \"No");
+        assert_eq!(
+            build_insert_token(&tok, "", "Notes Archive", true),
+            "\"Notes Archive\"\\"
+        );
+    }
+
     /// A quote opened after the last `/` sits inside the replaced component
     /// and must be re-emitted.
+    #[cfg(not(windows))]
     #[test]
     fn insert_token_reopens_quote_after_slash() {
         let tok = parse_current_token("cat dir/\"fi");
-        // raw_dir covers `dir/`; the quote reopened inside the component.
+        assert_eq!(tok.dir_raw_end, 8);
+        assert_eq!(tok.open_quote_idx, 8);
+        assert_eq!(
+            build_insert_token(&tok, "dir/", "file name.txt", false),
+            "dir/\"file name.txt\""
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn insert_token_reopens_quote_after_slash_windows() {
+        let tok = parse_current_token("cat dir/\"fi");
         assert_eq!(tok.dir_raw_end, 8);
         assert_eq!(tok.open_quote_idx, 8);
         assert_eq!(
@@ -562,6 +651,7 @@ mod tests {
     /// component while `raw_dir` keeps the opener — the rebuilt insert must
     /// still close it (files) or keep drilling (dirs), never emit
     /// `"My Dir/file.txt` with a dangling opener.
+    #[cfg(not(windows))]
     #[test]
     fn insert_token_quote_closed_at_cursor_keeps_closer() {
         let tok = parse_current_token("cat \"My Dir/fi\"");
@@ -583,10 +673,45 @@ mod tests {
         );
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn insert_token_quote_closed_at_cursor_keeps_closer_windows() {
+        let tok = parse_current_token("cat \"My Dir/fi\"");
+        assert_eq!(tok.quote, QuoteStyle::None);
+        assert_eq!(tok.closed_quote, Some((QuoteStyle::Double, false)));
+        assert_eq!(
+            build_insert_token(&tok, "\"My Dir/", "file.txt", false),
+            "\"My Dir/file.txt\""
+        );
+        assert_eq!(
+            build_insert_token(&tok, "\"My Dir/", "subdir", true),
+            "\"My Dir/subdir\"\\"
+        );
+
+        let tok = parse_current_token("cat 'My Dir/fi'");
+        assert_eq!(
+            build_insert_token(&tok, "'My Dir/", "file.txt", false),
+            "'My Dir/file.txt'"
+        );
+    }
+
     /// Cursor still INSIDE the quotes (closer not part of the prefix): the
     /// open-quote path is unchanged by the closed-quote tracking.
+    #[cfg(not(windows))]
     #[test]
     fn insert_token_cursor_inside_quotes_unchanged() {
+        let tok = parse_current_token("cat \"My Dir/fi");
+        assert_eq!(tok.quote, QuoteStyle::Double);
+        assert_eq!(tok.closed_quote, None);
+        assert_eq!(
+            build_insert_token(&tok, "\"My Dir/", "file.txt", false),
+            "\"My Dir/file.txt\""
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn insert_token_cursor_inside_quotes_unchanged_windows() {
         let tok = parse_current_token("cat \"My Dir/fi");
         assert_eq!(tok.quote, QuoteStyle::Double);
         assert_eq!(tok.closed_quote, None);
@@ -610,8 +735,20 @@ mod tests {
 
     /// A quote closed BEFORE the last `/` is raw-dir-internal (kept
     /// verbatim) and must not force quote rendering on the component.
+    #[cfg(not(windows))]
     #[test]
     fn insert_token_quote_closed_in_raw_dir_stays_plain() {
+        let tok = parse_current_token("cat \"My Dir\"/fi");
+        assert_eq!(tok.closed_quote, None);
+        assert_eq!(
+            build_insert_token(&tok, "\"My Dir\"/", "file.txt", false),
+            "\"My Dir\"/file.txt"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn insert_token_quote_closed_in_raw_dir_stays_plain_windows() {
         let tok = parse_current_token("cat \"My Dir\"/fi");
         assert_eq!(tok.closed_quote, None);
         assert_eq!(
@@ -624,6 +761,7 @@ mod tests {
     /// component can never parse as a flag (`rm ` + Tab must not become
     /// `rm -rf`); quoting alone would not help. Directory-prefixed
     /// components are already anchored.
+    #[cfg(not(windows))]
     #[test]
     fn insert_token_anchors_dash_leading_names() {
         let tok = parse_current_token("rm ");
@@ -631,6 +769,21 @@ mod tests {
         assert_eq!(
             build_insert_token(&tok, "", "-flag dir", true),
             "./-flag\\ dir/"
+        );
+        let tok = parse_current_token("rm \"");
+        assert_eq!(build_insert_token(&tok, "", "-rf", false), "./\"-rf\"");
+        let tok = parse_current_token("rm sub/");
+        assert_eq!(build_insert_token(&tok, "sub/", "-rf", false), "sub/-rf");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn insert_token_anchors_dash_leading_names_windows() {
+        let tok = parse_current_token("rm ");
+        assert_eq!(build_insert_token(&tok, "", "-rf", false), "./-rf");
+        assert_eq!(
+            build_insert_token(&tok, "", "-flag dir", true),
+            "./\"-flag dir\"\\"
         );
         let tok = parse_current_token("rm \"");
         assert_eq!(build_insert_token(&tok, "", "-rf", false), "./\"-rf\"");
