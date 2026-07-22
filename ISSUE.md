@@ -190,7 +190,7 @@
 
 - **M12-001** `xai-grok-shell/src/completion/mod.rs` — `PowerShellAdapter` 和 `CmdAdapter` 完整实现 `ShellCompletionAdapter` trait（含 tokenize/escape/score/apply_replacement），且有对应的单元测试和 UI 集成测试，但 **从未被运行时接入**。无人 import、无人实例化、无人调用。Windows 用户在交互补全中被当作 Bash 用户处理。`PromptInputMode`（`xai-grok-pager/src/app/agent_view/mod.rs:298`）仅有 `Normal`/`Bash`/`Feedback`/`Remember` 变体，无 PowerShell 或 Cmd 变体。
 
-- **M12-002** `xai-grok-tools/src/computer/local/shell_state.rs:183` — `ShellKind` 枚举仅有 `Bash` 和 `Zsh` 变体，缺少 `Cmd` 和 `PowerShell`。V2 计划 §1878 要求 "V1 冻结支持 `ShellKind::Cmd` 作为最后 fallback"，但 `bash` / `run_terminal_cmd` 工具无法将 cmd.exe 作为活动 shell 调用。
+- **M12-002** `xai-grok-tools/src/computer/local/shell_state.rs:183` — `ShellKind` 枚举仅有 `Bash` 和 `Zsh` 变体，缺少 `Cmd` 和 `PowerShell`。V2 计划 §1878 要求 "V1 冻结支持 `ShellKind::Cmd` 作为最后 fallback"。-Fixed
 
 ### 建议
 
@@ -207,7 +207,7 @@
 | 条目 | 文件 | 状态 |
 |------|------|------|
 | M12-001 | completion/mod.rs | 待修复 — 适配器未接入运行时 |
-| M12-002 | shell_state.rs | 待修复 — ShellKind 缺少 Cmd/PowerShell |
+| M12-002 | shell_state.rs | ShellKind::Cmd 变体已添加（V1 冻结） — 待再审 |
 | S12-001 | completion/mod.rs + shell_completion.rs | 待修复 — 运行时适配器选择 |
 | S12-002 | file_provider.rs | 待修复 — Windows 文件补全禁用 |
 | S12-003 | completions_cmd.rs | 待修复 — grok completions cmd 未返回 unsupported |

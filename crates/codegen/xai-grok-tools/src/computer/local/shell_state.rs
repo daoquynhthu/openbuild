@@ -183,6 +183,7 @@ function dump_zsh_state() {
 pub enum ShellKind {
     Bash,
     Zsh,
+    Cmd,
 }
 
 impl ShellKind {
@@ -202,6 +203,7 @@ impl ShellKind {
         let kind = match self {
             Self::Bash => xai_grok_config::shell::UnixShellKind::Bash,
             Self::Zsh => xai_grok_config::shell::UnixShellKind::Zsh,
+            Self::Cmd => return "cmd.exe",
         };
         xai_grok_config::shell::unix_shell_path(kind)
     }
@@ -211,6 +213,7 @@ impl ShellKind {
         match self {
             Self::Bash => ".bashrc",
             Self::Zsh => ".zshrc",
+            Self::Cmd => "",
         }
     }
 
@@ -218,6 +221,7 @@ impl ShellKind {
         match self {
             Self::Bash => DUMP_BASH_STATE_SCRIPT,
             Self::Zsh => DUMP_ZSH_STATE_SCRIPT,
+            Self::Cmd => "",
         }
     }
 
@@ -225,6 +229,7 @@ impl ShellKind {
         match self {
             Self::Bash => "dump_bash_state",
             Self::Zsh => "dump_zsh_state",
+            Self::Cmd => "",
         }
     }
 
@@ -232,6 +237,7 @@ impl ShellKind {
         match self {
             Self::Bash => BASH_STATE_START_MARKER,
             Self::Zsh => ZSH_STATE_START_MARKER,
+            Self::Cmd => "",
         }
     }
 
@@ -239,6 +245,7 @@ impl ShellKind {
         match self {
             Self::Bash => BASH_STATE_END_MARKER,
             Self::Zsh => ZSH_STATE_END_MARKER,
+            Self::Cmd => "",
         }
     }
 }
@@ -268,6 +275,13 @@ impl ShellState {
         shell: ShellKind,
         cwd: &Path,
     ) -> Result<Self, crate::computer::types::ComputerError> {
+        // Cmd shell state init not supported (V1 frozen).
+        if shell == ShellKind::Cmd {
+            return Err(crate::computer::types::ComputerError::io(
+                "Cmd shell state init not supported".into(),
+            ));
+        }
+
         let dump_script = shell.dump_script();
         let dump_fn = shell.dump_function_name();
 
@@ -278,6 +292,7 @@ impl ShellState {
         let args: Vec<&str> = match shell {
             ShellKind::Bash => vec!["-O", "extglob", "-ilc", &script],
             ShellKind::Zsh => vec!["-o", "extendedglob", "-ilc", &script],
+            ShellKind::Cmd => unreachable!(), // handled above
         };
 
         // stderr is intentionally discarded (Stdio::null) — we never read it,
@@ -390,18 +405,6 @@ impl ShellState {
         // 4. Exit with the user command's exit code
         let wrapper = match self.shell {
             ShellKind::Bash => format!(
-                // Merge the user command's stderr into its
-                // stdout via `2>&1` so the captured byte stream preserves
-                // chronological write order. Without this, the bash tool's
-                // separate stdout/stderr pipes (each read in lockstep)
-                // emit all-of-stdout-then-all-of-stderr in a single poll
-                // tick, so a command like `echo X 1>&2 && echo Y` shows
-                // up as `Y\nX\n` instead of the chronological `X\nY\n`.
-                // Shell-level diagnostics (eval syntax errors, etc.) still
-                // land on the outer shell's stderr — those are unaffected.
-                // Re-export GROK_AGENT=1 after snapshot eval so agent-definition
-                // selectors (or other values) from prior shells cannot clear the
-                // agent sentinel (process env alone is insufficient).
                 "{dump_script} \
                  snap=$(command cat <&3) && builtin shopt -s extglob && builtin eval -- \"$snap\" && \
                  {{ builtin set +u 2>/dev/null || true; \
@@ -411,7 +414,6 @@ impl ShellState {
                  builtin eval \"$1\" 2>&1; }}; \
                  COMMAND_EXIT_CODE=$?; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
             ),
-            // After snapshot restore: force nonomatch so login dumps cannot re-arm NOMATCH for model globs.
             ShellKind::Zsh => format!(
                 "{dump_script} \
                  snap=$(command cat <&3); \
@@ -426,6 +428,12 @@ impl ShellState {
                  builtin eval \"$1\" 2>&1; }}; \
                  COMMAND_EXIT_CODE=$?; {dump_fn} >&4; builtin exit $COMMAND_EXIT_CODE"
             ),
+            ShellKind::Cmd => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "Cmd persistent shell not supported",
+                ));
+            }
         };
 
         let effective_cwd = cwd_override.unwrap_or(&self.cwd);
@@ -440,6 +448,7 @@ impl ShellState {
                 user_command.into(),
             ],
             ShellKind::Zsh => vec!["-c".into(), wrapper, "--".into(), user_command.into()],
+            ShellKind::Cmd => unreachable!(), // handled above in wrapper match
         };
 
         let fd_mappings = vec![

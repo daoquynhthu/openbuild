@@ -775,7 +775,7 @@ mod tests {
         let result = xai_tool_runtime::Tool::run(&tool, ctx, input)
             .await
             .unwrap();
-        let expected_path = xai_grok_paths::normalize::normalized_absolute(tmp.path().join("subdir"))
+        let expected_path = xai_grok_paths::normalize::normalized_absolute(&tmp.path().join("subdir"))
             .unwrap_or_else(|_| tmp.path().join("subdir"));
         let expected = format!("Failed to read file: {}", expected_path.display());
         match result {
