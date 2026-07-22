@@ -442,7 +442,7 @@ pub fn is_unsafe_trust_root(key: &Path) -> bool {
 }
 
 fn canonicalize_or_owned(path: &Path) -> PathBuf {
-    dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn now_unix() -> Option<i64> {
@@ -1439,7 +1439,7 @@ mod tests {
 
         // Canonicalize so macOS /var -> /private/var agrees between the stored
         // record path and the canonicalized lookup query.
-        let root = dunce::canonicalize(temp.path()).unwrap();
+        let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
         let home = root.join("grok-home");
         let wt = home.join("worktrees").join("repo").join(name);
         std::fs::create_dir_all(&wt).unwrap();
@@ -1479,7 +1479,7 @@ mod tests {
         // in production), so the git-root normalization is deterministic
         // regardless of where `$TMPDIR` lives.
         let temp = tempfile::TempDir::new().unwrap();
-        let root = dunce::canonicalize(temp.path()).unwrap();
+        let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
         let source_repo = root.join("source-repo");
         std::fs::create_dir_all(&source_repo).unwrap();
         git2::Repository::init(&source_repo).unwrap();
@@ -1510,7 +1510,7 @@ mod tests {
         // worktree launched from a subdir shares ONE key with the source and
         // linked worktrees (which key on the root), not on `<repo>/sub`.
         let temp = tempfile::TempDir::new().unwrap();
-        let root = dunce::canonicalize(temp.path()).unwrap();
+        let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
         let repo = root.join("realrepo");
         std::fs::create_dir_all(&repo).unwrap();
         git2::Repository::init(&repo).unwrap();
@@ -1536,7 +1536,7 @@ mod tests {
         // under its `worktrees/`) so the fallback is deterministic (no conditional
         // skip) — we assert the key is `outside`'s own root, never the source repo.
         let temp = tempfile::TempDir::new().unwrap();
-        let root = dunce::canonicalize(temp.path()).unwrap();
+        let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
         let source_repo = root.join("source-repo");
         std::fs::create_dir_all(&source_repo).unwrap();
         git2::Repository::init(&source_repo).unwrap();

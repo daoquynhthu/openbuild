@@ -374,7 +374,7 @@ mod tests {
     /// `list_blocking` against `dir` as both walk root and workspace root
     /// (canonicalized for the confinement check, like production).
     fn list_dir(dir: &Path, req: &FsListReq, max_collect: usize) -> FsListRes {
-        let canonical = dunce::canonicalize(dir).unwrap();
+        let canonical = xai_grok_paths::normalize::normalized_absolute(dir).unwrap();
         list_blocking(dir, dir, &canonical, req, max_collect).unwrap()
     }
 
