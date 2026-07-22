@@ -1909,7 +1909,7 @@ pool_size = 3
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_pool_fill_creates_worktrees() {
         let (_dir, repo_path) = create_temp_git_repo(5);
-        let repo_path = dunce::canonicalize(&repo_path).expect("canonicalize repo path");
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).expect("canonicalize repo path");
 
         let config = PoolConfig {
             pool_size: 2,
@@ -1943,7 +1943,7 @@ pool_size = 3
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_pool_fill_replenishes_after_acquire() {
         let (_dir, repo_path) = create_temp_git_repo(5);
-        let repo_path = dunce::canonicalize(&repo_path).expect("canonicalize repo path");
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).expect("canonicalize repo path");
 
         let config = PoolConfig {
             pool_size: 2,
@@ -1983,7 +1983,7 @@ pool_size = 3
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_pool_release_and_reacquire() {
         let (_dir, repo_path) = create_temp_git_repo(10);
-        let repo_path = dunce::canonicalize(&repo_path).expect("canonicalize repo path");
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).expect("canonicalize repo path");
 
         let config = PoolConfig {
             pool_size: 2,
@@ -2184,7 +2184,7 @@ pool_size = 3
     #[test]
     fn test_is_worktree_adoptable_valid() {
         let (_dir, repo_path) = create_temp_git_repo(3);
-        let repo_path = dunce::canonicalize(&repo_path).unwrap();
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).unwrap();
         let instance_dir = tempfile::tempdir().unwrap();
         let wt_path = create_orphan_worktree(&repo_path, instance_dir.path(), "test-pool-id");
 
@@ -2233,7 +2233,7 @@ pool_size = 3
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_adopt_orphan_worktrees_basic() {
         let (_dir, repo_path) = create_temp_git_repo(5);
-        let repo_path = dunce::canonicalize(&repo_path).unwrap();
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).unwrap();
 
         // Create a fake "dead instance" with a real linked worktree.
         let old_instance_dir = tempfile::tempdir().unwrap();
@@ -2303,9 +2303,9 @@ pool_size = 3
     async fn test_adopt_rejects_cross_repo_worktree() {
         // Create two separate repos.
         let (_dir_a, repo_a) = create_temp_git_repo(3);
-        let repo_a = dunce::canonicalize(&repo_a).unwrap();
+        let repo_a = xai_grok_paths::normalize::normalized_absolute(&repo_a).unwrap();
         let (_dir_b, repo_b) = create_temp_git_repo(3);
-        let repo_b = dunce::canonicalize(&repo_b).unwrap();
+        let repo_b = xai_grok_paths::normalize::normalized_absolute(&repo_b).unwrap();
 
         // Create a worktree linked to repo_a.
         let old_instance_dir = tempfile::tempdir().unwrap();
@@ -2340,7 +2340,7 @@ pool_size = 3
     #[ignore = "flaky: worktree adoption count is timing-dependent on CI"]
     async fn test_adopt_respects_hard_cap_limit() {
         let (_dir, repo_path) = create_temp_git_repo(3);
-        let repo_path = dunce::canonicalize(&repo_path).unwrap();
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).unwrap();
 
         // Create 3 orphan worktrees but hard_cap is 1.
         let old_instance_dir = tempfile::tempdir().unwrap();
@@ -2386,7 +2386,7 @@ pool_size = 3
     #[serial]
     async fn test_adopt_in_fill_loop_creates_deficit() {
         let (_dir, repo_path) = create_temp_git_repo(5);
-        let repo_path = dunce::canonicalize(&repo_path).unwrap();
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).unwrap();
 
         // Create 1 orphan worktree, pool_size = 2.
         // The fill loop should adopt 1 and create 1 more.
