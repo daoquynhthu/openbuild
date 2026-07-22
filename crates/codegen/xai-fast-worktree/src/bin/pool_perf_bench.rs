@@ -703,7 +703,7 @@ fn main() -> Result<()> {
             .init();
     }
 
-    let source = dunce::canonicalize(&cli.source).context("source path not found")?;
+    let source = xai_grok_paths::normalize::normalized_absolute(&cli.source).context("source path not found")?;
     let tracked = count_tracked_files(&source).unwrap_or(0);
 
     if !cli.json {

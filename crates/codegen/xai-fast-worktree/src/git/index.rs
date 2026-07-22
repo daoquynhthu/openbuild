@@ -168,7 +168,7 @@ fn resolve_common_dir(git_dir: &Path) -> PathBuf {
         let relative = content.trim();
         let resolved = git_dir.join(relative);
         // Canonicalize to clean up `../..` etc.
-        dunce::canonicalize(&resolved).unwrap_or(resolved)
+        xai_grok_paths::normalize::normalized_absolute(&resolved).unwrap_or(resolved)
     } else {
         git_dir.to_path_buf()
     }

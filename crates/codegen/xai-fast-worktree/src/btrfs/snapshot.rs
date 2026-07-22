@@ -391,7 +391,7 @@ fn is_safe_snapshot_delete_target_in(snapshot_path: &Path, btrfs_mounts: &[PathB
     let Some(parent) = snapshot_path.parent() else {
         return false;
     };
-    let Ok(canonical_parent) = dunce::canonicalize(parent) else {
+    let Ok(canonical_parent) = xai_grok_paths::normalize::normalized_absolute(parent) else {
         return false;
     };
     // Parent must be a snapshot-storage dir (`worktrees` / `.grok-snapshots`)...
@@ -408,7 +408,7 @@ fn is_safe_snapshot_delete_target_in(snapshot_path: &Path, btrfs_mounts: &[PathB
     };
     btrfs_mounts
         .iter()
-        .any(|m| m == grandparent || dunce::canonicalize(m).is_ok_and(|c| c == grandparent))
+        .any(|m| m == grandparent || xai_grok_paths::normalize::normalized_absolute(m).is_ok_and(|c| c == grandparent))
 }
 
 /// Metadata persisted alongside a direct btrfs snapshot for crash recovery
@@ -927,7 +927,7 @@ mod tests {
     fn test_is_safe_snapshot_delete_target_accepts_contained() {
         // The tmp dir stands in for a real btrfs mount point.
         let tmp = tempfile::TempDir::new().unwrap();
-        let mount = dunce::canonicalize(tmp.path()).unwrap();
+        let mount = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         for subdir in BTRFS_SNAPSHOT_SUBDIRS {
             let dir = tmp.path().join(subdir);
             std::fs::create_dir(&dir).unwrap();
@@ -964,7 +964,7 @@ mod tests {
         // A symlink confused to point at the live source repo: its parent is not
         // a snapshot-storage dir, so deletion must be refused.
         let tmp = tempfile::TempDir::new().unwrap();
-        let mount = dunce::canonicalize(tmp.path()).unwrap();
+        let mount = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let repo = tmp.path().join("repo");
         std::fs::create_dir(&repo).unwrap();
         assert!(!is_safe_snapshot_delete_target_in(&repo, &[mount]));
@@ -973,7 +973,7 @@ mod tests {
     #[test]
     fn test_is_safe_snapshot_delete_target_rejects_parent_dir_component() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let mount = dunce::canonicalize(tmp.path()).unwrap();
+        let mount = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let dir = tmp.path().join("worktrees");
         std::fs::create_dir(&dir).unwrap();
         // `worktrees/../escape` escapes the snapshot storage despite the name.
@@ -986,7 +986,7 @@ mod tests {
     #[test]
     fn test_is_safe_snapshot_delete_target_rejects_symlink_itself() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let mount = dunce::canonicalize(tmp.path()).unwrap();
+        let mount = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let dir = tmp.path().join("worktrees");
         std::fs::create_dir(&dir).unwrap();
         let real = tmp.path().join("elsewhere");

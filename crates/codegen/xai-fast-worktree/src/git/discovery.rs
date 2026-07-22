@@ -47,7 +47,7 @@ pub(crate) fn find_worktree_git_dir(worktree_path: &Path) -> Result<PathBuf> {
         } else {
             raw_path.to_path_buf()
         };
-        Ok(dunce::canonicalize(&resolved).unwrap_or(resolved))
+        Ok(xai_grok_paths::normalize::normalized_absolute(&resolved).unwrap_or(resolved))
     } else if git_path.is_dir() {
         // Regular repository
         Ok(git_path)
@@ -121,7 +121,7 @@ mod tests {
         std::fs::write(worktree.join(".git"), "gitdir: ../repo/.git/worktrees/wt\n").unwrap();
 
         let resolved = find_worktree_git_dir(&worktree).unwrap();
-        assert_eq!(resolved, dunce::canonicalize(&real_git).unwrap());
+        assert_eq!(resolved, xai_grok_paths::normalize::normalized_absolute(&real_git).unwrap());
     }
 
     #[test]
