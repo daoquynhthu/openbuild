@@ -171,3 +171,43 @@
 - P11-001/002/003 — config/catalog/session 三大持久化消费者均已使用 `atomic_replace` ✅
 - P11-005 — workspace classifier Windows 修复已完成（移除 `#[cfg(not(windows))]`，19 测试通过）✅
 - P11-007 — watcher + atomic_replace 契约测试已添加 ✅
+
+---
+
+## 审计: 2026-07-22 (Phase 12 跨平台进程/补全/终端缺口)
+
+### 范围
+对照 `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md` §Phase 12
+(lines 1832–1904) 逐条审计当前实现状态。P12-001 (process termination contract) 和 P12-003 (Windows process adapter) 已完整实现。P12-009 和 P12-010 存在缺口。
+
+### 审计方法
+- 搜索 `ShellCompletionAdapter`、`PowerShellAdapter`、`CmdAdapter`、`ShellKind`、`PromptInputMode` 类型定义和使用
+- 搜索运行时适配器选择逻辑（适配器如何被导入和调用）
+- 搜索 `grok completions` CLI 命令处理
+- 核查 V2 计划 §1870–1880 的逐条要求
+
+### 中等
+
+- **M12-001** `xai-grok-shell/src/completion/mod.rs` — `PowerShellAdapter` 和 `CmdAdapter` 完整实现 `ShellCompletionAdapter` trait（含 tokenize/escape/score/apply_replacement），且有对应的单元测试和 UI 集成测试，但 **从未被运行时接入**。无人 import、无人实例化、无人调用。Windows 用户在交互补全中被当作 Bash 用户处理。`PromptInputMode`（`xai-grok-pager/src/app/agent_view/mod.rs:298`）仅有 `Normal`/`Bash`/`Feedback`/`Remember` 变体，无 PowerShell 或 Cmd 变体。
+
+- **M12-002** `xai-grok-tools/src/computer/local/shell_state.rs:183` — `ShellKind` 枚举仅有 `Bash` 和 `Zsh` 变体，缺少 `Cmd` 和 `PowerShell`。V2 计划 §1878 要求 "V1 冻结支持 `ShellKind::Cmd` 作为最后 fallback"，但 `bash` / `run_terminal_cmd` 工具无法将 cmd.exe 作为活动 shell 调用。
+
+### 建议
+
+- **S12-001** `xai-grok-shell/src/completion/mod.rs` — `PowerShellAdapter` 和 `CmdAdapter` 已实现但未接入运行时。需建立适配器选择逻辑（根据检测到的 shell 在 `PosixAdapter`/`PowerShellAdapter`/`CmdAdapter` 间切换），并扩展 `PromptInputMode` 以支持非 POSIX shell。`xai-grok-pager/src/app/agent_view/shell_completion.rs` 中 PowerShell/Cmd 测试通过将模式设置为 `Bash` 绕过此缺口。
+
+- **S12-002** `xai-grok-shell/src/extensions/suggest/file_provider.rs:61-64` — `FilePathProvider::suggest()` 在 `cfg!(windows)` 时返回空向量，注释 "shell_token quoting is POSIX-only"。V2 计划 §1880 要求交互补全使用 cmd quoting/replacement contract，但当前 Windows 上文件路径补全完全被禁用。需使用 `ShellCompletionAdapter` 实现 Windows 文件补全。
+
+- **S12-003** V2 计划 §1880 要求 "`grok completions cmd` 必须显式返回 unsupported"。当前 `completions_cmd.rs` 使用 `clap_complete::Shell`（仅有 Bash/Elvish/Fish/PowerShell/Zsh），`grok completions cmd` 在 clap CLI 解析层失败，而非产生明确 unsupported 信息。需捕获无效 shell 名称并返回清晰消息。
+
+---
+
+### 状态汇总
+
+| 条目 | 文件 | 状态 |
+|------|------|------|
+| M12-001 | completion/mod.rs | 待修复 — 适配器未接入运行时 |
+| M12-002 | shell_state.rs | 待修复 — ShellKind 缺少 Cmd/PowerShell |
+| S12-001 | completion/mod.rs + shell_completion.rs | 待修复 — 运行时适配器选择 |
+| S12-002 | file_provider.rs | 待修复 — Windows 文件补全禁用 |
+| S12-003 | completions_cmd.rs | 待修复 — grok completions cmd 未返回 unsupported |
