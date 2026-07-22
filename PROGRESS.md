@@ -468,3 +468,29 @@ All 12 P13 tasks resolved:
 | production chain: RME → prepare → PreparedSamplerConfig → Sampler | ✅ (static scan) |
 | no apply_auth_policy(...).ok() / 吞错 | ✅ (zero `.ok()` on apply_auth_policy; pre-existing `match`+`warn!` in legacy `sampling_config_for_model` documented as residual) |
 | secret canary zero leak | ✅ (P8-009: 6 redaction tests) |
+
+### P8-011 deviation fixes — 2026-07-22
+
+#### C01: trace_classifier bypass of `prepare_sampler_config`
+- `build_sampler_client` rewritten: constructs `ResolvedModelExecution` + `RequestCredential` + calls `prepare_sampler_config` instead of struct literal
+- No more `PreparedSamplerConfig {` in shell crate production code ✅
+
+#### C02: Sampler production entry point
+- Added `SamplingClient::from_prepared(config: impl Into<SamplerConfig>)` as the preferred production entry
+- `build_sampler_client` now uses `from_prepared` instead of `new`
+- Note: `new` retained for backward compat; cannot accept `PreparedSamplerConfig` directly due to circular dep (sampler ← provider)
+
+#### C03: `test_prepared_config` gating + residual documentation
+- Gated `test_prepared_config` with `#[cfg(test)]`
+- `sampling_config_for_model`: documented as known residual (29+ call sites, needs separate migration task)
+
+#### Files changed
+- `crates/codegen/xai-grok-provider/src/prepared.rs` — `#[cfg(test)]` on helper
+- `crates/codegen/xai-grok-sampler/src/client.rs` — `from_prepared()` method
+- `crates/codegen/xai-grok-shell/src/trace_classifier/mod.rs` — use `prepare_sampler_config`
+
+#### Key results
+- `cargo test -p xai-grok-provider --lib -- prepared`: 30/30 pass ✅
+- `cargo test -p xai-grok-shell --lib -- trace_classifier`: 47/47 pass ✅
+- Static scan: 0 `SamplerConfig {` and 0 `PreparedSamplerConfig {` in shell crate production code ✅
+- `cargo clippy -p xai-grok-sampler -p xai-grok-provider -p xai-grok-shell -- -D warnings`: clean ✅
