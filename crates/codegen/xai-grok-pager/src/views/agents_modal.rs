@@ -554,7 +554,7 @@ pub fn persona_path_is_deletable(path: &Path) -> bool {
 }
 /// Shared guard: canonical path under `~/.grok/{subdir}` or `{cwd}/.grok/{subdir}`, not bundled.
 fn config_path_is_user_or_project(path: &Path, subdir: &str) -> bool {
-    let Ok(canonical) = dunce::canonicalize(path) else {
+    let Ok(canonical) = xai_grok_paths::normalize::normalized_absolute(path) else {
         return false;
     };
     if canonical
@@ -564,7 +564,7 @@ fn config_path_is_user_or_project(path: &Path, subdir: &str) -> bool {
         return false;
     }
     let grok_home = xai_grok_config::grok_home();
-    let in_user = dunce::canonicalize(grok_home.join(subdir))
+    let in_user = xai_grok_paths::normalize::normalized_absolute(&grok_home.join(subdir))
         .ok()
         .is_some_and(|d| canonical.starts_with(&d));
     let project_suffix = std::path::Path::new(".grok").join(subdir);
@@ -588,7 +588,7 @@ pub fn persona_is_deletable(persona: &PersonaDetail) -> bool {
 /// Delete a local persona file from disk.
 pub fn delete_persona_file(path: &Path) -> Result<(), String> {
     if !persona_path_is_deletable(path) {
-        if dunce::canonicalize(path).ok().is_some_and(|c| {
+        if xai_grok_paths::normalize::normalized_absolute(path).ok().is_some_and(|c| {
             c.components()
                 .any(|comp| matches!(comp, std::path::Component::Normal(s) if s == "bundled"))
         }) {

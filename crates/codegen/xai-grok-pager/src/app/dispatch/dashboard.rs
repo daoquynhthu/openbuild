@@ -759,7 +759,7 @@ pub(super) fn dispatch_dashboard_open_location_picker(app: &mut AppView) -> Vec<
     // tag both recents and live directory suggestions.
     let worktrees = crate::git_info::worktree_label_index();
     let worktree_label = |path: &std::path::Path| -> Option<String> {
-        let key = dunce::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        let key = xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.to_path_buf());
         worktrees.get(&key).cloned()
     };
 

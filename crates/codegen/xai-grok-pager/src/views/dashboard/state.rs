@@ -1019,7 +1019,7 @@ fn read_subdirs(
             let worktree = if worktrees.is_empty() {
                 None
             } else {
-                let canon = dunce::canonicalize(&path).unwrap_or_else(|_| path.clone());
+                let canon = xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or_else(|_| path.clone());
                 worktrees.get(&canon).cloned()
             };
             out.push(LocationCandidate {
@@ -10067,7 +10067,7 @@ mod tests {
         std::fs::create_dir(tmp.path().join("wt")).unwrap();
         std::fs::create_dir(tmp.path().join("plain")).unwrap();
         // Index `wt` as a managed worktree (keys are canonical paths).
-        let canon = dunce::canonicalize(tmp.path()).unwrap_or_else(|_| tmp.path().to_path_buf());
+        let canon = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap_or_else(|_| tmp.path().to_path_buf());
         let mut worktrees = std::collections::HashMap::new();
         worktrees.insert(canon.join("wt"), "my-feature".to_string());
 
@@ -10097,7 +10097,7 @@ mod tests {
         std::os::unix::fs::symlink(real.path(), parent.path().join("link")).unwrap();
 
         // Index keyed by the real (canonical) path, as the worktree DB is.
-        let real_canon = dunce::canonicalize(real.path()).unwrap();
+        let real_canon = xai_grok_paths::normalize::normalized_absolute(real.path()).unwrap();
         let mut worktrees = std::collections::HashMap::new();
         worktrees.insert(real_canon, "linked-wt".to_string());
 
