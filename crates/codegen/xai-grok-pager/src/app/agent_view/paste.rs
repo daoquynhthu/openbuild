@@ -717,7 +717,7 @@ pub(super) mod paste_key_tests {
             "no chip placeholder expected for non-image drop; got {:?}",
             agent.prompt.text()
         );
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want_with_trailing_space = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want_with_trailing_space),
@@ -760,7 +760,7 @@ pub(super) mod paste_key_tests {
             "no chip placeholder expected; got {:?}",
             agent.prompt.text()
         );
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want_with_trailing_space = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want_with_trailing_space),
@@ -790,7 +790,7 @@ pub(super) mod paste_key_tests {
             agent.prompt.images.is_empty(),
             "file-url path must beat the icon image even when text is \"\"",
         );
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want_with_trailing_space = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want_with_trailing_space),
@@ -828,7 +828,7 @@ pub(super) mod paste_key_tests {
             "PNG chip placeholder must be present; prompt = {:?}",
             agent.prompt.text(),
         );
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want_with_trailing_space = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want_with_trailing_space),
@@ -858,7 +858,7 @@ pub(super) mod paste_key_tests {
             deferred_probe_target(&agent).is_none(),
             "a classifying text paste must not also defer a probe"
         );
-        let canon_primary = dunce::canonicalize(&primary).unwrap();
+        let canon_primary = xai_grok_paths::normalize::normalized_absolute(&primary).unwrap();
         let want_primary = format!("{} ", canon_primary.display());
         assert!(
             agent.prompt.text().contains(&want_primary),
@@ -885,7 +885,7 @@ pub(super) mod paste_key_tests {
             "no chip placeholder expected for non-image drop; got {:?}",
             agent.prompt.text()
         );
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want_with_trailing_space = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want_with_trailing_space),
@@ -919,7 +919,7 @@ pub(super) mod paste_key_tests {
             "non-image must not also produce a chip; prompt = {:?}",
             agent.prompt.text()
         );
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want_with_trailing_space = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want_with_trailing_space),
@@ -987,7 +987,7 @@ pub(super) mod paste_key_tests {
             "no chip placeholder expected; got {:?}",
             agent.prompt.text()
         );
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want_with_trailing_space = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want_with_trailing_space),
@@ -1032,7 +1032,7 @@ pub(super) mod paste_key_tests {
         let outcome = paste_cmd_v(&mut agent, Some(&pasted));
         assert!(matches!(outcome, InputOutcome::Changed));
         assert_eq!(agent.prompt.images.len(), cap);
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want),
@@ -1086,7 +1086,7 @@ pub(super) mod paste_key_tests {
             "[{arm_name}] no `file://` fragment may leak into the prompt; got {:?}",
             agent.prompt.text()
         );
-        let canon_txt = dunce::canonicalize(&txt).unwrap();
+        let canon_txt = xai_grok_paths::normalize::normalized_absolute(&txt).unwrap();
         let want = format!("{} ", canon_txt.display());
         assert!(
             agent.prompt.text().contains(&want),
