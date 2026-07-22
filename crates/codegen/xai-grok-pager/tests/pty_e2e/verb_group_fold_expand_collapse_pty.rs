@@ -37,7 +37,7 @@ async fn verb_group_fold_expand_collapse_pty() {
             "hello verb group\n"
         };
         std::fs::write(&path, body).expect("write fixture file");
-        paths.push(dunce::canonicalize(&path).unwrap_or(path));
+        paths.push(xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or(path));
     }
     fn read_args(p: &std::path::Path) -> String {
         json!({ "target_file": p.to_string_lossy() }).to_string()

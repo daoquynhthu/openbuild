@@ -70,7 +70,7 @@ async fn settle() {
 async fn bash_mode_file_completion_shell_like() {
     let project = tempfile::tempdir().expect("create project dir");
     seed_cwd(project.path());
-    let cwd = dunce::canonicalize(project.path()).expect("canonicalize project");
+    let cwd = xai_grok_paths::normalize::normalized_absolute(project.path()).expect("canonicalize project");
 
     let content = ContentController::start().await.expect("start content");
     content.set_response(format!("{MOCK_RESPONSE_SENTINEL} session up."));

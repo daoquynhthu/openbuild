@@ -23,7 +23,7 @@ async fn verb_group_streaming_fold_pty() {
     for name in ["s1.txt", "s2.txt", "s3.txt"] {
         let path = content.home().join(name);
         std::fs::write(&path, "hello verb group\n").expect("write fixture file");
-        paths.push(dunce::canonicalize(&path).unwrap_or(path));
+        paths.push(xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or(path));
     }
     for (i, p) in paths.iter().enumerate() {
         enqueue_tool_turn(

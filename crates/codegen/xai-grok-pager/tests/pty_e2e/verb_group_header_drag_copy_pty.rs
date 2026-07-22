@@ -56,7 +56,7 @@ async fn verb_group_header_drag_copy_pty() {
     for name in ["dragme1.txt", "dragme2.txt"] {
         let path = content.home().join(name);
         std::fs::write(&path, "hello drag copy\n").expect("write fixture file");
-        paths.push(dunce::canonicalize(&path).unwrap_or(path));
+        paths.push(xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or(path));
     }
     for (i, p) in paths.iter().enumerate() {
         enqueue_tool_turn(

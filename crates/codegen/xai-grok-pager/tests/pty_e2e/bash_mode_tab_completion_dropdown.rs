@@ -58,7 +58,7 @@ async fn bash_mode_tab_accepts_dropdown_item_in_place() {
     std::fs::create_dir_all(project.path().join(".git")).expect("create .git");
     std::fs::write(project.path().join(FILE_AAA), "").expect("seed AAA file");
     std::fs::write(project.path().join(FILE_BBB), "").expect("seed BBB file");
-    let cwd = dunce::canonicalize(project.path()).expect("canonicalize project");
+    let cwd = xai_grok_paths::normalize::normalized_absolute(project.path()).expect("canonicalize project");
 
     let content = ContentController::start().await.expect("start content");
     content.set_response(format!("{MOCK_RESPONSE_SENTINEL} session up."));

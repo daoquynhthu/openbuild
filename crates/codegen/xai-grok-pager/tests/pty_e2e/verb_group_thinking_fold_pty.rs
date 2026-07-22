@@ -34,7 +34,7 @@ async fn verb_group_thinking_fold_pty() {
     for name in ["t1.txt", "t2.txt"] {
         let path = content.home().join(name);
         std::fs::write(&path, "hello thought fold\n").expect("write fixture file");
-        paths.push(dunce::canonicalize(&path).unwrap_or(path));
+        paths.push(xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or(path));
     }
     let reasoning = format!("{REASONING_SENTINEL} weighing which fixture file to read first");
 

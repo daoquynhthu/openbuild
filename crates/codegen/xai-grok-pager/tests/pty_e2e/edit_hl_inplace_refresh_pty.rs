@@ -102,7 +102,7 @@ async fn edit_hl_inplace_refresh_pty() {
     let body = fixture_python(pad);
     let target = content.home().join("queue_item.py");
     fs::write(&target, &body).expect("write fixture");
-    let abs = dunce::canonicalize(&target).unwrap_or(target.clone());
+    let abs = xai_grok_paths::normalize::normalized_absolute(&target).unwrap_or(target.clone());
 
     // Small unique edit on the field line after the closing """ (the spill zone).
     let old = "    notes: str = Field(..., min_length=1)";

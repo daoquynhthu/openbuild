@@ -71,7 +71,7 @@ async fn basename_path_demo_pty() {
     fs::create_dir_all(&nest_dir).expect("nest dirs");
     let target = nest_dir.join(FILE_NAME);
     fs::write(&target, "// basename path demo fixture\npub fn demo() {}\n").expect("write fixture");
-    let abs = dunce::canonicalize(&target).unwrap_or(target.clone());
+    let abs = xai_grok_paths::normalize::normalized_absolute(&target).unwrap_or(target.clone());
     let full_path = abs.to_string_lossy().into_owned();
 
     enqueue_tool_turn(

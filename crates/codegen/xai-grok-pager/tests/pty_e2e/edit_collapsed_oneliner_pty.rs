@@ -29,7 +29,7 @@ async fn edit_collapsed_oneliner_pty() {
         "# collapsed one-liner demo fixture\ndef greet():\n    return \"hi\"\n",
     )
     .expect("write fixture");
-    let abs = dunce::canonicalize(&target).unwrap_or(target.clone());
+    let abs = xai_grok_paths::normalize::normalized_absolute(&target).unwrap_or(target.clone());
 
     // One deleted line, two inserted lines => a `+2/-1` diffstat.
     enqueue_tool_turn(

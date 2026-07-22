@@ -27,7 +27,7 @@ async fn verify_bashq_claim3_edit_keeps_bash() {
 
     let project = tempfile::tempdir().expect("create project dir");
     std::fs::create_dir_all(project.path().join(".git")).expect("create .git");
-    let cwd = dunce::canonicalize(project.path()).expect("canonicalize project");
+    let cwd = xai_grok_paths::normalize::normalized_absolute(project.path()).expect("canonicalize project");
 
     let binary = pager_binary().expect("resolve pager binary");
     let mut harness = PtyHarness::spawn_with_content_in_dir(
