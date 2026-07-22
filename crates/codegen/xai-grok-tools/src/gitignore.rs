@@ -56,7 +56,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
         // Canonicalize to handle macOS /tmp → /private/tmp
-        let root = &dunce::canonicalize(root).unwrap();
+        let root = &xai_grok_paths::normalize::normalized_absolute(root).unwrap();
         let gi = build_gitignore(root, &["build/"]);
         assert!(is_ignored(&gi, &root.join("build/out.o"), Some(root)));
         assert!(is_ignored(&gi, &root.join("build/sub/file.rs"), Some(root)));
@@ -66,7 +66,7 @@ mod tests {
     fn is_ignored_does_not_match_non_gitignored_paths() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
-        let root = &dunce::canonicalize(root).unwrap();
+        let root = &xai_grok_paths::normalize::normalized_absolute(root).unwrap();
         let gi = build_gitignore(root, &["build/"]);
         assert!(!is_ignored(&gi, &root.join("src/main.rs"), Some(root)));
         assert!(!is_ignored(&gi, &root.join("AGENTS.md"), Some(root)));
@@ -76,7 +76,7 @@ mod tests {
     fn is_ignored_strips_git_root_prefix() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
-        let root = &dunce::canonicalize(root).unwrap();
+        let root = &xai_grok_paths::normalize::normalized_absolute(root).unwrap();
         let gi = build_gitignore(root, &["build/"]);
         // With root: strips prefix, matches build/out.o
         assert!(is_ignored(&gi, &root.join("build/out.o"), Some(root)));
@@ -92,7 +92,7 @@ mod tests {
     fn is_ignored_returns_false_for_path_outside_git_root() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
-        let root = &dunce::canonicalize(root).unwrap();
+        let root = &xai_grok_paths::normalize::normalized_absolute(root).unwrap();
         let gi = build_gitignore(root, &["build/", "*.md"]);
         // A path completely outside the git root should not be checked
         // against the repo's .gitignore (e.g., ~/.grok/Agents.md).
@@ -108,7 +108,7 @@ mod tests {
 
         // Build an absolute path outside the gitignore root.
         let tmp = tempfile::tempdir().unwrap();
-        let abs_root = dunce::canonicalize(tmp.path()).unwrap();
+        let abs_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let abs_path = abs_root.parent().unwrap().join("nonexistent").join("file.md");
 
         // Proves the raw crate panics with these inputs.

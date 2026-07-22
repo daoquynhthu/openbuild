@@ -1500,7 +1500,7 @@ mod tests {
     }
     fn test_resources_with_gitignore(cwd: &std::path::Path) -> Resources {
         let mut resources = test_resources(cwd);
-        let canonical = dunce::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+        let canonical = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
         let gi = build_gitignore(&canonical, &["build/", "dist/", "*.min.js"]);
         resources.insert(GitignoreFilter::new(gi, canonical));
         resources
@@ -1508,7 +1508,7 @@ mod tests {
     #[tokio::test]
     async fn edit_blocked_by_gitignore() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let build_dir = canonical_root.join("build");
         std::fs::create_dir(&build_dir).unwrap();
         std::fs::write(build_dir.join("output.js"), "var x = 1;\n").unwrap();
@@ -1537,7 +1537,7 @@ mod tests {
     #[tokio::test]
     async fn legacy_edit_allowed_for_gitignored_file() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let build_dir = canonical_root.join("build");
         std::fs::create_dir(&build_dir).unwrap();
         let file_path = build_dir.join("output.js");
@@ -1573,7 +1573,7 @@ mod tests {
     #[tokio::test]
     async fn create_file_blocked_by_gitignore() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let dist_dir = canonical_root.join("dist");
         std::fs::create_dir(&dist_dir).unwrap();
         let tool = SearchReplaceTool;
@@ -1597,7 +1597,7 @@ mod tests {
     #[tokio::test]
     async fn edit_allowed_when_not_gitignored() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let src_dir = canonical_root.join("src");
         std::fs::create_dir(&src_dir).unwrap();
         std::fs::write(src_dir.join("main.rs"), "fn main() {}\n").unwrap();

@@ -775,7 +775,7 @@ mod tests {
         let result = xai_tool_runtime::Tool::run(&tool, ctx, input)
             .await
             .unwrap();
-        let expected_path = dunce::canonicalize(tmp.path().join("subdir"))
+        let expected_path = xai_grok_paths::normalize::normalized_absolute(tmp.path().join("subdir"))
             .unwrap_or_else(|_| tmp.path().join("subdir"));
         let expected = format!("Failed to read file: {}", expected_path.display());
         match result {
@@ -1155,7 +1155,7 @@ mod tests {
     }
     fn test_resources_with_gitignore(cwd: &std::path::Path) -> Resources {
         let mut resources = test_resources(cwd);
-        let canonical = dunce::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+        let canonical = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
         let gi = build_gitignore(&canonical, &["build/", "node_modules/", "*.log"]);
         resources.insert(GitignoreFilter::new(gi, canonical));
         resources
@@ -1163,7 +1163,7 @@ mod tests {
     #[tokio::test]
     async fn read_file_allows_gitignored_files_by_default() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let build_dir = canonical_root.join("build");
         std::fs::create_dir(&build_dir).unwrap();
         std::fs::write(
@@ -1202,7 +1202,7 @@ mod tests {
     #[tokio::test]
     async fn read_file_blocked_when_respect_gitignore_enabled() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let build_dir = canonical_root.join("build");
         std::fs::create_dir(&build_dir).unwrap();
         std::fs::write(build_dir.join("output.o"), "binary data").unwrap();
@@ -1238,7 +1238,7 @@ mod tests {
     #[tokio::test]
     async fn legacy_read_file_allows_gitignored_files() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let build_dir = canonical_root.join("build");
         std::fs::create_dir(&build_dir).unwrap();
         std::fs::write(build_dir.join("output.txt"), "build output data\n").unwrap();
@@ -1273,7 +1273,7 @@ mod tests {
     #[tokio::test]
     async fn read_file_allowed_when_not_gitignored() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let src_dir = canonical_root.join("src");
         std::fs::create_dir(&src_dir).unwrap();
         std::fs::write(src_dir.join("main.rs"), "fn main() {}\n").unwrap();
@@ -1299,7 +1299,7 @@ mod tests {
     #[tokio::test]
     async fn read_file_allows_gitignored_by_extension() {
         let tmp = TempDir::new().unwrap();
-        let canonical_root = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         std::fs::write(
             canonical_root.join("debug.log"),
             "log data for read_file test\n",
