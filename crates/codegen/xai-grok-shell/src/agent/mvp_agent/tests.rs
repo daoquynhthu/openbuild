@@ -892,7 +892,7 @@ fn read_session_or_init_meta_str_falls_back_to_init_meta() {
 #[test]
 fn parse_session_plugin_dirs_filters_and_dedupes() {
     let tmp = tempfile::tempdir().unwrap();
-    let dir = dunce::canonicalize(tmp.path()).unwrap().join("plugin");
+    let dir = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap().join("plugin");
     std::fs::create_dir(&dir).unwrap();
     let file = tmp.path().join("file.txt");
     std::fs::write(&file, "x").unwrap();

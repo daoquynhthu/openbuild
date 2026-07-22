@@ -722,8 +722,8 @@ pub(crate) async fn handle_subagent_request(
         &ctx.parent_cwd,
     );
     let cwd_outside_parent = match (
-        dunce::canonicalize(&child_cwd),
-        dunce::canonicalize(&ctx.parent_cwd),
+        xai_grok_paths::normalize::normalized_absolute(&child_cwd),
+        xai_grok_paths::normalize::normalized_absolute(&ctx.parent_cwd),
     ) {
         (Ok(child), Ok(parent)) => !child.starts_with(&parent),
         _ => child_cwd != ctx.parent_cwd,

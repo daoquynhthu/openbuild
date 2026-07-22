@@ -300,7 +300,7 @@ pub(crate) fn parse_session_plugin_dirs(
             tracing::warn!("pluginDirs entry is not absolute; skipping");
             continue;
         }
-        let canonical = dunce::canonicalize(&path).unwrap_or(path);
+        let canonical = xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or(path);
         if !canonical.is_dir() {
             tracing::warn!("pluginDirs entry is not a directory; skipping");
             continue;
