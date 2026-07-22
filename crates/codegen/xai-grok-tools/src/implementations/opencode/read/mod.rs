@@ -518,7 +518,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         // Canonicalize the tmp path to match what the tool will store in the tracker
         // (on macOS /tmp is a symlink to /private/tmp).
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("test.txt");
         std::fs::write(&file_path, "line1\nline2\nline3\n").unwrap();
 
@@ -721,7 +721,7 @@ mod tests {
     #[tokio::test]
     async fn image_file_detection() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("photo.png");
 
         // Real PNG: small enough to pass through the compression gate
@@ -764,7 +764,7 @@ mod tests {
     #[tokio::test]
     async fn truncated_image_not_embedded_raw() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("cut.jpg");
 
         let img: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
@@ -804,7 +804,7 @@ mod tests {
     #[tokio::test]
     async fn long_line_truncation() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("long.txt");
 
         // Create a line well beyond MAX_LINE_LENGTH (2000 chars).
@@ -838,7 +838,7 @@ mod tests {
     #[tokio::test]
     async fn byte_cap_truncation() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("big.txt");
 
         // Each line is ~100 bytes; we need >50 KB = 51200 bytes total.
@@ -877,7 +877,7 @@ mod tests {
     #[tokio::test]
     async fn offset_past_end() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("short.txt");
         std::fs::write(&file_path, "one\ntwo\nthree\n").unwrap();
 
@@ -908,7 +908,7 @@ mod tests {
     #[tokio::test]
     async fn empty_file() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("empty.txt");
         std::fs::write(&file_path, "").unwrap();
 
@@ -940,7 +940,7 @@ mod tests {
     #[tokio::test]
     async fn line_limit_reached() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("hundred.txt");
 
         let content: String = (1..=100)
@@ -976,7 +976,7 @@ mod tests {
     #[tokio::test]
     async fn relative_path_resolved() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("hello.txt");
         std::fs::write(&file_path, "hello world\n").unwrap();
 
@@ -1009,7 +1009,7 @@ mod tests {
     #[tokio::test]
     async fn pdf_file_detection() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("test.pdf");
 
         // Arbitrary bytes — not a real PDF, but the extension triggers PDF handling.
@@ -1046,7 +1046,7 @@ mod tests {
     #[tokio::test]
     async fn directory_with_symlink() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
 
         // Create a real directory and a symlink pointing to it.
         std::fs::create_dir(canonical_tmp.join("real_dir")).unwrap();
@@ -1088,7 +1088,7 @@ mod tests {
     #[tokio::test]
     async fn directory_pagination() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
 
         // Create 20 files named a01.txt .. a20.txt.
         for i in 1..=20 {
@@ -1136,7 +1136,7 @@ mod tests {
     #[tokio::test]
     async fn file_not_found_with_suggestions() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
 
         // Create a file that should be suggested.
         std::fs::write(canonical_tmp.join("test.txt"), "content").unwrap();
@@ -1196,7 +1196,7 @@ mod tests {
     #[tokio::test]
     async fn xml_output_structure() {
         let tmp = TempDir::new().unwrap();
-        let canonical_tmp = dunce::canonicalize(tmp.path()).unwrap();
+        let canonical_tmp = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let file_path = canonical_tmp.join("structure.txt");
         std::fs::write(&file_path, "first line\nsecond line\n").unwrap();
 

@@ -10,7 +10,7 @@ mod conditional;
 mod listing;
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::implementations::skills::types::SkillInfo;
 use crate::types::compat::CompatConfig;
@@ -146,7 +146,7 @@ pub struct SkillManager {
 /// Canonicalize a skill path, falling back to the raw path for not-yet-created
 /// files or symlink-resolution failures.
 fn canonical_path(path: &str) -> PathBuf {
-    dunce::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path))
+    xai_grok_paths::normalize::normalized_absolute(Path::new(path)).unwrap_or_else(|_| PathBuf::from(path))
 }
 
 /// Why a reconciliation is pending.
@@ -165,7 +165,7 @@ fn dedup_by_canonical_path(primary: &[SkillInfo], secondary: &[SkillInfo]) -> Ve
     let mut result = Vec::with_capacity(primary.len() + secondary.len());
     for skill in primary.iter().chain(secondary.iter()) {
         let canonical =
-            dunce::canonicalize(&skill.path).unwrap_or_else(|_| PathBuf::from(&skill.path));
+            xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path)).unwrap_or_else(|_| PathBuf::from(&skill.path));
         if seen_paths.insert(canonical) {
             result.push(skill.clone());
         }
@@ -182,7 +182,7 @@ fn dedupe_by_canonical_path_and_name(
     let mut result = Vec::with_capacity(primary.len() + secondary.len());
     for skill in primary.iter().chain(secondary.iter()) {
         let canonical =
-            dunce::canonicalize(&skill.path).unwrap_or_else(|_| PathBuf::from(&skill.path));
+            xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path)).unwrap_or_else(|_| PathBuf::from(&skill.path));
         if !seen_paths.insert(canonical) {
             continue;
         }
@@ -322,8 +322,8 @@ impl SkillManager {
             }
             self.display_cwd = Some(display.clone());
         }
-        self.cwd = cwd.map(|p| dunce::canonicalize(&p).unwrap_or(p));
-        self.git_root = git_root.map(|p| dunce::canonicalize(&p).unwrap_or(p));
+        self.cwd = cwd.map(|p| xai_grok_paths::normalize::normalized_absolute(&p).unwrap_or(p));
+        self.git_root = git_root.map(|p| xai_grok_paths::normalize::normalized_absolute(&p).unwrap_or(p));
         let unconditional = self.conditional.take_unconditional(startup_skills);
         let has_skills = !unconditional.is_empty();
         self.startup_skills = unconditional;
@@ -576,7 +576,7 @@ mod tests {
     #[test]
     fn conditional_skill_hidden_until_match() {
         let tmp = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(tmp.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let mut mgr = SkillManager::new();
         mgr.seed(
             Some(cwd.clone()),
@@ -605,7 +605,7 @@ mod tests {
     #[test]
     fn dynamically_discovered_conditional_skill_is_held_back() {
         let tmp = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(tmp.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let mut mgr = SkillManager::new();
         mgr.seed(Some(cwd.clone()), None, vec![], None, None, None);
 
@@ -629,7 +629,7 @@ mod tests {
     #[test]
     fn dynamic_conditional_survives_baseline_reseed() {
         let tmp = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(tmp.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let mut mgr = SkillManager::new();
         mgr.seed(Some(cwd.clone()), None, vec![], None, None, None);
 
@@ -650,7 +650,7 @@ mod tests {
     #[test]
     fn conditional_non_match_stays_hidden() {
         let tmp = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(tmp.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let mut mgr = SkillManager::new();
         mgr.seed(
             Some(cwd.clone()),
@@ -670,7 +670,7 @@ mod tests {
     #[test]
     fn activated_conditional_survives_reseed() {
         let tmp = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(tmp.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let mut mgr = SkillManager::new();
         mgr.seed(
             Some(cwd.clone()),
@@ -701,7 +701,7 @@ mod tests {
     #[test]
     fn reload_holds_back_conditional_skills() {
         let tmp = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(tmp.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let mut mgr = SkillManager::new();
         mgr.seed(Some(cwd), None, vec![], None, None, None);
         let _ = mgr.take_pending_reconciliation();
@@ -718,7 +718,7 @@ mod tests {
     #[test]
     fn on_clear_rehides_reload_promoted_conditional() {
         let tmp = tempfile::tempdir().unwrap();
-        let cwd = dunce::canonicalize(tmp.path()).unwrap();
+        let cwd = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
         let mut mgr = SkillManager::new();
         mgr.seed(
             Some(cwd.clone()),
