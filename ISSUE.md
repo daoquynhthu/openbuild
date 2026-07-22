@@ -142,26 +142,25 @@
   - `xai-grok-tools` — 全部迁移 ✅（12 个源文件，~58 调用点，4 次提交，含 +dep + Path import, fix PathError→io::Error conversion）
   - `xai-grok-pager` — 全部迁移 ✅（16 个源文件，~45 调用点，6 次提交，含 +dep, fix PathBuf borrow)）
   - `xai-grok-shared` — 全部迁移 ✅（1 个源文件，49 调用点，1 次提交，含 +dep, fix PathBuf borrow + error kind）
+  - `xai-codebase-graph` — 全部迁移 ✅（2 文件，2 调用点，1 次提交）
+  - `xai-grok-config` — 全部迁移 ✅（1 文件，2 调用点）
+  - `xai-grok-plugin-marketplace` — 全部迁移 ✅（1 文件，2 调用点）
+  - `xai-grok-pager-bin` — 全部迁移 ✅（1 文件，1 调用点）
+  - `xai-grok-pager-pty-harness` — 全部迁移 ✅（1 文件，1 调用点）
+  - `xai-grok-sandbox` — 全部迁移 ✅（3 文件，4 调用点）
+  - `xai-hunk-tracker` — 全部迁移 ✅（1 文件，6 调用点）
+  - `xai-grok-memory` — 全部迁移 ✅（2 文件，7 调用点，fix ?-conversion）
+  - `xai-grok-update` — 全部迁移 ✅（3 测试文件，8 调用点）
+  - `xai-fast-worktree` — 全部迁移 ✅（7 文件，16 调用点）
+  - `xai-grok-agent` — 全部迁移 ✅（9 文件，34 调用点，fix String→Path + PathError→io::Error）
+  - 额外：shell ext (benches/tests, 5 调用点)
 
-  **待迁移 crate**（按剩余调用点计数）：
+  **P11-004 结果**：全部 19 个消费 crate + shell ext 已完成迁移。唯一保留的 `dunce::canonicalize` 在 `xai-grok-paths/src/normalize.rs:25`（单一点）。
 
-  | Crate | 剩余调用 | 已有 `xai-grok-paths` 依赖？ | 备注 |
-  |-------|---------|---------------------------|------|
-  | `xai-grok-agent` | ~34 | 需检查 | 散布调用 |
-  | `xai-fast-worktree` | ~16 | 需检查 | |
-  | `xai-grok-update` | 8 | 需检查 | |
-  | `xai-grok-memory` | 7 | 需检查 | |
-  | `xai-hunk-tracker` | 6 | 需检查 | |
-  | `xai-grok-sandbox` | 4 | 需检查 | |
-  | `xai-codebase-graph` | 2 | 是 | |
-  | `xai-grok-config` | 2 | 需检查 | |
-  | `xai-grok-plugin-marketplace` | 2 | 需检查 | |
-  | `xai-grok-pager-bin` | 1 | 需检查 | |
-  | `xai-grok-pager-pty-harness` | 1 | 需检查 | |
+  **待迁移 crate**：无（P11-004 完成）
 
-  此外 shell crate 尚有 5 个调用在 `benches/` 和 `tests/` 目录（非 `src/`），等待后续处理。
 
-### 建议
+### 已通过
 
 - **S11-001** **P11-006**（worktree/git/path repair queue）被跳过。PROGRESS.md 注明"跳过：需要 Phase 2 冻结任务卡（未执行）"。按 V2 计划 §1812–1813 要求，应分别覆盖 `xai-fast-worktree`、plugin marketplace git、provider/tool paths，每张卡只归属一个 crate/一个 root cause。Windows 使用 Git 可理解路径和参数数组，禁止 shell 字符串拼接。
 
