@@ -12,6 +12,8 @@
 //! no subshells or `$(…)`, no here-docs, no brace/glob expansion, no
 //! `~user` home lookup.
 
+use crate::completion::{CmdAdapter, ShellCompletionAdapter};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum QuoteStyle {
     None,
@@ -335,19 +337,10 @@ fn escape_unquoted(name: &str) -> String {
     }
     if cfg!(windows) {
         // cmd.exe uses `\` as a path separator, not an escape char.
-        // Only double-quote when the name actually needs quoting.
+        // Use the CmdAdapter's escaping contract (double-quote wrapping).
+        // Only quote when the name actually needs it.
         if !name.is_empty() && needs_quoting(name) {
-            let mut out = String::with_capacity(name.len() + 2);
-            out.push('"');
-            for c in name.chars() {
-                if c == '"' {
-                    out.push_str("\"\"");
-                } else {
-                    out.push(c);
-                }
-            }
-            out.push('"');
-            return out;
+            return CmdAdapter.escape(name);
         }
         return name.to_owned();
     }
