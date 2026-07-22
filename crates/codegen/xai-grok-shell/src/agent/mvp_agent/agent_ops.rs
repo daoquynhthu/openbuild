@@ -1169,17 +1169,20 @@ impl MvpAgent {
 
         // P7-003: when model has provider binding AND registry revision>0,
         // route compiler errors MUST propagate (no legacy fallback).
-        let mut config = crate::agent::config::sampling_config_for_model_with_registry(
-            model,
-            credentials,
-            alpha_test_key.clone(),
-            client_version.clone(),
-            deployment_id.clone(),
-            user_id.clone(),
-            None,
-            registry_snapshot.as_deref(),
-        )
-        .unwrap_or_else(|e| {
+        let handle = tokio::runtime::Handle::current();
+        let registry_result = handle.block_on(
+            crate::agent::config::sampling_config_for_model_with_registry(
+                model,
+                credentials,
+                alpha_test_key.clone(),
+                client_version.clone(),
+                deployment_id.clone(),
+                user_id.clone(),
+                None,
+                registry_snapshot.as_deref(),
+            ),
+        );
+        let mut config = registry_result.unwrap_or_else(|e| {
             if has_provider_binding && has_registry {
                 panic!(
                     "P7-003: route compiler hard error for provider-bound model `{}`: {e}",

@@ -56,7 +56,13 @@ pub fn execution_to_sampler_config(
     base_url_override: Option<&str>,
 ) -> Result<SamplerConfig, ProviderResolutionError> {
     let execution = resolve_model_execution(model, registry, base_url_override)?;
-    Ok(execution_to_unprepared_sampler_config_for_migration(&execution, api_key))
+    let rt = tokio::runtime::Runtime::new()
+        .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
+    rt.block_on(execution_to_unprepared_sampler_config_for_migration(
+        &execution,
+        api_key,
+    ))
+    .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))
 }
 
 /// Merge generation parameters with fixed precedence: route defaults < model info < request overrides.
@@ -210,33 +216,29 @@ pub fn resolve_model_execution(
 /// This function is deprecated; new callers should use
 /// `resolve_model_execution → prepare_sampler_config → PreparedSamplerConfig → Sampler`.
 #[deprecated(note = "removed in P8-011; use prepare_sampler_config instead")]
-pub fn execution_to_unprepared_sampler_config_for_migration(
+/// Migration adapter: converts route compiler output to `SamplerConfig`.
+/// Replaced by direct `prepare_sampler_config` + `.into()` usage.
+/// This function is kept for backward compat during P8-011 transition.
+/// After migration, remove this and all callers should use:
+/// `prepare_sampler_config(&execution, &credentials, &[]).await.into()`
+#[allow(deprecated)]
+pub async fn execution_to_unprepared_sampler_config_for_migration(
     execution: &ResolvedModelExecution,
     api_key: Option<&str>,
-) -> SamplerConfig {
-    let mut headers = execution.static_headers.clone();
-    if let Some(key) = api_key {
-        let (name, value) = match &execution.auth_policy {
-            AuthPolicy::Bearer { .. } => ("authorization", format!("Bearer {key}")),
-            AuthPolicy::Header { name, .. } => (name.as_str(), key.to_string()),
-            AuthPolicy::None => ("", String::new()),
-        };
-        if !name.is_empty() {
-            headers.insert(name.to_string(), value);
-        }
-    }
+) -> Result<SamplerConfig, xai_grok_provider::prepared::RequestPreparationError> {
+    use xai_grok_provider::prepared::{prepare_sampler_config, RequestCredential};
+    use xai_grok_provider::auth::SecretValue;
 
-    let prepared = PreparedSamplerConfig {
-        provider_id: execution.provider_id.clone(),
-        route_id: execution.route_id.clone(),
-        protocol_id: execution.protocol_id.to_string(),
-        request_url: execution.request_url.clone(),
-        headers: SensitiveHeaderMap::from_index_map(&headers),
-        model_id: execution.model_id.clone(),
-        generation: execution.generation.clone(),
-        limits: execution.limits.clone(),
+    let model_inline = api_key.map(|k| SecretValue::new(k.to_string()));
+    let credentials = RequestCredential {
+        request_override: None,
+        model_inline: model_inline.as_ref(),
+        provider_inline: None,
+        env_reader: &|_| Ok(None),
+        session_resolver: &|| None,
     };
-    prepared.into()
+    let prepared = prepare_sampler_config(execution, &credentials, &[]).await?;
+    Ok(prepared.into())
 }
 
 /// A legacy (unqualified) xAI model reference that can be migrated to

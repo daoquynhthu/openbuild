@@ -4519,20 +4519,23 @@ pub fn resolve_aux_model_sampling_config(
     client_version: Option<String>,
     registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
 ) -> Option<SamplerConfig> {
+    let handle = tokio::runtime::Handle::current();
     let catalog_entry = find_model_by_id(models, model_id).cloned();
     if let Some(entry) = &catalog_entry {
         let has_provider_binding = entry.provider_id.is_some();
         let has_registry = registry.is_some_and(|snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(entry, session_key, disable_api_key_auth);
-        match sampling_config_for_model_with_registry(
-            entry,
-            credentials,
-            alpha_test_key.clone(),
-            client_version.clone(),
-            None,
-            None,
-            None,
-            registry,
+        match handle.block_on(
+            sampling_config_for_model_with_registry(
+                entry,
+                credentials,
+                alpha_test_key.clone(),
+                client_version.clone(),
+                None,
+                None,
+                None,
+                registry,
+            ),
         ) {
             Ok(sampler) if sampler.api_key.is_some() => return Some(sampler),
             Ok(_) => {}
@@ -4673,7 +4676,7 @@ pub fn resolve_chat_state_auth_type(
 /// Delegates to `resolve_model_execution` when a registry snapshot is
 /// provided via `registry_override`. Returns an error when resolution fails.
 /// This is the primary entry point for production inference paths.
-pub fn sampling_config_for_model_with_registry(
+pub async fn sampling_config_for_model_with_registry(
     model: &ModelEntry,
     credentials: ResolvedCredentials,
     alpha_test_key: Option<String>,
@@ -4694,10 +4697,17 @@ pub fn sampling_config_for_model_with_registry(
             Some(&base_url),
         )?;
         #[allow(deprecated)]
-        return Ok(crate::agent::provider_resolution::execution_to_unprepared_sampler_config_for_migration(
-            &execution,
-            credentials.api_key.as_deref(),
-        ));
+        let config = {
+            crate::agent::provider_resolution::execution_to_unprepared_sampler_config_for_migration(
+                &execution,
+                credentials.api_key.as_deref(),
+            )
+        }
+        .await
+        .map_err(|e| {
+            crate::agent::provider_resolution::ProviderResolutionError::AuthCredential(e.to_string())
+        })?;
+        return Ok(config);
     }
     // No registry or no provider_id — use legacy path (P7-003: remove this).
     Ok(sampling_config_for_model(
@@ -4919,19 +4929,22 @@ pub fn resolve_web_search_sampling_config(
     endpoints: &EndpointsConfig,
     registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
 ) -> Option<SamplerConfig> {
+    let handle = tokio::runtime::Handle::current();
     let resolved = if let Some(entry) = find_model_by_id(models, model_id).cloned() {
         let has_provider_binding = entry.provider_id.is_some();
         let has_registry = registry.is_some_and(|snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
-        match sampling_config_for_model_with_registry(
-            &entry,
-            credentials,
-            alpha_test_key,
-            client_version,
-            None,
-            None,
-            None,
-            registry,
+        match handle.block_on(
+            sampling_config_for_model_with_registry(
+                &entry,
+                credentials,
+                alpha_test_key,
+                client_version,
+                None,
+                None,
+                None,
+                registry,
+            ),
         ) {
             Ok(cfg) => Some(cfg),
             Err(e) if has_provider_binding && has_registry => {
@@ -11465,8 +11478,8 @@ default = "grok-4.5"
                 Some("https://api.x.ai/v1".into()),
             ),
         );
-        tokio::runtime::Runtime::new()
-            .unwrap()
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime
             .block_on(rt.rebuild(&config_map))
             .expect("rebuild");
         let snapshot = rt.snapshot();
@@ -11475,17 +11488,18 @@ default = "grok-4.5"
         model.provider_id = Some("xai".into());
 
         let credentials = resolve_credentials_enforced(&model, None, false);
-        let config = sampling_config_for_model_with_registry(
-            &model,
-            credentials,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(&snapshot),
-        )
-        .expect("route compiler with valid registry must succeed");
+        let config = runtime
+            .block_on(sampling_config_for_model_with_registry(
+                &model,
+                credentials,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(&snapshot),
+            ))
+            .expect("route compiler with valid registry must succeed");
         // Route compiler was invoked: protocol_id reflects the route, not fallback
         assert_eq!(
             config.protocol_id.as_deref(),
@@ -11514,8 +11528,8 @@ default = "grok-4.5"
                 Some("https://api.x.ai/v1".into()),
             ),
         );
-        tokio::runtime::Runtime::new()
-            .unwrap()
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime
             .block_on(rt.rebuild(&config_map))
             .expect("rebuild");
         let snapshot = rt.snapshot();
@@ -11525,7 +11539,7 @@ default = "grok-4.5"
         model.provider_id = Some("nonexistent-provider".into());
 
         let credentials = resolve_credentials_enforced(&model, None, false);
-        let result = sampling_config_for_model_with_registry(
+        let result = runtime.block_on(sampling_config_for_model_with_registry(
             &model,
             credentials,
             None,
@@ -11534,7 +11548,7 @@ default = "grok-4.5"
             None,
             None,
             Some(&snapshot),
-        );
+        ));
         assert!(
             result.is_err(),
             "missing provider must return hard error, got Ok: {:?}",
@@ -11563,8 +11577,8 @@ default = "grok-4.5"
                 Some("https://api.x.ai/v1".into()),
             ),
         );
-        tokio::runtime::Runtime::new()
-            .unwrap()
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime
             .block_on(rt.rebuild(&config_map))
             .expect("rebuild");
         let snapshot = rt.snapshot();
@@ -11575,7 +11589,7 @@ default = "grok-4.5"
         model.route_id = Some("nonexistent-route".into());
 
         let credentials = resolve_credentials_enforced(&model, None, false);
-        let result = sampling_config_for_model_with_registry(
+        let result = runtime.block_on(sampling_config_for_model_with_registry(
             &model,
             credentials,
             None,
@@ -11584,7 +11598,7 @@ default = "grok-4.5"
             None,
             None,
             Some(&snapshot),
-        );
+        ));
         assert!(
             result.is_err(),
             "missing route must return hard error, got Ok: {:?}",
@@ -11615,8 +11629,8 @@ default = "grok-4.5"
                 Some("https://api.x.ai/v1".into()),
             ),
         );
-        tokio::runtime::Runtime::new()
-            .unwrap()
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime
             .block_on(rt.rebuild(&config_map))
             .expect("rebuild");
         // The xAI provider has valid routes (responses protocol).
@@ -11628,7 +11642,7 @@ default = "grok-4.5"
         model.provider_id = Some("xai".into());
 
         let credentials = resolve_credentials_enforced(&model, None, false);
-        let result = sampling_config_for_model_with_registry(
+        let result = runtime.block_on(sampling_config_for_model_with_registry(
             &model,
             credentials,
             None,
@@ -11637,7 +11651,7 @@ default = "grok-4.5"
             None,
             None,
             Some(&snapshot),
-        );
+        ));
         // xAI uses responses protocol — must succeed
         assert!(result.is_ok(), "xAI with known protocol must succeed");
     }

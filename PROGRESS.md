@@ -421,6 +421,14 @@ All 12 P13 tasks resolved:
 - Removed 3 dead tests (credential_source_public_vs_none, credential_source_resolve_inline_none, public_is_distinct_from_none_for_auth)
 - `cargo check -p xai-grok-provider -p xai-grok-shell` clean, `cargo clippy` clean
 
+### P8-011: Migrate registry path through PreparedSamplerConfig
+- Rewrote `execution_to_unprepared_sampler_config_for_migration` to call `prepare_sampler_config` with proper `RequestCredential` instead of manually constructing headers
+- Function is now async (returns `Result<SamplerConfig, RequestPreparationError>`)
+- `sampling_config_for_model_with_registry` made async to await the migration function
+- All 3 sync callers bridge with `Handle::current().block_on()` or temporary `Runtime::new()`
+- 4 test functions updated to use `Runtime::new().block_on()`
+- All 13 provider_resolution tests pass
+
 ### P8-007: Header merge layer ordering fix
 - Fixed `prepare_sampler_config`: Layer 3 (provider extra) no longer incorrectly duplicates Layer 2 (route static)
 - Uses explicit empty `IndexMap` for provider extra with comment explaining it's reserved for future separate tracking
