@@ -50,10 +50,10 @@ fn is_user_grok_config_file(config_path: &Path) -> bool {
     if config_path == user_config.as_path() {
         return true;
     }
-    let Ok(canonical_config) = dunce::canonicalize(config_path) else {
+    let Ok(canonical_config) = xai_grok_paths::normalize::normalized_absolute(config_path) else {
         return false;
     };
-    let canonical_user = dunce::canonicalize(&user_config).unwrap_or(user_config);
+    let canonical_user = xai_grok_paths::normalize::normalized_absolute(&user_config).unwrap_or(user_config);
     canonical_config == canonical_user
 }
 

@@ -129,7 +129,7 @@ fn symlink_stays_in_root(path: &Path, canonical_root: &Path) -> bool {
     if !is_symlink {
         return true;
     }
-    dunce::canonicalize(path)
+    xai_grok_paths::normalize::normalized_absolute(path)
         .map(|c| c.starts_with(canonical_root))
         .unwrap_or(false)
 }

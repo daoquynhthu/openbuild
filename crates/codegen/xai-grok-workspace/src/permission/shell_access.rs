@@ -736,8 +736,8 @@ fn resolve_following_symlinks(path: &Path, depth: usize) -> Option<PathBuf> {
     if depth > MAX_SYMLINK_DEPTH {
         return None;
     }
-    // `dunce` avoids Windows `\\?\` verbatim paths (repo convention).
-    if let Ok(canonical) = dunce::canonicalize(path) {
+    // `normalized_absolute` wraps `dunce` to avoid Windows `\\?\` verbatim paths (repo convention).
+    if let Ok(canonical) = xai_grok_paths::normalize::normalized_absolute(path) {
         return Some(canonical);
     }
     // Resolve the parent, then the final component, so a dangling/new leaf still follows.
