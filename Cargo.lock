@@ -12974,6 +12974,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "xai-grok-paths",
  "xai-tracing-macros",
 ]
 

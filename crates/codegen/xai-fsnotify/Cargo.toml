@@ -7,6 +7,7 @@ description = "Local-filesystem event source: single causal stream of semantic F
 
 [dependencies]
 dunce = { workspace = true }
+xai-grok-paths = { path = "../xai-grok-paths" }
 notify = "8"
 notify-debouncer-full = "0.5"
 ignore = { workspace = true }

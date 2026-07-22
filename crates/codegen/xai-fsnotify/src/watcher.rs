@@ -489,12 +489,12 @@ fn find_git_dir(watch_path: &Path) -> Option<PathBuf> {
             continue;
         };
         if meta.file_type().is_dir() {
-            return Some(dunce::canonicalize(&dot_git).unwrap_or(dot_git));
+            return Some(xai_grok_paths::normalize::normalized_absolute(&dot_git).unwrap_or(dot_git));
         }
         // A `.git` file or symlink: let git validate the target before watching.
         if let Ok(repo) = git2::Repository::open(ancestor) {
             let gd = repo.path().to_path_buf();
-            return Some(dunce::canonicalize(&gd).unwrap_or(gd));
+            return Some(xai_grok_paths::normalize::normalized_absolute(&gd).unwrap_or(gd));
         }
     }
     None
@@ -511,7 +511,7 @@ pub(crate) fn find_sl_dir(watch_path: &Path) -> Option<PathBuf> {
             continue;
         };
         if meta.file_type().is_dir() {
-            return Some(dunce::canonicalize(&dot_sl).unwrap_or(dot_sl));
+            return Some(xai_grok_paths::normalize::normalized_absolute(&dot_sl).unwrap_or(dot_sl));
         }
     }
     None
@@ -935,7 +935,7 @@ pub(crate) fn start_with_timeout(
     // Canonicalize once: notify echoes event paths under the watched path, but
     // macOS FSEvents resolves symlinks, so a raw (symlinked/relative) root would
     // never match `parent() == root` and dynamic watching would silently break.
-    let watch_path = dunce::canonicalize(&watch_path).unwrap_or(watch_path);
+    let watch_path = xai_grok_paths::normalize::normalized_absolute(&watch_path).unwrap_or(watch_path);
 
     tracing::debug!("fs_notify: starting watcher under {:?}", watch_path);
 
@@ -1544,7 +1544,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_debouncer_create_file() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             let config = FsNotifyConfig {
                 debounce_ms: TEST_DEBOUNCE_MS,
@@ -1581,7 +1581,7 @@ mod tests {
         #[serial]
         fn test_debouncer_modify_file() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Create file before starting watcher
             let test_file = watch_path.join("existing.txt");
@@ -1620,7 +1620,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_debouncer_delete_file() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Create file before starting watcher
             let test_file = watch_path.join("to_delete.txt");
@@ -1661,7 +1661,7 @@ mod tests {
         #[serial]
         fn test_debouncer_rename_file() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Create file before starting watcher
             let old_path = watch_path.join("old_name.txt");
@@ -1703,7 +1703,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_debouncer_multiple_rapid_creates() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             let config = FsNotifyConfig {
                 debounce_ms: 50, // Slightly longer debounce to batch events
@@ -1750,7 +1750,7 @@ mod tests {
         #[serial]
         fn test_debouncer_gitignore_respected() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Create .gitignore first
             let gitignore = watch_path.join(".gitignore");
@@ -1796,7 +1796,7 @@ mod tests {
         #[serial]
         fn test_debouncer_custom_ignore_patterns() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             let config = FsNotifyConfig {
                 debounce_ms: TEST_DEBOUNCE_MS,
@@ -1830,7 +1830,7 @@ mod tests {
         #[serial]
         fn test_debouncer_subdirectory() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Create subdirectory
             let sub_dir = watch_path.join("src");
@@ -1865,7 +1865,7 @@ mod tests {
         #[serial]
         fn test_handle_drop_stops_watcher() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             let config = FsNotifyConfig {
                 debounce_ms: TEST_DEBOUNCE_MS,
@@ -1933,7 +1933,7 @@ mod tests {
         fn test_debouncer_negation_pattern_include() {
             // Test that negation patterns (!) override ignore patterns
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             let config = FsNotifyConfig {
                 debounce_ms: TEST_DEBOUNCE_MS,
@@ -1973,7 +1973,7 @@ mod tests {
         fn test_debouncer_nested_gitignore() {
             // Test that nested .gitignore files are respected
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Create nested directory structure
             let sub_dir = watch_path.join("src");
@@ -2019,7 +2019,7 @@ mod tests {
         fn test_debouncer_git_directory_ignored() {
             // .git directory contents should always be ignored
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Create .git directory
             let git_dir = watch_path.join(".git");
@@ -2058,7 +2058,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_debouncer_create_directory() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             let config = FsNotifyConfig {
                 debounce_ms: TEST_DEBOUNCE_MS,
@@ -2093,7 +2093,7 @@ mod tests {
         #[serial]
         fn test_debouncer_deeply_nested_file() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Create deeply nested directory structure
             let deep_dir = watch_path.join("a").join("b").join("c").join("d");
@@ -2128,7 +2128,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_top_level_gitignored_target_never_surfaces() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // Exclude `target/` via `.git/info/exclude` (not `.gitignore`): the
             // per-event GitignoreCache ignores it, so only watch-level exclusion
@@ -2178,7 +2178,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_fallback_mode_watches_top_level_dir() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // > cap non-ignored top-level dirs forces the recursive-root
             // fallback, which DOES watch the `.git/info/exclude`d `target/` — the
@@ -2227,7 +2227,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_new_top_level_dir_contents_watched_dynamically() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             let config = FsNotifyConfig {
                 debounce_ms: TEST_DEBOUNCE_MS,
@@ -2263,7 +2263,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_moved_in_top_level_dir_is_watched() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
 
             // A populated dir prepared OUTSIDE the watch root.
             let outside = TempDir::new().unwrap();
@@ -2302,7 +2302,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_deleted_and_recreated_top_level_dir_rewatched() {
             let temp_dir = TempDir::new().unwrap();
-            let watch_path = dunce::canonicalize(temp_dir.path()).unwrap();
+            let watch_path = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
             let dir = watch_path.join("pkg");
             fs::create_dir(&dir).unwrap();
 
@@ -2340,7 +2340,7 @@ mod tests {
             // The watcher must canonicalize its root so dynamic watching works
             // even when started on a non-canonical (symlinked) path.
             let temp_dir = TempDir::new().unwrap();
-            let real = dunce::canonicalize(temp_dir.path()).unwrap();
+            let real = xai_grok_paths::normalize::normalized_absolute(temp_dir.path()).unwrap();
             let link = real.join("link_root");
             let real_root = real.join("real_root");
             fs::create_dir(&real_root).unwrap();
@@ -2382,7 +2382,7 @@ mod tests {
         #[serial]
         fn test_per_dir_watch_count_excludes_ignored_and_git_internals() {
             let temp = TempDir::new().unwrap();
-            let root = dunce::canonicalize(temp.path()).unwrap();
+            let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
             fs::create_dir_all(root.join(".git/objects/ab")).unwrap();
             fs::create_dir_all(root.join(".git/refs/heads")).unwrap();
             fs::write(root.join(".gitignore"), "node_modules/\n").unwrap();
@@ -2422,7 +2422,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_per_dir_nested_ignored_dir_produces_no_events() {
             let temp = TempDir::new().unwrap();
-            let root = dunce::canonicalize(temp.path()).unwrap();
+            let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
             fs::create_dir_all(root.join(".git")).unwrap();
             fs::write(root.join(".gitignore"), "node_modules/\n").unwrap();
             fs::create_dir_all(root.join("web/node_modules/react")).unwrap();
@@ -2465,7 +2465,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_per_dir_new_nested_dir_watched_with_backfill() {
             let temp = TempDir::new().unwrap();
-            let root = dunce::canonicalize(temp.path()).unwrap();
+            let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
             fs::create_dir_all(root.join("src")).unwrap();
 
             let (mut rx, handle) = start_with_retry_strategy(
@@ -2518,7 +2518,7 @@ mod tests {
         #[ignore = "flaky in CI — fs events not reliably delivered"]
         fn test_per_dir_removed_subtree_pruned() {
             let temp = TempDir::new().unwrap();
-            let root = dunce::canonicalize(temp.path()).unwrap();
+            let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
             fs::create_dir_all(root.join("pkg/a/b")).unwrap();
 
             let (mut rx, handle) = start_with_retry_strategy(
@@ -3627,7 +3627,7 @@ mod tests {
             // Hermetic: we create no `.git`, so `find_git_dir` must not return one
             // inside our tree (an ancestor repo's `.git`, outside it, is fine).
             let temp = TempDir::new().unwrap();
-            let root = dunce::canonicalize(temp.path()).unwrap();
+            let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
             let deep = root.join("no/git/here");
             fs::create_dir_all(&deep).unwrap();
             let result = find_git_dir(&deep);
@@ -3650,7 +3650,7 @@ mod tests {
             .unwrap();
 
             let resolved = find_git_dir(proj.path());
-            let external_canon = dunce::canonicalize(external.path()).unwrap();
+            let external_canon = xai_grok_paths::normalize::normalized_absolute(external.path()).unwrap();
             assert!(
                 resolved.as_deref() != Some(external_canon.as_path()),
                 "bogus gitlink target must not be watched, got {resolved:?}"
@@ -3668,7 +3668,7 @@ mod tests {
             std::os::unix::fs::symlink(external.path(), proj.path().join(".git")).unwrap();
 
             let resolved = find_git_dir(proj.path());
-            let external_canon = dunce::canonicalize(external.path()).unwrap();
+            let external_canon = xai_grok_paths::normalize::normalized_absolute(external.path()).unwrap();
             assert!(
                 resolved.as_deref() != Some(external_canon.as_path()),
                 "symlinked .git to an external dir must not be watched, got {resolved:?}"
@@ -3683,7 +3683,7 @@ mod tests {
             let main = temp.path().join("main");
             fs::create_dir_all(&main).unwrap();
             let real_gitdir = git2::Repository::init(&main).unwrap().path().to_path_buf();
-            let real_gitdir = dunce::canonicalize(&real_gitdir).unwrap_or(real_gitdir);
+            let real_gitdir = xai_grok_paths::normalize::normalized_absolute(&real_gitdir).unwrap_or(real_gitdir);
 
             let linked = temp.path().join("linked");
             fs::create_dir_all(&linked).unwrap();
@@ -3703,7 +3703,7 @@ mod tests {
         #[test]
         fn find_sl_dir_discovers_real_repo_and_from_subdir() {
             let temp = TempDir::new().unwrap();
-            let root = dunce::canonicalize(temp.path()).unwrap();
+            let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
             fs::create_dir(root.join(".sl")).unwrap();
 
             let sd = find_sl_dir(&root).expect("repo .sl found");
@@ -3722,7 +3722,7 @@ mod tests {
         fn find_sl_dir_none_when_no_repo() {
             // Hermetic: no `.sl` created, so none must be found inside our tree.
             let temp = TempDir::new().unwrap();
-            let root = dunce::canonicalize(temp.path()).unwrap();
+            let root = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
             let deep = root.join("no/sl/here");
             fs::create_dir_all(&deep).unwrap();
             assert!(
@@ -3741,7 +3741,7 @@ mod tests {
             std::os::unix::fs::symlink(external.path(), proj.path().join(".sl")).unwrap();
 
             let resolved = find_sl_dir(proj.path());
-            let external_canon = dunce::canonicalize(external.path()).unwrap();
+            let external_canon = xai_grok_paths::normalize::normalized_absolute(external.path()).unwrap();
             assert!(
                 resolved.as_deref() != Some(external_canon.as_path()),
                 "symlinked .sl to an external dir must not be watched, got {resolved:?}"
@@ -3770,7 +3770,7 @@ mod tests {
             // (e.g. `grok` run in `crates/codegen`): the production guard must
             // still attach the watch under a recursive root (fanout=false).
             let temp = TempDir::new().unwrap();
-            let repo = dunce::canonicalize(temp.path()).unwrap();
+            let repo = xai_grok_paths::normalize::normalized_absolute(temp.path()).unwrap();
             fs::create_dir(repo.join(".sl")).unwrap();
             let watch_path = repo.join("crates/codegen");
             fs::create_dir_all(&watch_path).unwrap();

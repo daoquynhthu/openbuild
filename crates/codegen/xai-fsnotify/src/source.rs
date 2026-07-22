@@ -89,7 +89,7 @@ fn registry() -> &'static Mutex<HashMap<PathBuf, Weak<FsEventSource>>> {
 /// Canonicalize so symlinked / relative spellings of the same directory map
 /// to one watcher. Falls back to the raw path if the dir doesn't exist yet.
 fn canonical_key(cwd: &Path) -> PathBuf {
-    dunce::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf())
+    xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf())
 }
 
 /// Runtime the event loop should run on: the registered process-lifetime
@@ -239,7 +239,7 @@ impl FsEventSource {
         // here keeps `discover_vcs` (and thus `lock_present`/`is_internal`) in
         // agreement with the watcher. Falls back to the raw path if `cwd`
         // doesn't exist yet, matching the watcher's own fallback.
-        let cwd = dunce::canonicalize(&cwd).unwrap_or(cwd);
+        let cwd = xai_grok_paths::normalize::normalized_absolute(&cwd).unwrap_or(cwd);
         // Resolve the Sapling kill-switch once so discovery and the watcher
         // agree on whether `.sl` is active.
         let sapling = watcher::sapling_enabled();
