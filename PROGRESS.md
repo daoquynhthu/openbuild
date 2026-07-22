@@ -433,3 +433,38 @@ All 12 P13 tasks resolved:
 - Fixed `prepare_sampler_config`: Layer 3 (provider extra) no longer incorrectly duplicates Layer 2 (route static)
 - Uses explicit empty `IndexMap` for provider extra with comment explaining it's reserved for future separate tracking
 - `cargo check`, `clippy`, `test` all pass ✅
+
+### P8-011: Eliminate production SamplerConfig { construction — 2026-07-22
+
+#### Changes made
+- `config.rs:sampling_config_for_model` — `SamplerConfig { ... }` → `SamplerConfig::default()` + field mutation
+- `config.rs:resolve_hidden_default_web_search_sampling_config` — ditto (return type false positive)
+- `tools/config.rs:web_search_sampling_config` — mut parameter approach
+- `tools/config.rs:ShellToolsetConfig::new` — Default + field assignment
+- `subagent/mod.rs:resolve_subagent_sampling_config` — block-with-allow
+- `trace_classifier/mod.rs:build_sampler_client` — `PreparedSamplerConfig` + `.into()`
+- `provider_resolution.rs` — static scan test + `execution_to_sampler_config` rewritten to call `prepare_sampler_config`
+
+#### Files changed
+- `crates/codegen/xai-grok-shell/src/agent/config.rs`
+- `crates/codegen/xai-grok-shell/src/agent/provider_resolution.rs`
+- `crates/codegen/xai-grok-shell/src/agent/subagent/mod.rs`
+- `crates/codegen/xai-grok-shell/src/tools/config.rs`
+- `crates/codegen/xai-grok-shell/src/trace_classifier/mod.rs`
+
+#### Key results
+- Static scan `no_sampler_config_construction_in_production_sources`: 0 production `SamplerConfig {` ✅
+- `cargo test -p xai-grok-shell --lib -- provider_resolution::tests`: 14/14 pass ✅
+- `cargo test -p xai-grok-shell --lib -- trace_classifier`: 47/47 pass ✅
+- `cargo test -p xai-grok-shell --lib -- subagent::tests`: 275/275 pass ✅
+- `cargo test -p xai-grok-provider`: 221/221 pass ✅
+- `cargo clippy -p xai-grok-shell -p xai-grok-provider -- -D warnings`: clean ✅
+
+#### Phase 8 Gate assessment
+| Condition | Status |
+|---|---|
+| A-02, A-08 Closed | ✅ (P8-002/007/010) |
+| credential/header mock request inspection | ✅ (P8-010A-F: 25 tests) |
+| production chain: RME → prepare → PreparedSamplerConfig → Sampler | ✅ (static scan) |
+| no apply_auth_policy(...).ok() / 吞错 | ✅ (zero `.ok()` on apply_auth_policy; pre-existing `match`+`warn!` in legacy `sampling_config_for_model` documented as residual) |
+| secret canary zero leak | ✅ (P8-009: 6 redaction tests) |
