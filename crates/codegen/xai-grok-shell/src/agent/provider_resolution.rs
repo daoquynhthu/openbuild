@@ -210,7 +210,7 @@ pub fn resolve_model_execution(
     Ok(ResolvedModelExecution {
         provider_id: configured.id.clone(),
         route_id: RouteId::new(&route_id),
-        protocol_id: protocol_id.into(),
+        protocol_id,
         request_url,
         static_headers,
         auth_policy: route.auth.clone(),

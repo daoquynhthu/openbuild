@@ -1273,7 +1273,7 @@ pub fn apply_sandbox(
         });
     xai_grok_sandbox::set_configured_profile(&resolved.value);
     let workspace = cwd
-        .and_then(|p| dunce::canonicalize(p).ok())
+        .and_then(|p| xai_grok_paths::normalize::normalized_absolute(p).ok())
         .or_else(|| std::env::current_dir().ok())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     #[cfg(target_os = "linux")]
@@ -1605,7 +1605,7 @@ pub fn validate_hooks_path(path: &str) -> Result<(), Box<dyn std::error::Error>>
         return Err("Hook path must be absolute.".into());
     }
     let grok_home = crate::util::grok_home::grok_home();
-    let canonical = dunce::canonicalize(candidate)
+    let canonical = xai_grok_paths::normalize::normalized_absolute(candidate)
         .or_else(|_| {
             let mut base = candidate.to_path_buf();
             let mut tail = Vec::new();
@@ -1617,14 +1617,14 @@ pub fn validate_hooks_path(path: &str) -> Result<(), Box<dyn std::error::Error>>
                     break;
                 }
             }
-            let mut resolved = dunce::canonicalize(&base)?;
+            let mut resolved = xai_grok_paths::normalize::normalized_absolute(&base)?;
             for component in tail.into_iter().rev() {
                 resolved.push(component);
             }
             Ok(resolved)
         })
-        .map_err(|e: std::io::Error| format!("Cannot resolve hook path: {e}"))?;
-    let canonical_home = dunce::canonicalize(&grok_home).unwrap_or_else(|_| grok_home.clone());
+        .map_err(|e: xai_grok_paths::normalize::PathError| format!("Cannot resolve hook path: {e}"))?;
+    let canonical_home = xai_grok_paths::normalize::normalized_absolute(&grok_home).unwrap_or_else(|_| grok_home.clone());
     if !canonical.starts_with(&canonical_home) {
         return Err(format!(
             "Hook path must be under ~/.grok/ ({}). Got: {}",

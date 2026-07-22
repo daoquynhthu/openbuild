@@ -336,7 +336,7 @@ fn parent_is_dir(parent: Option<&Path>, dir: &Path) -> bool {
     let Some(parent) = parent else {
         return false;
     };
-    parent == dir || dunce::canonicalize(parent).is_ok_and(|p| p == dir)
+    parent == dir || xai_grok_paths::normalize::normalized_absolute(parent).is_ok_and(|p| p == dir)
 }
 
 /// Add the two non-recursive watches for a project root.
@@ -447,7 +447,7 @@ const HOME_VENDOR_DIRS: &[&str] = &[".grok", ".agents", ".claude", ".cursor"];
 
 /// Testable core of [`is_global_config_dir`] with `$HOME` injected.
 fn is_global_config_dir_impl(dir: &Path, grok_home: &Path, home: Option<&Path>) -> bool {
-    let canon = |p: &Path| dunce::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let canon = |p: &Path| xai_grok_paths::normalize::normalized_absolute(p).unwrap_or_else(|_| p.to_path_buf());
     if canon(dir) == canon(grok_home) {
         return true;
     }
