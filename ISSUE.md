@@ -132,13 +132,34 @@
 
 ### 中等
 
-- **M11-001** 全 workspace 路径规范化迁移（P11-004）严重不完整。V2 计划 §1805 要求"所有消费者只调用 Phase 3 的 `normalized_absolute`；不得直接调用 `dunce::canonicalize` 或 `std::fs::canonicalize` 形成第二路径语义"。当前扫描结果：
-  - `xai-grok-shell/src/` — 11 个文件存在直接调用
-  - `xai-grok-pager/src/` — 16 个文件存在直接调用
-  - `xai-grok-tools/src/` — 12 个文件存在直接调用
-  - 此外 workspace 其他 crate 也有散布调用
-  - 总计约 200+ 处违规调用点
-  - 现有 `docs/provider-adapter-v1/execution-v2/evidence-p11-004.md` 承认"完整迁移需要单独的专用阶段"
+- **M11-001** 全 workspace 路径规范化迁移（P11-004）进行中。V2 计划 §1805 要求"所有消费者只调用 Phase 3 的 `normalized_absolute`；不得直接调用 `dunce::canonicalize` 或 `std::fs::canonicalize` 形成第二路径语义"。
+
+  **已完成迁移的 crate**：
+  - `xai-grok-shell` — 全部迁移 ✅（13 个源文件，~28 调用点，4 次提交）
+  - `xai-grok-workspace` — 全部迁移 ✅（16 个源文件，~45 调用点，7 次提交）
+
+  **待迁移 crate**（按剩余调用点计数）：
+
+  | Crate | 剩余调用 | 已有 `xai-grok-paths` 依赖？ | 备注 |
+  |-------|---------|---------------------------|------|
+  | `xai-grok-shared` | ~48 | 需检查 | 含 ~40 调用在 `placeholder_images.rs` 测试代码 |
+  | `xai-grok-pager` | ~45 | 否 | 16 个文件 |
+  | `xai-grok-fsnotify` | ~38 | 需检查 | 含 ~29 测试调用 |
+  | `xai-grok-agent` | ~34 | 需检查 | 散布调用 |
+  | `xai-grok-pager-render` | 17 | 是 | 单文件（迁移中） |
+  | `xai-fast-worktree` | ~16 | 需检查 | |
+  | `xai-grok-tools` | ~58 | 否 | 12 个文件 |
+  | `xai-codebase-graph` | 2 | 是 | |
+  | `xai-grok-config` | 2 | 需检查 | |
+  | `xai-grok-memory` | 7 | 需检查 | |
+  | `xai-grok-sandbox` | 4 | 需检查 | |
+  | `xai-grok-update` | 8 | 需检查 | |
+  | `xai-hunk-tracker` | 6 | 需检查 | |
+  | `xai-grok-plugin-marketplace` | 2 | 需检查 | |
+  | `xai-grok-pager-bin` | 1 | 需检查 | |
+  | `xai-grok-pager-pty-harness` | 1 | 需检查 | |
+
+  此外 shell crate 尚有 5 个调用在 `benches/` 和 `tests/` 目录（非 `src/`），等待后续处理。
 
 ### 建议
 
