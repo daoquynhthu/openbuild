@@ -13077,6 +13077,7 @@ dependencies = [
  "tracing",
  "urlencoding",
  "which",
+ "xai-grok-paths",
  "xai-grok-version",
  "xai-tty-utils",
 ]
@@ -13384,6 +13385,7 @@ dependencies = [
  "xai-grok-config",
  "xai-grok-pager",
  "xai-grok-pager-minimal",
+ "xai-grok-paths",
  "xai-grok-provider",
  "xai-grok-sandbox",
  "xai-grok-shell",
@@ -13432,6 +13434,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "xai-grok-paths",
  "xai-grok-test-support",
  "xai-tty-utils",
 ]
@@ -13518,6 +13521,7 @@ dependencies = [
  "tracing",
  "xai-grok-agent",
  "xai-grok-config",
+ "xai-grok-paths",
  "xai-hooks-plugins-types",
  "xai-tty-utils",
 ]

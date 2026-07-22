@@ -589,7 +589,7 @@ impl IndexManager {
     /// handle is returned instead of creating a new one.
     pub fn spawn(config: IndexManagerConfig) -> Arc<IndexManagerHandle> {
         let canonical_root =
-            dunce::canonicalize(&config.root_path).unwrap_or_else(|_| config.root_path.clone());
+            xai_grok_paths::normalize::normalized_absolute(&config.root_path).unwrap_or_else(|_| config.root_path.clone());
 
         // Test beacon: shared with the actor thread's ExitBeacon guard.
         #[cfg(test)]

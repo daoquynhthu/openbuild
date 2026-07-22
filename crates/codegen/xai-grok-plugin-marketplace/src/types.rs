@@ -95,7 +95,7 @@ impl MarketplaceRelativePath {
     pub fn join_under(&self, root: &Path) -> Result<PathBuf, MarketplacePathError> {
         let candidate = root.join(&self.0);
         let canonical_root =
-            dunce::canonicalize(root).map_err(|_| MarketplacePathError::EscapesRoot)?;
+            xai_grok_paths::normalize::normalized_absolute(root).map_err(|_| MarketplacePathError::EscapesRoot)?;
 
         let mut current = candidate.as_path();
         let mut missing_suffix = Vec::new();
@@ -108,7 +108,7 @@ impl MarketplaceRelativePath {
         }
 
         let canonical_existing =
-            dunce::canonicalize(current).map_err(|_| MarketplacePathError::EscapesRoot)?;
+            xai_grok_paths::normalize::normalized_absolute(current).map_err(|_| MarketplacePathError::EscapesRoot)?;
         // Fail-closed >MAX_PATH caveat: see workspace clippy.toml.
         if !canonical_existing.starts_with(&canonical_root) {
             return Err(MarketplacePathError::EscapesRoot);

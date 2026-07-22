@@ -15,6 +15,7 @@ publish = false
 # Headless PTY controller with alacritty_terminal-based terminal emulation,
 # vim key notation parser, styled/HTML output, and HTTP server.
 dunce = { workspace = true }
+xai-grok-paths = { path = "../xai-grok-paths" }
 ptyctl = { path = "../ptyctl" }
 
 # PTY spawning + input/output

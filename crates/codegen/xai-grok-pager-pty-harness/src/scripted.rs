@@ -1303,7 +1303,7 @@ fn prepare_image_fixtures(
         let path = dir.join(format!("{}.{}", fixture.name, ext));
         write_fixture_image(&path, fixture.kind)
             .with_context(|| format!("write image fixture {}", path.display()))?;
-        let path = dunce::canonicalize(&path)
+        let path = xai_grok_paths::normalize::normalized_absolute(&path)
             .with_context(|| format!("canonicalize image fixture {}", path.display()))?;
         out.insert(fixture.name.clone(), path);
     }

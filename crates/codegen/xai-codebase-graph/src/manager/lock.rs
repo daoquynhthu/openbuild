@@ -256,7 +256,7 @@ pub fn is_operation_in_progress(workspace: &Path, operation: IndexOperation) -> 
 /// Canonicalize workspace path for consistent lock keys.
 fn canonicalize_workspace(workspace: &Path) -> PathBuf {
     // Try to canonicalize, fall back to the original path
-    dunce::canonicalize(workspace).unwrap_or_else(|_| workspace.to_path_buf())
+    xai_grok_paths::normalize::normalized_absolute(workspace).unwrap_or_else(|_| workspace.to_path_buf())
 }
 
 /// Get the lock file path for a workspace.
