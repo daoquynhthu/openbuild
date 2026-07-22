@@ -234,6 +234,7 @@ fn resolve_candidates_system_order(
 }
 
 /// Test helper: create a `PreparedSamplerConfig` for direct sampler tests.
+#[cfg(test)]
 pub fn test_prepared_config(model_id: &str, base_url: &str) -> PreparedSamplerConfig {
     PreparedSamplerConfig {
         provider_id: ProviderId::new("test"),

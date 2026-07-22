@@ -1121,25 +1121,42 @@ async fn build_sampler_client(
         }
     };
     let resolved = resolve_api_key(api_key, grok_home_path).await?;
-    let mut idx = indexmap::IndexMap::new();
-    idx.insert("Authorization".to_string(), format!("Bearer {resolved}"));
-    let headers = xai_grok_provider::headers::SensitiveHeaderMap::from_index_map(&idx);
     let url: url::Url = base_url.parse()
         .map_err(|e| anyhow!("invalid base_url {base_url:?}: {e}"))?;
-    let prepared = xai_grok_provider::prepared::PreparedSamplerConfig {
+
+    let secret = xai_grok_provider::auth::SecretValue::new(resolved);
+    let credentials = xai_grok_provider::prepared::RequestCredential {
+        request_override: Some(&secret),
+        model_inline: None,
+        provider_inline: None,
+        env_reader: &|_| Ok(None),
+        session_resolver: &|| None,
+    };
+
+    let execution = xai_grok_provider::resolution::ResolvedModelExecution {
         provider_id: xai_grok_provider::types::ProviderId::new("xai"),
         route_id: xai_grok_provider::types::RouteId::new("xai-responses"),
-        protocol_id: "chat_completions".to_string(),
+        protocol_id: xai_grok_provider::protocol::ProtocolId::from("chat_completions"),
         request_url: url,
-        headers,
+        static_headers: indexmap::IndexMap::new(),
+        auth_policy: xai_grok_provider::auth::AuthPolicy::Bearer {
+            candidates: vec![xai_grok_provider::auth::CredentialCandidate::RequestOverride],
+            required: true,
+        },
         model_id: xai_grok_provider::types::ModelId::new(model),
         generation: xai_grok_provider::model::GenerationOptions::new(
             Some(LAZINESS_MAX_OUTPUT_TOKENS), None, None,
         ),
         limits: xai_grok_provider::model::ModelLimits::default(),
     };
-    let config: xai_grok_sampler::SamplerConfig = prepared.into();
-    xai_grok_sampler::SamplingClient::new(config).map_err(|e| anyhow!("build SamplingClient: {e}"))
+
+    let prepared = xai_grok_provider::prepared::prepare_sampler_config(
+        &execution,
+        &credentials,
+        &[],
+    ).await.map_err(|e| anyhow!("prepare sampler config: {e}"))?;
+
+    xai_grok_sampler::SamplingClient::from_prepared(prepared).map_err(|e| anyhow!("build SamplingClient: {e}"))
 }
 
 /// End-to-end entry point used by the binary. Writes one JSONL line

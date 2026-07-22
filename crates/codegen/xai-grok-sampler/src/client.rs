@@ -561,6 +561,17 @@ impl SamplingClient {
         })
     }
 
+    /// Construct a sampling client from anything that can be converted into a
+    /// [`SamplerConfig`] — the primary production entry point.
+    ///
+    /// Production code SHOULD construct a `PreparedSamplerConfig` via
+    /// `prepare_sampler_config` (in the `xai-grok-provider` crate) and pass it
+    /// here. Direct `SamplerConfig` construction is only for legacy/crate-internal
+    /// use.
+    pub fn from_prepared(config: impl Into<SamplerConfig>) -> Result<Self> {
+        Self::new(config.into())
+    }
+
     pub fn protocol_id(&self) -> &str {
         match &self.defaults.protocol_id {
             Some(id) if !id.0.is_empty() => &id.0,
