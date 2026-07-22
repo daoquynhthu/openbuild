@@ -198,7 +198,7 @@
 
 - **S12-002** `xai-grok-shell/src/extensions/suggest/file_provider.rs:61-64` — `FilePathProvider::suggest()` 在 `cfg!(windows)` 时返回空向量，注释 "shell_token quoting is POSIX-only"。V2 计划 §1880 要求交互补全使用 cmd quoting/replacement contract，但当前 Windows 上文件路径补全完全被禁用。需使用 `ShellCompletionAdapter` 实现 Windows 文件补全。
 
-- **S12-003** V2 计划 §1880 要求 "`grok completions cmd` 必须显式返回 unsupported"。当前 `completions_cmd.rs` 使用 `clap_complete::Shell`（仅有 Bash/Elvish/Fish/PowerShell/Zsh），`grok completions cmd` 在 clap CLI 解析层失败，而非产生明确 unsupported 信息。需捕获无效 shell 名称并返回清晰消息。
+- **S12-003** V2 计划 §1880 要求 "`grok completions cmd` 必须显式返回 unsupported"。`completions_cmd.rs` 现在接受 `String`、解析已知 shell、为 `cmd`/`pwsh` 返回显式 unsupported 消息。有两个测试验证此行为。 -Fixed
 
 ---
 
@@ -210,4 +210,4 @@
 | M12-002 | shell_state.rs | ShellKind::Cmd 变体已添加（V1 冻结） — 待再审 |
 | S12-001 | completion/mod.rs + shell_completion.rs | 待修复 — 运行时适配器选择 |
 | S12-002 | file_provider.rs | 待修复 — Windows 文件补全禁用 |
-| S12-003 | completions_cmd.rs | 待修复 — grok completions cmd 未返回 unsupported |
+| S12-003 | completions_cmd.rs | 已修复 — 显式返回 unsupported — 待再审 |

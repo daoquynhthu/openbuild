@@ -1718,16 +1718,15 @@ mod tests {
     }
     #[test]
     fn cli_completions_parses() {
-        use clap_complete::Shell;
         let args = try_parse_pager(&["grok-pager", "completions", "zsh"]).unwrap();
         assert!(matches!(
             args.command,
-            Some(Command::Completions { shell: Shell::Zsh })
+            Some(Command::Completions { ref shell }) if shell == "zsh"
         ));
         let args = try_parse_pager(&["grok-pager", "completions", "bash"]).unwrap();
         assert!(matches!(
             args.command,
-            Some(Command::Completions { shell: Shell::Bash })
+            Some(Command::Completions { shell: ref s }) if s == "bash"
         ));
     }
     /// Always fails writes with EIO (os error 5) — closed-pane stderr.

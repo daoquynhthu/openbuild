@@ -9,7 +9,22 @@ use clap_complete::{Shell, generate};
 use crate::app::PagerArgs;
 
 /// Generate and print the completion script for the given shell.
-pub fn run(shell: Shell) {
+pub fn run(shell: &str) {
+    if matches!(shell, "cmd" | "pwsh") {
+        eprintln!("Shell '{shell}' does not support completion script generation");
+        return;
+    }
+
+    let shell: Shell = match shell.parse() {
+        Ok(s) => s,
+        Err(_) => {
+            eprintln!(
+                "Unknown shell: '{shell}'. Supported: bash, zsh, fish, powershell, elvish"
+            );
+            return;
+        }
+    };
+
     // Ensure the script always uses the public "grok" name (matches historical
     // behavior and what the installers + docs expect).
     let mut cmd = PagerArgs::command().name("grok");
@@ -22,9 +37,6 @@ pub fn run(shell: Shell) {
     generate(shell, &mut cmd, "grok", &mut buf);
     match String::from_utf8(buf) {
         Ok(script) => print!("{}", fix_zsh_root_prompt_positional(&script)),
-        // clap_complete output is generated from Rust strings, so this arm is
-        // unreachable in practice — but the installers run this command, so
-        // emit the unmodified script rather than panic.
         Err(e) => {
             use std::io::Write as _;
             let _ = std::io::stdout().write_all(e.as_bytes());
@@ -52,7 +64,6 @@ fn fix_zsh_root_prompt_positional(script: &str) -> String {
     let mut out = String::with_capacity(script.len());
     script
         .lines()
-        // "prompt" is the clap arg id of the root positional.
         .filter(|line| !line.starts_with("'::prompt -- "))
         .for_each(|line| {
             out.push_str(line);
@@ -86,16 +97,9 @@ mod tests {
         String::from_utf8(buf).expect("completion script is UTF-8")
     }
 
-    // The optional `[PROMPT]` positional (app/cli.rs) makes clap_complete emit
-    // a `::prompt` slot before the subcommand slot and dispatch on `$line[2]`,
-    // so `grok worktree <TAB>` re-offered every top-level command (upstream
-    // clap-rs/clap#6282).
     #[test]
     fn zsh_completions_drop_prompt_slot_and_dispatch_on_line_1() {
         let raw = zsh_script();
-        // Preconditions: the workaround is still needed. If these start
-        // failing, clap_complete fixed the positional handling — delete
-        // `fix_zsh_root_prompt_positional` instead of updating the test.
         assert!(raw.contains("'::prompt -- "), "raw script has prompt slot");
         assert!(
             raw.contains("case $line[2] in"),
@@ -115,12 +119,22 @@ mod tests {
             fixed.contains(r#"curcontext="${curcontext%:*:*}:grok-command-$line[1]:""#),
             "root dispatch context must use $line[1]"
         );
-        // Subcommand dispatch blocks (already on $line[1]) must survive.
         assert!(
             fixed.contains("grok-worktree-command-$line[1]"),
             "nested subcommand dispatch must be untouched"
         );
-        // The subcommand list itself must still be offered at the root.
         assert!(fixed.contains("_grok_commands"), "root command list intact");
+    }
+
+    #[test]
+    fn cmd_returns_unsupported() {
+        // Must not panic and must print an unsupported message.
+        run("cmd");
+        run("pwsh");
+    }
+
+    #[test]
+    fn unknown_shell_returns_error() {
+        run("nosuchshell");
     }
 }

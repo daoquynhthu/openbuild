@@ -1,7 +1,6 @@
 //! CLI argument parsing for the pager.
 pub use crate::headless::OutputFormat;
 use clap::{ArgAction, Parser, Subcommand, ValueHint};
-use clap_complete::Shell;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 /// Top-level commands for the pager binary.
@@ -120,8 +119,7 @@ See ~/.grok/README.md for more information.
     /// Generate shell completion scripts (bash, zsh, fish, powershell, ...)
     Completions {
         /// Target shell
-        #[arg(value_enum)]
-        shell: Shell,
+        shell: String,
     },
     /// Manage git worktrees
     Worktree(crate::worktree_cmd::WorktreeArgs),

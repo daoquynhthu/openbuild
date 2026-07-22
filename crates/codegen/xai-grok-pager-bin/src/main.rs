@@ -1621,7 +1621,7 @@ async fn async_main() -> Result<()> {
         set_if_unset("GROK_HOOKS_LOG", "1");
     }
     if let Some(Command::Completions { shell }) = &args.command {
-        xai_grok_pager::completions_cmd::run(*shell);
+        xai_grok_pager::completions_cmd::run(shell.as_str());
         return Ok(());
     }
     if let Some(Command::Wrap(ref wrap_args)) = args.command {
@@ -1831,7 +1831,7 @@ async fn async_main() -> Result<()> {
                 return xai_grok_pager::wrap_cmd::run(wrap_args);
             }
             Command::Completions { shell } => {
-                xai_grok_pager::completions_cmd::run(shell);
+                xai_grok_pager::completions_cmd::run(shell.as_str());
                 return Ok(());
             }
             Command::Dashboard => {
