@@ -116,3 +116,38 @@
 | S03 | provider/src/auth.rs:104 | -Fixed |
 | S04 | provider/src/auth.rs:20 | -Fixed |
 | S05 | provider/src/route.rs:20 | -Fixed |
+
+---
+
+## 审计: 2026-07-22 (Phase 11 跨平台文件系统缺口)
+
+### 范围
+对照 `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md` §Phase 11
+(lines 1776–1829) 逐条审计消费者迁移状态。
+
+### 审计方法
+- 运行 `rg "dunce::canonicalize|std::fs::canonicalize|Path::canonicalize|tokio::fs::canonicalize"` 统计全 workspace 违规调用点
+- 核查 config/catalog/session 三大持久化消费者是否使用 `atomic_replace`
+- 核查 `P11-006`/`P11-008` 执行状态
+
+### 中等
+
+- **M11-001** 全 workspace 路径规范化迁移（P11-004）严重不完整。V2 计划 §1805 要求"所有消费者只调用 Phase 3 的 `normalized_absolute`；不得直接调用 `dunce::canonicalize` 或 `std::fs::canonicalize` 形成第二路径语义"。当前扫描结果：
+  - `xai-grok-shell/src/` — 11 个文件存在直接调用
+  - `xai-grok-pager/src/` — 16 个文件存在直接调用
+  - `xai-grok-tools/src/` — 12 个文件存在直接调用
+  - 此外 workspace 其他 crate 也有散布调用
+  - 总计约 200+ 处违规调用点
+  - 现有 `docs/provider-adapter-v1/execution-v2/evidence-p11-004.md` 承认"完整迁移需要单独的专用阶段"
+
+### 建议
+
+- **S11-001** **P11-006**（worktree/git/path repair queue）被跳过。PROGRESS.md 注明"跳过：需要 Phase 2 冻结任务卡（未执行）"。按 V2 计划 §1812–1813 要求，应分别覆盖 `xai-fast-worktree`、plugin marketplace git、provider/tool paths，每张卡只归属一个 crate/一个 root cause。Windows 使用 Git 可理解路径和参数数组，禁止 shell 字符串拼接。
+
+- **S11-002** **P11-008**（关闭 P2 filesystem exclusions）被跳过。PROGRESS.md 注明"跳过：需要 Phase 2 排除登记册（未执行）"。按 V2 计划 §1819–1821 要求，应逐项删除 `INVALID_EXCLUSION/CROSS_PLATFORM_CONTRACT/MISSING_WINDOWS_IMPLEMENTATION`，保留真正 Unix-only 项必须改用 `cfg(unix)` 并写不适用证据。
+
+### 已通过
+
+- P11-001/002/003 — config/catalog/session 三大持久化消费者均已使用 `atomic_replace` ✅
+- P11-005 — workspace classifier Windows 修复已完成（移除 `#[cfg(not(windows))]`，19 测试通过）✅
+- P11-007 — watcher + atomic_replace 契约测试已添加 ✅
