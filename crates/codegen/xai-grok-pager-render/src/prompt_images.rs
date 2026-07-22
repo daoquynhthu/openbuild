@@ -1175,7 +1175,7 @@ fn try_read_dropped_path(token: &str) -> Option<DroppedPath> {
     // to the raw decoded path when canonicalisation fails (broken
     // symlinks, permission issues, network mounts, `file://` URLs to
     // missing files).
-    let resolved = dunce::canonicalize(&path).unwrap_or(path);
+    let resolved = xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or(path);
     Some(DroppedPath::NonImage(resolved))
 }
 
@@ -1551,7 +1551,7 @@ pub fn build_content_blocks_with_prefixes_and_caps(
         } else {
             img.source_path
                 .as_ref()
-                .and_then(|path| dunce::canonicalize(path).ok())
+                .and_then(|path| xai_grok_paths::normalize::normalized_absolute(path).ok())
                 .map(|canonical| format!("file://{}", canonical.display()))
         };
 
@@ -1633,7 +1633,7 @@ fn resolve_orphan_placeholders(
                 }
                 aggregate_bytes = next_total;
                 let data = base64::engine::general_purpose::STANDARD.encode(&loaded.data);
-                let uri = dunce::canonicalize(std::path::Path::new(&ph.path))
+                let uri = xai_grok_paths::normalize::normalized_absolute(std::path::Path::new(&ph.path))
                     .ok()
                     .map(|p| format!("file://{}", p.display()));
                 recovered.push(
@@ -2372,7 +2372,7 @@ mod tests {
 
     /// Non-image paths are canonicalized before insertion.
     fn canon(p: &std::path::Path) -> PathBuf {
-        dunce::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
+        xai_grok_paths::normalize::normalized_absolute(p).unwrap_or_else(|_| p.to_path_buf())
     }
 
     #[test]
@@ -2823,7 +2823,7 @@ mod tests {
         let images = try_read_images_from_paste(&visible.display().to_string());
         assert_eq!(images.len(), 1);
         assert_eq!(images[0].source_path.as_deref(), Some(visible.as_path()));
-        assert_ne!(visible, dunce::canonicalize(&visible).unwrap());
+        assert_ne!(visible, xai_grok_paths::normalize::normalized_absolute(&visible).unwrap());
     }
 
     fn dropped_non_image_paths(text: &str) -> Vec<PathBuf> {
@@ -4085,7 +4085,7 @@ mod tests {
         let agent_client_protocol::ContentBlock::Image(image) = &blocks[1] else {
             panic!("expected image");
         };
-        let canonical_target = dunce::canonicalize(&target).unwrap();
+        let canonical_target = xai_grok_paths::normalize::normalized_absolute(&target).unwrap();
         assert_eq!(
             image.uri.as_deref(),
             Some(format!("file://{}", canonical_target.display()).as_str())
@@ -4162,9 +4162,9 @@ mod tests {
 
         let text = format!(
             "look at [Image #1: {}] please",
-            dunce::canonicalize(&path).unwrap().display(),
+            xai_grok_paths::normalize::normalized_absolute(&path).unwrap().display(),
         );
-        let allowed = [dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = [xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let blocks = build_content_blocks_with_prefixes(text, vec![], Some(&allowed));
 
         // Text block + 1 recovered image.
@@ -4249,7 +4249,7 @@ mod tests {
         let bogus = dir.path().join("nope.png");
         let text = format!("before [Image #4: {}] after", bogus.display());
 
-        let allowed = [dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = [xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let blocks = build_content_blocks_with_prefixes(text, vec![], Some(&allowed));
         // No image attached, only text block.
         assert_eq!(blocks.len(), 1);
@@ -4294,7 +4294,7 @@ mod tests {
         let img = make_real_image(40, 40);
         let text = format!("see [Image #1: {}]", missing.display());
 
-        let allowed = [dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = [xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let blocks = build_content_blocks_with_prefixes(text, vec![img], Some(&allowed));
         // Text + the PastedImage's own block; no orphan recovery
         // (skipped because `display_number` matches).
@@ -4364,10 +4364,10 @@ mod tests {
         let png = make_test_png(20, 20);
         std::fs::write(&p1, &png).unwrap();
         std::fs::write(&p2, &png).unwrap();
-        let c1 = dunce::canonicalize(&p1).unwrap();
-        let c2 = dunce::canonicalize(&p2).unwrap();
+        let c1 = xai_grok_paths::normalize::normalized_absolute(&p1).unwrap();
+        let c2 = xai_grok_paths::normalize::normalized_absolute(&p2).unwrap();
         let text = format!("[Image #1: {}] [Image #2: {}]", c1.display(), c2.display());
-        let allowed = [dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = [xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         // Cap admits the first image but not the cumulative second.
         let blocks =
             build_content_blocks_with_prefixes_and_caps(text, vec![], Some(&allowed), png.len());
@@ -4417,9 +4417,9 @@ mod tests {
         let path = dir.path().join("one.png");
         let png = make_test_png(20, 20);
         std::fs::write(&path, &png).unwrap();
-        let canon = dunce::canonicalize(&path).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(&path).unwrap();
         let text = format!("[Image #1: {}]", canon.display());
-        let allowed = [dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = [xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let blocks =
             build_content_blocks_with_prefixes_and_caps(text, vec![], Some(&allowed), png.len());
         assert_eq!(blocks.len(), 2);
@@ -4454,9 +4454,9 @@ mod tests {
         let path = dir.path().join("one.png");
         let png = make_test_png(20, 20);
         std::fs::write(&path, &png).unwrap();
-        let canon = dunce::canonicalize(&path).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(&path).unwrap();
         let text = format!("[Image #1: {}]", canon.display());
-        let allowed = [dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = [xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let blocks = build_content_blocks_with_prefixes_and_caps(
             text,
             vec![],
