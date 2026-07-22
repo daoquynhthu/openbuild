@@ -55,3 +55,61 @@
 | S01 | `dir`/`outside` 变量声明移入 `#[cfg(unix)]` 块 |
 | S02 | `match compress_image_for_conversation(...) { Ok(_) => ..., Err(_) => {} }` → `if let Ok(...) = ...` |
 | S03 | `MockManager::new()` 加 `#[allow(clippy::new_ret_no_self)]`；3 处 `assert_eq!(..., false)` → `assert!(!...)` |
+
+---
+
+## 审计: 2026-07-22 (Phase 8 V2 计划偏差)
+
+### 范围
+对照 `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md` §Phase 8
+(lines 1450–1589) 逐条审计当前代码实现。
+
+### 审计方法
+- 逐一比对 §冻结认证模型与最终请求准备接口 中的类型定义 (lines 1456–1491)
+- 逐一比对 §冻结语义 (lines 1493–1499) 的行为要求
+- 逐一比对 P8-001～P8-011 的实现状态
+- 验证生产调用链是否唯一为 `ResolvedModelExecution → prepare_sampler_config → PreparedSamplerConfig → Sampler`
+
+### 严重
+
+- **C01** `shell/src/trace_classifier/mod.rs` — `build_sampler_client` 直接构造 `PreparedSamplerConfig { ... }` 绕过 `prepare_sampler_config`。Plan §P8-011: 构造器只能是 Phase 8 的 `prepare_sampler_config`。-Fixed
+- **C02** `xai-grok-sampler/src/client.rs` — `SamplingClient` 无 `from_prepared(config: impl Into<SamplerConfig>)` 生产入口。Plan §P8-011: Sampler 的生产入口只接受 `PreparedSamplerConfig`。-Fixed
+- **C03** `provider/src/prepared.rs:238` — `test_prepared_config` 在 `#[cfg(test)]` 外定义为 `pub`，生产代码可调用。Plan §P8-011: 仅 `test_prepared_config()` 测试 helper。-Fixed
+
+### 中等
+
+- **M01** `provider/src/auth.rs:76` — `AuthPolicy::Header.name` 在 M01 修复前为 `String`（无类型验证）。Plan §line 1470: `name: HeaderName`。-Fixed
+- **M02** `provider/src/prepared.rs:19` — `PreparedSamplerConfig::protocol_id` 类型为 `String`。Plan §line 1478: `protocol_id: ProtocolId`（类型已存在于 `xai_grok_sampling_types::ProtocolId`，`ResolvedModelExecution` 已正确使用）。-Fixed
+- **M03** `provider/src/prepared.rs:87` — provider crate 定义了自己的 `RequestCredential` 结构体（使用 `&dyn Fn` 闭包特质）而非采用 plan 要求的命名特质。Plan §lines 1514–1523 要求 `environment: &'a dyn EnvironmentReader` 和 `session: &'a dyn SessionCredentialResolver`。Shell crate (`credential_context.rs:78`) 已有 plan 合规的 `RequestCredentialContext`，但 provider crate 未使用。两个平行实现存在。-Fixed
+- **M04** `provider/src/prepared.rs:92` — `session_resolver` 为同步 `&dyn Fn() -> Option<SecretValue>`。Plan §line 1523: "SessionCredentialResolver 使用仓库已有 boxed-future 模式异步返回 Result<Option<SecretValue>, CredentialError>"。Shell 的 `SessionCredentialResolver` (credential_context.rs:33) 使用 `Pin<Box<dyn Future>>`，已在正确 crate 使用。-Fixed
+- **M05** `provider/src/prepared.rs:91` — `env_reader` 返回 `Result<Option<SecretValue>, String>` 而非 plan 要求的 `CredentialError`。Provider crate 中无 `CredentialError` 类型。-Fixed
+- **M06** `shell/src/agent/config.rs:4716`, `shell/src/agent/provider_resolution.rs:71` — 生产调用点仍使用 `.map(SamplerConfig::from)` 桥接而非直接 `SamplingClient::from_prepared`。Plan §P8-011: 所有调用点必须直接走 `PreparedSamplerConfig → Sampler`。当前仅 `trace_classifier/mod.rs:1159` 正确使用 `from_prepared`。
+- **M07** `provider/src/prepared.rs:32` — `From<PreparedSamplerConfig> for SamplerConfig` 桥接实现从 `SensitiveHeaderMap` 中反向推导 `auth_scheme`（遍历 headers 匹配 "authorization"/"x-api-key"）。Plan §P8-011: P8-011 完成前必须删除此桥接。Header merge 结果应直接传递，无需重新推导。
+
+### 建议
+
+- **S01** `provider/src/prepared.rs:104` — `prepare_sampler_config` 第三个参数为 `&[(&str, &str)]`。Plan §line 1489: `request_headers: &RequestHeaderOverrides` — 缺少新类型包装且无类型验证。
+- **S02** `provider/src/prepared.rs:186`（`resolve_candidates_system_order`）与 `shell/src/agent/credential_context.rs:108`（`RequestCredentialContext::resolve_candidates`）— 同一 system-fixed 优先级解析逻辑的平行实现。应统一。
+- **S03** `provider/src/auth.rs:104` — `AuthPolicy::validate()` 对所有变体无条件返回 `Ok(())`。`Header` 变体的名称已在类型级别由 `HeaderName` 验证，无需运行期验证；应删除此方法或添加真正的验证逻辑。
+- **S04** `provider/src/auth.rs:20` — `SecretValue::inner()` 为 `pub` 明文 accessor。Plan §line 1007: "明文 accessor 仅 `pub(crate)`"。
+- **S05** `provider/src/route.rs:20` — `Route::protocol_id` 为 `String`。虽不在 Phase 8 强制范围内，但与 `ResolvedModelExecution::protocol_id`（`ProtocolId`）和 `PreparedSamplerConfig::protocol_id`（应为 `ProtocolId`）不一致。建议在 Phase 4/7 路由重构时对齐。
+
+### 状态汇总
+
+| 条目 | 文件 | 状态 |
+|------|------|------|
+| C01 | trace_classifier/mod.rs | -Fixed |
+| C02 | xai-grok-sampler/src/client.rs | -Fixed |
+| C03 | provider/src/prepared.rs | -Fixed |
+| M01 | provider/src/auth.rs | -Fixed |
+| M02 | provider/src/prepared.rs:19 | -Fixed |
+| M03 | provider/src/prepared.rs:87 | -Fixed |
+| M04 | provider/src/prepared.rs:92 | -Fixed |
+| M05 | provider/src/prepared.rs:91 | -Fixed |
+| M06 | shell/config.rs,provider_resolution.rs | 待修复 |
+| M07 | provider/src/prepared.rs:32 | 待修复 |
+| S01 | provider/src/prepared.rs:104 | 待修复 |
+| S02 | provider/src/prepared.rs/shell/credential_context.rs | 待修复 |
+| S03 | provider/src/auth.rs:104 | 待修复 |
+| S04 | provider/src/auth.rs:20 | 待修复 |
+| S05 | provider/src/route.rs:20 | 待修复 |

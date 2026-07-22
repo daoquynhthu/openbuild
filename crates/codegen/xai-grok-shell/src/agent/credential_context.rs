@@ -2,12 +2,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use xai_grok_provider::auth::{CredentialCandidate, SecretValue};
+use xai_grok_provider::auth::{CredentialCandidate, CredentialError, SecretValue};
 
-/// Environment reader — only resolves variables at request time.
-pub trait EnvironmentReader: Send + Sync {
-    fn read(&self, var: &str) -> Result<Option<SecretValue>, String>;
-}
+pub use xai_grok_provider::auth::{EnvironmentReader, RequestCredentialContext, SessionCredentialResolver};
 
 /// Deterministic environment reader for testing.
 #[derive(Default)]
@@ -23,19 +20,34 @@ impl TestEnvironment {
 }
 
 impl EnvironmentReader for TestEnvironment {
-    fn read(&self, var: &str) -> Result<Option<SecretValue>, String> {
+    fn read(&self, var: &str) -> Result<Option<SecretValue>, CredentialError> {
         Ok(self.vars.get(var).map(|v| SecretValue::new(v.clone())))
     }
 }
 
-/// Session credential resolver — async, no block_on.
-/// Uses boxed-future pattern as required by P8-003.
-pub trait SessionCredentialResolver: Send + Sync {
-    fn resolve(&self) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>>;
-}
-
 /// Concrete environment reader that reads from process env at request time.
 pub(crate) struct ProcessEnvironment;
+
+impl EnvironmentReader for ProcessEnvironment {
+    fn read(&self, var: &str) -> Result<Option<SecretValue>, CredentialError> {
+        match std::env::var(var) {
+            Ok(val) if !val.is_empty() => Ok(Some(SecretValue::new(val))),
+            _ => Ok(None),
+        }
+    }
+}
+
+/// Session resolver that always returns `None`.
+pub(crate) struct NoopSessionResolver;
+
+impl SessionCredentialResolver for NoopSessionResolver {
+    fn resolve(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
+    {
+        Box::pin(async { Ok(None) })
+    }
+}
 
 /// xAI OAuth session resolver. Wraps the existing `AuthManager` to provide
 /// session tokens as a `CredentialCandidate::Session` resolver (P8-005).
@@ -51,7 +63,10 @@ impl XaiSessionResolver {
 }
 
 impl SessionCredentialResolver for XaiSessionResolver {
-    fn resolve(&self) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
+    fn resolve(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
+    {
         let auth = self.manager.current_or_expired();
         Box::pin(async move {
             match auth {
@@ -65,130 +80,9 @@ impl SessionCredentialResolver for XaiSessionResolver {
     }
 }
 
-impl EnvironmentReader for ProcessEnvironment {
-    fn read(&self, var: &str) -> Result<Option<SecretValue>, String> {
-        match std::env::var(var) {
-            Ok(val) if !val.is_empty() => Ok(Some(SecretValue::new(val))),
-            _ => Ok(None),
-        }
-    }
-}
-
-/// Request-time credential context for `prepare_sampler_config`.
-pub struct RequestCredentialContext<'a> {
-    pub request_override: Option<&'a SecretValue>,
-    pub model_inline: Option<&'a SecretValue>,
-    pub provider_inline: Option<&'a SecretValue>,
-    pub environment: &'a dyn EnvironmentReader,
-    pub session: &'a dyn SessionCredentialResolver,
-}
-
-impl<'a> RequestCredentialContext<'a> {
-    pub fn new(
-        request_override: Option<&'a SecretValue>,
-        model_inline: Option<&'a SecretValue>,
-        provider_inline: Option<&'a SecretValue>,
-        environment: &'a dyn EnvironmentReader,
-        session: &'a dyn SessionCredentialResolver,
-    ) -> Self {
-        Self {
-            request_override,
-            model_inline,
-            provider_inline,
-            environment,
-            session,
-        }
-    }
-
-    /// Resolve a credential from a list of candidates following the UNIFIED priority:
-    /// request override > model inline > provider inline > model env > provider env > built-in env > session.
-    ///
-    /// The provider declares ONLY which candidates exist; the ORDER is fixed by the system.
-    /// Provider-declared order is ignored — only the SET of candidate types matters.
-    pub async fn resolve_candidates(&self, candidates: &[CredentialCandidate]) -> Option<String> {
-        // Build a set of candidate types declared by the provider.
-        let provider_has_request_override = candidates
-            .iter()
-            .any(|c| matches!(c, CredentialCandidate::RequestOverride));
-        let provider_has_model_inline = candidates
-            .iter()
-            .any(|c| matches!(c, CredentialCandidate::ModelInline));
-        let provider_has_provider_inline = candidates
-            .iter()
-            .any(|c| matches!(c, CredentialCandidate::ProviderInline));
-        let provider_env_keys: Vec<&Vec<String>> = candidates
-            .iter()
-            .filter_map(|c| match c {
-                CredentialCandidate::ModelEnvironment(k) => Some(k),
-                _ => None,
-            })
-            .collect();
-        let provider_env_keys: Vec<&String> =
-            provider_env_keys.iter().flat_map(|v| v.iter()).collect();
-        let provider_env_keys: Vec<String> = provider_env_keys.into_iter().cloned().collect();
-        let builtin_env_keys: Vec<String> = candidates
-            .iter()
-            .filter_map(|c| match c {
-                CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
-                _ => None,
-            })
-            .flatten()
-            .collect();
-        let has_session = candidates
-            .iter()
-            .any(|c| matches!(c, CredentialCandidate::Session(_)));
-
-        // System-fixed priority order — provider order is ignored.
-        // 1. RequestOverride
-        if provider_has_request_override {
-            if let Some(val) = self.request_override {
-                return Some(val.inner().to_string());
-            }
-        }
-        // 2. ModelInline
-        if provider_has_model_inline {
-            if let Some(val) = self.model_inline {
-                return Some(val.inner().to_string());
-            }
-        }
-        // 3. ProviderInline
-        if provider_has_provider_inline {
-            if let Some(val) = self.provider_inline {
-                return Some(val.inner().to_string());
-            }
-        }
-        // 4-6: Environment (model env, provider env, built-in env — in that order)
-        for key in &provider_env_keys {
-            if let Ok(Some(val)) = self.environment.read(key) {
-                return Some(val.inner().to_string());
-            }
-        }
-        for key in &builtin_env_keys {
-            if let Ok(Some(val)) = self.environment.read(key) {
-                return Some(val.inner().to_string());
-            }
-        }
-        // 7. Session (always last)
-        if has_session {
-            if let Ok(Some(val)) = self.session.resolve().await {
-                return Some(val.inner().to_string());
-            }
-        }
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    impl SessionCredentialResolver for () {
-        fn resolve(
-            &self,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
-            Box::pin(async { Ok(None) })
-        }
-    }
 
     /// A session resolver that returns a fixed value.
     struct FixedSession(&'static str);
@@ -196,7 +90,8 @@ mod tests {
     impl SessionCredentialResolver for FixedSession {
         fn resolve(
             &self,
-        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, String>> + Send>> {
+        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
+        {
             let val = self.0.to_string();
             Box::pin(async move { Ok(Some(SecretValue::new(val))) })
         }
@@ -219,7 +114,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_resolver_returns_none_by_default() {
-        let resolver = ();
+        let resolver = NoopSessionResolver;
         let result = resolver.resolve().await.unwrap();
         assert!(result.is_none());
     }
@@ -297,7 +192,7 @@ mod tests {
     async fn priority_none_when_all_missing() {
         let env = TestEnvironment::default();
         // Session resolver returns None rather than empty string
-        let session = ();
+        let session = NoopSessionResolver;
         let ctx = RequestCredentialContext::new(None, None, None, &env, &session);
         let result = ctx
             .resolve_candidates(&[
@@ -313,8 +208,8 @@ mod tests {
     fn credential_context_holds_references() {
         let val = SecretValue::new("tok".to_string());
         let env = TestEnvironment::default().set("ENV_KEY", "env-val");
-        let resolver = ();
-        let ctx = RequestCredentialContext::new(Some(&val), None, None, &env, &resolver);
+        let session = NoopSessionResolver;
+        let ctx = RequestCredentialContext::new(Some(&val), None, None, &env, &session);
         assert_eq!(ctx.request_override.unwrap().inner(), "tok");
     }
 }

@@ -53,23 +53,25 @@ pub fn execution_to_sampler_config(
     api_key: Option<&str>,
     base_url_override: Option<&str>,
 ) -> Result<SamplerConfig, ProviderResolutionError> {
-    use xai_grok_provider::prepared::{prepare_sampler_config, RequestCredential};
     use xai_grok_provider::auth::SecretValue;
+    use xai_grok_provider::prepared::prepare_sampler_config;
 
     let execution = resolve_model_execution(model, registry, base_url_override)?;
     let model_inline = api_key.map(|k| SecretValue::new(k.to_string()));
-    let creds = RequestCredential {
-        request_override: None,
-        model_inline: model_inline.as_ref(),
-        provider_inline: None,
-        env_reader: &|_| Ok(None),
-        session_resolver: &|| None,
-    };
+    let env = crate::agent::credential_context::ProcessEnvironment;
+    let session = crate::agent::credential_context::NoopSessionResolver;
+    let creds = xai_grok_provider::auth::RequestCredentialContext::new(
+        None,
+        model_inline.as_ref(),
+        None,
+        &env,
+        &session,
+    );
     let rt = tokio::runtime::Runtime::new()
         .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
-    rt.block_on(prepare_sampler_config(&execution, &creds, &[]))
-        .map(xai_grok_sampler::SamplerConfig::from)
-        .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))
+    let prepared = rt.block_on(prepare_sampler_config(&execution, &creds, &[]))
+        .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
+    Ok(xai_grok_sampler::SamplerConfig::from(prepared))
 }
 
 /// Merge generation parameters with fixed precedence: route defaults < model info < request overrides.

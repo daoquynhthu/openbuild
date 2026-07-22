@@ -4,9 +4,10 @@
 
 use indexmap::IndexMap;
 
-use crate::auth::{AuthPolicy, CredentialCandidate, SecretValue};
+use crate::auth::{AuthPolicy, RequestCredentialContext};
 use crate::headers::SensitiveHeaderMap;
 use crate::model::{GenerationOptions, ModelLimits};
+use crate::protocol::ProtocolId;
 use crate::resolution::ResolvedModelExecution;
 use crate::types::{ModelId, ProviderId, RouteId};
 
@@ -16,7 +17,7 @@ use crate::types::{ModelId, ProviderId, RouteId};
 pub struct PreparedSamplerConfig {
     pub provider_id: ProviderId,
     pub route_id: RouteId,
-    pub protocol_id: String,
+    pub protocol_id: ProtocolId,
     pub request_url: url::Url,
     pub headers: SensitiveHeaderMap,
     pub model_id: ModelId,
@@ -32,7 +33,7 @@ pub struct PreparedSamplerConfig {
 impl From<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig {
     fn from(prepared: PreparedSamplerConfig) -> Self {
         let protocol_id = prepared.protocol_id.clone();
-        let api_backend = match protocol_id.as_str() {
+        let api_backend = match &*protocol_id {
             "chat_completions" => xai_grok_sampler::ApiBackend::ChatCompletions,
             "responses" => xai_grok_sampler::ApiBackend::Responses,
             "messages" => xai_grok_sampler::ApiBackend::Messages,
@@ -60,7 +61,7 @@ impl From<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig {
             base_url: prepared.request_url.to_string(),
             request_url: Some(prepared.request_url.to_string()),
             api_backend,
-            protocol_id: Some(protocol_id.into()),
+            protocol_id: Some(protocol_id),
             auth_scheme,
             extra_headers,
             context_window: prepared.limits.context.unwrap_or(0),
@@ -83,15 +84,6 @@ pub enum RequestPreparationError {
     InvalidHeader(String),
 }
 
-/// Request-time credential context for `prepare_sampler_config`.
-pub struct RequestCredential<'a> {
-    pub request_override: Option<&'a SecretValue>,
-    pub model_inline: Option<&'a SecretValue>,
-    pub provider_inline: Option<&'a SecretValue>,
-    pub env_reader: &'a dyn Fn(&str) -> Result<Option<SecretValue>, String>,
-    pub session_resolver: &'a dyn Fn() -> Option<SecretValue>,
-}
-
 /// Prepare a `PreparedSamplerConfig` from a resolved execution and credentials.
 /// This is the ONLY production entry point for constructing the sampler input.
 ///
@@ -100,13 +92,13 @@ pub struct RequestCredential<'a> {
 /// 3. Produces a `PreparedSamplerConfig` with no plaintext secrets in Debug output.
 pub async fn prepare_sampler_config(
     execution: &ResolvedModelExecution,
-    credentials: &RequestCredential<'_>,
+    credentials: &RequestCredentialContext<'_>,
     request_headers: &[(&str, &str)],
 ) -> Result<PreparedSamplerConfig, RequestPreparationError> {
     use crate::headers::merge_headers;
 
     // Resolve auth header from policy candidates (system-fixed priority order)
-    let auth_header = resolve_auth_from_policy(&execution.auth_policy, credentials)?;
+    let auth_header = resolve_auth_from_policy(&execution.auth_policy, credentials).await?;
 
     // Build request override header map
     let mut override_map = http::HeaderMap::new();
@@ -127,7 +119,7 @@ pub async fn prepare_sampler_config(
         &[], // Layer 1: transport-required
         &execution.static_headers, // Layer 2: route static headers
         &provider_extra,           // Layer 3: provider extra headers (reserved)
-        auth_header.as_ref().map(|(n, v)| (n.as_str(), v.as_str())), // Layer 4: auth
+        auth_header.as_ref().map(|(n, v)| (n.as_ref(), v.as_ref())), // Layer 4: auth
         &override_map, // Layer 5: request overrides
     )
     .map_err(|e| RequestPreparationError::HeaderConflict(e.to_string()))?;
@@ -135,7 +127,7 @@ pub async fn prepare_sampler_config(
     Ok(PreparedSamplerConfig {
         provider_id: execution.provider_id.clone(),
         route_id: execution.route_id.clone(),
-        protocol_id: execution.protocol_id.to_string(),
+        protocol_id: execution.protocol_id.clone(),
         request_url: execution.request_url.clone(),
         headers: merged,
         model_id: execution.model_id.clone(),
@@ -145,9 +137,9 @@ pub async fn prepare_sampler_config(
 }
 
 /// Resolve auth header from an `AuthPolicy` using the credential context.
-pub(crate) fn resolve_auth_from_policy(
+pub(crate) async fn resolve_auth_from_policy(
     policy: &AuthPolicy,
-    ctx: &RequestCredential<'_>,
+    ctx: &RequestCredentialContext<'_>,
 ) -> Result<Option<(String, String)>, RequestPreparationError> {
     match policy {
         AuthPolicy::None => Ok(None),
@@ -155,7 +147,7 @@ pub(crate) fn resolve_auth_from_policy(
             candidates,
             required,
         } => {
-            let value = resolve_candidates_system_order(candidates, ctx);
+            let value = ctx.resolve_candidates(candidates).await;
             match value {
                 Some(v) => Ok(Some(("Authorization".to_string(), format!("Bearer {v}")))),
                 None if *required => Err(RequestPreparationError::Credential(
@@ -169,9 +161,9 @@ pub(crate) fn resolve_auth_from_policy(
             candidates,
             required,
         } => {
-            let value = resolve_candidates_system_order(candidates, ctx);
+            let value = ctx.resolve_candidates(candidates).await;
             match value {
-                Some(v) => Ok(Some((name.clone(), v))),
+                Some(v) => Ok(Some((name.to_string(), v))),
                 None if *required => Err(RequestPreparationError::Credential(format!(
                     "required header credential for {name} not resolved"
                 ))),
@@ -181,65 +173,13 @@ pub(crate) fn resolve_auth_from_policy(
     }
 }
 
-/// Resolve candidates in SYSTEM-fixed order, ignoring provider-declared order.
-/// Providers declare ONLY which candidate types exist.
-fn resolve_candidates_system_order(
-    candidates: &[CredentialCandidate],
-    ctx: &RequestCredential<'_>,
-) -> Option<String> {
-    let has_req = candidates
-        .iter()
-        .any(|c| matches!(c, CredentialCandidate::RequestOverride));
-    let has_model = candidates
-        .iter()
-        .any(|c| matches!(c, CredentialCandidate::ModelInline));
-    let has_prov = candidates
-        .iter()
-        .any(|c| matches!(c, CredentialCandidate::ProviderInline));
-    let env_keys: Vec<String> = candidates
-        .iter()
-        .filter_map(|c| match c {
-            CredentialCandidate::ModelEnvironment(k)
-            | CredentialCandidate::ProviderEnvironment(k)
-            | CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
-            _ => None,
-        })
-        .flatten()
-        .collect();
-    let has_sess = candidates
-        .iter()
-        .any(|c| matches!(c, CredentialCandidate::Session(_)));
-
-    if let Some(v) = ctx.request_override.filter(|_| has_req) {
-        return Some(v.inner().to_string());
-    }
-    if let Some(v) = ctx.model_inline.filter(|_| has_model) {
-        return Some(v.inner().to_string());
-    }
-    if let Some(v) = ctx.provider_inline.filter(|_| has_prov) {
-        return Some(v.inner().to_string());
-    }
-    for key in &env_keys {
-        if let Ok(Some(v)) = (ctx.env_reader)(key) {
-            return Some(v.inner().to_string());
-        }
-    }
-    #[allow(clippy::collapsible_if)]
-    if has_sess {
-        if let Some(v) = (ctx.session_resolver)() {
-            return Some(v.inner().to_string());
-        }
-    }
-    None
-}
-
 /// Test helper: create a `PreparedSamplerConfig` for direct sampler tests.
 #[cfg(test)]
 pub fn test_prepared_config(model_id: &str, base_url: &str) -> PreparedSamplerConfig {
     PreparedSamplerConfig {
         provider_id: ProviderId::new("test"),
         route_id: crate::types::RouteId::new("test-chat"),
-        protocol_id: "chat_completions".to_string(),
+        protocol_id: ProtocolId::from("chat_completions"),
         request_url: url::Url::parse(&format!("{base_url}/v1/chat/completions")).unwrap(),
         headers: crate::headers::SensitiveHeaderMap::new(http::HeaderMap::new()),
         model_id: ModelId::new(model_id),
@@ -250,9 +190,82 @@ pub fn test_prepared_config(model_id: &str, base_url: &str) -> PreparedSamplerCo
 
 #[cfg(test)]
 mod tests {
+    use std::future::Future;
+    use std::pin::Pin;
+
     use super::*;
-    use crate::auth::SessionKind;
+    use crate::auth::{CredentialCandidate, CredentialError, EnvironmentReader, SecretValue, SessionCredentialResolver, SessionKind};
     use url::Url;
+
+    // ── Test helper types for EnvironmentReader / SessionCredentialResolver ──
+
+    struct TestEnv;
+    impl EnvironmentReader for TestEnv {
+        fn read(&self, _var: &str) -> Result<Option<SecretValue>, CredentialError> {
+            Ok(None)
+        }
+    }
+
+    struct StaticEnv(&'static str, &'static str);
+    impl EnvironmentReader for StaticEnv {
+        fn read(&self, var: &str) -> Result<Option<SecretValue>, CredentialError> {
+            if var == self.0 {
+                Ok(Some(SecretValue::new(self.1.to_string())))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+
+    struct TestSession;
+    impl SessionCredentialResolver for TestSession {
+        fn resolve(
+            &self,
+        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
+        {
+            Box::pin(async { Ok(None) })
+        }
+    }
+
+    struct FixedSession(&'static str);
+    impl SessionCredentialResolver for FixedSession {
+        fn resolve(
+            &self,
+        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
+        {
+            let val = self.0.to_string();
+            Box::pin(async move { Ok(Some(SecretValue::new(val))) })
+        }
+    }
+
+    struct TrackingSession {
+        called: std::sync::atomic::AtomicBool,
+        value: &'static str,
+    }
+
+    impl TrackingSession {
+        fn new(value: &'static str) -> Self {
+            Self {
+                called: std::sync::atomic::AtomicBool::new(false),
+                value,
+            }
+        }
+
+        fn was_called(&self) -> bool {
+            self.called.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    impl SessionCredentialResolver for TrackingSession {
+        fn resolve(
+            &self,
+        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
+        {
+            self.called.store(true, std::sync::atomic::Ordering::SeqCst);
+            let val = self.value.to_string();
+            Box::pin(async move { Ok(Some(SecretValue::new(val))) })
+        }
+    }
 
     fn dummy_execution(auth: AuthPolicy) -> ResolvedModelExecution {
         ResolvedModelExecution {
@@ -268,13 +281,13 @@ mod tests {
         }
     }
 
-    fn empty_credential() -> RequestCredential<'static> {
-        RequestCredential {
+    fn empty_credential() -> RequestCredentialContext<'static> {
+        RequestCredentialContext {
             request_override: None,
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         }
     }
 
@@ -311,7 +324,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_required_header_credential_fails_before_http_send() {
-        let execution = dummy_execution(AuthPolicy::header("x-api-key", vec![], true));
+        let execution = dummy_execution(AuthPolicy::header(http::HeaderName::from_static("x-api-key"), vec![], true));
         let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
         assert!(result.is_err(), "required header with no candidates must error");
         let err = result.unwrap_err().to_string();
@@ -338,7 +351,7 @@ mod tests {
 
     #[tokio::test]
     async fn optional_header_without_candidates_succeeds() {
-        let execution = dummy_execution(AuthPolicy::header("x-api-key", vec![], false));
+        let execution = dummy_execution(AuthPolicy::header(http::HeaderName::from_static("x-api-key"), vec![], false));
         let result = prepare_sampler_config(&execution, &empty_credential(), &[]).await;
         assert!(result.is_ok(), "optional header with no candidates must succeed");
     }
@@ -350,12 +363,12 @@ mod tests {
     #[tokio::test]
     async fn bearer_request_override_produces_authorization_header() {
         let val = SecretValue::new("sk-override".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::bearer(
             vec![CredentialCandidate::RequestOverride],
@@ -375,12 +388,12 @@ mod tests {
     #[tokio::test]
     async fn bearer_provider_inline_falls_back_correctly() {
         let inline = SecretValue::new("sk-inline".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: None,
             model_inline: None,
             provider_inline: Some(&inline),
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::bearer(
             vec![CredentialCandidate::ProviderInline],
@@ -394,15 +407,13 @@ mod tests {
 
     #[tokio::test]
     async fn bearer_env_reader_used_when_inline_absent() {
-        let ctx = RequestCredential {
+        let env = StaticEnv("MY_API_KEY", "sk-from-env");
+        let ctx = RequestCredentialContext {
             request_override: None,
             model_inline: None,
             provider_inline: None,
-            env_reader: &|k| {
-                assert_eq!(k, "MY_API_KEY");
-                Ok(Some(SecretValue::new("sk-from-env".to_string())))
-            },
-            session_resolver: &|| None,
+            environment: &env,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::bearer(
             vec![CredentialCandidate::ProviderEnvironment(vec![
@@ -420,12 +431,12 @@ mod tests {
     async fn bearer_precedence_request_override_beats_inline() {
         let request_val = SecretValue::new("sk-request".to_string());
         let inline_val = SecretValue::new("sk-inline".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&request_val),
             model_inline: Some(&inline_val),
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::bearer(
             vec![
@@ -456,12 +467,12 @@ mod tests {
         );
 
         let val = SecretValue::new("sk-key".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let result = prepare_sampler_config(&execution, &ctx, &[]).await;
         let config = result.expect("must succeed");
@@ -482,12 +493,12 @@ mod tests {
         );
 
         let val = SecretValue::new("sk-key".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let result = prepare_sampler_config(&execution, &ctx, &[("x-custom", "override")]).await;
         let config = result.expect("must succeed");
@@ -518,15 +529,15 @@ mod tests {
     #[tokio::test]
     async fn header_auth_request_override_produces_correct_header() {
         let val = SecretValue::new("sk-ant-override".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::header(
-            "x-api-key",
+            http::HeaderName::from_static("x-api-key"),
             vec![CredentialCandidate::RequestOverride],
             true,
         ));
@@ -543,15 +554,15 @@ mod tests {
     #[tokio::test]
     async fn header_auth_provider_inline_falls_back_correctly() {
         let inline = SecretValue::new("sk-ant-inline".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: None,
             model_inline: None,
             provider_inline: Some(&inline),
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::header(
-            "x-api-key",
+            http::HeaderName::from_static("x-api-key"),
             vec![CredentialCandidate::ProviderInline],
             true,
         ));
@@ -565,15 +576,15 @@ mod tests {
     async fn header_auth_precedence_request_override_beats_inline() {
         let request_val = SecretValue::new("sk-ant-request".to_string());
         let inline_val = SecretValue::new("sk-ant-inline".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&request_val),
             model_inline: Some(&inline_val),
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::header(
-            "x-api-key",
+            http::HeaderName::from_static("x-api-key"),
             vec![
                 CredentialCandidate::RequestOverride,
                 CredentialCandidate::ModelInline,
@@ -606,12 +617,12 @@ mod tests {
     #[tokio::test]
     async fn no_auth_with_request_override_still_omits_auth() {
         let val = SecretValue::new("sk-should-not-appear".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::None);
         let result = prepare_sampler_config(&execution, &ctx, &[]).await;
@@ -643,11 +654,11 @@ mod tests {
     async fn header_isolation_two_independent_calls_differ() {
         let val_a = SecretValue::new("sk-a".to_string());
         let val_b = SecretValue::new("sk-b".to_string());
-        let ctx_a = RequestCredential {
+        let ctx_a = RequestCredentialContext {
             request_override: Some(&val_a),
             ..empty_credential()
         };
-        let ctx_b = RequestCredential {
+        let ctx_b = RequestCredentialContext {
             request_override: Some(&val_b),
             ..empty_credential()
         };
@@ -691,7 +702,7 @@ mod tests {
     #[tokio::test]
     async fn invalid_header_name_in_request_overrides_rejected() {
         let val = SecretValue::new("sk-key".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             ..empty_credential()
         };
@@ -711,7 +722,7 @@ mod tests {
     #[tokio::test]
     async fn invalid_header_value_in_request_overrides_rejected() {
         let val = SecretValue::new("sk-key".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             ..empty_credential()
         };
@@ -732,7 +743,7 @@ mod tests {
     #[tokio::test]
     async fn conflict_between_static_header_and_auth_header_rejected() {
         let mut execution = dummy_execution(AuthPolicy::header(
-            "x-api-key",
+            http::HeaderName::from_static("x-api-key"),
             vec![CredentialCandidate::RequestOverride],
             true,
         ));
@@ -741,7 +752,7 @@ mod tests {
             .insert("x-api-key".to_string(), "static-value".to_string());
 
         let val = SecretValue::new("auth-value".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             ..empty_credential()
         };
@@ -760,7 +771,7 @@ mod tests {
     #[tokio::test]
     async fn same_static_and_auth_header_value_allowed() {
         let mut execution = dummy_execution(AuthPolicy::header(
-            "x-api-key",
+            http::HeaderName::from_static("x-api-key"),
             vec![CredentialCandidate::RequestOverride],
             true,
         ));
@@ -769,7 +780,7 @@ mod tests {
             .insert("x-api-key".to_string(), "same-value".to_string());
 
         let val = SecretValue::new("same-value".to_string());
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             ..empty_credential()
         };
@@ -787,19 +798,15 @@ mod tests {
     #[tokio::test]
     async fn session_used_only_when_explicit_candidates_missing() {
         let request_val = SecretValue::new("sk-request".to_string());
-        let session_val = SecretValue::new("sk-session".to_string());
 
         // Session resolver is called but should NOT be used because request_override wins
-        let session_resolver_called = std::sync::atomic::AtomicBool::new(false);
-        let ctx = RequestCredential {
+        let tracking = TrackingSession::new("sk-session");
+        let ctx = RequestCredentialContext {
             request_override: Some(&request_val),
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| {
-                session_resolver_called.store(true, std::sync::atomic::Ordering::SeqCst);
-                Some(session_val.clone())
-            },
+            environment: &TestEnv,
+            session: &tracking,
         };
         let execution = dummy_execution(AuthPolicy::bearer(
             vec![
@@ -818,20 +825,20 @@ mod tests {
             "request override must be used, not session"
         );
         assert!(
-            !session_resolver_called.load(std::sync::atomic::Ordering::SeqCst),
+            !tracking.was_called(),
             "session resolver must not be called when earlier candidate succeeds"
         );
     }
 
     #[tokio::test]
     async fn session_fills_when_all_explicit_candidates_absent() {
-        let session_val = SecretValue::new("sk-session".to_string());
-        let ctx = RequestCredential {
+        let fixed = FixedSession("sk-session");
+        let ctx = RequestCredentialContext {
             request_override: None,
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| Some(session_val.clone()),
+            environment: &TestEnv,
+            session: &fixed,
         };
         let execution = dummy_execution(AuthPolicy::bearer(
             vec![CredentialCandidate::Session(SessionKind::Xai)],
@@ -846,12 +853,12 @@ mod tests {
 
     #[tokio::test]
     async fn session_returning_none_fails_when_required() {
-        let ctx = RequestCredential {
+        let ctx = RequestCredentialContext {
             request_override: None,
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &TestEnv,
+            session: &TestSession,
         };
         let execution = dummy_execution(AuthPolicy::bearer(
             vec![CredentialCandidate::Session(SessionKind::Xai)],
@@ -875,18 +882,13 @@ mod tests {
 
     #[tokio::test]
     async fn session_not_used_when_session_candidate_absent() {
-        let session_val = SecretValue::new("sk-session".to_string());
-
-        let session_resolver_called = std::sync::atomic::AtomicBool::new(false);
-        let ctx = RequestCredential {
+        let tracking = TrackingSession::new("sk-session");
+        let ctx = RequestCredentialContext {
             request_override: None,
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| {
-                session_resolver_called.store(true, std::sync::atomic::Ordering::SeqCst);
-                Some(session_val.clone())
-            },
+            environment: &TestEnv,
+            session: &tracking,
         };
         // No Session candidate in the list
         let execution = dummy_execution(AuthPolicy::bearer(vec![], true));
@@ -896,25 +898,20 @@ mod tests {
             "mandatory auth with no candidates must fail even if session resolver present"
         );
         assert!(
-            !session_resolver_called.load(std::sync::atomic::Ordering::SeqCst),
+            !tracking.was_called(),
             "session resolver must not be called when Session candidate is absent"
         );
     }
 
     #[tokio::test]
     async fn optional_session_not_used_when_session_candidate_absent() {
-        let session_val = SecretValue::new("sk-session".to_string());
-
-        let session_resolver_called = std::sync::atomic::AtomicBool::new(false);
-        let ctx = RequestCredential {
+        let tracking = TrackingSession::new("sk-session");
+        let ctx = RequestCredentialContext {
             request_override: None,
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| {
-                session_resolver_called.store(true, std::sync::atomic::Ordering::SeqCst);
-                Some(session_val.clone())
-            },
+            environment: &TestEnv,
+            session: &tracking,
         };
         let execution = dummy_execution(AuthPolicy::bearer(vec![], false));
         let config = prepare_sampler_config(&execution, &ctx, &[])
@@ -925,7 +922,7 @@ mod tests {
             "no auth header expected"
         );
         assert!(
-            !session_resolver_called.load(std::sync::atomic::Ordering::SeqCst),
+            !tracking.was_called(),
             "session resolver must not be called when Session candidate is absent"
         );
     }

@@ -76,7 +76,7 @@ impl Provider for AnthropicProvider {
                 query: None,
             },
             AuthPolicy::header(
-                "x-api-key",
+                http::HeaderName::from_static("x-api-key"),
                 vec![CredentialCandidate::ProviderEnvironment(vec![
                     "ANTHROPIC_API_KEY".into(),
                 ])],

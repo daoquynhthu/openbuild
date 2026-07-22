@@ -1125,13 +1125,15 @@ async fn build_sampler_client(
         .map_err(|e| anyhow!("invalid base_url {base_url:?}: {e}"))?;
 
     let secret = xai_grok_provider::auth::SecretValue::new(resolved);
-    let credentials = xai_grok_provider::prepared::RequestCredential {
-        request_override: Some(&secret),
-        model_inline: None,
-        provider_inline: None,
-        env_reader: &|_| Ok(None),
-        session_resolver: &|| None,
-    };
+    let env = crate::agent::credential_context::ProcessEnvironment;
+    let session = crate::agent::credential_context::NoopSessionResolver;
+    let credentials = xai_grok_provider::auth::RequestCredentialContext::new(
+        Some(&secret),
+        None,
+        None,
+        &env,
+        &session,
+    );
 
     let execution = xai_grok_provider::resolution::ResolvedModelExecution {
         provider_id: xai_grok_provider::types::ProviderId::new("xai"),

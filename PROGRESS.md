@@ -494,3 +494,27 @@ All 12 P13 tasks resolved:
 - `cargo test -p xai-grok-shell --lib -- trace_classifier`: 47/47 pass ✅
 - Static scan: 0 `SamplerConfig {` and 0 `PreparedSamplerConfig {` in shell crate production code ✅
 - `cargo clippy -p xai-grok-sampler -p xai-grok-provider -p xai-grok-shell -- -D warnings`: clean ✅
+
+### P8 M03-M05: Closure-based → trait-based credential context — 2026-07-22
+
+#### Changes made
+- **M02**: `PreparedSamplerConfig::protocol_id` from `String` to `ProtocolId` (import, field, `&*protocol_id` match, `protocol_id.clone()`, tests)
+- **M03/M04/M05**: Created `CredentialError`, `EnvironmentReader`, `SessionCredentialResolver` traits and `RequestCredentialContext` struct in `provider/src/auth.rs`
+- Replaced `<T>` closure-based `RequestCredential` with trait-based `RequestCredentialContext` in `prepared.rs`
+- Made `resolve_auth_from_policy` async
+- Replaced test closures with `TestEnv`/`TestSession`/`TrackingSession`/`FixedSession`/`StaticEnv` helper types
+- Fixed `resolve_candidates` env ordering (model > provider > built-in)
+- Added `RequestCredentialContext::new()` constructor
+- **Shell crate**: removed duplicate `EnvironmentReader`/`SessionCredentialResolver`/`RequestCredentialContext` definitions from `credential_context.rs`
+- Replaced with `pub use` re-exports from `xai_grok_provider::auth`
+- Added `NoopSessionResolver` and kept `TestEnvironment`, `ProcessEnvironment`, `XaiSessionResolver` as implementation types
+- Updated 3 shell call sites (`config.rs:4703`, `provider_resolution.rs:61`, `trace_classifier/mod.rs:1128`) to use `RequestCredentialContext` with trait objects
+
+#### Key results
+- `cargo test -p xai-grok-provider`: 173+1+5+28+8+6 = 221 passed ✅
+- `cargo test -p xai-grok-shell --lib -- credential_context`: 9/9 pass ✅
+- `cargo clippy -p xai-grok-shell -p xai-grok-provider -- -D warnings`: clean ✅
+
+#### Remaining (M06/M07)
+- **M06**: `config.rs`/`provider_resolution.rs` still use `SamplerConfig::from(prepared)` instead of `SamplingClient::from_prepared`. Requires changing `sampling_config_for_model_with_registry` return type from `SamplerConfig` to `SamplingClient`. This affects ~100+ call sites that access `.api_key`. Deferred — requires P8-011 full scope.
+- **M07**: Remove `From<PreparedSamplerConfig> for SamplerConfig` bridge. Depends on M06. Deferred.

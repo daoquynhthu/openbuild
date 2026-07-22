@@ -73,7 +73,7 @@ pub enum AuthPolicy {
     },
     /// Arbitrary header from a list of credential candidates.
     Header {
-        name: String,
+        name: http::HeaderName,
         candidates: Vec<CredentialCandidate>,
         required: bool,
     },
@@ -88,28 +88,22 @@ impl AuthPolicy {
     }
 
     pub fn header(
-        name: impl Into<String>,
+        name: http::HeaderName,
         candidates: Vec<CredentialCandidate>,
         required: bool,
     ) -> Self {
         AuthPolicy::Header {
-            name: name.into(),
+            name,
             candidates,
             required,
         }
     }
 
     /// Validate header names against HTTP token rules.
+    /// `HeaderName` guarantees validity at the type level.
     pub fn validate(&self) -> Result<(), ProviderError> {
         match self {
-            AuthPolicy::Header { name, .. } => {
-                if name.is_empty() || name.bytes().any(|b| b <= 32 || b > 126 || b == 58) {
-                    return Err(ProviderError::InvalidHeader(format!(
-                        "invalid header name: {name:?}"
-                    )));
-                }
-                Ok(())
-            }
+            AuthPolicy::Header { .. } => Ok(()),
             _ => Ok(()),
         }
     }
@@ -148,6 +142,129 @@ fn resolve_candidates_legacy(
     None
 }
 
+/// Credential resolution error (P8-003).
+#[derive(Debug, thiserror::Error)]
+pub enum CredentialError {
+    #[error("{0}")]
+    Read(String),
+}
+
+/// Environment reader — only resolves variables at request time (P8-003).
+pub trait EnvironmentReader: Send + Sync {
+    fn read(&self, var: &str) -> Result<Option<SecretValue>, CredentialError>;
+}
+
+/// Session credential resolver — async, no block_on (P8-003).
+/// Uses boxed-future pattern as required by the architecture.
+pub trait SessionCredentialResolver: Send + Sync {
+    fn resolve(
+        &self,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>,
+    >;
+}
+
+/// Request-time credential context for `prepare_sampler_config` (P8-003).
+/// Providers declare ONLY which candidate types exist; the resolution order
+/// is SYSTEM-fixed and cannot be overridden by individual providers.
+pub struct RequestCredentialContext<'a> {
+    pub request_override: Option<&'a SecretValue>,
+    pub model_inline: Option<&'a SecretValue>,
+    pub provider_inline: Option<&'a SecretValue>,
+    pub environment: &'a dyn EnvironmentReader,
+    pub session: &'a dyn SessionCredentialResolver,
+}
+
+impl<'a> RequestCredentialContext<'a> {
+    pub fn new(
+        request_override: Option<&'a SecretValue>,
+        model_inline: Option<&'a SecretValue>,
+        provider_inline: Option<&'a SecretValue>,
+        environment: &'a dyn EnvironmentReader,
+        session: &'a dyn SessionCredentialResolver,
+    ) -> Self {
+        Self {
+            request_override,
+            model_inline,
+            provider_inline,
+            environment,
+            session,
+        }
+    }
+
+    /// Resolve a credential from a list of candidates following system-fixed priority:
+    /// request override > model inline > provider inline > model env > provider env >
+    /// built-in env > session.
+    pub async fn resolve_candidates(&self, candidates: &[CredentialCandidate]) -> Option<String> {
+        let has_req = candidates.iter().any(|c| matches!(c, CredentialCandidate::RequestOverride));
+        let has_model = candidates.iter().any(|c| matches!(c, CredentialCandidate::ModelInline));
+        let has_prov = candidates.iter().any(|c| matches!(c, CredentialCandidate::ProviderInline));
+        let model_env_keys: Vec<String> = candidates
+            .iter()
+            .filter_map(|c| match c {
+                CredentialCandidate::ModelEnvironment(k) => Some(k.clone()),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        let provider_env_keys: Vec<String> = candidates
+            .iter()
+            .filter_map(|c| match c {
+                CredentialCandidate::ProviderEnvironment(k) => Some(k.clone()),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        let builtin_env_keys: Vec<String> = candidates
+            .iter()
+            .filter_map(|c| match c {
+                CredentialCandidate::BuiltinEnvironment(k) => Some(k.clone()),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        let has_sess = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session(_)));
+
+        // 1. RequestOverride
+        if let Some(v) = self.request_override.filter(|_| has_req) {
+            return Some(v.inner().to_string());
+        }
+        // 2. ModelInline
+        if let Some(v) = self.model_inline.filter(|_| has_model) {
+            return Some(v.inner().to_string());
+        }
+        // 3. ProviderInline
+        if let Some(v) = self.provider_inline.filter(|_| has_prov) {
+            return Some(v.inner().to_string());
+        }
+        // 4. Model environment variables
+        for key in &model_env_keys {
+            if let Ok(Some(v)) = self.environment.read(key) {
+                return Some(v.inner().to_string());
+            }
+        }
+        // 5. Provider environment variables
+        for key in &provider_env_keys {
+            if let Ok(Some(v)) = self.environment.read(key) {
+                return Some(v.inner().to_string());
+            }
+        }
+        // 6. Built-in environment variables
+        for key in &builtin_env_keys {
+            if let Ok(Some(v)) = self.environment.read(key) {
+                return Some(v.inner().to_string());
+            }
+        }
+        // 7. Session (always last)
+        if has_sess
+            && let Ok(Some(v)) = self.session.resolve().await
+        {
+            return Some(v.inner().to_string());
+        }
+        None
+    }
+}
+
 /// Apply an AuthPolicy to produce headers at request time.
 /// Legacy version — resolves using env/session only.
 /// P8 callers should use `prepare_sampler_config` instead.
@@ -183,11 +300,12 @@ pub fn apply_auth_policy(
             match (value, required) {
                 (Some(v), _) => {
                     let mut headers = existing.clone();
-                    headers.insert(name.clone(), v);
+                    headers.insert(name.to_string(), v);
                     Ok(headers)
                 }
                 (None, true) => Err(ProviderError::MissingCredential(format!(
-                    "header credential for {name} not resolved"
+                    "header credential for {} not resolved",
+                    name
                 ))),
                 (None, false) => Ok(existing.clone()),
             }
@@ -433,7 +551,7 @@ mod tests {
     #[test]
     fn auth_policy_validate_header_name() {
         let valid = AuthPolicy::header(
-            "x-api-key",
+            http::HeaderName::from_static("x-api-key"),
             vec![CredentialCandidate::ModelEnvironment(vec![
                 "ANTHROPIC_API_KEY".into(),
             ])],
@@ -441,11 +559,9 @@ mod tests {
         );
         assert!(valid.validate().is_ok());
 
-        let invalid = AuthPolicy::header("", vec![], true);
-        assert!(invalid.validate().is_err());
-
-        let with_colon = AuthPolicy::header("bad:name", vec![], true);
-        assert!(with_colon.validate().is_err());
+        // HeaderName enforces validity at the type level — empty and
+        // colon-containing names cannot be constructed, so those test
+        // cases are no longer applicable.
     }
 
     #[test]
@@ -545,7 +661,7 @@ mod tests {
     #[test]
     fn header_required_without_candidates_errors() {
         let result = apply_auth_policy(
-            &AuthPolicy::header("x-api-key", vec![], true),
+            &AuthPolicy::header(http::HeaderName::from_static("x-api-key"), vec![], true),
             &HeaderMap::new(),
         );
         assert!(
@@ -557,7 +673,7 @@ mod tests {
     #[test]
     fn header_optional_without_candidates_succeeds() {
         let result = apply_auth_policy(
-            &AuthPolicy::header("x-api-key", vec![], false),
+            &AuthPolicy::header(http::HeaderName::from_static("x-api-key"), vec![], false),
             &HeaderMap::new(),
         );
         assert!(result.is_ok(), "optional header without candidates is ok");
@@ -587,22 +703,42 @@ mod tests {
     // After P8-002/P8-011, CredentialCandidate + prepare_sampler_config provide
     // proper inline resolution and Public/None distinction.
 
-    #[test]
-    fn bearer_with_request_override_resolves() {
-        // Simulate the new API: RequestCredential with an override value.
-        // The prepare_sampler_config function resolves candidates in system order.
-        use crate::prepared::{RequestCredential, resolve_auth_from_policy};
+    use std::future::Future;
+    use std::pin::Pin;
+
+    struct TestEnv;
+    impl EnvironmentReader for TestEnv {
+        fn read(&self, _var: &str) -> Result<Option<SecretValue>, CredentialError> {
+            Ok(None)
+        }
+    }
+
+    struct TestSession;
+    impl SessionCredentialResolver for TestSession {
+        fn resolve(
+            &self,
+        ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
+        {
+            Box::pin(async { Ok(None) })
+        }
+    }
+
+    #[tokio::test]
+    async fn bearer_with_request_override_resolves() {
+        use crate::prepared::resolve_auth_from_policy;
 
         let val = SecretValue::new("sk-override".to_string());
-        let ctx = RequestCredential {
+        let env = TestEnv;
+        let session = TestSession;
+        let ctx = RequestCredentialContext {
             request_override: Some(&val),
             model_inline: None,
             provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
+            environment: &env,
+            session: &session,
         };
         let policy = AuthPolicy::bearer(vec![CredentialCandidate::RequestOverride], true);
-        let result = resolve_auth_from_policy(&policy, &ctx);
+        let result = resolve_auth_from_policy(&policy, &ctx).await;
         assert!(result.is_ok());
         let (name, value) = result.unwrap().expect("must resolve");
         assert_eq!(name, "Authorization");

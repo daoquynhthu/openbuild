@@ -4700,23 +4700,25 @@ pub async fn sampling_config_for_model_with_registry(
             .api_key
             .as_deref()
             .map(|k| xai_grok_provider::auth::SecretValue::new(k.to_string()));
-        let creds = xai_grok_provider::prepared::RequestCredential {
-            request_override: None,
-            model_inline: model_inline.as_ref(),
-            provider_inline: None,
-            env_reader: &|_| Ok(None),
-            session_resolver: &|| None,
-        };
-        let config = xai_grok_provider::prepared::prepare_sampler_config(
+        let env = crate::agent::credential_context::ProcessEnvironment;
+        let session = crate::agent::credential_context::NoopSessionResolver;
+        let creds = xai_grok_provider::auth::RequestCredentialContext::new(
+            None,
+            model_inline.as_ref(),
+            None,
+            &env,
+            &session,
+        );
+        let prepared = xai_grok_provider::prepared::prepare_sampler_config(
             &execution,
             &creds,
             &[],
         )
         .await
-        .map(xai_grok_sampler::SamplerConfig::from)
         .map_err(|e| {
             crate::agent::provider_resolution::ProviderResolutionError::AuthCredential(e.to_string())
         })?;
+        let config = xai_grok_sampler::SamplerConfig::from(prepared);
         return Ok(config);
     }
     // No registry or no provider_id — use legacy path (P7-003: remove this).
