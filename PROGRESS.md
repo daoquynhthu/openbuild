@@ -288,7 +288,10 @@
 - 19 tests pass on Windows
 
 ### P11-006: Worktree/git/path repair queue
-- Skipped: requires Phase 2 frozen task cards (not executed)
+- Audited 3 crates for git command shell string concatenation compliance
+- Created P11-PATH-001 (xai-fast-worktree), P11-PATH-002 (xai-grok-plugin-marketplace), P11-PATH-003 (xai-grok-provider) task cards — all VERIFIED
+- All `Command::new("git")` invocations use proper `.arg()`/`.args()` argument arrays; no shell strings
+- xai-grok-provider has zero shell invocations (pure HTTP/API crate)
 
 ### P11-007: Watcher + atomic_replace contract
 - Added `atomic_replace_triggers_watcher_and_coalesces` test
