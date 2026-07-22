@@ -518,3 +518,37 @@ All 12 P13 tasks resolved:
 #### Remaining (M06/M07)
 - **M06**: `config.rs`/`provider_resolution.rs` still use `SamplerConfig::from(prepared)` instead of `SamplingClient::from_prepared`. Requires changing `sampling_config_for_model_with_registry` return type from `SamplerConfig` to `SamplingClient`. This affects ~100+ call sites that access `.api_key`. Deferred — requires P8-011 full scope.
 - **M07**: Remove `From<PreparedSamplerConfig> for SamplerConfig` bridge. Depends on M06. Deferred.
+
+### P8 S01-S05: Phase 8 audit cleanup — 2026-07-22
+
+#### S01: RequestHeaderOverrides newtype
+- Created `RequestHeaderOverrides` newtype in `headers.rs` with `from_slice` validation
+- Changed `prepare_sampler_config` third param from `&[(&str, &str)]` to `&RequestHeaderOverrides`
+- Moved invalid-header tests to validate `RequestHeaderOverrides::from_slice` directly
+- Updated all test call sites in provider crate + 3 shell crate call sites
+- `cargo test -p xai-grok-provider -- prepared`: 30/30 pass ✅
+
+#### S03: Remove AuthPolicy::validate()
+- `AuthPolicy::validate()` always returned `Ok(())` for all variants
+- `HeaderName` type-level validation makes runtime validation redundant
+- Removed the method, its call in `Route::validate()`, and the `auth_policy_validate_header_name` test
+- Test count drops from 173 to 172
+
+#### S04: SecretValue::inner() pub → pub(crate)
+- Changed `inner()` visibility to `pub(crate)` per Plan §line 1007
+- Added `PartialEq` implementation (compares inner values) so external tests can use `==` instead of `.inner()`
+- Shell test assertions updated to use `PartialEq`/`assert_eq`
+- Removed `#[allow(dead_code)]` from `inner` field (now properly used)
+
+#### S05: Route::protocol_id String → ProtocolId
+- Changed field type from `String` to `ProtocolId` (matching `ResolvedModelExecution` and `PreparedSamplerConfig`)
+- Updated `Route::new()` and `Route::make()` parameter types
+- Updated `Route::validate()` to compare with `ProtocolId::default()`
+- Shell crate call site (`provider_resolution.rs:166`) unchanged since `ProtocolId: Clone`
+
+#### Key results
+- `cargo check -p xai-grok-provider -p xai-grok-shell`: clean ✅
+- `cargo clippy -p xai-grok-provider -p xai-grok-shell -- -D warnings`: clean ✅
+- `cargo test -p xai-grok-provider`: 172 passed, 0 failed ✅
+- `cargo test -p xai-grok-shell --lib -- credential_context`: 9/9 pass ✅
+- All S01-S05 items marked `-Fixed` in ISSUE.md ✅
