@@ -13641,6 +13641,7 @@ dependencies = [
  "wl-clipboard-rs",
  "xai-grok-config-types",
  "xai-grok-models",
+ "xai-grok-paths",
  "xai-grok-tools",
  "xai-tty-utils",
 ]

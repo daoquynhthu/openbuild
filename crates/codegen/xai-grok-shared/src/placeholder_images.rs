@@ -331,7 +331,7 @@ pub enum PlaceholderLoadError {
 ///
 /// The list is canonicalised up-front so prefix checks against
 /// canonical resolved paths work. Non-canonical paths are **never**
-/// appended — if `dunce::canonicalize(workspace_cwd)` fails (transient
+/// appended — if `xai_grok_paths::normalize::normalized_absolute(workspace_cwd)` fails (transient
 /// permission, missing dir), the workspace prefix is dropped entirely.
 ///
 /// `$HOME` itself is **not** an allowed prefix: that would let
@@ -355,19 +355,19 @@ pub fn default_allowed_prefixes_with_home(
     home: Option<PathBuf>,
 ) -> Vec<PathBuf> {
     let mut prefixes: Vec<PathBuf> = Vec::new();
-    match dunce::canonicalize(workspace_cwd) {
+    match xai_grok_paths::normalize::normalized_absolute(workspace_cwd) {
         Ok(canon) => prefixes.push(canon),
         Err(e) => {
             tracing::warn!(
                 workspace_cwd = ?workspace_cwd,
-                error_kind = ?e.kind(),
+                error_kind = ?e,
                 "placeholder_images: workspace cwd does not canonicalize; dropping from allowlist",
             );
         }
     }
     if let Some(home) = home {
         for sub in HOME_IMAGE_SUBDIRS {
-            if let Ok(canon) = dunce::canonicalize(home.join(sub)) {
+            if let Ok(canon) = xai_grok_paths::normalize::normalized_absolute(&home.join(sub)) {
                 prefixes.push(canon);
             }
         }
@@ -433,7 +433,7 @@ pub fn load_placeholder_image_with_cap(
     allowed_prefixes: &[PathBuf],
     max_bytes: usize,
 ) -> Result<LoadedPlaceholderImage, PlaceholderLoadError> {
-    let canonical = dunce::canonicalize(Path::new(path_str))
+    let canonical = xai_grok_paths::normalize::normalized_absolute(Path::new(path_str))
         .map_err(|_| PlaceholderLoadError::CanonicalizeFailed)?;
     load_canonical_placeholder_image(&canonical, allowed_prefixes, max_bytes)
 }
@@ -617,7 +617,7 @@ pub fn recover_orphan_placeholders_with_prefixes_and_caps(
     let mut recovered: usize = 0;
     let mut aggregate_bytes: usize = 0;
     for ph in placeholders {
-        let canonical = match dunce::canonicalize(Path::new(&ph.path)) {
+        let canonical = match xai_grok_paths::normalize::normalized_absolute(Path::new(&ph.path)) {
             Ok(c) => c,
             Err(_) => {
                 tracing::warn!(
@@ -683,7 +683,7 @@ pub fn canonical_from_file_uri(uri: &str) -> Option<PathBuf> {
         Err(_) => std::borrow::Cow::Borrowed(raw_path_str),
     };
     let raw = Path::new(decoded.as_ref());
-    Some(dunce::canonicalize(raw).unwrap_or_else(|_| raw.to_path_buf()))
+    Some(xai_grok_paths::normalize::normalized_absolute(raw).unwrap_or_else(|_| raw.to_path_buf()))
 }
 
 #[cfg(test)]
@@ -883,7 +883,7 @@ mod tests {
     fn load_placeholder_image_happy_path() {
         let dir = tempfile::tempdir().unwrap();
         let path = write_png(dir.path(), "ok.png");
-        let canon = dunce::canonicalize(dir.path()).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         let loaded =
             load_placeholder_image(path.to_str().unwrap(), std::slice::from_ref(&canon)).unwrap();
         assert_eq!(loaded.mime_type, "image/png");
@@ -893,7 +893,7 @@ mod tests {
     #[test]
     fn load_placeholder_image_rejects_missing_path() {
         let dir = tempfile::tempdir().unwrap();
-        let canon = dunce::canonicalize(dir.path()).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         let missing = dir.path().join("does-not-exist.png");
         let err = load_placeholder_image(missing.to_str().unwrap(), std::slice::from_ref(&canon))
             .unwrap_err();
@@ -905,7 +905,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("notes.txt");
         std::fs::write(&path, b"hello").unwrap();
-        let canon = dunce::canonicalize(dir.path()).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         let err = load_placeholder_image(path.to_str().unwrap(), std::slice::from_ref(&canon))
             .unwrap_err();
         assert!(matches!(err, PlaceholderLoadError::UnsupportedExtension));
@@ -916,7 +916,7 @@ mod tests {
         let real_dir = tempfile::tempdir().unwrap();
         let png = write_png(real_dir.path(), "real.png");
         let other_dir = tempfile::tempdir().unwrap();
-        let other_canon = dunce::canonicalize(other_dir.path()).unwrap();
+        let other_canon = xai_grok_paths::normalize::normalized_absolute(other_dir.path()).unwrap();
         let err = load_placeholder_image(png.to_str().unwrap(), std::slice::from_ref(&other_canon))
             .unwrap_err();
         assert!(matches!(err, PlaceholderLoadError::OutsideAllowedPrefixes));
@@ -927,7 +927,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("fake.png");
         std::fs::write(&path, b"not actually a png").unwrap();
-        let canon = dunce::canonicalize(dir.path()).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         let err = load_placeholder_image(path.to_str().unwrap(), std::slice::from_ref(&canon))
             .unwrap_err();
         assert!(matches!(err, PlaceholderLoadError::NotAnImage));
@@ -947,7 +947,7 @@ mod tests {
         let mut bytes = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
         bytes.extend(b"PRIVATE KEY DATA - not a real PNG");
         std::fs::write(&path, &bytes).unwrap();
-        let canon = dunce::canonicalize(dir.path()).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         let err = load_placeholder_image(path.to_str().unwrap(), std::slice::from_ref(&canon))
             .unwrap_err();
         assert!(
@@ -961,7 +961,7 @@ mod tests {
         let allowed = tempfile::tempdir().unwrap();
         let dir_path = allowed.path().join("looks-like.png");
         std::fs::create_dir(&dir_path).unwrap();
-        let canon = dunce::canonicalize(allowed.path()).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(allowed.path()).unwrap();
         let err = load_placeholder_image(dir_path.to_str().unwrap(), std::slice::from_ref(&canon))
             .unwrap_err();
         assert!(matches!(err, PlaceholderLoadError::NotAFile));
@@ -980,7 +980,7 @@ mod tests {
         let path = dir.path().join("locked.png");
         std::fs::write(&path, PNG_BYTES).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
-        let canon = dunce::canonicalize(dir.path()).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         let err = load_placeholder_image(path.to_str().unwrap(), std::slice::from_ref(&canon))
             .unwrap_err();
         let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
@@ -994,7 +994,7 @@ mod tests {
     fn load_placeholder_image_rejects_oversize_via_injectable_cap() {
         let dir = tempfile::tempdir().unwrap();
         let path = write_png(dir.path(), "small-but-over-cap.png");
-        let canon = dunce::canonicalize(dir.path()).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         let err = load_placeholder_image_with_cap(
             path.to_str().unwrap(),
             std::slice::from_ref(&canon),
@@ -1019,7 +1019,7 @@ mod tests {
         let link = allowed_dir.path().join("link.png");
         std::os::unix::fs::symlink(&target, &link).unwrap();
 
-        let allowed_canon = dunce::canonicalize(allowed_dir.path()).unwrap();
+        let allowed_canon = xai_grok_paths::normalize::normalized_absolute(allowed_dir.path()).unwrap();
         let err =
             load_placeholder_image(link.to_str().unwrap(), std::slice::from_ref(&allowed_canon))
                 .unwrap_err();
@@ -1042,7 +1042,7 @@ mod tests {
             .join("..")
             .join(outside_dir.path().file_name().unwrap())
             .join(&unique);
-        let allowed_canon = dunce::canonicalize(allowed_dir.path()).unwrap();
+        let allowed_canon = xai_grok_paths::normalize::normalized_absolute(allowed_dir.path()).unwrap();
         let err = load_placeholder_image(
             traversal.to_str().unwrap(),
             std::slice::from_ref(&allowed_canon),
@@ -1063,7 +1063,7 @@ mod tests {
             .join("originals");
         std::fs::create_dir_all(&bundle).unwrap();
         let png = write_png(&bundle, "hash.png");
-        let allowed_canon = dunce::canonicalize(root.path()).unwrap();
+        let allowed_canon = xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap();
         let err =
             load_placeholder_image(png.to_str().unwrap(), std::slice::from_ref(&allowed_canon))
                 .unwrap_err();
@@ -1085,12 +1085,12 @@ mod tests {
         for sub in HOME_IMAGE_SUBDIRS {
             let p = home.path().join(sub);
             std::fs::create_dir(&p).unwrap();
-            expected_subdir_canons.push(dunce::canonicalize(&p).unwrap());
+            expected_subdir_canons.push(xai_grok_paths::normalize::normalized_absolute(&p).unwrap());
         }
 
         let prefixes =
             default_allowed_prefixes_with_home(dir.path(), Some(home.path().to_path_buf()));
-        let dir_canon = dunce::canonicalize(dir.path()).unwrap();
+        let dir_canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         assert!(prefixes.contains(&dir_canon));
         for canon in &expected_subdir_canons {
             assert!(
@@ -1099,7 +1099,7 @@ mod tests {
             );
         }
         // $HOME itself is NOT in the list.
-        assert!(!prefixes.contains(&dunce::canonicalize(home.path()).unwrap()));
+        assert!(!prefixes.contains(&xai_grok_paths::normalize::normalized_absolute(home.path()).unwrap()));
         // At least workspace + each subdir, sorted+deduped. Uses `>=`
         // not `==` so the test stays green if `$TMPDIR` happens to
         // resolve inside one of the home subdirs (e.g. CI runners that
@@ -1117,7 +1117,7 @@ mod tests {
     fn default_allowed_prefixes_with_home_unset_returns_workspace_only() {
         let dir = tempfile::tempdir().unwrap();
         let prefixes = default_allowed_prefixes_with_home(dir.path(), None);
-        let dir_canon = dunce::canonicalize(dir.path()).unwrap();
+        let dir_canon = xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap();
         assert_eq!(prefixes, vec![dir_canon]);
     }
 
@@ -1128,7 +1128,7 @@ mod tests {
         std::fs::create_dir(&downloads).unwrap();
         let prefixes =
             default_allowed_prefixes_with_home(&downloads, Some(home.path().to_path_buf()));
-        let dl_canon = dunce::canonicalize(&downloads).unwrap();
+        let dl_canon = xai_grok_paths::normalize::normalized_absolute(&downloads).unwrap();
         let count = prefixes.iter().filter(|p| **p == dl_canon).count();
         assert_eq!(
             count, 1,
@@ -1162,7 +1162,7 @@ mod tests {
         let with_space = dir.path().join("My Pictures");
         std::fs::create_dir(&with_space).unwrap();
         let png = write_png(&with_space, "cat.png");
-        let canon = dunce::canonicalize(&png).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(&png).unwrap();
         // RFC 3986 form: spaces percent-encoded.
         let raw = format!("file://{}", png.display());
         let encoded = raw.replace(' ', "%20");
@@ -1183,10 +1183,10 @@ mod tests {
     fn recover_orphan_placeholders_loads_orphan() {
         let dir = tempfile::tempdir().unwrap();
         let path = write_png(dir.path(), "rec.png");
-        let canon = dunce::canonicalize(&path).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(&path).unwrap();
         let query = format!("look at [Image #1: {}]", canon.display());
         let mut raw: Vec<agent_client_protocol::ImageContent> = Vec::new();
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(n, 1);
         assert_eq!(raw.len(), 1);
@@ -1202,11 +1202,11 @@ mod tests {
     fn recover_orphan_placeholders_dedupes_against_canonical_uri() {
         let dir = tempfile::tempdir().unwrap();
         let path = write_png(dir.path(), "dup.png");
-        let canon = dunce::canonicalize(&path).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(&path).unwrap();
         let attached_uri = format!("file://{}", canon.display());
         let mut raw = vec![make_acp_image(&attached_uri)];
         let query = format!("see [Image #1: {}]", canon.display());
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(n, 0, "canonical-canonical dedup must skip the load");
         assert_eq!(raw.len(), 1);
@@ -1226,9 +1226,9 @@ mod tests {
 
         let attached_uri = format!("file://{}", link.display()); // non-canonical
         let mut raw = vec![make_acp_image(&attached_uri)];
-        let canonical_placeholder = dunce::canonicalize(&real_target).unwrap();
+        let canonical_placeholder = xai_grok_paths::normalize::normalized_absolute(&real_target).unwrap();
         let query = format!("[Image #1: {}]", canonical_placeholder.display());
-        let allowed = vec![dunce::canonicalize(outside_root.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(outside_root.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(
             n, 0,
@@ -1244,13 +1244,13 @@ mod tests {
         let space_dir = dir.path().join("My Pictures");
         std::fs::create_dir(&space_dir).unwrap();
         let png = write_png(&space_dir, "cat.png");
-        let canon = dunce::canonicalize(&png).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(&png).unwrap();
         // Attached image URI uses RFC 3986 percent-encoded form.
         let raw_form = format!("file://{}", canon.display());
         let encoded = raw_form.replace(' ', "%20");
         let mut raw = vec![make_acp_image(&encoded)];
         let query = format!("[Image #1: {}]", canon.display());
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(
             n, 0,
@@ -1275,14 +1275,14 @@ mod tests {
         let space_dir = dir.path().join("My Pictures");
         std::fs::create_dir(&space_dir).unwrap();
         let png = write_png(&space_dir, "cat.png");
-        let canon = dunce::canonicalize(&png).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(&png).unwrap();
         let attached_uri = format!("file://{}", canon.display());
         let mut raw = vec![make_acp_image(&attached_uri)];
         // Percent-encoded path inside the placeholder text — not the
         // documented wire format.
         let encoded_in_text = format!("{}", canon.display()).replace(' ', "%20");
         let query = format!("[Image #1: {}]", encoded_in_text);
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(n, 0);
         assert_eq!(raw.len(), 1, "attached URI must remain intact");
@@ -1293,7 +1293,7 @@ mod tests {
     fn recover_orphan_placeholders_zero_placeholders_short_circuits() {
         let dir = tempfile::tempdir().unwrap();
         let mut raw: Vec<agent_client_protocol::ImageContent> = Vec::new();
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes("just a message", &mut raw, &allowed);
         assert_eq!(n, 0);
         assert!(raw.is_empty());
@@ -1305,7 +1305,7 @@ mod tests {
         let missing = dir.path().join("nope.png");
         let mut raw: Vec<agent_client_protocol::ImageContent> = Vec::new();
         let query = format!("[Image #1: {}]", missing.display());
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(n, 0);
         assert!(raw.is_empty());
@@ -1316,12 +1316,12 @@ mod tests {
         let workspace = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
         let png = write_png(outside.path(), "secret.png");
-        let canon = dunce::canonicalize(&png).unwrap();
+        let canon = xai_grok_paths::normalize::normalized_absolute(&png).unwrap();
         let mut raw: Vec<agent_client_protocol::ImageContent> = Vec::new();
         let query = format!("[Image #1: {}]", canon.display());
         // Allowlist is workspace only — the placeholder canon is
         // outside it.
-        let allowed = vec![dunce::canonicalize(workspace.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(workspace.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(n, 0);
         assert!(raw.is_empty());
@@ -1338,11 +1338,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let p1 = write_png(dir.path(), "a.png");
         let p2 = write_png(dir.path(), "b.png");
-        let c1 = dunce::canonicalize(&p1).unwrap();
-        let c2 = dunce::canonicalize(&p2).unwrap();
+        let c1 = xai_grok_paths::normalize::normalized_absolute(&p1).unwrap();
+        let c2 = xai_grok_paths::normalize::normalized_absolute(&p2).unwrap();
         let query = format!("[Image #1: {}] [Image #2: {}]", c1.display(), c2.display());
         let mut raw: Vec<agent_client_protocol::ImageContent> = Vec::new();
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         // Per-image cap permissive; aggregate cap admits exactly one
         // image (PNG_BYTES is 67 bytes; cap at 100 lets one through,
         // blocks the second).
@@ -1367,10 +1367,10 @@ mod tests {
     fn recover_orphan_placeholders_aggregate_cap_inclusive_boundary() {
         let dir = tempfile::tempdir().unwrap();
         let p = write_png(dir.path(), "one.png");
-        let c = dunce::canonicalize(&p).unwrap();
+        let c = xai_grok_paths::normalize::normalized_absolute(&p).unwrap();
         let query = format!("[Image #1: {}]", c.display());
         let mut raw: Vec<agent_client_protocol::ImageContent> = Vec::new();
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         // Cap == image size: the `>` comparison admits this image.
         let n = recover_orphan_placeholders_with_prefixes_and_caps(
             &query,
@@ -1391,10 +1391,10 @@ mod tests {
     fn recover_orphan_placeholders_aggregate_cap_inclusive_boundary_rejects_at_one_below() {
         let dir = tempfile::tempdir().unwrap();
         let p = write_png(dir.path(), "one.png");
-        let c = dunce::canonicalize(&p).unwrap();
+        let c = xai_grok_paths::normalize::normalized_absolute(&p).unwrap();
         let query = format!("[Image #1: {}]", c.display());
         let mut raw: Vec<agent_client_protocol::ImageContent> = Vec::new();
-        let allowed = vec![dunce::canonicalize(dir.path()).unwrap()];
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes_and_caps(
             &query,
             &mut raw,
@@ -1430,10 +1430,10 @@ mod tests {
                 std::fs::create_dir(&current).unwrap();
             }
             let png = write_png(&current, "x.png");
-            let canon = dunce::canonicalize(&png).unwrap();
+            let canon = xai_grok_paths::normalize::normalized_absolute(&png).unwrap();
             // Allowlist is the root — without the deny-list, this
             // path would be accepted.
-            let allowed = vec![dunce::canonicalize(root.path()).unwrap()];
+            let allowed = vec![xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap()];
             let err = load_placeholder_image(canon.to_str().unwrap(), &allowed).unwrap_err();
             assert!(
                 matches!(err, PlaceholderLoadError::OutsideAllowedPrefixes),
@@ -1447,8 +1447,8 @@ mod tests {
         // path would pass the loop above and ship.
         let root = tempfile::tempdir().unwrap();
         let png = write_png(root.path(), "picture.png");
-        let canon = dunce::canonicalize(&png).unwrap();
-        let allowed = vec![dunce::canonicalize(root.path()).unwrap()];
+        let canon = xai_grok_paths::normalize::normalized_absolute(&png).unwrap();
+        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap()];
         let loaded =
             load_placeholder_image(canon.to_str().unwrap(), &allowed).unwrap_or_else(|e| {
                 panic!("positive control: benign path inside allowed prefix must load, got: {e:?}")
