@@ -9,6 +9,7 @@ description = "Track file hunks (diffs) with agent/external attribution"
 # External
 chrono = { workspace = true, features = ["serde"] }
 dunce = { workspace = true }
+xai-grok-paths = { path = "../xai-grok-paths" }
 rustc-hash = { workspace = true }
 gix = { workspace = true, features = ["status", "index", "parallel"] }
 serde = { workspace = true, features = ["derive", "rc"] }

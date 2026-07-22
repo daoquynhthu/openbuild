@@ -1024,7 +1024,7 @@ mod factory_tests {
         // in the index must match what the watcher event delivers.
         let file_raw = global.join("note.md");
         std::fs::write(&file_raw, "# Unique\n\nXyzzy-watcher-delete-token.").unwrap();
-        let file = dunce::canonicalize(&file_raw).unwrap_or(file_raw);
+        let file = xai_grok_paths::normalize::normalized_absolute(&file_raw).unwrap_or(file_raw);
 
         {
             let mut idx = MemoryIndex::open_or_create(
@@ -1040,7 +1040,7 @@ mod factory_tests {
 
         // Step 2: Start watcher AFTER indexing so the Remove event for the
         // upcoming deletion is the first event the watcher ever sees.
-        let watch_dir = dunce::canonicalize(&global).unwrap_or(global.clone());
+        let watch_dir = xai_grok_paths::normalize::normalized_absolute(&global).unwrap_or(global.clone());
         let watcher = match crate::watcher::MemoryFileWatcher::start(&watch_dir) {
             Some(w) => w,
             None => {

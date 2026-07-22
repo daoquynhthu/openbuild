@@ -46,8 +46,8 @@ fn open_or_discover(
 
             // Canonicalize both paths to handle symlinks (e.g., /var -> /private/var on macOS)
             let canonical_working_dir =
-                dunce::canonicalize(working_dir).unwrap_or_else(|_| working_dir.to_path_buf());
-            let canonical_repo_root = dunce::canonicalize(&repo_root).unwrap_or(repo_root);
+                xai_grok_paths::normalize::normalized_absolute(working_dir).unwrap_or_else(|_| working_dir.to_path_buf());
+            let canonical_repo_root = xai_grok_paths::normalize::normalized_absolute(&repo_root).unwrap_or(repo_root);
 
             let prefix = canonical_working_dir
                 .strip_prefix(&canonical_repo_root)
@@ -70,9 +70,9 @@ fn open_or_discover(
 /// when the file itself doesn't exist (e.g., deleted files on macOS where
 /// `/var` -> `/private/var`).
 fn canonicalize_or_parent(path: &Path) -> PathBuf {
-    dunce::canonicalize(path).unwrap_or_else(|_| {
+    xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| {
         path.parent()
-            .and_then(|p| dunce::canonicalize(p).ok())
+            .and_then(|p| xai_grok_paths::normalize::normalized_absolute(p).ok())
             .and_then(|cp| path.file_name().map(|f| cp.join(f)))
             .unwrap_or_else(|| path.to_path_buf())
     })
@@ -364,7 +364,7 @@ impl HunkTrackerActor {
             // Canonicalize to handle symlinks (e.g., /var -> /private/var on macOS).
             let canonical_abs_path = canonicalize_or_parent(&abs_path);
             let canonical_working_dir =
-                dunce::canonicalize(&working_dir_for_strip).unwrap_or(working_dir_for_strip);
+                xai_grok_paths::normalize::normalized_absolute(&working_dir_for_strip).unwrap_or(working_dir_for_strip);
 
             let working_dir_relative = match canonical_abs_path.strip_prefix(&canonical_working_dir)
             {
@@ -461,7 +461,7 @@ impl HunkTrackerActor {
                 };
             };
 
-            let canonical_working_dir = dunce::canonicalize(&working_dir).unwrap_or(working_dir);
+            let canonical_working_dir = xai_grok_paths::normalize::normalized_absolute(&working_dir).unwrap_or(working_dir);
 
             // Resolve HEAD tree once for all lookups
             let tree = (|| {

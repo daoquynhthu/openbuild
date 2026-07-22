@@ -13236,6 +13236,7 @@ dependencies = [
  "xai-grok-auth",
  "xai-grok-config-types",
  "xai-grok-http",
+ "xai-grok-paths",
  "xai-grok-telemetry",
  "xai-grok-tools",
  "xai-grok-version",
@@ -13608,6 +13609,7 @@ dependencies = [
  "toml",
  "tracing",
  "xai-grok-config",
+ "xai-grok-paths",
 ]
 
 [[package]]
@@ -14216,6 +14218,7 @@ dependencies = [
  "tracing",
  "uuid",
  "xai-gix-status",
+ "xai-grok-paths",
  "xai-test-utils",
 ]
 

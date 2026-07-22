@@ -278,8 +278,10 @@ impl MemoryStorage {
         lines: Option<usize>,
     ) -> std::io::Result<String> {
         // Security: canonicalize both sides — fail hard if either doesn't exist.
-        let canonical = dunce::canonicalize(path)?;
-        let canonical_global = dunce::canonicalize(&self.global_dir).map_err(|e| {
+        let canonical = xai_grok_paths::normalize::normalized_absolute(path).map_err(|e| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, e.to_string())
+        })?;
+        let canonical_global = xai_grok_paths::normalize::normalized_absolute(&self.global_dir).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!("memory directory {:?} does not exist: {e}", self.global_dir),
@@ -581,12 +583,12 @@ pub fn normalize_memory_content(raw: &str) -> String {
 /// like `/tmp/…` or `/var/folders/…/T/…`. Creating persistent workspace
 /// memory for these paths is wasteful and produces orphan directories.
 fn is_ephemeral_cwd(cwd: &Path) -> bool {
-    let canonical = dunce::canonicalize(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let canonical = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
     let s = canonical.to_string_lossy();
     let raw_s = cwd.to_string_lossy();
 
     let temp = std::env::temp_dir();
-    let temp_canonical = dunce::canonicalize(&temp).unwrap_or(temp);
+    let temp_canonical = xai_grok_paths::normalize::normalized_absolute(&temp).unwrap_or(temp);
 
     canonical.starts_with(&temp_canonical)
         || raw_s.starts_with("/tmp/")
@@ -618,7 +620,7 @@ fn compute_workspace_hash(cwd: &Path) -> String {
         }
         None => {
             // Windows-only, non-git cwds: dunce changes the hash input, so the old-form dir is orphaned until session gc() reaps it after max_age_days — accepted over an unverifiable rename migration (Unix unchanged).
-            let canonical = dunce::canonicalize(cwd).unwrap_or_else(|_| {
+            let canonical = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| {
                 tracing::warn!(
                     path = %cwd.display(),
                     "could not canonicalize workspace path for memory hash; using raw path"

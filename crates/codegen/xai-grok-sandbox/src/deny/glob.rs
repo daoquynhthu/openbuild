@@ -217,7 +217,7 @@ fn glob_tail_to_regex(tail: &str) -> String {
 fn glob_to_seatbelt_regexes(workspace: &Path, glob: &str) -> Vec<String> {
     let (root, tail) = split_glob_root(workspace, glob);
     let tail_regex = glob_tail_to_regex(&tail);
-    let canonical_root = dunce::canonicalize(&root).unwrap_or_else(|_| root.clone());
+    let canonical_root = xai_grok_paths::normalize::normalized_absolute(&root).unwrap_or_else(|_| root.clone());
     let mut regexes = Vec::new();
     for form in macos_deny_aliases(&root, &canonical_root) {
         let Some(form_str) = form.to_str() else {
