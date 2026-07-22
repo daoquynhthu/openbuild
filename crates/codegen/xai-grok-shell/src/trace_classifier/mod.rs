@@ -1121,13 +1121,24 @@ async fn build_sampler_client(
         }
     };
     let resolved = resolve_api_key(api_key, grok_home_path).await?;
-    let config = xai_grok_sampler::SamplerConfig {
-        api_key: Some(resolved),
-        base_url,
-        model,
-        max_completion_tokens: Some(LAZINESS_MAX_OUTPUT_TOKENS),
-        ..xai_grok_sampler::SamplerConfig::default()
+    let mut idx = indexmap::IndexMap::new();
+    idx.insert("Authorization".to_string(), format!("Bearer {resolved}"));
+    let headers = xai_grok_provider::headers::SensitiveHeaderMap::from_index_map(&idx);
+    let url: url::Url = base_url.parse()
+        .map_err(|e| anyhow!("invalid base_url {base_url:?}: {e}"))?;
+    let prepared = xai_grok_provider::prepared::PreparedSamplerConfig {
+        provider_id: xai_grok_provider::types::ProviderId::new("xai"),
+        route_id: xai_grok_provider::types::RouteId::new("xai-responses"),
+        protocol_id: "chat_completions".to_string(),
+        request_url: url,
+        headers,
+        model_id: xai_grok_provider::types::ModelId::new(model),
+        generation: xai_grok_provider::model::GenerationOptions::new(
+            Some(LAZINESS_MAX_OUTPUT_TOKENS), None, None,
+        ),
+        limits: xai_grok_provider::model::ModelLimits::default(),
     };
+    let config: xai_grok_sampler::SamplerConfig = prepared.into();
     xai_grok_sampler::SamplingClient::new(config).map_err(|e| anyhow!("build SamplingClient: {e}"))
 }
 

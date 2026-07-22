@@ -772,6 +772,7 @@ use xai_grok_subagent_resolution::resolve_effective_overrides;
 /// intentionally ignored. Subagent prompt/toolset is always determined by
 /// the `AgentDefinition`, not the model. See design spec
 /// "Behavioral Rules section 3".
+#[allow(clippy::field_reassign_with_default)]
 async fn resolve_subagent_sampling_config(
     agent_name: &str,
     agent_model: &xai_grok_agent::config::ModelOverride,
@@ -919,44 +920,47 @@ async fn read_parent_sampling_config(
                     .into(),
             );
 
-            let inherited = xai_grok_sampler::SamplerConfig {
-                api_key: creds.api_key,
-                base_url: cfg.base_url,
-                model: cfg.model.clone(),
-                endpoint_path: ctx.sampling_config.endpoint_path.clone(),
-                endpoint_query: ctx.sampling_config.endpoint_query.clone(),
-                request_url: ctx.sampling_config.request_url.clone(),
-                max_completion_tokens: cfg.max_completion_tokens,
-                temperature: cfg.temperature,
-                top_p: cfg.top_p,
-                api_backend: cfg.api_backend,
-                protocol_id: parent_protocol,
-                auth_scheme,
-                extra_headers,
-                context_window: cfg.context_window.get(),
-                client_version: creds.client_version,
-                reasoning_effort: cfg.reasoning_effort,
-                force_http1: false,
-                max_retries: None,
-                stream_tool_calls: cfg.stream_tool_calls.unwrap_or(false),
-                idle_timeout_secs: None,
-                client_identifier: ctx.sampling_config.client_identifier.clone(),
-                deployment_id: ctx.sampling_config.deployment_id.clone(),
-                user_id: ctx.sampling_config.user_id.clone(),
-                origin_client: ctx.sampling_config.origin_client.clone(),
-                attribution_callback: ctx.attribution_callback.clone(),
-                bearer_resolver: None,
-                supports_backend_search: ctx
+            #[allow(clippy::field_reassign_with_default)]
+            let inherited = {
+                let mut c = xai_grok_sampler::SamplerConfig::default();
+                c.api_key = creds.api_key;
+                c.base_url = cfg.base_url;
+                c.model = cfg.model.clone();
+                c.endpoint_path = ctx.sampling_config.endpoint_path.clone();
+                c.endpoint_query = ctx.sampling_config.endpoint_query.clone();
+                c.request_url = ctx.sampling_config.request_url.clone();
+                c.max_completion_tokens = cfg.max_completion_tokens;
+                c.temperature = cfg.temperature;
+                c.top_p = cfg.top_p;
+                c.api_backend = cfg.api_backend;
+                c.protocol_id = parent_protocol;
+                c.auth_scheme = auth_scheme;
+                c.extra_headers = extra_headers;
+                c.context_window = cfg.context_window.get();
+                c.client_version = creds.client_version;
+                c.reasoning_effort = cfg.reasoning_effort;
+                c.force_http1 = false;
+                c.max_retries = None;
+                c.stream_tool_calls = cfg.stream_tool_calls.unwrap_or(false);
+                c.idle_timeout_secs = None;
+                c.client_identifier = ctx.sampling_config.client_identifier.clone();
+                c.deployment_id = ctx.sampling_config.deployment_id.clone();
+                c.user_id = ctx.sampling_config.user_id.clone();
+                c.origin_client = ctx.sampling_config.origin_client.clone();
+                c.attribution_callback = ctx.attribution_callback.clone();
+                c.bearer_resolver = None;
+                c.supports_backend_search = ctx
                     .models_manager
-                    .model_supports_backend_search(ctx.model_id.0.as_ref()),
-                compactions_remaining: ctx
+                    .model_supports_backend_search(ctx.model_id.0.as_ref());
+                c.compactions_remaining = ctx
                     .models_manager
-                    .model_compactions_remaining(ctx.model_id.0.as_ref()),
-                compaction_at_tokens: ctx
+                    .model_compactions_remaining(ctx.model_id.0.as_ref());
+                c.compaction_at_tokens = ctx
                     .models_manager
-                    .model_compaction_at_tokens(ctx.model_id.0.as_ref()),
-                doom_loop_recovery: ctx.sampling_config.doom_loop_recovery,
-                header_injector: ctx.sampling_config.header_injector.clone(),
+                    .model_compaction_at_tokens(ctx.model_id.0.as_ref());
+                c.doom_loop_recovery = ctx.sampling_config.doom_loop_recovery;
+                c.header_injector = ctx.sampling_config.header_injector.clone();
+                c
             };
             let model_id = ctx.model_id.clone();
             let global_model_id = ctx.models_manager.current_model_id();

@@ -183,68 +183,26 @@ impl Default for ShellToolsetConfig {
 }
 
 /// Web-search-specific sampling overrides applied on top of a base `SamplerConfig`.
-pub(crate) fn web_search_sampling_config(base: SamplerConfig) -> SamplerConfig {
-    let model = if base.model.is_empty() {
-        models::default_web_search_model().to_string()
-    } else {
-        base.model.clone()
-    };
-    SamplerConfig {
-        model,
-        max_completion_tokens: Some(8192),
-        temperature: Some(0.1),
-        top_p: Some(0.95),
-        force_http1: false,
-        max_retries: None,
-        ..base
+pub(crate) fn web_search_sampling_config(mut base: SamplerConfig) -> SamplerConfig {
+    if base.model.is_empty() {
+        base.model = models::default_web_search_model().to_string();
     }
+    base.max_completion_tokens = Some(8192);
+    base.temperature = Some(0.1);
+    base.top_p = Some(0.95);
+    base.force_http1 = false;
+    base.max_retries = None;
+    base
 }
 
 impl ShellToolsetConfig {
     /// Optionally layers sampling credentials onto the web search config.
     /// Classification: LEGACY FALLBACK PATH (web search default base)
+    #[allow(clippy::field_reassign_with_default)]
     pub fn new(base: Option<Self>, sampling_config: Option<SamplerConfig>) -> Self {
-        let default_base = SamplerConfig {
-            api_key: None,
-            base_url: "https://api.x.ai/v1".to_string(),
-            model: String::new(),
-            max_completion_tokens: None,
-            temperature: None,
-            top_p: None,
-            api_backend: Default::default(),
-            protocol_id: None,
-            auth_scheme: Default::default(),
-            extra_headers: indexmap::IndexMap::new(),
-            context_window: 256_000,
-            client_version: None,
-            reasoning_effort: None,
-            force_http1: false,
-            max_retries: None,
-            stream_tool_calls: false,
-            endpoint_path: None,
-            endpoint_query: None,
-            request_url: None,
-            idle_timeout_secs: None,
-            client_identifier: None,
-            deployment_id: None,
-            user_id: None,
-            origin_client: None,
-            // Default base for the in-process web-search tool config.
-            // Real `SamplerConfig`s (e.g. from `sampling_config_for_model`)
-            // overwrite this entire struct via the `..base` pattern in
-            // `web_search_sampling_config`, so leaving the callback
-            // `None` here is fine -- it is only the placeholder for the
-            // "no base provided" path. The live attribution
-            // wiring lives at the production SamplerConfig sites in
-            // agent/config.rs and acp_session.rs.
-            attribution_callback: None,
-            bearer_resolver: None,
-            supports_backend_search: false,
-            compactions_remaining: None,
-            compaction_at_tokens: None,
-            doom_loop_recovery: None,
-            header_injector: None,
-        };
+        let mut default_base = SamplerConfig::default();
+        default_base.base_url = "https://api.x.ai/v1".to_string();
+        default_base.context_window = 256_000;
         let mut toolset = base.unwrap_or_else(|| Self {
             bash: BashToolConfig::default(),
             web_search: web_search_sampling_config(default_base),

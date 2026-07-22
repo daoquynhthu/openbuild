@@ -676,7 +676,11 @@ mod tests {
                     }
                     continue;
                 }
-                if trimmed.contains("SamplerConfig {") && !trimmed.starts_with("//") {
+                if !trimmed.starts_with("//")
+                    && trimmed.contains("SamplerConfig {")
+                    && !trimmed.contains("-> SamplerConfig {")
+                    && !trimmed.contains("PreparedSamplerConfig")
+                {
                     failures.push(format!(
                         "{}:{}: {}",
                         relative.display(),

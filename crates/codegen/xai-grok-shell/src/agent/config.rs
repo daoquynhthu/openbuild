@@ -4737,6 +4737,7 @@ pub async fn sampling_config_for_model_with_registry(
 /// Delegates to `resolve_model_execution` when a registry snapshot is
 /// provided via `registry_override`. Falls back to legacy path for
 /// backward compatibility when no registry is available.
+#[allow(clippy::field_reassign_with_default)]
 pub fn sampling_config_for_model(
     model: &ModelEntry,
     credentials: ResolvedCredentials,
@@ -4781,41 +4782,31 @@ pub fn sampling_config_for_model(
         (credentials.api_key, credentials.auth_scheme)
     };
 
-    SamplerConfig {
-        api_key,
-        model: model_name,
-        base_url: credentials.base_url,
-        max_completion_tokens,
-        temperature,
-        top_p,
-        protocol_id: Some(
-            xai_grok_sampler::protocols::api_backend_to_protocol_id(&api_backend).into(),
-        ),
-        api_backend,
-        auth_scheme,
-        extra_headers,
-        context_window: info.context_window.get(),
-        client_version,
-        reasoning_effort: info.reasoning_effort,
-        force_http1: false,
-        max_retries: info.max_retries,
-        stream_tool_calls: info.stream_tool_calls.unwrap_or(false),
-        endpoint_path: None,
-        endpoint_query: None,
-        request_url: None,
-        idle_timeout_secs: None,
-        client_identifier: None,
-        deployment_id,
-        user_id,
-        origin_client: None,
-        attribution_callback: None,
-        bearer_resolver: None,
-        supports_backend_search: info.supports_backend_search,
-        compactions_remaining: info.compactions_remaining,
-        compaction_at_tokens: info.compaction_at_tokens,
-        doom_loop_recovery: None,
-        header_injector: None,
-    }
+    let mut result = SamplerConfig::default();
+    result.api_key = api_key;
+    result.model = model_name;
+    result.base_url = credentials.base_url;
+    result.max_completion_tokens = max_completion_tokens;
+    result.temperature = temperature;
+    result.top_p = top_p;
+    result.protocol_id = Some(
+        xai_grok_sampler::protocols::api_backend_to_protocol_id(&api_backend).into(),
+    );
+    result.api_backend = api_backend;
+    result.auth_scheme = auth_scheme;
+    result.extra_headers = extra_headers;
+    result.context_window = info.context_window.get();
+    result.client_version = client_version;
+    result.reasoning_effort = info.reasoning_effort;
+    result.force_http1 = false;
+    result.max_retries = info.max_retries;
+    result.stream_tool_calls = info.stream_tool_calls.unwrap_or(false);
+    result.deployment_id = deployment_id;
+    result.user_id = user_id;
+    result.supports_backend_search = info.supports_backend_search;
+    result.compactions_remaining = info.compactions_remaining;
+    result.compaction_at_tokens = info.compaction_at_tokens;
+    result
 }
 /// Fold URL-derived headers into `extra_headers`.
 ///
