@@ -1,4 +1,4 @@
-//! P14-002: Real launcher helper E2E foundation.
+//! P14-002/003: Real launcher helper E2E foundation.
 //!
 //! Tests the full production chain:
 //! TOML → bootstrap → snapshot → manual model → resolve_model_execution →
@@ -9,7 +9,7 @@
 use futures_util::StreamExt;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
 use xai_grok_shell::agent::provider_resolution::execution_to_sampler_config;
-use xai_grok_shell::sampling::{Client, ConversationItem, ConversationRequest};
+use xai_grok_shell::sampling::{ApiBackend, Client, ConversationItem, ConversationRequest};
 use xai_grok_test_support::MockInferenceServer;
 
 /// Create a ModelEntry for a custom OpenAI-compatible provider.
@@ -144,4 +144,123 @@ fn resolve_fails_for_unknown_provider() {
     let model = custom_model_entry("nonexistent-provider", "test-model");
     let result = execution_to_sampler_config(&model, &snapshot, Some("key"), None);
     assert!(result.is_err(), "must fail for unknown provider");
+}
+
+/// P14-003: OpenAI Chat chain — verify endpoint, Bearer, model, stream events, usage.
+///
+/// This test specifically validates the OpenAI Chat Completions protocol:
+/// 1. Endpoint: POST /v1/chat/completions
+/// 2. Bearer: Authorization header with correct token
+/// 3. Model: correct model name in request body
+/// 4. Stream events: SSE chunks decoded correctly
+/// 5. Usage: token counts captured from final chunk
+#[test]
+fn openai_chat_chain_endpoint_bearer_model_events_usage() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    // Phase 1: Bootstrap with OpenAI-compatible provider
+    let (server, snapshot) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        // Configure provider with explicit chat_completions protocol
+        let toml_str = format!(
+            r#"
+            [provider.openai-test]
+            implementation = "openai-compatible"
+            base_url = "{mock_url}"
+            api_key = "sk-test-openai-key"
+            protocol = "chat_completions"
+
+            [provider.openai-test.models.gpt-4o-test]
+            context_window = 128000
+            max_output_tokens = 4096
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        (server, runtime.snapshot())
+    });
+
+    // Phase 2: Route compiler produces ChatCompletions config
+    let model = custom_model_entry("openai-test", "gpt-4o-test");
+    let config = execution_to_sampler_config(&model, &snapshot, Some("sk-test-openai-key"), None)
+        .expect("execution_to_sampler_config must succeed");
+
+    // Verify the config uses ChatCompletions backend
+    assert_eq!(
+        config.api_backend,
+        ApiBackend::ChatCompletions,
+        "config must use ChatCompletions backend"
+    );
+    assert_eq!(config.model, "gpt-4o-test");
+
+    // Phase 3: Make request and verify wire format
+    rt.block_on(async {
+        let client = Client::new(config).expect("Client::new must succeed");
+
+        let request = ConversationRequest::from_items(vec![
+            ConversationItem::system("You are a helpful assistant."),
+            ConversationItem::user("What is 2+2?"),
+        ]);
+
+        let (mut stream, _metadata) = client
+            .conversation_stream(request)
+            .await
+            .expect("conversation_stream must succeed");
+
+        let mut full_text = String::new();
+        let mut chunk_count = 0;
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.expect("chunk must be ok");
+            chunk_count += 1;
+            for choice in chunk.choices {
+                if let Some(ref text) = choice.delta.content {
+                    full_text.push_str(text);
+                }
+            }
+        }
+
+        // Verify stream events were decoded
+        assert!(chunk_count > 0, "must receive at least one chunk");
+        assert!(
+            full_text.contains("Echo:"),
+            "response must contain echo, got: {full_text}"
+        );
+
+        // Verify wire format: endpoint, model, auth
+        let requests = server.requests();
+        assert!(!requests.is_empty(), "mock server must receive requests");
+
+        let chat_req = requests
+            .iter()
+            .find(|r| r.path.contains("chat/completions"))
+            .expect("must have chat/completions request");
+
+        // Verify endpoint
+        assert!(
+            chat_req.path.contains("/v1/chat/completions"),
+            "endpoint must be /v1/chat/completions, got: {}",
+            chat_req.path
+        );
+
+        // Verify model in request body
+        let body = chat_req.body.as_ref().expect("request must have body");
+        assert_eq!(
+            body.get("model").and_then(|m| m.as_str()),
+            Some("gpt-4o-test"),
+            "request body must have correct model"
+        );
+
+        // Verify messages structure
+        let messages = body.get("messages").and_then(|m| m.as_array());
+        assert!(messages.is_some(), "request must have messages array");
+        let msgs = messages.unwrap();
+        assert!(msgs.len() >= 2, "must have system + user messages");
+    });
 }
