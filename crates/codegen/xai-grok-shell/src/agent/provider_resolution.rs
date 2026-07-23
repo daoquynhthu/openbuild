@@ -47,14 +47,13 @@ pub enum ProviderResolutionError {
 
 /// Migration adapter: converts route compiler output to `SamplerConfig`.
 /// Calls `prepare_sampler_config` directly with minimal credential context.
-pub fn execution_to_sampler_config(
+pub async fn execution_to_sampler_config(
     model: &ModelEntry,
     registry: &RegistrySnapshot,
     api_key: Option<&str>,
     base_url_override: Option<&str>,
 ) -> Result<SamplerConfig, ProviderResolutionError> {
     use xai_grok_provider::auth::SecretValue;
-    use xai_grok_provider::prepared::prepare_sampler_config;
 
     let execution = resolve_model_execution(model, registry, base_url_override)?;
     let model_inline = api_key.map(|k| SecretValue::new(k.to_string()));
@@ -67,10 +66,9 @@ pub fn execution_to_sampler_config(
         &env,
         &session,
     );
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
     let headers = xai_grok_provider::headers::RequestHeaderOverrides::new();
-    let prepared = rt.block_on(prepare_sampler_config(&execution, &creds, &headers))
+    let prepared = xai_grok_provider::prepared::prepare_sampler_config(&execution, &creds, &headers)
+        .await
         .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
     Ok(xai_grok_sampler::SamplerConfig::from(prepared))
 }
@@ -416,12 +414,12 @@ mod tests {
     }
 
     // P7-001: missing provider returns typed ProviderNotFound error
-    #[test]
-    fn route_compiler_missing_provider() {
+    #[tokio::test]
+    async fn route_compiler_missing_provider() {
         let reg = provider_registry_with_defaults();
         let snap = reg.snapshot();
         let entry = model_entry("gpt-4o", "nonexistent");
-        let result = execution_to_sampler_config(&entry, &snap, Some("key"), None);
+        let result = execution_to_sampler_config(&entry, &snap, Some("key"), None).await;
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -430,11 +428,9 @@ mod tests {
     }
 
     // P7-001: provider exists but endpoint uses insecure remote HTTP
-    #[test]
-    fn route_compiler_invalid_endpoint_rejected() {
+    #[tokio::test]
+    async fn route_compiler_invalid_endpoint_rejected() {
         let reg = xai_grok_provider::registry::ProviderRegistry::new();
-        // register_route is a no-op in the current registry, so this tests that
-        // the route compiler returns an error when a provider is not fully configured
         let _route = xai_grok_provider::route::Route::new(
             xai_grok_provider::types::RouteId::new("bad-route"),
             xai_grok_provider::types::ProviderId::new("test-p"),
@@ -448,7 +444,7 @@ mod tests {
         );
         let snap = reg.snapshot();
         let entry = model_entry("some-model", "test-p");
-        let result = execution_to_sampler_config(&entry, &snap, Some("key"), None);
+        let result = execution_to_sampler_config(&entry, &snap, Some("key"), None).await;
         assert!(result.is_err(), "route compiler must error for missing provider");
     }
 

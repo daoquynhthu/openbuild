@@ -73,13 +73,13 @@ async fn bootstrap_async(toml_str: &str) -> Arc<xai_grok_shell::agent::provider_
 }
 
 // ---------------------------------------------------------------------------
-// A2.1: OBPA-001 — execution_to_sampler_config panics with nested runtime
+// A2.1: OBPA-001 — async chain no longer creates nested runtime
 // ---------------------------------------------------------------------------
 //
-// The sync helper calls `Runtime::new().block_on(...)` which panics on
-// multi-thread tokio runtimes.
+// `execution_to_sampler_config` is now async, so calling it inside a
+// tokio runtime context no longer panics from `Runtime::new().block_on()`.
 #[tokio::test]
-async fn obpa001_nested_runtime_panics() {
+async fn obpa001_no_nested_runtime_panic_after_fix() {
     let snapshot = bootstrap_async(r#"
         [provider.test-provider]
         implementation = "openai-compatible"
@@ -94,18 +94,21 @@ async fn obpa001_nested_runtime_panics() {
 
     let model = model_entry("test-provider", "test-model");
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
-            &model,
-            &snapshot,
-            Some("test-key"),
-            None,
-        )
-    }));
+    // This previously panicked with "Cannot start a runtime from within
+    // a runtime". Now that execution_to_sampler_config is async, it
+    // runs cleanly inside the existing tokio context.
+    let result = xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
+        &model,
+        &snapshot,
+        Some("test-key"),
+        None,
+    )
+    .await;
 
     assert!(
-        result.is_err(),
-        "execution_to_sampler_config MUST panic inside tokio runtime (OBPA-001)"
+        result.is_ok(),
+        "execution_to_sampler_config must succeed inside tokio runtime after OBPA-001 fix: {:?}",
+        result.err()
     );
 }
 

@@ -9,10 +9,27 @@
 use serial_test::serial;
 
 use futures_util::StreamExt;
+use xai_grok_provider::registry::RegistrySnapshot;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
-use xai_grok_shell::agent::provider_resolution::execution_to_sampler_config;
+use xai_grok_shell::agent::provider_resolution::ProviderResolutionError;
+use xai_grok_sampler::SamplerConfig;
 use xai_grok_shell::sampling::{ApiBackend, Client, ConversationItem, ConversationRequest};
 use xai_grok_test_support::MockInferenceServer;
+
+/// Sync wrapper for tests: calls the async production function
+/// with its own one-shot runtime. Safe because tests run on the main thread
+/// without an existing tokio context.
+fn execution_to_sampler_config(
+    model: &ModelEntry,
+    registry: &RegistrySnapshot,
+    api_key: Option<&str>,
+    base_url_override: Option<&str>,
+) -> Result<SamplerConfig, ProviderResolutionError> {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
+        model, registry, api_key, base_url_override,
+    ))
+}
 
 /// Create a ModelEntry for a custom OpenAI-compatible provider.
 fn custom_model_entry(provider_id: &str, model: &str) -> ModelEntry {
@@ -69,7 +86,7 @@ fn full_chain_toml_to_decoded_events() {
         (server, snapshot, mock_url)
     });
 
-    // Phase 2: Route compiler + auth (sync — creates its own runtime internally)
+    // Phase 2: Route compiler + auth
     let model = custom_model_entry("test-provider", "test-model");
     let config = execution_to_sampler_config(&model, &snapshot, Some("test-key-123"), None)
         .expect("execution_to_sampler_config must succeed");
