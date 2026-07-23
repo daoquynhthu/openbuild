@@ -325,3 +325,80 @@ fn openai_responses_chain_selects_responses_route() {
     // SAFETY: test-only, single-threaded access to env var
     unsafe { std::env::remove_var("XAI_API_KEY") };
 }
+
+/// P14-005: Anthropic Messages chain — verify x-api-key, anthropic-version, path, decoder.
+///
+/// This test validates that the Anthropic provider correctly:
+/// 1. Uses `ApiBackend::Messages`
+/// 2. Uses `x-api-key` header for auth (not Bearer)
+/// 3. Includes `anthropic-version` header
+/// 4. Uses `/messages` endpoint path
+#[test]
+fn anthropic_messages_chain_x_api_key_version_path() {
+    // Anthropic provider requires ANTHROPIC_API_KEY environment variable
+    // SAFETY: test-only, single-threaded access to env var
+    unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-ant-test-key") };
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    // Phase 1: Bootstrap with Anthropic provider
+    let snapshot = rt.block_on(async {
+        let toml: toml::Value = toml::from_str(
+            r#"
+            [provider.anthropic]
+            "#,
+        )
+        .unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        runtime.snapshot()
+    });
+
+    // Phase 2: Route compiler produces Messages config for Anthropic
+    let model = custom_model_entry("anthropic", "claude-3-5-sonnet");
+    let config = execution_to_sampler_config(&model, &snapshot, None, None)
+        .expect("execution_to_sampler_config must succeed");
+
+    // Verify the config uses Messages backend
+    assert_eq!(
+        config.api_backend,
+        ApiBackend::Messages,
+        "Anthropic config must use Messages backend"
+    );
+
+    // Verify auth scheme is XApiKey (not Bearer)
+    assert_eq!(
+        config.auth_scheme,
+        xai_grok_sampler::AuthScheme::XApiKey,
+        "Anthropic config must use XApiKey auth scheme"
+    );
+
+    // Verify the endpoint path is /messages
+    assert!(
+        config.endpoint_path.as_deref() == Some("/messages")
+            || config.request_url.as_deref().is_some_and(|u| u.contains("/messages")),
+        "Anthropic config must use /messages endpoint, got endpoint_path={:?}, request_url={:?}",
+        config.endpoint_path,
+        config.request_url
+    );
+
+    // Verify anthropic-version header is present
+    assert!(
+        config.extra_headers.contains_key("anthropic-version"),
+        "Anthropic config must have anthropic-version header, got headers: {:?}",
+        config.extra_headers.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        config.extra_headers.get("anthropic-version").map(String::as_str),
+        Some("2023-06-01"),
+        "anthropic-version must be 2023-06-01"
+    );
+
+    // Clean up environment variable
+    // SAFETY: test-only, single-threaded access to env var
+    unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+}
