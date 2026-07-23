@@ -253,6 +253,7 @@
 | 条目 | 修复描述 |
 |------|----------|
 | C01 | `test_actor.rs:72` — test_config() 中加 `request_url: None` |
+| M01 | `protocols/mod.rs:27-44`, `client.rs:575-580` — `resolve_protocol_id_optional(None)` 返回 error，`protocol_id()` 改为 expect 而非回退 api_backend；所有测试构造函数加显式 `protocol_id` |
 | M03 | `request_inspection.rs:328-337` — 移除未使用导入，`config` → `_config` |
 | S01 | `terminal.rs:2881` — 移除未使用 `use std::path::PathBuf` |
 | — | `windows_tests.rs:24-25` — `normalized_absolute()` 参数加 `&` 引用 |
@@ -273,7 +274,7 @@
 | 条目 | 文件 | 状态 |
 |------|------|------|
 | C01 | xai-grok-sampler/tests/test_actor.rs:72 | Fixed — 添加 request_url: None |
-| M01 | xai-grok-sampler/src/protocols/mod.rs:38-44 | 待评估 — api_backend_to_protocol_id 回退路径 |
+| M01 | xai-grok-sampler/src/protocols/mod.rs:38-44 | Fixed — `resolve_protocol_id_optional(None)` 返回 error，`protocol_id()` 不再回退 api_backend |
 | M02 | xai-grok-shell/src/ agent/*.rs session/*.rs | 待评估 — 20+ 处直接 .api_key 字段修改 |
 | M03 | xai-grok-provider/tests/request_inspection.rs:337 | Fixed — 移除未使用导入/变量 |
 | S01 | xai-grok-tools/src/computer/local/terminal.rs:2881 | Fixed — 移除未使用导入 |

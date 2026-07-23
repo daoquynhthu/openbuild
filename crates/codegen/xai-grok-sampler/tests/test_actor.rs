@@ -25,7 +25,7 @@ use xai_grok_sampler::{
     SamplingErrorKind, SamplingEvent,
 };
 use xai_grok_sampling_types::{
-    ConversationItem, ConversationRequest, DoomLoopRecoveryPolicy, UserItem,
+    ConversationItem, ConversationRequest, DoomLoopRecoveryPolicy, ProtocolId, UserItem,
 };
 use xai_grok_test_support::{SseEvent, sse};
 
@@ -77,7 +77,7 @@ fn test_config(base_url: String, model: &str) -> SamplerConfig {
         temperature: None,
         top_p: None,
         api_backend: ApiBackend::ChatCompletions,
-        protocol_id: None,
+        protocol_id: Some(ProtocolId("chat_completions".into())),
         auth_scheme: Default::default(),
         extra_headers: IndexMap::new(),
         context_window: 128_000,
@@ -553,6 +553,7 @@ async fn auth_401_emits_failed_immediately_no_retry() {
 fn messages_config(base_url: String) -> SamplerConfig {
     let mut cfg = test_config(base_url, "messages-compatible-model");
     cfg.api_backend = ApiBackend::Messages;
+    cfg.protocol_id = Some(ProtocolId("messages".into()));
     cfg
 }
 
@@ -776,6 +777,7 @@ async fn update_config_changes_subsequent_request_model() {
 fn responses_config(base_url: String, doom_loop: Option<DoomLoopRecoveryPolicy>) -> SamplerConfig {
     let mut cfg = test_config(base_url, "test-model");
     cfg.api_backend = ApiBackend::Responses;
+    cfg.protocol_id = Some(ProtocolId("responses".into()));
     cfg.doom_loop_recovery = doom_loop;
     cfg
 }

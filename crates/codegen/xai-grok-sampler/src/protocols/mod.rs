@@ -22,19 +22,23 @@ pub fn resolve_protocol_id(id: &str) -> Result<&'static str, SamplingError> {
     }
 }
 
-/// Resolve a protocol ID from an `Option`, falling back to `api_backend`
-/// for legacy callers. Returns error when `Some(unknown)`.
+/// Resolve a protocol ID from an `Option`.
+/// Returns error when `None` or when `Some(unknown)`.
 pub fn resolve_protocol_id_optional(
     id: Option<&str>,
-    backend: &xai_grok_sampling_types::ApiBackend,
 ) -> Result<&'static str, SamplingError> {
     match id {
         Some(id_str) => resolve_protocol_id(id_str),
-        None => Ok(api_backend_to_protocol_id(backend)),
+        None => Err(SamplingError::InvalidConfiguration(
+            "protocol_id is required — use PreparedSamplerConfig::from to construct SamplerConfig",
+        )),
     }
 }
 
 /// Map an ApiBackend to the corresponding protocol ID string.
+///
+/// This is a legacy utility kept for test convenience.
+/// Production code must use explicit `protocol_id` instead.
 pub fn api_backend_to_protocol_id(backend: &xai_grok_sampling_types::ApiBackend) -> &'static str {
     match backend {
         xai_grok_sampling_types::ApiBackend::ChatCompletions => id::CHAT_COMPLETIONS,
@@ -71,19 +75,21 @@ mod tests {
 
     #[test]
     fn resolve_protocol_id_optional_some_unknown_returns_error() {
-        let err = resolve_protocol_id_optional(
-            Some("bogus"),
-            &xai_grok_sampling_types::ApiBackend::ChatCompletions,
-        )
-        .unwrap_err();
+        let err = resolve_protocol_id_optional(Some("bogus")).unwrap_err();
         assert!(matches!(err, SamplingError::InvalidConfiguration(_)));
     }
 
     #[test]
-    fn resolve_protocol_id_optional_none_falls_back_to_api_backend() {
-        let id =
-            resolve_protocol_id_optional(None, &xai_grok_sampling_types::ApiBackend::Responses)
-                .unwrap();
-        assert_eq!(id, "responses");
+    fn resolve_protocol_id_optional_none_returns_error() {
+        let err = resolve_protocol_id_optional(None).unwrap_err();
+        assert!(matches!(err, SamplingError::InvalidConfiguration(_)));
+    }
+
+    #[test]
+    fn api_backend_to_protocol_id_maps_chat() {
+        assert_eq!(
+            api_backend_to_protocol_id(&xai_grok_sampling_types::ApiBackend::ChatCompletions),
+            "chat_completions"
+        );
     }
 }

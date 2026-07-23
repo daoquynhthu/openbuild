@@ -573,10 +573,10 @@ impl SamplingClient {
     }
 
     pub fn protocol_id(&self) -> &str {
-        match &self.defaults.protocol_id {
-            Some(id) if !id.0.is_empty() => &id.0,
-            _ => crate::protocols::api_backend_to_protocol_id(&self.defaults.api_backend),
-        }
+        &self.defaults.protocol_id.as_ref()
+            .filter(|id| !id.0.is_empty())
+            .expect("SamplerConfig.protocol_id is required — use PreparedSamplerConfig -> SamplerConfig conversion")
+            .0
     }
 
     /// POST with default headers. Overrides auth from resolver if wired.
@@ -2091,7 +2091,7 @@ mod tests {
             temperature: None,
             top_p: None,
             api_backend: ApiBackend::ChatCompletions,
-            protocol_id: None,
+            protocol_id: Some(xai_grok_sampling_types::ProtocolId("chat_completions".into())),
             auth_scheme: AuthScheme::Bearer,
             extra_headers: IndexMap::new(),
             context_window: 8192,

@@ -43,7 +43,7 @@ pub(crate) fn ctx_with_toggle(toggle: HashMap<String, bool>) -> SubagentSpawnCon
             endpoint_path: None,
             endpoint_query: None,
             request_url: None,
-            protocol_id: None,
+            protocol_id: Some(xai_grok_sampling_types::ProtocolId("chat_completions".into())),
             max_completion_tokens: None,
             temperature: None,
             top_p: None,
