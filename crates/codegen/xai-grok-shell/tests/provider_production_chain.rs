@@ -274,10 +274,25 @@ async fn obpa008_cli_base_url_override_survives_reload() {
 
     let reloaded_snapshot = reloaded.snapshot();
 
-    let config_after = resolve_prepare(&model, &reloaded_snapshot, Some("test-key")).await;
-    assert!(
-        config_after.base_url.contains("127.0.0.1"),
-        "CLI base_url override must survive reload (OBPA-008), got: {}",
-        config_after.base_url
-    );
+    // After reload without CLI override, resolve_model_execution may fail
+    // (endpoint has no valid URL) or produce a default base_url.
+    // Either way, the CLI override is lost — this assertion documents the bug.
+    let execution_result = resolve_model_execution(&model, &reloaded_snapshot, None);
+    match execution_result {
+        Ok(execution) => {
+            // Even if execution succeeds, the base_url MUST still contain
+            // the CLI override. This is the primary OBPA-008 assertion.
+            assert!(
+                execution.request_url.as_str().contains("127.0.0.1"),
+                "CLI base_url override must survive reload (OBPA-008), got request_url: {}",
+                execution.request_url
+            );
+        }
+        Err(_) => {
+            // resolve_model_execution fails because the endpoint has no
+            // valid base URL after CLI override is lost. This is also
+            // a manifestation of OBPA-008.
+            panic!("CLI base_url override lost after reload (OBPA-008): resolve_model_execution failed because endpoint URL became invalid");
+        }
+    }
 }
