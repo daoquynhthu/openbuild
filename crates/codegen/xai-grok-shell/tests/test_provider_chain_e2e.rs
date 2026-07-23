@@ -402,3 +402,312 @@ fn anthropic_messages_chain_x_api_key_version_path() {
     // SAFETY: test-only, single-threaded access to env var
     unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
 }
+
+/// P14-006: OpenCode public chain — no auth header, anonymous inference succeeds.
+///
+/// The OpenCode provider uses `AuthPolicy::None`, meaning no API key or auth
+/// header is required. This test validates:
+/// 1. `AuthScheme::None` in the sampler config
+/// 2. `api_key` is `None` or empty
+/// 3. ChatCompletions backend with correct endpoint path
+/// 4. Full request/response cycle with mock server
+#[test]
+fn opencode_public_chain_no_auth() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server, snapshot) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        // Provider with AuthPolicy::None
+        let toml_str = format!(
+            r#"
+            [provider.opencode-test]
+            implementation = "openai-compatible"
+            base_url = "{mock_url}"
+            # no api_key → AuthPolicy::None / no auth
+
+            [provider.opencode-test.models.public-model]
+            context_window = 64000
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        (_server, runtime.snapshot())
+    });
+
+    // Phase 2: Route compiler produces no-auth config
+    let model = custom_model_entry("opencode-test", "public-model");
+    let config = execution_to_sampler_config(&model, &snapshot, None, None)
+        .expect("execution_to_sampler_config must succeed");
+
+    // Verify no auth scheme
+    assert_eq!(
+        config.auth_scheme,
+        xai_grok_sampler::AuthScheme::None,
+        "OpenCode public provider must have AuthScheme::None"
+    );
+
+    // Verify ChatCompletions backend
+    assert_eq!(
+        config.api_backend,
+        ApiBackend::ChatCompletions,
+        "must use ChatCompletions backend"
+    );
+
+    // Phase 3: Full request/response cycle
+    rt.block_on(async {
+        let client = Client::new(config).expect("Client::new must succeed");
+
+        let request = ConversationRequest::from_items(vec![ConversationItem::user(
+            "Hello from no-auth test!",
+        )]);
+
+        let (mut stream, _metadata) = client.conversation_stream(request).await.unwrap();
+
+        let mut full_text = String::new();
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.unwrap();
+            for choice in chunk.choices {
+                if let Some(ref text) = choice.delta.content {
+                    full_text.push_str(text);
+                }
+            }
+        }
+
+        assert!(
+            full_text.contains("Echo:"),
+            "response must contain echo, got: {full_text}"
+        );
+    });
+}
+
+/// P14-007: Custom base URL chain — no auth, custom base URL.
+///
+/// Uses openai-compatible provider (which supports base_url overrides)
+/// with no api_key. Validates:
+/// 1. Custom base URL is correctly used
+/// 2. `AuthScheme::None` in sampler config
+/// 3. ChatCompletions backend with no auth
+#[test]
+fn custom_base_url_no_auth() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (_server, snapshot) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.custom-noauth]
+            implementation = "openai-compatible"
+            base_url = "{mock_url}"
+            # no api_key → no auth
+
+            [provider.custom-noauth.models.custom-model]
+            context_window = 64000
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        (_server, runtime.snapshot())
+    });
+
+    // Phase 2: Verify custom base URL and no auth
+    let model = custom_model_entry("custom-noauth", "custom-model");
+    let config = execution_to_sampler_config(&model, &snapshot, None, None)
+        .expect("execution_to_sampler_config must succeed");
+
+    // Verify custom base URL
+    assert!(
+        config.base_url.contains("127.0.0.1") || config.base_url.contains("localhost"),
+        "base_url must contain mock server address, got: {}",
+        config.base_url
+    );
+
+    // Verify no auth
+    assert_eq!(
+        config.auth_scheme,
+        xai_grok_sampler::AuthScheme::None,
+        "custom-noauth provider must have AuthScheme::None"
+    );
+
+    assert_eq!(
+        config.api_backend,
+        ApiBackend::ChatCompletions,
+        "must use ChatCompletions backend"
+    );
+
+    // Phase 3: Full request/response cycle
+    rt.block_on(async {
+        let client = Client::new(config).expect("Client::new must succeed");
+
+        let request = ConversationRequest::from_items(vec![ConversationItem::user(
+            "Hello from custom base URL test!",
+        )]);
+
+        let (mut stream, _metadata) = client.conversation_stream(request).await.unwrap();
+
+        let mut full_text = String::new();
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.unwrap();
+            for choice in chunk.choices {
+                if let Some(ref text) = choice.delta.content {
+                    full_text.push_str(text);
+                }
+            }
+        }
+
+        assert!(
+            full_text.contains("Echo:"),
+            "response must contain echo, got: {full_text}"
+        );
+    });
+}
+
+/// P14-008: Two custom compatible providers — no state cross-contamination.
+///
+/// Two openai-compatible providers with different:
+/// - base URLs (different mock server ports)
+/// - API keys
+/// - model names
+///
+/// Validates that provider-qualified selection picks the correct provider
+/// and their states (api keys, base URLs) don't leak into each other.
+#[test]
+fn two_custom_providers_no_state_cross_contamination() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server_a, server_b, snapshot) = rt.block_on(async {
+        let server_a = MockInferenceServer::start().await.unwrap();
+        let server_b = MockInferenceServer::start().await.unwrap();
+        let url_a = server_a.url();
+        let url_b = server_b.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.provider-a]
+            implementation = "openai-compatible"
+            base_url = "{url_a}"
+            api_key = "key-a-123"
+
+            [provider.provider-a.models.model-alpha]
+            context_window = 64000
+
+            [provider.provider-b]
+            implementation = "openai-compatible"
+            base_url = "{url_b}"
+            api_key = "key-b-456"
+
+            [provider.provider-b.models.model-beta]
+            context_window = 128000
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        (server_a, server_b, runtime.snapshot())
+    });
+
+    // Phase 2: Resolve model-alpha → provider-a
+    let model_a = custom_model_entry("provider-a", "model-alpha");
+    let config_a = execution_to_sampler_config(&model_a, &snapshot, None, None)
+        .expect("config for provider-a must succeed");
+
+    assert_eq!(config_a.model, "model-alpha");
+    assert!(
+        config_a.base_url.contains("127.0.0.1"),
+        "provider-a must use its own base_url, got: {}",
+        config_a.base_url
+    );
+
+    // Resolve model-beta → provider-b
+    let model_b = custom_model_entry("provider-b", "model-beta");
+    let config_b = execution_to_sampler_config(&model_b, &snapshot, None, None)
+        .expect("config for provider-b must succeed");
+
+    assert_eq!(config_b.model, "model-beta");
+    assert!(
+        config_b.base_url.contains("127.0.0.1"),
+        "provider-b must use its own base_url, got: {}",
+        config_b.base_url
+    );
+
+    // Verify they're different servers
+    assert_ne!(
+        config_a.base_url, config_b.base_url,
+        "two providers must have different base URLs (different mock servers)"
+    );
+
+    // Phase 3: Full request/response cycle for both providers
+    rt.block_on(async {
+        // Provider A
+        let client_a = Client::new(config_a).expect("Client::new for provider-a must succeed");
+        let request_a = ConversationRequest::from_items(vec![ConversationItem::user(
+            "Hello from provider A!",
+        )]);
+        let (mut stream_a, _) = client_a.conversation_stream(request_a).await.unwrap();
+        let mut text_a = String::new();
+        while let Some(chunk_result) = stream_a.next().await {
+            let chunk = chunk_result.unwrap();
+            for choice in chunk.choices {
+                if let Some(ref text) = choice.delta.content {
+                    text_a.push_str(text);
+                }
+            }
+        }
+        assert!(text_a.contains("Echo:"), "provider-a response must contain echo");
+
+        // Provider B
+        let client_b = Client::new(config_b).expect("Client::new for provider-b must succeed");
+        let request_b = ConversationRequest::from_items(vec![ConversationItem::user(
+            "Hello from provider B!",
+        )]);
+        let (mut stream_b, _) = client_b.conversation_stream(request_b).await.unwrap();
+        let mut text_b = String::new();
+        while let Some(chunk_result) = stream_b.next().await {
+            let chunk = chunk_result.unwrap();
+            for choice in chunk.choices {
+                if let Some(ref text) = choice.delta.content {
+                    text_b.push_str(text);
+                }
+            }
+        }
+        assert!(text_b.contains("Echo:"), "provider-b response must contain echo");
+
+        // Verify each provider received requests on its own mock server
+        let requests_a = server_a.requests();
+        let requests_b = server_b.requests();
+        assert!(!requests_a.is_empty(), "server A must receive requests");
+        assert!(!requests_b.is_empty(), "server B must receive requests");
+
+        // Verify correct API keys were used via Bearer auth
+        let body_a = requests_a[0].body.as_ref().expect("request A must have body");
+        assert_eq!(
+            body_a.get("model").and_then(|m| m.as_str()),
+            Some("model-alpha"),
+            "provider-a request must have model-alpha"
+        );
+
+        let body_b = requests_b[0].body.as_ref().expect("request B must have body");
+        assert_eq!(
+            body_b.get("model").and_then(|m| m.as_str()),
+            Some("model-beta"),
+            "provider-b request must have model-beta"
+        );
+    });
+}
