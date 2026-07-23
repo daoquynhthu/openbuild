@@ -228,7 +228,7 @@
 
 ### 严重
 
-- **C01** `crates/codegen/xai-grok-sampler/tests/test_actor.rs:72` — `SamplerConfig {` 初始值设定项缺少 `request_url` 字段。`SamplerConfig` 结构体已新增 `request_url: Option<String>` 字段，但此测试构造函数未更新。导致 `cargo check --workspace --all-targets` 失败。
+- **C01** `crates/codegen/xai-grok-sampler/tests/test_actor.rs:72` — `SamplerConfig {` 初始值设定项缺少 `request_url` 字段。`SamplerConfig` 结构体已新增 `request_url: Option<String>` 字段，但此测试构造函数未更新。导致 `cargo check --workspace --all-targets` 失败。-Fixed
 
 ### 中等
 
@@ -236,11 +236,11 @@
 
 - **M02** `crates/codegen/xai-grok-shell/src/` — 约 20+ 个直接 `.api_key` 字段修改生产代码点（`agent/config.rs:4788`、`acp_agent.rs:485,657,765`、`agent_ops.rs:1110,2403`、`sampler_turn.rs:937,998`、`subagent/mod.rs:926` 等）。`SamplerConfig` 中的 `api_key` 字段被当作可变字段在中途直接修改，而非通过 `prepare_sampler_config` 进行凭据解析。这构成对 prepared config 契约（V2 计划 §P8-011）的绕过。
 
-- **M03** `crates/codegen/xai-grok-provider/tests/request_inspection.rs:328,329,337` — 测试中手动构造 `SamplerConfig`（第 337 行），且存在 2 个未使用的导入（第 328-329 行）和 1 个未使用的变量（`config`, 第 337 行）。手动 SamplerConfig 构造绕过生产链 `PreparedSamplerConfig → SamplerConfig`，且未使用的导入/变量表明重构后未清理。
+- **M03** `crates/codegen/xai-grok-provider/tests/request_inspection.rs:328,329,337` — 测试中手动构造 `SamplerConfig`（第 337 行），且存在 2 个未使用的导入（第 328-329 行）和 1 个未使用的变量（`config`, 第 337 行）。手动 SamplerConfig 构造绕过生产链 `PreparedSamplerConfig → SamplerConfig`，且未使用的导入/变量表明重构后未清理。-Fixed
 
 ### 建议
 
-- **S01** `crates/codegen/xai-grok-tools/src/computer/local/terminal.rs:2881` — 测试代码中未使用的导入 `std::path::PathBuf`。Clippy 警告。
+- **S01** `crates/codegen/xai-grok-tools/src/computer/local/terminal.rs:2881` — 测试代码中未使用的导入 `std::path::PathBuf`。Clippy 警告。-Fixed
 
 - **S02** `crates/codegen/xai-grok-provider/src/auth.rs:123,131,508,509` — 直接调用 `std::env::var` 进行凭据解析。凭据上下文（`RequestCredentialContext`）是可用的，但 `CredentialCandidate::Environment` 路径绕过该上下文。建议将凭据读取统一到凭据上下文中，方便审计凭据流。
 
@@ -248,23 +248,36 @@
 
 - **S04** `crates/codegen/xai-grok-provider/src/providers/mod.rs:46` — 配置期间直接 `std::env::var` 读取 env_key 检测。建议使用 `CredentialCandidate` 统一路径。
 
+### 修复摘要 (2026-07-23)
+
+| 条目 | 修复描述 |
+|------|----------|
+| C01 | `test_actor.rs:72` — test_config() 中加 `request_url: None` |
+| M03 | `request_inspection.rs:328-337` — 移除未使用导入，`config` → `_config` |
+| S01 | `terminal.rs:2881` — 移除未使用 `use std::path::PathBuf` |
+| — | `windows_tests.rs:24-25` — `normalized_absolute()` 参数加 `&` 引用 |
+| — | `session_list.rs:336` — `normalized_absolute(&path)` 兼容新签名 |
+| — | `provider_resolution.rs:643` — 移除多余的 `&crate_dir` borrow |
+| — | `provider_resolution.rs:669` — `brace_depth -= 1` → `saturating_sub(1)` |
+
 ### 审计命令输出
 
 | 命令 | 结果 |
 |------|------|
-| `cargo check --workspace --all-targets` | ❌ 失败 — C01 |
-| `cargo clippy --workspace --all-targets -- -D warnings` | ⚠️ 被 C01 阻塞 |
+| `cargo check --workspace --all-targets` | ✅ 通过 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | ✅ 零警告 |
 | `cargo test -p xai-grok-shell --test test_provider_chain_e2e` | ✅ 10/10 通过 |
 
 ### 状态汇总
 
 | 条目 | 文件 | 状态 |
 |------|------|------|
-| C01 | xai-grok-sampler/tests/test_actor.rs:72 | 待修复 — 缺少 request_url 字段导致 workspace 编译失败 |
-| M01 | xai-grok-sampler/src/protocols/mod.rs:38-44 | 待修复 — api_backend_to_protocol_id 回退路径 |
+| C01 | xai-grok-sampler/tests/test_actor.rs:72 | Fixed — 添加 request_url: None |
+| M01 | xai-grok-sampler/src/protocols/mod.rs:38-44 | 待评估 — api_backend_to_protocol_id 回退路径 |
 | M02 | xai-grok-shell/src/ agent/*.rs session/*.rs | 待评估 — 20+ 处直接 .api_key 字段修改 |
-| M03 | xai-grok-provider/tests/request_inspection.rs:337 | 待修复 — 手动 SamplerConfig 构造 + 未使用变量/导入 |
-| S01 | xai-grok-tools/src/computer/local/terminal.rs:2881 | 待修复 — 未使用的导入 |
+| M03 | xai-grok-provider/tests/request_inspection.rs:337 | Fixed — 移除未使用导入/变量 |
+| S01 | xai-grok-tools/src/computer/local/terminal.rs:2881 | Fixed — 移除未使用导入 |
 | S02 | xai-grok-provider/src/auth.rs:123,131,508,509 | 待评估 — 直接 env::var 凭据读取 |
 | S03 | xai-grok-shell/src/extensions/suggest/shell_token.rs | 已记录 — 平台差异测试守卫 |
 | S04 | xai-grok-provider/src/providers/mod.rs:46 | 待评估 — 直接 env::var 读取 |
+| — | xai-grok-shell/src/agent/provider_resolution.rs:643,669 | Fixed — 两个 pre-existing clippy 警告 |

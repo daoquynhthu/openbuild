@@ -640,7 +640,7 @@ mod tests {
         let mut files = Vec::new();
         collect_rs_files(&src_dir, &mut files);
         for file_path in &files {
-            let relative = file_path.strip_prefix(&crate_dir).unwrap_or(file_path);
+            let relative = file_path.strip_prefix(crate_dir).unwrap_or(file_path);
             // Skip directories that are test-only (gated by #[cfg(test)] with #[path])
             let rel_str = relative.to_string_lossy().replace('\\', "/");
             if rel_str.contains("acp_session_tests/") || rel_str.contains("test_support/") {
@@ -666,9 +666,7 @@ mod tests {
                         continue;
                     }
                     if trimmed == "}" {
-                        if brace_depth > 0 {
-                            brace_depth -= 1;
-                        }
+                        brace_depth = brace_depth.saturating_sub(1);
                         if brace_depth == 0 {
                             in_test_block = false;
                         }

@@ -333,7 +333,7 @@ fn create_same_repo_cwds(home: &Path) -> SameRepoTopology {
         repo.worktree(&name, &path, None)
             .expect("create linked worktree");
         linked.push((
-            xai_grok_paths::normalize::normalized_absolute(path)
+            xai_grok_paths::normalize::normalized_absolute(&path)
                 .expect("canonicalize linked worktree")
                 .to_string_lossy()
                 .into_owned(),

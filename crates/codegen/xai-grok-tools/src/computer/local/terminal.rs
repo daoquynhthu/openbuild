@@ -2878,7 +2878,6 @@ fn extract_exit_status(status: std::process::ExitStatus) -> ExitStatus {
 mod tests {
     use super::*;
     use crate::computer::types::TaskKind;
-    use std::path::PathBuf;
 
     fn make_request(command: &str) -> TerminalRunRequest {
         // Use a unique temp file for each test

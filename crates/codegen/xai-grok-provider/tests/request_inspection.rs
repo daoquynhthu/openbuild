@@ -325,8 +325,6 @@ async fn missing_definition_errors_before_http_send() {
 
 #[tokio::test]
 async fn missing_provider_id_errors_before_http_send() {
-    use xai_grok_provider::config::ProviderConfig;
-    use xai_grok_provider::types::RouteId;
     use xai_grok_sampler::SamplerConfig;
 
     let mock = MockInferenceServer::start().await.expect("start mock");
@@ -334,7 +332,7 @@ async fn missing_provider_id_errors_before_http_send() {
 
     // Build a SamplerConfig pointing to mock but with no provider_id
     // This simulates a request that fails before sending.
-    let config = SamplerConfig {
+    let _config = SamplerConfig {
         base_url: mock_url,
         ..Default::default()
     };
