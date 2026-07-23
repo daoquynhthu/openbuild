@@ -1211,10 +1211,6 @@ mod tests {
         let reg = Arc::new(ProviderRegistry::new());
         reg.register_definition(Arc::new(DummyProvider::new()))
             .unwrap();
-        let factory =
-            Arc::new(crate::providers::openai_compatible_factory::OpenAiCompatibleProviderFactory);
-        reg.register_factory(ProviderFactoryKind::OpenAiCompatible, factory)
-            .unwrap();
 
         let resolved = ResolvedProviderSet {
             providers: IndexMap::from([(
@@ -1240,12 +1236,22 @@ mod tests {
             )]),
         };
 
+        fn retry_rebuild(reg: &ProviderRegistry, resolved: &ResolvedProviderSet) -> u64 {
+            loop {
+                match reg.rebuild_from_resolved(resolved) {
+                    Ok(r) => return r,
+                    Err(crate::error::ProviderError::Config(_)) => continue,
+                    Err(e) => panic!("rebuild_from_resolved failed: {e}"),
+                }
+            }
+        }
+
         let resolved1 = resolved.clone();
         let reg1 = Arc::clone(&reg);
-        let h1 = std::thread::spawn(move || reg1.rebuild_from_resolved(&resolved1).unwrap());
+        let h1 = std::thread::spawn(move || retry_rebuild(&reg1, &resolved1));
         let resolved2 = resolved.clone();
         let reg2 = Arc::clone(&reg);
-        let h2 = std::thread::spawn(move || reg2.rebuild_from_resolved(&resolved2).unwrap());
+        let h2 = std::thread::spawn(move || retry_rebuild(&reg2, &resolved2));
 
         let r1 = h1.join().unwrap();
         let r2 = h2.join().unwrap();

@@ -342,4 +342,76 @@ mod tests {
         );
         assert!(OpenAiCompatibleProviderFactory::env_key_for_profile(None).is_empty());
     }
+
+    /// D6 gate: two providers with different protocols, env keys, headers — fully isolated.
+    #[test]
+    fn factory_isolation_different_protocol_envkey_headers() {
+        let factory = OpenAiCompatibleProviderFactory;
+
+        // Provider A: chat_completions with custom env key and extra headers
+        let spec_a = make_spec("provider-a", None, Some("http://mock-a:8080/v1".into()));
+        let p_a = factory.create(&spec_a).unwrap();
+        let cfg_a = ProviderConfig {
+            id: Some("provider-a".into()),
+            base_url: Some("http://mock-a:8080/v1".into()),
+            protocol: Some("chat_completions".into()),
+            env_key: Some(vec!["CUSTOM_A_KEY".into()]),
+            extra_headers: Some(IndexMap::from([("X-Custom-A".into(), "value-a".into())])),
+            ..Default::default()
+        };
+        let configured_a = p_a.configure(cfg_a);
+
+        // Provider B: responses protocol with different env key and headers
+        let spec_b = make_spec("provider-b", None, Some("http://mock-b:8080/v1".into()));
+        let p_b = factory.create(&spec_b).unwrap();
+        let cfg_b = ProviderConfig {
+            id: Some("provider-b".into()),
+            base_url: Some("http://mock-b:8080/v1".into()),
+            protocol: Some("responses".into()),
+            env_key: Some(vec!["CUSTOM_B_KEY".into()]),
+            extra_headers: Some(IndexMap::from([("X-Custom-B".into(), "value-b".into())])),
+            ..Default::default()
+        };
+        let configured_b = p_b.configure(cfg_b);
+
+        // Route protocol isolation
+        let route_a = configured_a.routes.values().next().unwrap();
+        assert_eq!(&*route_a.protocol_id.0, "chat_completions");
+        let endpoint_debug_a = format!("{:?}", route_a.endpoint);
+        assert!(endpoint_debug_a.contains("/chat/completions"), "provider-a endpoint: {endpoint_debug_a}");
+
+        let route_b = configured_b.routes.values().next().unwrap();
+        assert_eq!(&*route_b.protocol_id.0, "responses");
+        let endpoint_debug_b = format!("{:?}", route_b.endpoint);
+        assert!(endpoint_debug_b.contains("/responses"), "provider-b endpoint: {endpoint_debug_b}");
+
+        // Endpoint URL isolation (different base URLs)
+        assert_ne!(endpoint_debug_a, endpoint_debug_b, "provider endpoints must differ");
+
+        // Extra header isolation
+        assert!(
+            format!("{:?}", route_a.static_headers).contains("X-Custom-A"),
+            "provider-a must have X-Custom-A header"
+        );
+        assert!(
+            !format!("{:?}", route_a.static_headers).contains("X-Custom-B"),
+            "provider-a must NOT have provider-b's headers"
+        );
+        assert!(
+            format!("{:?}", route_b.static_headers).contains("X-Custom-B"),
+            "provider-b must have X-Custom-B header"
+        );
+        assert!(
+            !format!("{:?}", route_b.static_headers).contains("X-Custom-A"),
+            "provider-b must NOT have provider-a's headers"
+        );
+
+        // Auth env key isolation (auth policy must reference correct env keys)
+        let auth_a = format!("{:?}", route_a.auth);
+        let auth_b = format!("{:?}", route_b.auth);
+        assert!(auth_a.contains("CUSTOM_A_KEY"), "provider-a auth must reference CUSTOM_A_KEY");
+        assert!(!auth_a.contains("CUSTOM_B_KEY"), "provider-a must not reference CUSTOM_B_KEY");
+        assert!(auth_b.contains("CUSTOM_B_KEY"), "provider-b auth must reference CUSTOM_B_KEY");
+        assert!(!auth_b.contains("CUSTOM_A_KEY"), "provider-b must not reference CUSTOM_A_KEY");
+    }
 }
