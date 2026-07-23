@@ -4955,6 +4955,7 @@ pub fn resolve_web_search_sampling_config(
                     "route compiler hard error for web search model `{}`: {e}",
                     entry.info.model
                 );
+                None
             }
             Err(_) => None,
         }
