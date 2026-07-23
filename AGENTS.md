@@ -88,7 +88,7 @@
 
 ### 4.1 每次操作前
 
-- 读取 `docs/implementation-plan.md` 确认当前 Phase 和子任务
+- 读取 `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md`（V2 计划）确认当前 Phase 和子任务
 - 读取 `docs/model-adapter-architecture.md` 确认类型定义和接口设计
 - 如果是修改已有文件，先 `git diff` 查看当前变更
 
@@ -219,11 +219,12 @@ cargo doc --no-deps 2>&1 | Select-String "warning"
 
 | 文档 | 内容 | 优先级 |
 |------|------|--------|
+| `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md` | V2 生产闭环计划（唯一执行权威） | ★★★ |
 | `docs/model-adapter-architecture.md` | 目标架构定义（13 个章节） | ★★★ |
-| `docs/implementation-plan.md` | 实施计划和任务分解（8 个 Phase） | ★★★ |
 | `AGENTS.md` | 代理工作规范（本文） | ★★ |
 | `clippy.toml` | Clippy 配置和禁止的模式 | ★★ |
 | `Cargo.toml` | 工作区成员和依赖版本 | ★ |
+| `docs/implementation-plan.md` | 历史计划（已作废——仅作参考） | ★ |
 | `PROGRESS.md` | 进度追踪（追加式） | ★ |
 | `ISSUE.md` | 问题审计（按需写入） | ★ |
 

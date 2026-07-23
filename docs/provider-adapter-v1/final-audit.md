@@ -69,7 +69,8 @@
 
 ## P14-03: Issue closure verification
 
-All `C-` and `M-` issues in ISSUE.md are verified as `-Fixed`. See ISSUE.md for details.
+All `C-` and `M-` issues in the 2026-07-18 ISSUE.md audit are verified as `-Closed`. See ISSUE.md for details.
+A subsequent comprehensive audit (2026-07-23) found additional issues (C01, M01, M03) which have been fixed; see the 2026-07-23 audit section in ISSUE.md.
 
 ### C01 — test_seam module
 - **Test:** `cargo check -p xai-grok-shell --all-targets` → exit 0
@@ -106,10 +107,13 @@ All `C-` and `M-` issues in ISSUE.md are verified as `-Fixed`. See ISSUE.md for 
 
 ## P14-04: Full clean-checkout verification
 
+> **Status:** Partial — workspace check/clippy/E2E tests pass. Full workspace test (all 80+ crates) blocked by disk space (54 GiB cleaned, ~16 GiB needed per rebuild cycle).
+
 ```bash
-cargo fmt --all -- --check      # pending
-cargo check --workspace --all-targets  # pending
-cargo clippy --workspace --all-targets -- -D warnings  # pending
-cargo test --workspace --all-targets  # pending
-cargo doc --workspace --no-deps  # pending
+cargo check --workspace --all-targets  # ✅ 2026-07-23
+cargo clippy --workspace --all-targets -- -D warnings  # ✅ 2026-07-23
+cargo test -p xai-grok-shell --test test_provider_chain_e2e  # ✅ 10/10 2026-07-23
+cargo fmt --all -- --check      # pending — pre-existing formatting not audited
+cargo test --workspace --all-targets  # blocked by disk space on Windows
+cargo doc --workspace --no-deps  # blocked by disk space on Windows
 ```

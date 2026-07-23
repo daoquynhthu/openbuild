@@ -639,3 +639,22 @@ All 12 P13 tasks resolved:
 | Two custom compatible | P14-008 |
 | Missing auth hard fail | `missing_auth_hard_fail_request_count_zero` |
 | Invalid endpoint hard fail | `invalid_endpoint_hard_fail_request_count_zero` |
+
+### Phase 14后续：全方位审计与修复（2026-07-23）
+
+对照 V2 计划全文档要求进行全方位代码审计，发现并修复如下问题：
+
+| 条目 | 问题 | 修复 |
+|------|------|------|
+| C01 | `test_actor.rs` SamplerConfig 缺少 `request_url` 字段 → workspace 编译失败 | 添加 `request_url: None` |
+| M01 | `api_backend_to_protocol_id` 回退路径违反 V2 §2.3 | 移除回退，`protocol_id()` 改为 expect；所有测试构造函数加显式 protocol_id |
+| M02 | 20+ 处直接 `.api_key` 字段修改 | 已评估（不可操作），添加 deprecation doc |
+| M03 | `request_inspection.rs` 手动 SamplerConfig + 未使用导入/变量 | 清理代码 |
+| S01 | `terminal.rs` 未使用导入 | 移除 |
+
+**门禁结果：** `cargo check --workspace` ✅ `cargo clippy --workspace -D warnings` ✅ `cargo test -p xai-grok-shell --test test_provider_chain_e2e` ✅ (10/10)
+
+### 文档统一（2026-07-23）
+- AGENTS.md: 将 `implementation-plan.md` 引用替换为 V2 计划，更新优先级表
+- PROGRESS.md: 追加审计修复记录
+- `docs/implementation-plan.md`: 已标记为历史（作废）

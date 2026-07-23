@@ -1,5 +1,12 @@
 # OpenBuild Provider Adapter V1 Production Closure Implementation Plan
 
+> **⚠️ 作废 — 以 V2 计划为准**
+>
+> 本文件保留为历史参考。Provider Adapter V1 生产闭环的**唯一执行权威**是：
+> `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md`
+>
+> **禁止使用本文件进行任何执行决策。**
+
 > **For agentic workers:** This document is the execution authority for the provider-adapter production closure. Execute exactly one task at a time, preserve the stated architecture, run every required gate, and stop on any gate failure. Do not infer missing requirements, invent shortcuts, or continue after a failed prerequisite.
 
 **Goal:** Transform the current partially integrated provider-adapter branch into a deterministic, testable, cross-platform V1 production closure in which provider configuration, model discovery, model selection, authentication, request routing, protocol dispatch, runtime reload, and TUI configuration form one authoritative end-to-end chain.
