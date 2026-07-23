@@ -211,3 +211,60 @@
 | S12-001 | completion/mod.rs + shell_token.rs | 已修复 — Windows 使用 CmdAdapter — Closed |
 | S12-002 | file_provider.rs + path_provider.rs + shell_token.rs + prompt.rs | 已修复 — 移除 Windows 门控，双引号转义 — Closed |
 | S12-003 | completions_cmd.rs | 已修复 — 显式返回 unsupported — Closed |
+
+---
+
+## 审计: 2026-07-23 (V2 计划全方位审计)
+
+### 范围
+对照 `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md` 全文档要求，对当前 `feat/provider-adapter` 分支代码进行全方位审计。涵盖编译状态、Clippy 警告、anti-pattern 搜索、平台差异审查。
+
+### 审计方法
+- `cargo check --workspace --all-targets` — 编译检查
+- `cargo clippy --workspace --all-targets` — 代码风格（被编译错误阻塞）
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e` — E2E 测试
+- 手动搜索 SamplerConfig/PreparedSamplerConfig 显式构造、`api_backend` 运行时路由、直接 `.api_key` 字段修改、`std::env::var` 凭据读取、`#[cfg(not(windows))]` 排除
+- 参照 V2 计划 §2.3 (请求闭环)、§4 (不可变计划)、§Phase 8/10/11 要求
+
+### 严重
+
+- **C01** `crates/codegen/xai-grok-sampler/tests/test_actor.rs:72` — `SamplerConfig {` 初始值设定项缺少 `request_url` 字段。`SamplerConfig` 结构体已新增 `request_url: Option<String>` 字段，但此测试构造函数未更新。导致 `cargo check --workspace --all-targets` 失败。
+
+### 中等
+
+- **M01** `xai-grok-sampler/src/protocols/mod.rs:38-44` — `api_backend_to_protocol_id()` 函数通过对 `ApiBackend` 枚举变体的 `match` 进行协议路由判定。`client.rs:578` 在 `protocol_id` 为 `None` 时调用此函数作为回退。V2 计划 §2.3 明确要求 "Sampler 不得根据 api_backend 重新推导路由"。生产级 `SamplerConfig` 应始终携带显式 `protocol_id`；此回退路径使得无协议配置仍能勉强运行，掩盖了上游未正确设置 protocol_id 的问题。
+
+- **M02** `crates/codegen/xai-grok-shell/src/` — 约 20+ 个直接 `.api_key` 字段修改生产代码点（`agent/config.rs:4788`、`acp_agent.rs:485,657,765`、`agent_ops.rs:1110,2403`、`sampler_turn.rs:937,998`、`subagent/mod.rs:926` 等）。`SamplerConfig` 中的 `api_key` 字段被当作可变字段在中途直接修改，而非通过 `prepare_sampler_config` 进行凭据解析。这构成对 prepared config 契约（V2 计划 §P8-011）的绕过。
+
+- **M03** `crates/codegen/xai-grok-provider/tests/request_inspection.rs:328,329,337` — 测试中手动构造 `SamplerConfig`（第 337 行），且存在 2 个未使用的导入（第 328-329 行）和 1 个未使用的变量（`config`, 第 337 行）。手动 SamplerConfig 构造绕过生产链 `PreparedSamplerConfig → SamplerConfig`，且未使用的导入/变量表明重构后未清理。
+
+### 建议
+
+- **S01** `crates/codegen/xai-grok-tools/src/computer/local/terminal.rs:2881` — 测试代码中未使用的导入 `std::path::PathBuf`。Clippy 警告。
+
+- **S02** `crates/codegen/xai-grok-provider/src/auth.rs:123,131,508,509` — 直接调用 `std::env::var` 进行凭据解析。凭据上下文（`RequestCredentialContext`）是可用的，但 `CredentialCandidate::Environment` 路径绕过该上下文。建议将凭据读取统一到凭据上下文中，方便审计凭据流。
+
+- **S03** `crates/codegen/xai-grok-shell/src/extensions/suggest/shell_token.rs` — 9 个 `#[cfg(not(windows))]` 守卫包围测试函数。每个守卫都有对应的 `#[cfg(windows)]` 双胞胎测试，因此代表真实的平台行为差异（POSIX 反斜杠转义 vs Windows 双引号包裹），非不完整实现。建议未来重构为跨平台契约测试，消除条件编译。
+
+- **S04** `crates/codegen/xai-grok-provider/src/providers/mod.rs:46` — 配置期间直接 `std::env::var` 读取 env_key 检测。建议使用 `CredentialCandidate` 统一路径。
+
+### 审计命令输出
+
+| 命令 | 结果 |
+|------|------|
+| `cargo check --workspace --all-targets` | ❌ 失败 — C01 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | ⚠️ 被 C01 阻塞 |
+| `cargo test -p xai-grok-shell --test test_provider_chain_e2e` | ✅ 10/10 通过 |
+
+### 状态汇总
+
+| 条目 | 文件 | 状态 |
+|------|------|------|
+| C01 | xai-grok-sampler/tests/test_actor.rs:72 | 待修复 — 缺少 request_url 字段导致 workspace 编译失败 |
+| M01 | xai-grok-sampler/src/protocols/mod.rs:38-44 | 待修复 — api_backend_to_protocol_id 回退路径 |
+| M02 | xai-grok-shell/src/ agent/*.rs session/*.rs | 待评估 — 20+ 处直接 .api_key 字段修改 |
+| M03 | xai-grok-provider/tests/request_inspection.rs:337 | 待修复 — 手动 SamplerConfig 构造 + 未使用变量/导入 |
+| S01 | xai-grok-tools/src/computer/local/terminal.rs:2881 | 待修复 — 未使用的导入 |
+| S02 | xai-grok-provider/src/auth.rs:123,131,508,509 | 待评估 — 直接 env::var 凭据读取 |
+| S03 | xai-grok-shell/src/extensions/suggest/shell_token.rs | 已记录 — 平台差异测试守卫 |
+| S04 | xai-grok-provider/src/providers/mod.rs:46 | 待评估 — 直接 env::var 读取 |
