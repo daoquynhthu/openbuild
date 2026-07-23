@@ -603,3 +603,39 @@ All 12 P13 tasks resolved:
 
 ### S11-001 / S11-002
 - Still blocked by Phase 2 task card ledger (not executed)
+
+## Phase 14: E2E Tests (V2 Acceptance Matrix) — 2026-07-23
+
+### Completed
+- P14-001: MockInferenceServer with Ollama `/api/tags` endpoint (`xai-grok-test-support/src/mock_server.rs`)
+- P14-002: Full chain E2E — TOML → bootstrap → snapshot → execution_to_sampler_config → Client → mock → decoded SSE events
+- P14-003: OpenAI Chat chain — endpoint `/v1/chat/completions`, Bearer auth, model name, stream events, usage
+- P14-004: OpenAI Responses chain — xAI provider uses `ApiBackend::Responses`, `/responses` endpoint
+- P14-005: Anthropic Messages chain — `x-api-key` header, `anthropic-version: 2023-06-01`, `/messages` endpoint
+- P14-006: OpenCode public (no-auth) chain — `AuthScheme::None`, ChatCompletions, full request/response
+- P14-007: Custom base URL chain — openai-compatible with custom base_url, no auth, full request/response
+- P14-008: Two custom compatible providers — identity isolation, different mock servers, different models/keys
+- Acceptance matrix: missing auth hard fail — `execution_to_sampler_config` fails with `AuthCredential`, zero HTTP requests
+- Acceptance matrix: invalid endpoint hard fail — `execution_to_sampler_config` fails with protocol error, zero HTTP requests
+
+### Files modified
+- `crates/codegen/xai-grok-test-support/src/mock_server.rs` — Ollama `/api/tags` endpoint
+- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — 10 E2E tests
+
+### Key results
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 10/10 pass ✅
+- `cargo check -p xai-grok-shell`: passes ✅
+- `cargo clippy -p xai-grok-shell`: passes ✅ (zero new warnings)
+- No new dependencies introduced
+
+### Acceptance matrix coverage
+| Matrix item | Covered by |
+|---|---|
+| OpenAI Chat | P14-003 |
+| OpenAI Responses | P14-004 |
+| Anthropic Messages | P14-005 |
+| OpenCode public | P14-006 |
+| Ollama custom URL | P14-007 (generic custom base URL) |
+| Two custom compatible | P14-008 |
+| Missing auth hard fail | `missing_auth_hard_fail_request_count_zero` |
+| Invalid endpoint hard fail | `invalid_endpoint_hard_fail_request_count_zero` |
