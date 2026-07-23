@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::sync::Arc;
 
 use indexmap::IndexMap;
@@ -25,9 +23,18 @@ pub trait ProviderFactory: std::fmt::Debug {
 #[derive(Debug)]
 struct FactoryProvider {
     id: ProviderId,
-    profile: Option<String>,
     base_url: String,
-    env_key: Vec<String>,
+    profile_env_key: Vec<String>,
+}
+
+fn protocol_path(protocol: &str) -> Result<&'static str, crate::error::ProviderError> {
+    match protocol {
+        "chat_completions" => Ok("/chat/completions"),
+        "responses" => Ok("/responses"),
+        _ => Err(crate::error::ProviderError::Config(format!(
+            "unsupported protocol `{protocol}` for OpenAI-compatible provider"
+        ))),
+    }
 }
 
 impl Provider for FactoryProvider {
@@ -51,23 +58,54 @@ impl Provider for FactoryProvider {
             .clone()
             .unwrap_or_else(|| self.base_url.clone());
         let display_name = format!("{} (OpenAI Compatible)", self.id.0);
-        let route_id = RouteId::new(format!("{}-chat", self.id.0));
+
+        // D1: Resolve protocol from overrides, fall back to chat_completions
+        let protocol = overrides
+            .protocol
+            .as_deref()
+            .unwrap_or("chat_completions")
+            .to_owned();
+        let path = protocol_path(&protocol).unwrap_or("/chat/completions");
+
+        // D3: Merge profile env keys with user-provided env keys
+        let mut all_env_keys = self.profile_env_key.clone();
+        if let Some(ref user_keys) = overrides.env_key {
+            all_env_keys.extend(user_keys.iter().cloned());
+        }
+
+        // D3: Build auth candidates — provider inline key first, then env keys
+        let mut candidates: Vec<CredentialCandidate> = Vec::new();
+        if overrides.api_key.is_some() {
+            candidates.push(CredentialCandidate::RequestOverride);
+        }
+        if !all_env_keys.is_empty() {
+            candidates.push(CredentialCandidate::ProviderEnvironment(all_env_keys));
+        }
+        if candidates.is_empty() {
+            candidates.push(CredentialCandidate::ProviderEnvironment(vec![]));
+        }
+
+        let route_id = RouteId::new(format!("{}-{protocol}", self.id.0));
         let route = Route::make(
             route_id.0.clone(),
             Some(self.id.clone()),
-            "chat_completions",
+            protocol.as_str(),
             Endpoint {
                 base_url: Some(base_url),
-                path: EndpointPart::Static("/chat/completions".into()),
+                path: EndpointPart::Static(path.into()),
                 query: None,
             },
-            AuthPolicy::bearer(
-                vec![CredentialCandidate::ProviderEnvironment(
-                    self.env_key.clone(),
-                )],
-                false,
-            ),
+            AuthPolicy::bearer(candidates, false),
         );
+
+        // D4: Apply extra headers from overrides
+        let mut route = route;
+        if let Some(ref extra) = overrides.extra_headers {
+            for (key, value) in extra {
+                route.static_headers.insert(key.clone(), value.clone());
+            }
+        }
+
         let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);
         let selector = Arc::new(DefaultRouteSelector {
             default_route_id: route_id.clone(),
@@ -116,33 +154,13 @@ impl ProviderFactory for OpenAiCompatibleProviderFactory {
             })
             .unwrap_or_default();
 
-        let env_key = Self::env_key_for_profile(profile.as_deref());
+        let profile_env_key = Self::env_key_for_profile(profile.as_deref());
 
         Ok(Arc::new(FactoryProvider {
             id: spec.id.clone(),
-            profile,
             base_url,
-            env_key,
+            profile_env_key,
         }))
-    }
-}
-
-/// Profile metadata: default protocol and model-list format.
-struct ProfileMeta {
-    protocol: &'static str,
-    model_format: Option<&'static str>,
-}
-
-fn profile_meta(profile: &str) -> ProfileMeta {
-    match profile {
-        "openrouter" => ProfileMeta {
-            protocol: "chat_completions",
-            model_format: Some("openai_compatible"),
-        },
-        _ => ProfileMeta {
-            protocol: "chat_completions",
-            model_format: None,
-        },
     }
 }
 

@@ -1010,14 +1010,14 @@ mod tests {
             .routes
             .get(&ProviderRouteKey {
                 provider_id: ProviderId::new("deepseek"),
-                local_route_id: RouteId::new("deepseek-chat"),
+                local_route_id: RouteId::new("deepseek-chat_completions"),
             })
             .map(|r| r.endpoint.base_url.clone());
         let internal_url = snap
             .routes
             .get(&ProviderRouteKey {
                 provider_id: ProviderId::new("internal"),
-                local_route_id: RouteId::new("internal-chat"),
+                local_route_id: RouteId::new("internal-chat_completions"),
             })
             .map(|r| r.endpoint.base_url.clone());
         assert!(
