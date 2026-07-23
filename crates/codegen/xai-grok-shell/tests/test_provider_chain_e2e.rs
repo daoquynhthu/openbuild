@@ -6,6 +6,8 @@
 //!
 //! **Prohibited**: manual `SamplerConfig` or `PreparedSamplerConfig` construction.
 
+use serial_test::serial;
+
 use futures_util::StreamExt;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
 use xai_grok_shell::agent::provider_resolution::execution_to_sampler_config;
@@ -275,6 +277,7 @@ fn openai_chat_chain_endpoint_bearer_model_events_usage() {
 /// Protocol override via TOML `protocol = "responses"` is not yet implemented
 /// for openai-compatible providers (tracked as follow-up).
 #[test]
+#[serial]
 fn openai_responses_chain_selects_responses_route() {
     // xAI provider requires XAI_API_KEY environment variable for auth
     // SAFETY: test-only, single-threaded access to env var
@@ -334,6 +337,7 @@ fn openai_responses_chain_selects_responses_route() {
 /// 3. Includes `anthropic-version` header
 /// 4. Uses `/messages` endpoint path
 #[test]
+#[serial]
 fn anthropic_messages_chain_x_api_key_version_path() {
     // Anthropic provider requires ANTHROPIC_API_KEY environment variable
     // SAFETY: test-only, single-threaded access to env var
@@ -415,7 +419,7 @@ fn anthropic_messages_chain_x_api_key_version_path() {
 fn opencode_public_chain_no_auth() {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let (server, snapshot) = rt.block_on(async {
+    let (_server, snapshot) = rt.block_on(async {
         let server = MockInferenceServer::start().await.unwrap();
         let mock_url = server.url();
 
@@ -438,7 +442,7 @@ fn opencode_public_chain_no_auth() {
                 .await
                 .expect("bootstrap must succeed");
 
-        (_server, runtime.snapshot())
+        (server, runtime.snapshot())
     });
 
     // Phase 2: Route compiler produces no-auth config
@@ -520,7 +524,7 @@ fn custom_base_url_no_auth() {
                 .await
                 .expect("bootstrap must succeed");
 
-        (_server, runtime.snapshot())
+        (server, runtime.snapshot())
     });
 
     // Phase 2: Verify custom base URL and no auth
@@ -710,4 +714,108 @@ fn two_custom_providers_no_state_cross_contamination() {
             "provider-b request must have model-beta"
         );
     });
+}
+
+/// Acceptance matrix: missing auth hard fail — request count 0.
+///
+/// Anthropic provider requires `x-api-key` header (required: true).
+/// When no API key is provided (env var not set, no inline key),
+/// `execution_to_sampler_config` must fail with `AuthCredential` error
+/// and zero HTTP requests reach the mock server.
+#[test]
+#[serial]
+fn missing_auth_hard_fail_request_count_zero() {
+    // Ensure ANTHROPIC_API_KEY is NOT set
+    // SAFETY: test-only, single-threaded access to env var
+    unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server, snapshot) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.anthropic]
+            base_url = "{mock_url}"
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        (server, runtime.snapshot())
+    });
+
+    // Attempt to resolve with NO api_key and NO env var
+    let model = custom_model_entry("anthropic", "claude-3-5-sonnet");
+    let result = execution_to_sampler_config(&model, &snapshot, None, None);
+
+    // Must fail with auth credential error
+    assert!(
+        result.is_err(),
+        "missing auth must fail, got Ok: {:?}",
+        result
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.to_lowercase().contains("credential"),
+        "error must mention credential, got: {err}"
+    );
+
+    // Zero HTTP requests reached the mock server
+    let requests = server.requests();
+    assert!(
+        requests.is_empty(),
+        "zero HTTP requests must be made on missing auth, got: {}",
+        requests.len()
+    );
+}
+
+/// Acceptance matrix: invalid endpoint hard fail — request count 0.
+///
+/// An openai-compatible provider with a syntactically invalid base_url
+/// causes `Endpoint::render` to fail before any HTTP request is made.
+#[test]
+fn invalid_endpoint_hard_fail_request_count_zero() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let snapshot = rt.block_on(async {
+        let toml_str = r#"
+            [provider.bad-endpoint]
+            implementation = "openai-compatible"
+            base_url = "://invalid-url"
+
+            [provider.bad-endpoint.models.test-model]
+            context_window = 64000
+            "#;
+        let toml: toml::Value = toml::from_str(toml_str).unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        runtime.snapshot()
+    });
+
+    // Attempt to resolve with invalid endpoint URL
+    let model = custom_model_entry("bad-endpoint", "test-model");
+    let result = execution_to_sampler_config(&model, &snapshot, Some("key"), None);
+
+    // Must fail with protocol/endpoint error
+    assert!(
+        result.is_err(),
+        "invalid endpoint must fail, got Ok: {:?}",
+        result
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("endpoint") || err.contains("Endpoint") || err.contains("URL") || err.contains("protocol"),
+        "error must mention endpoint/URL/protocol, got: {err}"
+    );
 }
