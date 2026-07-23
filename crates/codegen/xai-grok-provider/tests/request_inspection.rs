@@ -50,6 +50,7 @@ fn spec(
                 extra_headers: IndexMap::new(),
             },
             inline_api_key: api_key.map(|k| SecretValue::new(k.to_string())),
+            env_keys: vec![],
         },
     }
 }

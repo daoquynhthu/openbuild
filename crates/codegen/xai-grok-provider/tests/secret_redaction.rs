@@ -85,6 +85,7 @@ fn snapshot_debug_redacts_canary() {
                         extra_headers: indexmap::IndexMap::new(),
                     },
                     inline_api_key: Some(canary_secret()),
+                    env_keys: vec![],
                 },
             },
         )]),

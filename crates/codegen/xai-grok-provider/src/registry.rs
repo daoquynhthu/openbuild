@@ -932,6 +932,7 @@ mod tests {
                         extra_headers: IndexMap::new(),
                     },
                     inline_api_key: None,
+                    env_keys: vec![],
                 },
             }
         }
@@ -952,6 +953,7 @@ mod tests {
                         extra_headers: IndexMap::new(),
                     },
                     inline_api_key: None,
+                    env_keys: vec![],
                 },
             }
         }
