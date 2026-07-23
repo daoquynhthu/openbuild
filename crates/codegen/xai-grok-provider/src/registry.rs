@@ -218,8 +218,31 @@ impl ProviderRegistry {
                             definition_id.0
                         ))
                     })?;
+                    let model_list_format = spec.config.public.model_list_format.map(|f| match f {
+                        crate::types::ModelListFormat::OpenAiCompatible => "openai_compatible".to_string(),
+                        crate::types::ModelListFormat::OllamaTags => "ollama_tags".to_string(),
+                    });
                     let overrides = ProviderConfig {
                         id: Some(spec.id.0.clone()),
+                        base_url: spec.config.public.base_url.clone(),
+                        protocol: spec.config.public.protocol.clone(),
+                        model_list_path: spec.config.public.model_list_path.clone(),
+                        model_list_format,
+                        env_key: if spec.config.env_keys.is_empty() {
+                            None
+                        } else {
+                            Some(spec.config.env_keys.clone())
+                        },
+                        extra_headers: if spec.config.public.extra_headers.is_empty() {
+                            None
+                        } else {
+                            Some(spec.config.public.extra_headers.clone())
+                        },
+                        allow_insecure_http: if spec.config.public.allow_insecure_http {
+                            Some(true)
+                        } else {
+                            None
+                        },
                         ..Default::default()
                     };
                     provider.configure(overrides)
@@ -231,9 +254,31 @@ impl ProviderRegistry {
                             ProviderError::Config("OpenAiCompatible factory not registered".into())
                         })?;
                     let provider = factory.create(spec)?;
+                    let model_list_format = spec.config.public.model_list_format.map(|f| match f {
+                        crate::types::ModelListFormat::OpenAiCompatible => "openai_compatible".to_string(),
+                        crate::types::ModelListFormat::OllamaTags => "ollama_tags".to_string(),
+                    });
                     let overrides = ProviderConfig {
                         id: Some(spec.id.0.clone()),
                         base_url: spec.config.public.base_url.clone(),
+                        protocol: spec.config.public.protocol.clone(),
+                        model_list_path: spec.config.public.model_list_path.clone(),
+                        model_list_format,
+                        env_key: if spec.config.env_keys.is_empty() {
+                            None
+                        } else {
+                            Some(spec.config.env_keys.clone())
+                        },
+                        extra_headers: if spec.config.public.extra_headers.is_empty() {
+                            None
+                        } else {
+                            Some(spec.config.public.extra_headers.clone())
+                        },
+                        allow_insecure_http: if spec.config.public.allow_insecure_http {
+                            Some(true)
+                        } else {
+                            None
+                        },
                         ..Default::default()
                     };
                     provider.configure(overrides)
@@ -556,6 +601,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),
@@ -588,6 +634,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),
@@ -626,6 +673,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),
@@ -652,6 +700,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),
@@ -695,6 +744,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),
@@ -722,6 +772,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),
@@ -824,6 +875,7 @@ mod tests {
                                 extra_headers: IndexMap::new(),
                             },
                             inline_api_key: None,
+                        env_keys: vec![],
                         },
                     },
                 ),
@@ -842,6 +894,7 @@ mod tests {
                                 extra_headers: IndexMap::new(),
                             },
                             inline_api_key: None,
+                        env_keys: vec![],
                         },
                     },
                 ),
@@ -1021,6 +1074,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),
@@ -1074,6 +1128,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),
@@ -1177,6 +1232,7 @@ mod tests {
                             extra_headers: IndexMap::new(),
                         },
                         inline_api_key: None,
+                        env_keys: vec![],
                     },
                 },
             )]),

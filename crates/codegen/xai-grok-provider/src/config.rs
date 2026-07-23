@@ -108,6 +108,7 @@ impl ProviderConfigInput {
     /// Consume this input and produce a [`ProviderRuntimeConfig`].
     /// `api_key` is wrapped in [`SecretValue`] and never returned as `String`.
     pub fn into_runtime_config(self) -> crate::resolution::ProviderRuntimeConfig {
+        let env_keys = self.env_key.unwrap_or_default();
         crate::resolution::ProviderRuntimeConfig {
             public: crate::resolution::ProviderPublicConfig {
                 base_url: self.base_url,
@@ -121,6 +122,7 @@ impl ProviderConfigInput {
                 extra_headers: self.extra_headers.unwrap_or_default(),
             },
             inline_api_key: self.api_key.map(crate::auth::SecretValue::new),
+            env_keys,
         }
     }
 }
