@@ -4540,8 +4540,8 @@ pub fn resolve_aux_model_sampling_config(
             Ok(sampler) if sampler.api_key.is_some() => return Some(sampler),
             Ok(_) => {}
             Err(e) if has_provider_binding && has_registry => {
-                panic!(
-                    "P7-003: route compiler hard error for provider-bound aux model `{}`: {e}",
+                tracing::error!(
+                    "route compiler hard error for provider-bound aux model `{}`: {e}",
                     entry.info.model
                 );
             }
@@ -4951,8 +4951,8 @@ pub fn resolve_web_search_sampling_config(
         ) {
             Ok(cfg) => Some(cfg),
             Err(e) if has_provider_binding && has_registry => {
-                panic!(
-                    "P7-003: route compiler hard error for web search model `{}`: {e}",
+                tracing::error!(
+                    "route compiler hard error for web search model `{}`: {e}",
                     entry.info.model
                 );
             }

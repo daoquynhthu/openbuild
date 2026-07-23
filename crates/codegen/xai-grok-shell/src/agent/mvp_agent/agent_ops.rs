@@ -1184,8 +1184,8 @@ impl MvpAgent {
         );
         let mut config = registry_result.unwrap_or_else(|e| {
             if has_provider_binding && has_registry {
-                panic!(
-                    "P7-003: route compiler hard error for provider-bound model `{}`: {e}",
+                tracing::error!(
+                    "route compiler hard error for provider-bound model `{}`: {e}",
                     model.info.model
                 );
             }
