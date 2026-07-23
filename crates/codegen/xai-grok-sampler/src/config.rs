@@ -40,6 +40,10 @@ use crate::retry::{DEFAULT_MAX_RETRIES, RATE_LIMIT_RETRY_THRESHOLD};
 /// protocol shape.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SamplerConfig {
+    /// API key for the provider. Direct read/write is a temporary stopgap;
+    /// production code should use `prepare_sampler_config` + `PreparedSamplerConfig`
+    /// for credential resolution. Direct mutation bypasses the credential context.
+    /// TODO: Make private, add accessor methods, route all writes through credential context.
     pub api_key: Option<String>,
     pub base_url: String,
     pub model: String,

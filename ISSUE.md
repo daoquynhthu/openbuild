@@ -275,10 +275,10 @@
 |------|------|------|
 | C01 | xai-grok-sampler/tests/test_actor.rs:72 | Fixed — 添加 request_url: None |
 | M01 | xai-grok-sampler/src/protocols/mod.rs:38-44 | Fixed — `resolve_protocol_id_optional(None)` 返回 error，`protocol_id()` 不再回退 api_backend |
-| M02 | xai-grok-shell/src/ agent/*.rs session/*.rs | 待评估 — 20+ 处直接 .api_key 字段修改 |
+| M02 | xai-grok-shell/src/agent/*.rs session/*.rs | 已评估 — 20+ 处 .api_key 字段修改，涉及 4 个 crate 的生产代码。此前 Phase 8 审计 M06 已判定为不可操作（修改面过大且无生产风险）。已添加 deprecated doc 注释，跟踪到技术债清单。 |
 | M03 | xai-grok-provider/tests/request_inspection.rs:337 | Fixed — 移除未使用导入/变量 |
 | S01 | xai-grok-tools/src/computer/local/terminal.rs:2881 | Fixed — 移除未使用导入 |
-| S02 | xai-grok-provider/src/auth.rs:123,131,508,509 | 待评估 — 直接 env::var 凭据读取 |
-| S03 | xai-grok-shell/src/extensions/suggest/shell_token.rs | 已记录 — 平台差异测试守卫 |
-| S04 | xai-grok-provider/src/providers/mod.rs:46 | 待评估 — 直接 env::var 读取 |
+| S02 | xai-grok-provider/src/auth.rs:123,131,508,509 | 已评估 — 这些直接 `std::env::var` 调用是 `CredentialCandidate::Environment` 和 `Session` 的叶节点实现，由 `RequestCredentialContext::resolve_candidates` 统一调用。不是绕过，而是预期实现。 |
+| S03 | xai-grok-shell/src/extensions/suggest/shell_token.rs | 已记录 — 9 个 `#[cfg(not(windows))]` 测试守卫，每个都有对应的 `#[cfg(windows)]` 变体，代表真实平台行为差异。 |
+| S04 | xai-grok-provider/src/providers/mod.rs:46 | 已评估 — 此处的 `std::env::var` 调用是 provider 配置期间的环境变量检测（`XAI_API_KEY`→xAI），属于配置解析层，与请求级凭据解析路径不同。 |
 | — | xai-grok-shell/src/agent/provider_resolution.rs:643,669 | Fixed — 两个 pre-existing clippy 警告 |
