@@ -264,3 +264,64 @@ fn openai_chat_chain_endpoint_bearer_model_events_usage() {
         assert!(msgs.len() >= 2, "must have system + user messages");
     });
 }
+
+/// P14-004: OpenAI Responses chain — verify responses route selection, not chat.
+///
+/// This test validates that the xAI provider (which uses Responses API by default)
+/// correctly produces a config with `ApiBackend::Responses` instead of
+/// `ApiBackend::ChatCompletions`.
+///
+/// Note: OpenAI-compatible providers currently default to ChatCompletions.
+/// Protocol override via TOML `protocol = "responses"` is not yet implemented
+/// for openai-compatible providers (tracked as follow-up).
+#[test]
+fn openai_responses_chain_selects_responses_route() {
+    // xAI provider requires XAI_API_KEY environment variable for auth
+    // SAFETY: test-only, single-threaded access to env var
+    unsafe { std::env::set_var("XAI_API_KEY", "xai-test-key-for-responses") };
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    // Phase 1: Bootstrap with xAI provider (uses Responses API by default)
+    let snapshot = rt.block_on(async {
+        // Include xAI provider in TOML so it appears in the snapshot
+        let toml: toml::Value = toml::from_str(
+            r#"
+            [provider.xai]
+            "#,
+        )
+        .unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        runtime.snapshot()
+    });
+
+    // Phase 2: Route compiler produces Responses config for xAI
+    let model = custom_model_entry("xai", "grok-test");
+    let config = execution_to_sampler_config(&model, &snapshot, None, None)
+        .expect("execution_to_sampler_config must succeed");
+
+    // Verify the config uses Responses backend (xAI default)
+    assert_eq!(
+        config.api_backend,
+        ApiBackend::Responses,
+        "xAI config must use Responses backend, not ChatCompletions"
+    );
+
+    // Verify the endpoint path is /responses (not /chat/completions)
+    assert!(
+        config.endpoint_path.as_deref() == Some("/responses")
+            || config.request_url.as_deref().is_some_and(|u| u.contains("/responses")),
+        "xAI config must use /responses endpoint, got endpoint_path={:?}, request_url={:?}",
+        config.endpoint_path,
+        config.request_url
+    );
+
+    // Clean up environment variable
+    // SAFETY: test-only, single-threaded access to env var
+    unsafe { std::env::remove_var("XAI_API_KEY") };
+}
