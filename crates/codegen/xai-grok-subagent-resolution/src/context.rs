@@ -34,12 +34,12 @@ const FORK_NOISE_TAGS: &[&str] = &[
 ///
 /// The System item is kept as-is (replaced later by `spawn_session_actor`).
 /// Parent conversation items (excluding System) are rendered into a single
-/// `<background_context>` User message. If there are [`MAX_VERBATIM_TURNS`]
+/// `<background_context>` User message. If there are `MAX_VERBATIM_TURNS`
 /// or fewer complete turns, all are included verbatim. If more, the last
-/// [`MAX_VERBATIM_TURNS`] are verbatim and earlier turns are summarized.
+/// `MAX_VERBATIM_TURNS` are verbatim and earlier turns are summarized.
 ///
 /// The task prompt is NOT included here: it arrives via the normal Prompt
-/// command and becomes the **last** user message (position [2]). This gives
+/// command and becomes the **last** user message (position `[2]`). This gives
 /// the task maximum recency-based attention from the model.
 ///
 /// Returns `(normalized_items, inherited_prefix_len)` where

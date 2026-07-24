@@ -299,7 +299,7 @@ where
     /// Obtains a difference between the previous and the current buffer and passes it to the
     /// current backend for drawing. Returns `true` if any cells were changed.
     ///
-    /// Uses [`diff_large`] instead of ratatui's [`Buffer::diff`] to avoid a `u16`
+    /// Uses `diff_large` instead of ratatui's `Buffer::diff` to avoid a `u16`
     /// truncation bug: upstream `pos_of()` casts the flat cell index to `u16`
     /// before computing `(x, y)`, which silently wraps around when
     /// `width * height > 65 535`.  On extra-large terminals (e.g. 420×160 = 67 200
@@ -1165,7 +1165,7 @@ fn diff_large<'a>(prev: &Buffer, next: &'a Buffer) -> Vec<(u16, u16, &'a Cell)> 
     updates
 }
 
-/// Like [`diff_large`] but a cell is also considered changed when its hyperlink
+/// Like `diff_large` but a cell is also considered changed when its hyperlink
 /// changed between the previous and current frame (even if the glyph/style is
 /// identical). This is what makes OSC 8 links participate in the frame diff:
 /// adding, removing, or retargeting a link forces the affected cells to be

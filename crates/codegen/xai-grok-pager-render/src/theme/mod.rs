@@ -39,7 +39,7 @@ pub enum ThemeKind {
     /// theme at startup and on live appearance changes. The `"auto"`
     /// string is stored on disk and in `app.current_ui.theme`, but
     /// only the resolved concrete kind lives in the cache.
-    /// Excluded from [`ALL`] and [`available()`].
+    /// Excluded from `ALL` and `available()`.
     Auto = 4,
 }
 
@@ -259,11 +259,11 @@ impl Theme {
     /// `const fn` constructor, and quantizes to the terminal's color level.
     ///
     /// On Windows applies a contrast boost so structural RGB survives the
-    /// display gamma. At [`ColorLevel::Basic`] (or legacy ConHost below
+    /// display gamma. At `ColorLevel::Basic` (or legacy ConHost below
     /// truecolor) we additionally pin chrome colors to ANSI-named entries
     /// because every dark RGB collapses onto the same ANSI16 slot otherwise.
     /// Modern ConHost (Win10 1709+) lands on TrueColor via
-    /// [`color_support::terminal_supports_truecolor`] and skips the overrides.
+    /// `color_support::terminal_supports_truecolor` and skips the overrides.
     pub fn current() -> Self {
         let level = color_support::detect();
         if cache::terminal_native_locked() {

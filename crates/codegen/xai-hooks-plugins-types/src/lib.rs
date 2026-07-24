@@ -229,7 +229,7 @@ pub struct HooksListResponse {
 pub struct PluginInfo {
     /// User-facing plugin name.
     pub name: String,
-    /// Stable plugin ID (format: "<scope>/<hex8>/<name>").
+    /// Stable plugin ID (format: `"<scope>/<hex8>/<name>"`).
     pub id: String,
     /// Absolute path to plugin root directory.
     pub root: String,

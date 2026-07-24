@@ -72,10 +72,10 @@ impl Default for ModalWindowState {
 pub struct ShortcutHitArea {
     /// Screen rect occupied by this shortcut label.
     pub rect: Rect,
-    /// Caller-defined identifier matching [`Shortcut::id`].
+    /// Caller-defined identifier matching `Shortcut::id`.
     pub id: usize,
     /// Index within the full `shortcuts` slice passed to
-    /// [`render_modal_shortcuts`]. Used by [`handle_modal_mouse`] to
+    /// `render_modal_shortcuts`. Used by `handle_modal_mouse` to
     /// track hover state in the same index space that the renderer uses.
     pub shortcuts_idx: usize,
     /// Whether clicking this shortcut dispatches `ShortcutActivated`.

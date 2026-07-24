@@ -113,7 +113,7 @@ impl<'a> Renderable for Line<'a> {
 // Renderable for Paragraph directly. Users should wrap text in custom types
 // that handle their own height calculation.
 
-/// Option<R> renders the inner value or nothing.
+/// `Option<R>` renders the inner value or nothing.
 impl<R: Renderable> Renderable for Option<R> {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         if let Some(renderable) = self {
@@ -130,7 +130,7 @@ impl<R: Renderable> Renderable for Option<R> {
     }
 }
 
-/// Arc<R> delegates to inner.
+/// `Arc<R>` delegates to inner.
 impl<R: Renderable> Renderable for Arc<R> {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         self.as_ref().render(area, buf);
@@ -140,7 +140,7 @@ impl<R: Renderable> Renderable for Arc<R> {
     }
 }
 
-/// Box<R> delegates to inner.
+/// `Box<R>` delegates to inner.
 impl<R: Renderable + ?Sized> Renderable for Box<R> {
     fn render(&self, area: Rect, buf: &mut Buffer) {
         self.as_ref().render(area, buf);

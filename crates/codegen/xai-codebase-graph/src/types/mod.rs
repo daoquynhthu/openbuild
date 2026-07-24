@@ -33,7 +33,7 @@ impl IndexStats {
 }
 
 /// A symbol with its line number (1-indexed).
-/// Uses Arc<str> to avoid extra allocation when merging into index.
+/// Uses `Arc<str>` to avoid extra allocation when merging into index.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolOccurrence {
     /// The symbol name
@@ -50,7 +50,7 @@ impl SymbolOccurrence {
 }
 
 /// An alias mapping (alias_name -> original_name).
-/// Uses Arc<str> to avoid extra allocation when merging into index.
+/// Uses `Arc<str>` to avoid extra allocation when merging into index.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolAlias {
     /// The alias name (e.g., imported as)

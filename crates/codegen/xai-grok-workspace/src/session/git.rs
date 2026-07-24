@@ -3358,7 +3358,7 @@ pub fn format_restore_summary(
         None => format!("staged: {staged}, unstaged: {unstaged}, untracked: {untracked}"),
     }
 }
-/// Append a "; saved your dirty changes to stash <ref>" suffix when a
+/// Append a "; saved your dirty changes to stash `<ref>`" suffix when a
 /// stash was created. Uses `;` (not parenthesised) so the suffix
 /// composes cleanly with summaries that already end in `)`. No-op when
 /// `stash_ref` is `None`.
@@ -3368,7 +3368,7 @@ pub fn append_stash_suffix(summary: &mut String, stash_ref: Option<&str>) {
         let _ = write!(summary, "; saved your dirty changes to stash {r}");
     }
 }
-/// Append "; stash skipped: <reason>" when a stash was needed but could
+/// Append "; stash skipped: `<reason>`" when a stash was needed but could
 /// not be created (in-progress merge, `git stash` failure, etc.).
 pub fn append_stash_skipped_suffix(summary: &mut String, reason: Option<&str>) {
     use std::fmt::Write as _;

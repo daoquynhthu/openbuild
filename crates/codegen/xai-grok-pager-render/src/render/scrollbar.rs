@@ -51,7 +51,7 @@ use tui_scrollbar::{SUBCELL, ScrollMetrics};
 /// unaffected.
 static SCROLLBARS_HIDDEN: AtomicBool = AtomicBool::new(false);
 
-/// Globally hide or show all scrollbars. See [`SCROLLBARS_HIDDEN`].
+/// Globally hide or show all scrollbars. See `SCROLLBARS_HIDDEN`.
 pub fn set_scrollbars_hidden(hidden: bool) {
     SCROLLBARS_HIDDEN.store(hidden, Ordering::Relaxed);
 }

@@ -24,13 +24,13 @@ use super::HunkTrackerActor;
 use super::file_utils::{classify_string, missing_content, read_file_bounded};
 use super::state::{FileContentState, FileHunkState};
 
-/// Log-line prefix emitted only when [`HunkTrackerActor::refresh_all_baselines`]
+/// Log-line prefix emitted only when `HunkTrackerActor::refresh_all_baselines`
 /// runs a real scan. Test scan counters match on it; keep it the single source
 /// of truth for the string.
 pub const REFRESH_SCAN_LOG_PREFIX: &str = "refresh_all_baselines: completed in";
 
 /// Log-line prefix for the unchanged-git-state skip path of
-/// [`HunkTrackerActor::refresh_all_baselines`] (no scan ran).
+/// `HunkTrackerActor::refresh_all_baselines` (no scan ran).
 pub const REFRESH_SKIP_LOG_PREFIX: &str = "refresh_all_baselines: git state unchanged";
 
 /// Strip a single trailing newline (`\r\n` or `\n`) for equality comparison.

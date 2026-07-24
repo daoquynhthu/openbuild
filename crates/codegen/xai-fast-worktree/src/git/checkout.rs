@@ -209,7 +209,7 @@ pub(crate) const SNAPSHOT_GIT_CONFIG: &[&str] = &[
     "core.fsmonitor=false",
 ];
 
-/// Like [`git_capture_in`], but prepends [`SNAPSHOT_GIT_CONFIG`] so the call is
+/// Like `git_capture_in`, but prepends `SNAPSHOT_GIT_CONFIG` so the call is
 /// insulated from the ambient git config. Scoped to the snapshot path; other
 /// fast-worktree operations keep the plain `git_command()` behavior.
 fn snapshot_git(worktree_path: &Path, args: &[&str], envs: &[(&str, &str)]) -> Result<String> {
@@ -277,7 +277,7 @@ fn scratch_index_path() -> PathBuf {
 /// delete the worktree must first transfer the ref into a durable repo via
 /// [`transfer_snapshot_to_repo`].
 ///
-/// Every git call applies [`SNAPSHOT_GIT_CONFIG`] (`core.autocrlf=false`,
+/// Every git call applies `SNAPSHOT_GIT_CONFIG` (`core.autocrlf=false`,
 /// `core.quotepath=false`, `core.fsmonitor=false`, …) so capture is independent
 /// of the user's/enterprise git config (line endings, path quoting, fsmonitor,
 /// long paths, symlinks); restore MUST apply the same flags for a clean
@@ -357,7 +357,7 @@ fn snapshot_worktree_to_ref_inner(
 /// Fetches the snapshot ref (with its reachable objects) from `worktree_path`
 /// into `source_repo`, then verifies it resolves to a commit there — returning
 /// an error (so the caller does NOT delete the worktree) if it does not. Every
-/// git call applies [`SNAPSHOT_GIT_CONFIG`] for parity with capture. Blocking.
+/// git call applies `SNAPSHOT_GIT_CONFIG` for parity with capture. Blocking.
 pub fn transfer_snapshot_to_repo(
     worktree_path: &Path,
     source_repo: &Path,
@@ -416,7 +416,7 @@ fn transfer_snapshot_to_repo_inner(
 /// it), the worktree is added at the snapshot commit instead — the content is
 /// still exact, only HEAD differs.
 ///
-/// Every git call applies [`SNAPSHOT_GIT_CONFIG`] so restore round-trips
+/// Every git call applies `SNAPSHOT_GIT_CONFIG` so restore round-trips
 /// symmetrically with capture (line endings, path quoting, fsmonitor, …). The
 /// rehydrated worktree is re-registered in the metadata DB as
 /// [`WorktreeKind::Subagent`](crate::db::WorktreeKind::Subagent), tagged with

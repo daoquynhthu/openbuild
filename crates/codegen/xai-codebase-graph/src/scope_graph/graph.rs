@@ -31,7 +31,7 @@ pub type SymbolWithRange = (Arc<str>, Range);
 pub type ReferenceWithDefinition = (String, Range, Option<(String, Range)>);
 
 /// Result of symbol extraction: (definitions, references, aliases).
-/// Aliases use Arc<str> to avoid extra allocation when merging into index.
+/// Aliases use `Arc<str>` to avoid extra allocation when merging into index.
 pub type ExtractedSymbols = (
     Vec<SymbolWithRange>,
     Vec<SymbolWithRange>,
@@ -766,7 +766,7 @@ impl ScopeGraphIndex {
             .insert(alias_id);
     }
 
-    /// Register an alias relationship using Arc<str> (for builder compatibility)
+    /// Register an alias relationship using `Arc<str>` (for builder compatibility)
     pub fn add_alias_arc(&mut self, alias_name: Arc<str>, original_name: Arc<str>) {
         self.add_alias(&alias_name, &original_name);
     }
@@ -808,7 +808,7 @@ impl ScopeGraphIndex {
 
     /// Add a reference occurrence with a pre-interned path id.
     ///
-    /// Same line-number contract as [`add_definition_with_path_id`]: values
+    /// Same line-number contract as `add_definition_with_path_id`: values
     /// above `u32::MAX` are saturated to `u32::MAX`.
     pub fn add_reference_with_path_id(&mut self, symbol: &str, path_id: StringId, line: usize) {
         let line_u32 = line.min(u32::MAX as usize) as u32;
@@ -1335,7 +1335,7 @@ impl ScopeGraphIndex {
     /// Reclaim over-allocated Vec capacity after a bulk build.
     ///
     /// This is a **supported public post-build maintenance hook**.  It is
-    /// called automatically by [`IndexBuilder`] after every bulk build, so
+    /// called automatically by `IndexBuilder` after every bulk build, so
     /// callers using `IndexBuilder` do not need to call it explicitly.
     ///
     /// It is useful when building an index manually via

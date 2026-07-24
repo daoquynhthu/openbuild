@@ -190,7 +190,7 @@ pub fn format_agents_md_section(configs: &[AgentConfigFile]) -> Option<String> {
     render_agents_md(configs)
 }
 
-/// Verbatim leading bytes [`render_agents_md`] emits for every reminder block.
+/// Verbatim leading bytes `render_agents_md` emits for every reminder block.
 /// Used by `xai-grok-shell` to structurally detect legacy untagged AGENTS.md
 /// copies (pre-`SyntheticReason::ProjectInstructions`) on resumed sessions.
 pub const LEGACY_AGENTS_MD_REMINDER_PREFIX: &str =

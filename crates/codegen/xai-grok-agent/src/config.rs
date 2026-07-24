@@ -20,7 +20,7 @@ use xai_grok_tools::registry::types::{ToolConfig, ToolServerConfig};
 /// # Visibility
 /// Each preset is registered as either **public** or **internal**:
 /// - **Public** presets are product presets: they are enumerated by
-///   [`preset_names`] / [`all_toolset_presets`] (so they appear in the
+///   [`preset_names`] / `all_toolset_presets` (so they appear in the
 ///   workspace manifest, preset sets, etc.) *and* resolvable via
 ///   [`toolset_for_preset`].
 /// - **Internal** presets are resolved by name at runtime by the shell /
@@ -51,8 +51,8 @@ fn toolset_preset_registry()
     TOOLSET_PRESETS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 /// Register an out-of-tree **public** (product) toolset preset by name. Public
-/// presets are enumerated by [`preset_names`] / [`all_toolset_presets`] and
-/// resolvable via [`toolset_for_preset`]. See [`TOOLSET_PRESETS`].
+/// presets are enumerated by [`preset_names`] / `all_toolset_presets` and
+/// resolvable via [`toolset_for_preset`]. See `TOOLSET_PRESETS`.
 pub fn register_toolset_preset(name: &str, builder: ToolsetPresetBuilder) {
     toolset_preset_registry()
         .lock()
@@ -62,9 +62,9 @@ pub fn register_toolset_preset(name: &str, builder: ToolsetPresetBuilder) {
 /// Register an out-of-tree **internal** toolset preset by name. Internal presets
 /// are resolvable via [`toolset_for_preset`] (the shell / orchestrator spawn
 /// path resolves them by name) but are deliberately NOT enumerated by
-/// [`preset_names`] / [`all_toolset_presets`], so they never leak into public
+/// [`preset_names`] / `all_toolset_presets`, so they never leak into public
 /// preset enumeration (manifest generation, product preset sets, …). See
-/// [`TOOLSET_PRESETS`].
+/// `TOOLSET_PRESETS`.
 pub fn register_internal_toolset_preset(name: &str, builder: ToolsetPresetBuilder) {
     toolset_preset_registry()
         .lock()

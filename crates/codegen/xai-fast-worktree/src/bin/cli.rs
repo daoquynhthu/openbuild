@@ -1,7 +1,7 @@
 //! CLI for fast git worktree creation.
 //!
 //! Usage:
-//!   fast-worktree create <source> <dest> [options]
+//!   fast-worktree create `<source>` `<dest>` `[options]`
 //!
 //! Example:
 //!   fast-worktree create /path/to/repo /path/to/worktree --dirty --parallelism 8

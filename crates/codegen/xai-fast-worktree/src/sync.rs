@@ -217,7 +217,7 @@ impl<'a> WorktreeSync<'a> {
 
     /// Sync using a pre-collected [`SourceDirtyState`].
     ///
-    /// Same as [`sync_worktree_opts`] but uses a pre-computed dirty state
+    /// Same as `sync_worktree_opts` but uses a pre-computed dirty state
     /// instead of running `git status` internally. This allows a single
     /// `git status` call to be shared across multiple worktree syncs.
     ///

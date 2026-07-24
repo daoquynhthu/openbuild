@@ -1,7 +1,7 @@
 //! Theme-aware markdown rendering style.
 //!
 //! Defines the `MarkdownStyle` used by agent message and thinking blocks.
-//! Colors come from the `md_*` fields on the current [`Theme`], which are
+//! Colors come from the `md_*` fields on the current `Theme`, which are
 //! already quantized to the terminal's color capability level.
 
 use anstyle::{Ansi256Color, AnsiColor, Color, Style};
@@ -98,7 +98,7 @@ fn heading_outer_styles(colors: [ratatui::style::Color; 6]) -> [Style; 6] {
 
 /// Get the theme-aware markdown style.
 ///
-/// Built fresh from [`Theme::current()`] on each call. Both the theme
+/// Built fresh from `Theme::current()` on each call. Both the theme
 /// construction and style mapping are trivial struct copies.
 pub fn style() -> MarkdownStyle {
     build_style()

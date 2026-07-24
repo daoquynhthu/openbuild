@@ -45,7 +45,7 @@ pub struct WaitDiagnostics {
     pub screen: String,
     pub cursor: CursorPosition,
     pub modes: TerminalModes,
-    /// Last bytes of raw PTY output (lossy UTF-8, at most [`RAW_TAIL_CAP`] bytes).
+    /// Last bytes of raw PTY output (lossy UTF-8, at most `RAW_TAIL_CAP` bytes).
     pub raw_tail: String,
     /// Grid generation at timeout.
     pub generation: u64,

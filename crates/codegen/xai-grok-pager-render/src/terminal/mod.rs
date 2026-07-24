@@ -247,7 +247,7 @@ pub enum ByobuBackend {
 ///
 /// Fields are gathered at startup from environment variables; no live
 /// subprocess calls are made here. Live tmux-option queries remain in
-/// [`crate::diagnostics`].
+/// `crate::diagnostics`.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct TmuxClientMeta {
     /// The raw `TMUX` variable value (e.g. `/tmp/tmux-501/default,12345,0`).

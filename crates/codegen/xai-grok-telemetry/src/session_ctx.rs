@@ -103,7 +103,7 @@ pub enum EmitterOrigin {
 }
 
 impl EmitterOrigin {
-    /// Every emitter origin. [`crate::client::event_value`] iterates this to
+    /// Every emitter origin. `crate::client::event_value` iterates this to
     /// strip whichever prefix an event name carries. Iteration *order* is
     /// irrelevant: the prefixes are mutually exclusive (no
     /// [`EmitterOrigin::event_prefix`] is a prefix of another — pinned by
@@ -113,7 +113,7 @@ impl EmitterOrigin {
     /// variant that is omitted here fails to compile.
     pub const ALL: [EmitterOrigin; 2] = [EmitterOrigin::Shell, EmitterOrigin::Workspace];
 
-    /// Analytics event-name prefix for this origin. [`crate::client::event_value`]
+    /// Analytics event-name prefix for this origin. `crate::client::event_value`
     /// strips the same prefix to derive the wire `event_value`, so the two must
     /// stay in lockstep.
     pub fn event_prefix(self) -> &'static str {

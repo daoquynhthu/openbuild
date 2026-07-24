@@ -3,7 +3,7 @@
 //! Re-exports [`ClipboardProvider`] and [`InternalClipboard`] from
 //! `xai-ratatui-textarea`, and adds [`SystemClipboard`] backed by `arboard`.
 //!
-//! Multi-fire writes (native / tmux / OSC 52); user-facing success is [`trust`].
+//! Multi-fire writes (native / tmux / OSC 52); user-facing success is `trust`.
 
 mod trust;
 
@@ -110,8 +110,8 @@ impl std::fmt::Display for ClipboardRoute {
 
 /// Resolve the clipboard route from a terminal context.
 ///
-/// Note: the `osc52` field depends on [`is_remote()`] and
-/// [`is_container_no_display()`] which read ambient env vars / filesystem
+/// Note: the `osc52` field depends on `is_remote()` and
+/// `is_container_no_display()` which read ambient env vars / filesystem
 /// markers (cached in `OnceLock`s). In tmux-backed environments `osc52` is
 /// unconditionally `true` regardless of SSH/container state, so this only
 /// matters for non-tmux contexts. Tests that cannot control SSH env vars
@@ -182,7 +182,7 @@ fn write_tmux_buffer(text: &str) -> bool {
 pub struct SystemClipboard;
 
 impl SystemClipboard {
-    /// Full write route; `true` when a trusted leg succeeded ([`trust`]).
+    /// Full write route; `true` when a trusted leg succeeded (`trust`).
     pub fn try_set(text: &str) -> bool {
         let legs = clipboard_write_with_route(text, clipboard_route());
         toast_for_legs(&legs, text).reported_success()

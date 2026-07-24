@@ -6,8 +6,8 @@
 //! [`ExternalKey`] enum, not strings — so the compiler enumerates every
 //! attribute that can possibly reach the wire. Three independent mechanisms
 //! must be defeated to leak a new attribute: this enum, the pinned
-//! [`EXTERNAL_ALLOWED_KEYS`] test, and the export-time validators in
-//! [`super::redact`]. Telemetry-owner review gates this file (CODEOWNERS).
+//! `EXTERNAL_ALLOWED_KEYS` test, and the export-time validators in
+//! `super::redact`. Telemetry-owner review gates this file (CODEOWNERS).
 
 use crate::events;
 
@@ -78,7 +78,7 @@ impl ExternalEventName {
 
 /// Every attribute key the external stream can attach to a log record. You
 /// cannot attach an attribute the schema doesn't name. Adding a variant trips
-/// the [`EXTERNAL_ALLOWED_KEYS`] pin test.
+/// the `EXTERNAL_ALLOWED_KEYS` pin test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumCount)]
 pub enum ExternalKey {
     // Context / correlation (injected by emit.rs)

@@ -291,7 +291,7 @@ pub struct RemoteSettings {
     pub subscription_watch_interval_secs: Option<u64>,
     #[serde(default)]
     pub writeback_enabled: Option<bool>,
-    /// OAuth2 provider issuer URL (e.g., "https://auth.x.ai"). When present
+    /// OAuth2 provider issuer URL (e.g., `<https://auth.x.ai>`). When present
     /// together with `oauth2_client_id`, the client uses OAuth2 authorization code
     /// flow. Controlled via remote settings for gradual rollout.
     #[serde(default)]
@@ -425,7 +425,7 @@ pub struct RemoteSettings {
     /// Planner role model+toolset. Absent ⇒ inherit current model. A
     /// present-but-malformed value is tolerantly dropped to `None` (not a
     /// hard parse error) so it cannot nuke the whole `RemoteSettings`
-    /// payload (see [`deserialize_tolerant_goal_role_model`]).
+    /// payload (see `deserialize_tolerant_goal_role_model`).
     #[serde(
         default,
         deserialize_with = "deserialize_tolerant_goal_role_model",
@@ -434,7 +434,7 @@ pub struct RemoteSettings {
     pub goal_planner_model: Option<GoalRoleModel>,
     /// Strategist role model+toolset. Absent ⇒ inherit current model. A
     /// present-but-malformed value is tolerantly dropped to `None`
-    /// (see [`deserialize_tolerant_goal_role_model`]).
+    /// (see `deserialize_tolerant_goal_role_model`).
     #[serde(
         default,
         deserialize_with = "deserialize_tolerant_goal_role_model",
@@ -445,7 +445,7 @@ pub struct RemoteSettings {
     /// `1..N` are assigned round-robin over the pool. Empty/absent ⇒
     /// inherit the current model. A single malformed pool entry is
     /// dropped rather than discarding the whole pool (see
-    /// [`deserialize_tolerant_goal_skeptic_models`]).
+    /// `deserialize_tolerant_goal_skeptic_models`).
     #[serde(
         default,
         deserialize_with = "deserialize_tolerant_goal_skeptic_models",

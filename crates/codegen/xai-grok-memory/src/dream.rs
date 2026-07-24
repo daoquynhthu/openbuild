@@ -147,7 +147,7 @@ pub struct DreamMessage {
     pub content: String,
     /// File stems that were successfully read and included. Only these
     /// sessions should be cleaned up after a successful consolidation —
-    /// stems beyond the [`MAX_DREAM_INPUT_CHARS`] cap are deliberately
+    /// stems beyond the `MAX_DREAM_INPUT_CHARS` cap are deliberately
     /// excluded so their content is preserved for a future dream pass.
     pub processed_stems: Vec<String>,
 }
@@ -176,7 +176,7 @@ pub(crate) fn is_scaffold_template(content: &str) -> bool {
 /// knowledge with new sessions.
 ///
 /// Reads each session file and concatenates their contents with separators.
-/// Stops adding sessions once total size exceeds [`MAX_DREAM_INPUT_CHARS`].
+/// Stops adding sessions once total size exceeds `MAX_DREAM_INPUT_CHARS`.
 /// Returns `None` if no session files could be read.
 pub fn build_dream_user_message(
     sessions_dir: &Path,
@@ -269,7 +269,7 @@ const MAX_DREAM_CHARS: usize = 16_000;
 /// directly without normalization, dream's markdown structure is
 /// preserved as-is.
 ///
-/// Truncates content exceeding [`MAX_DREAM_CHARS`].
+/// Truncates content exceeding `MAX_DREAM_CHARS`.
 pub fn process_dream_response(response: &str) -> Option<String> {
     let trimmed = response.trim();
     if trimmed.is_empty() {

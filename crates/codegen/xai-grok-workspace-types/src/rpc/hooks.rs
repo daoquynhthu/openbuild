@@ -91,7 +91,7 @@ pub enum HookEventNameWire {
 }
 
 impl HookEventNameWire {
-    /// The snake_case wire string (the captured raw value for [`Unknown`]).
+    /// The snake_case wire string (the captured raw value for `Unknown`).
     pub fn as_str(&self) -> &str {
         match self {
             Self::SessionStart => "session_start",

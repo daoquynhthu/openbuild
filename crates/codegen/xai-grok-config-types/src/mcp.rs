@@ -247,7 +247,7 @@ impl McpServerConfig {
 }
 
 /// Configuration for relay session sharing.
-/// Set in config.toml under [relay] section.
+/// Set in config.toml under `[relay]` section.
 ///
 /// Example:
 /// ```toml

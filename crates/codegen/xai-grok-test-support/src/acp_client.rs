@@ -129,7 +129,7 @@ impl GrokStdioClient {
         Self::spawn_with_home_and_env(server, cwd, home, &[]).await
     }
 
-    /// Like [`spawn_with_home`] but applies extra environment variables to the
+    /// Like `spawn_with_home` but applies extra environment variables to the
     /// child process (after the standard test env). Used by tests that toggle
     /// behavior via env vars (e.g. the vendor-compat suite).
     pub async fn spawn_with_home_and_env(
@@ -141,7 +141,7 @@ impl GrokStdioClient {
         Self::spawn_with_home_env_and_args(server, cwd, home, extra_env, &[]).await
     }
 
-    /// Like [`spawn_with_home_and_env`] but also prepends `leading_args` before
+    /// Like `spawn_with_home_and_env` but also prepends `leading_args` before
     /// the `agent stdio` subcommand. Used to drive top-level global flags (e.g.
     /// `--debug`) so a test can exercise the flag's master switch, not just env.
     pub async fn spawn_with_home_env_and_args(

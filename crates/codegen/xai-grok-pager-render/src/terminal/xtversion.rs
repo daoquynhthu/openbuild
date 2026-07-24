@@ -1,6 +1,6 @@
 //! Runtime XTVERSION probe (`CSI > 0 q` → `DCS > | text ST`), run when
 //! env-based brand detection yields Unknown (SSH, plain xterm) or a
-//! headfully-validated allowlisted brand (see [`gate_allows_probe`]).
+//! headfully-validated allowlisted brand (see `gate_allows_probe`).
 //!
 //! Fire-and-forget, parser-integrated model (as in helix and similar TUIs):
 //! the query is written once at startup with no timed read; the reply is

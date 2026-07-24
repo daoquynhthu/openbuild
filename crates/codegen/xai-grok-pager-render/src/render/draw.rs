@@ -2,7 +2,7 @@
 //!
 //! # Problem
 //!
-//! Ratatui's [`Terminal::draw()`] (internally `try_draw()`) unconditionally
+//! Ratatui's `Terminal::draw()` (internally `try_draw()`) unconditionally
 //! sends cursor escape sequences on every frame:
 //!
 //! - If `frame.set_cursor_position()` was called: `Show` + `MoveTo` every frame
@@ -277,7 +277,7 @@ impl CursorState {
     /// Determine what cursor action to take for this frame.
     ///
     /// Pure function — computes the action from current state without
-    /// side effects. Call [`apply`] to execute it.
+    /// side effects. Call `apply` to execute it.
     pub fn action(&self, cursor_pos: Option<(u16, u16)>, has_changes: bool) -> CursorAction {
         if cursor_pos == self.last_pos {
             if has_changes && let Some((x, y)) = cursor_pos {

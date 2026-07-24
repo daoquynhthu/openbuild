@@ -10,7 +10,7 @@
 //! Controls: `W`/`↑` forward, `S`/`↓` back, `A`/`D` strafe, `←`/`→` turn,
 //! mouse move/drag aim (in-modal, Playing only), click or `Space`/`Enter`
 //! fire, `Esc`/`q` quit. Movement uses the continuous held-key model in
-//! [`game`] — terminals deliver no key-release events, so it eases toward a
+//! `game` — terminals deliver no key-release events, so it eases toward a
 //! steady target while a key is held, staying smooth regardless of the OS
 //! key-repeat cadence.
 

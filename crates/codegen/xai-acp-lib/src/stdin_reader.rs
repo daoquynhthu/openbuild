@@ -74,7 +74,7 @@ const STDIN_LINE_CHANNEL_DEPTH: usize = 64;
 /// dropped. The reader is meant to be the **sole** stdin consumer in the
 /// agent-stdio / leader-bridge paths; on Windows it enforces that by redirecting
 /// the process's standard input to `NUL` so stray readers can't deadlock on it
-/// (see the [module docs](self)).
+/// (see the `self` module docs).
 pub fn spawn_stdin_line_reader() -> mpsc::Receiver<Vec<u8>> {
     let (tx, rx) = mpsc::channel::<Vec<u8>>(STDIN_LINE_CHANNEL_DEPTH);
 

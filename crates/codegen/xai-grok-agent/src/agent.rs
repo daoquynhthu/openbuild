@@ -19,7 +19,7 @@ use crate::system_reminder::ReminderPolicy;
 /// Created by AgentBuilder from an AgentDefinition + session context.
 ///
 /// The Agent is effectively immutable after construction. It holds
-/// Arc<ToolBridge> — mutations to tool state (MCP registration,
+/// `Arc<ToolBridge>` — mutations to tool state (MCP registration,
 /// completion tracking, retry config) go through ToolBridge's
 /// internal locks.
 pub struct Agent {

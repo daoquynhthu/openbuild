@@ -1,8 +1,8 @@
 //! Shared prompt-side image types and helpers.
 //!
 //! This is the single source of truth for image data attached to the prompt.
-//! Both the view layer ([`crate::views::prompt_widget`]) and the app/dispatch
-//! layer ([`crate::app::dispatch`]) consume these types, so they live here
+//! Both the view layer (`crate::views::prompt_widget`) and the app/dispatch
+//! layer (`crate::app::dispatch`) consume these types, so they live here
 //! rather than inside any single view or app module.
 
 use std::collections::HashSet;
@@ -26,8 +26,8 @@ pub const PROMPT_IMAGES_TRACING_TARGET: &str = "prompt_images";
 
 /// State for a modal image viewer.
 ///
-/// Supports deferred loading: [`open_from_path_deferred`] returns instantly
-/// with `loading: true`, then [`finish_loading`] performs the heavy I/O on
+/// Supports deferred loading: `open_from_path_deferred` returns instantly
+/// with `loading: true`, then `finish_loading` performs the heavy I/O on
 /// the next tick so the UI can show a spinner while the file is read.
 pub struct ImageViewerState {
     /// Original encoded image bytes.
@@ -94,7 +94,7 @@ impl ImageViewerState {
     }
 
     /// Create a viewer from a file path, loading synchronously. Prefer
-    /// [`open_from_path_deferred`] from input handlers to avoid blocking.
+    /// `open_from_path_deferred` from input handlers to avoid blocking.
     pub fn open_from_path(path: &std::path::Path) -> Option<Self> {
         let bytes = std::fs::read(path).ok()?;
 
@@ -124,7 +124,7 @@ impl ImageViewerState {
     ///
     /// Returns immediately with `loading: true`. A background thread
     /// runs [`load_image_data`] and the tick handler polls for the result,
-    /// then calls [`apply_loaded`] to complete the load.
+    /// then calls `apply_loaded` to complete the load.
     pub fn open_from_path_deferred(path: &std::path::Path) -> Self {
         Self {
             image_bytes: Vec::new(),
@@ -1085,7 +1085,7 @@ pub fn try_read_images_from_paste(text: &str) -> Vec<PastedImage> {
 #[derive(Debug)]
 pub enum DroppedPath {
     /// Token resolved to a readable image file (extension in
-    /// [`IMAGE_EXTENSIONS`] and bytes sniff as a known image format).
+    /// `IMAGE_EXTENSIONS` and bytes sniff as a known image format).
     Image(PastedImage),
     /// Token resolved to a `file://` URL or an existing on-disk path
     /// (file *or* directory) that is not a recognised image — the
@@ -1193,7 +1193,7 @@ fn try_read_dropped_path(token: &str) -> Option<DroppedPath> {
 /// begins with a drop anchor (`/`, `~/`, `X:\`) **and** the path
 /// exists on disk. This guards against prose that happens to coincide
 /// with a filesystem path being eaten from inside a sentence. See
-/// [`try_read_dropped_path`] for the full predicate.
+/// `try_read_dropped_path` for the full predicate.
 ///
 /// **Whole-paste-or-nothing.** A paste of
 /// `"file:///foo.png\nplease look at this"` must not emit just the
@@ -1207,7 +1207,7 @@ fn try_read_dropped_path(token: &str) -> Option<DroppedPath> {
 /// Concretely:
 /// - Empty/whitespace lines are separators (skipped).
 /// - For each non-empty line, all tokens emitted by
-///   [`space_split_line`] must resolve. If any fail, the whole paste
+///   `space_split_line` must resolve. If any fail, the whole paste
 ///   falls through to prose.
 /// - If every non-empty line fully resolves, entries are emitted in
 ///   source order.
@@ -1300,10 +1300,10 @@ pub fn try_read_image_from_path(text: &str) -> Option<PastedImage> {
 // Construction from clipboard data
 // -------------------------------------------------------------------------
 
-/// Build a `PastedImage` from raw clipboard [`ImageData`].
+/// Build a `PastedImage` from raw clipboard `ImageData`.
 ///
 /// `element_id` and `display_number` are set to placeholder values and
-/// will be overwritten by [`crate::views::prompt_widget::PromptWidget::insert_image`].
+/// will be overwritten by `crate::views::prompt_widget::PromptWidget::insert_image`.
 pub fn from_clipboard_data(data: &crate::clipboard::ImageData) -> PastedImage {
     PastedImage {
         element_id: ElementId::from_raw(0),
@@ -1407,7 +1407,7 @@ pub fn session_mermaid_dir(
 const MAX_SEND_BYTES: usize = 50_000_000; // 50 MB
 
 /// Load image bytes from a `PastedImage` (in-memory or from disk).
-/// Returns `None` if the image cannot be loaded or exceeds [`MAX_SEND_BYTES`].
+/// Returns `None` if the image cannot be loaded or exceeds `MAX_SEND_BYTES`.
 pub fn load_for_send(img: &PastedImage) -> Option<(Vec<u8>, String)> {
     let raw_bytes = if let Some(ref b) = img.encoded_bytes {
         b.to_vec()
@@ -1465,7 +1465,7 @@ pub fn load_for_send(img: &PastedImage) -> Option<(Vec<u8>, String)> {
 ///   `PastedImage` provides the bytes.
 /// - Otherwise, if `workspace_cwd` is `Some`, attempt to load the
 ///   placeholder's path via the shared
-///   [`xai_grok_shell::session::placeholder_images::load_placeholder_image`]
+///   `xai_grok_shell::session::placeholder_images::load_placeholder_image`
 ///   helper. On success: attach a `ContentBlock::Image` and leave the
 ///   placeholder text in place. On failure: strip the placeholder from
 ///   the forwarded text and emit a `tracing::warn!` (no UI alert
@@ -1509,7 +1509,7 @@ pub fn build_content_blocks_with_prefixes(
 /// that takes an explicit aggregate-bytes cap.
 ///
 /// Mirrors the server-side
-/// [`xai_grok_shell::session::placeholder_images::recover_orphan_placeholders_with_prefixes_and_caps`].
+/// `xai_grok_shell::session::placeholder_images::recover_orphan_placeholders_with_prefixes_and_caps`.
 /// Aggregate-cap semantics match: `aggregate + image.len() > cap`
 /// triggers the loop break (inclusive boundary — a running total
 /// exactly equal to the cap is admitted).

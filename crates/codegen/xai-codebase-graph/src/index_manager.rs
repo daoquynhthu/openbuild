@@ -19,7 +19,7 @@
 //! ```
 //!
 //! The IndexManager runs in its own task and processes events sequentially,
-//! eliminating the need for Arc<Mutex> around the index.
+//! eliminating the need for `Arc<Mutex>` around the index.
 //!
 //! **Note**: Debouncing is handled externally by notify-debouncer-full (FSEvents).
 //! Events arriving here are already debounced, so we process them immediately.
@@ -66,7 +66,7 @@ pub enum FileEventKind {
     Modified,
     /// File was deleted
     Removed,
-    /// File was renamed (old path in the event, new path in paths[1] if available)
+    /// File was renamed (old path in the event, new path in `paths[1]` if available)
     Renamed,
 }
 
@@ -552,7 +552,7 @@ impl Drop for ExitBeacon {
 /// The IndexManager owns and manages the ScopeGraphIndex.
 ///
 /// It processes file events through a channel and updates the index incrementally.
-/// This design avoids Arc<Mutex> by having a single owner of the index.
+/// This design avoids `Arc<Mutex>` by having a single owner of the index.
 pub struct IndexManager {
     /// The index being managed. Wrapped in `Arc` so that `GetSnapshot` can
     /// hand out a shared reference without cloning.  Mutations use

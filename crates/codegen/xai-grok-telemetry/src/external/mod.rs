@@ -9,7 +9,7 @@
 //! Structural invariants (enforced by construction and tests):
 //! - The providers here are **never** registered with `opentelemetry::global`
 //!   (the internal tracer provider owns the global slot); everything is
-//!   handle-based through the [`EXTERNAL`] registry.
+//!   handle-based through the `EXTERNAL` registry.
 //! - The exporters carry **only** customer headers/metadata from
 //!   `OTEL_EXPORTER_OTLP_HEADERS` — this module has no dependency on
 //!   `AuthCredentialProvider` and no code path that can attach internal auth
@@ -79,7 +79,7 @@ pub struct ExternalOtelRemotePolicy {
 }
 
 /// The handle owning both providers. Never global; reached only through the
-/// [`EXTERNAL`] registry.
+/// `EXTERNAL` registry.
 pub struct ExternalTelemetry {
     logger_provider: Option<SdkLoggerProvider>,
     meter_provider: Option<SdkMeterProvider>,

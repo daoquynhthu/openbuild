@@ -49,7 +49,7 @@ impl MmdcEngine {
         detect_mmdc().map(Self::new)
     }
 
-    /// Override the wall-clock timeout (default [`DEFAULT_MMDC_TIMEOUT`]).
+    /// Override the wall-clock timeout (default `DEFAULT_MMDC_TIMEOUT`).
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self

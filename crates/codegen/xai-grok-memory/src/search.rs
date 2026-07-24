@@ -3,14 +3,14 @@
 //! The search pipeline:
 //! 1. FTS5 keyword search (always available)
 //! 2. Vector KNN search (when sqlite-vec + embeddings are available)
-//! 3. Merge results by chunk_id, normalize scores to [0,1]
+//! 3. Merge results by chunk_id, normalize scores to `[0,1]`
 //! 4. Skip content-free chunks: empty/boilerplate templates (the
 //!    auto-generated `MEMORY.md` stub) never appear in results / injection
 //! 5. Apply temporal decay: evergreen sources (global, workspace) are exempt;
 //!    session chunks decay with exponential half-life:
 //!    `decayed = base × e^(-λ × age_days)` where `λ = ln(2) / half_life_days`
 //! 6. Apply source weights + access-frequency boost, filter by `min_score`,
-//!    rank on the unclamped score, then clamp the stored display score to [0,1]
+//!    rank on the unclamped score, then clamp the stored display score to `[0,1]`
 //! 7. MMR diversity re-ranking (opt-in, penalizes redundant results)
 //! 8. Limit to `max_results`
 //!

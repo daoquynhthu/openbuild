@@ -73,7 +73,7 @@ pub enum Commands {
         /// Keys to send (vim notation)
         keys: String,
 
-        /// Append Enter (<CR>) after keys
+        /// Append Enter (`<CR>`) after keys
         #[arg(short = 'e', long)]
         enter: bool,
     },

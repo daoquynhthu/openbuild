@@ -121,7 +121,7 @@ pub fn get_attachments() -> anyhow::Result<ClipboardAttachments> {
 /// `change_count` is the monotonic `NSPasteboard.changeCount` (`None` off-macOS
 /// or when AppKit can't load). `has_pasteable_image` is true when a raster type
 /// (`public.png` / `public.tiff` / `public.jpeg`) is advertised with no file-URL
-/// type alongside (see [`image_pasteable_from_types`]); `false` off-macOS.
+/// type alongside (see `image_pasteable_from_types`); `false` off-macOS.
 ///
 /// macOS native and sub-millisecond: inspects metadata only (no data read, no
 /// subprocess), so it is safe for the focus-driven UI path where [`get_image`]'s

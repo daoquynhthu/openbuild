@@ -1,8 +1,8 @@
 //! Shared helper for resolving `[Image #N: <path>]` placeholders into
 //! image bytes.
 //!
-//! Both the TUI ([`xai_grok_pager::prompt_images`]) and the server-side
-//! ingestion path ([`crate::session::acp_session`]) need to recover image
+//! Both the TUI (`xai_grok_pager::prompt_images`) and the server-side
+//! ingestion path (`crate::session::acp_session`) need to recover image
 //! bytes when a placeholder lacks an attached `PastedImage` /
 //! `ContentBlock::Image` — e.g. a paste from a previous session's
 //! prompt, a session reload, or a synthetic re-render. The two sides
@@ -37,7 +37,7 @@
 //!   cannot trigger huge sequential syscall chains or memory spikes.
 //!
 //! Wire format: `[Image #<n>: <absolute_path>]` — the producer is
-//! [`xai_grok_pager::prompt_images::display_text`]. The shape of this
+//! `xai_grok_pager::prompt_images::display_text`. The shape of this
 //! placeholder is part of the chat-history contract — do NOT change
 //! it. The regex requires the literal `": "` separator that the
 //! producer always emits; see [`extract_placeholders`].
@@ -410,7 +410,7 @@ pub const HOME_IMAGE_SUBDIRS: &[&str] = &[
 /// Symlinks: this loader follows symlinks (via `canonicalize`), then
 /// checks the **resolved** path against the prefix allowlist. That is
 /// strictly stronger than the legacy
-/// [`xai_grok_pager::prompt_images::read_image_at_path`], which has no
+/// `xai_grok_pager::prompt_images::read_image_at_path`, which has no
 /// prefix allowlist at all. The new rule applies to both
 /// `[Image #N: <path>]` placeholder recovery callers — the
 /// server-side `handle_prompt` fallback and the TUI orphan-placeholder

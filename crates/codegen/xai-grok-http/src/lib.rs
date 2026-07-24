@@ -293,7 +293,7 @@ pub fn shared_client() -> reqwest::Client {
         .clone()
 }
 
-/// Wrap a raw client with [`AuthRetryMiddleware`] for automatic 401 retry.
+/// Wrap a raw client with `AuthRetryMiddleware` for automatic 401 retry.
 pub fn with_auth_retry(
     client: reqwest::Client,
     credentials: std::sync::Arc<dyn xai_grok_auth::AuthCredentialProvider>,

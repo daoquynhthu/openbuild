@@ -324,7 +324,7 @@ pub struct MarkdownBuffers {
     pub table_replaces: Vec<TableReplace>,
     pub mermaid_replaces: Vec<MermaidReplace>,
     pub link_targets: Vec<LinkTarget>,
-    /// Closed fenced code blocks, in document order (see [`CodeBlockMeta`]).
+    /// Closed fenced code blocks, in document order (see `CodeBlockMeta`).
     pub code_blocks: Vec<CodeBlockMeta>,
 
     // Render scratch buffers (used only during render())
