@@ -608,6 +608,64 @@ impl ProviderCatalogService {
         serde_json::from_slice(&bytes).ok()
     }
 
+    /// Bootstrap the catalog from a persisted snapshot (F3a).
+    /// Sets the initial catalog state to Stale for all providers so that
+    /// the next refresh_all() will refresh them.
+    pub async fn bootstrap_from_snapshot(&self, persisted: ModelCatalogSnapshot) {
+        let mut snap = self.snapshot.write().await;
+        let mut providers = IndexMap::new();
+        for (pid, entry) in persisted.providers {
+            providers.insert(
+                pid,
+                ProviderCatalogEntry {
+                    state: ProviderCatalogState::Stale,
+                    ..entry
+                },
+            );
+        }
+        *snap = Arc::new(ModelCatalogSnapshot {
+            catalog_revision: 0,
+            providers,
+        });
+    }
+
+    /// Refresh only providers whose configuration has changed since the last
+    /// refresh (F3b: delta refresh). Compares provider IDs from the registry
+    /// against cached entries. New providers are refreshed; removed providers
+    /// are cleaned up.
+    pub async fn refresh_changed(
+        &self,
+        registry_providers: &IndexMap<ProviderId, Arc<xai_grok_provider::provider::ConfiguredProvider>>,
+        build_url: impl Fn(&ProviderId) -> Option<(String, xai_grok_provider::types::ProviderDefaults)>,
+        ttl: Duration,
+    ) {
+        let current = self.snapshot.read().await;
+
+        // Remove providers no longer in the registry
+        let mut to_remove = Vec::new();
+        for pid in current.providers.keys() {
+            if !registry_providers.contains_key(pid) {
+                to_remove.push(pid.clone());
+            }
+        }
+        drop(current);
+
+        // Refresh all registry providers (respects TTL internally)
+        let pids: Vec<ProviderId> = registry_providers.keys().cloned().collect();
+        self.refresh_all(&pids, build_url, ttl).await;
+
+        // Remove stale providers from snapshot
+        if !to_remove.is_empty() {
+            let mut snap = self.snapshot.write().await;
+            let mut new_snapshot = (**snap).clone();
+            for pid in to_remove {
+                new_snapshot.providers.swap_remove(&pid);
+            }
+            new_snapshot.catalog_revision += 1;
+            *snap = Arc::new(new_snapshot);
+        }
+    }
+
     /// Classify an HTTP status into a typed error string (P9-005).
     fn classify_http_status(status: reqwest::StatusCode) -> String {
         match status.as_u16() {

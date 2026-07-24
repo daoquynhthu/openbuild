@@ -55,6 +55,9 @@ pub async fn bootstrap_provider_runtime(
         .rebuild_from_resolved(&input.resolved)
         .map_err(|e| ProviderBootstrapError::RebuildFailed(e.to_string()))?;
 
+    // F3a: Bootstrap catalog from persisted snapshot.
+    runtime.bootstrap_catalog().await;
+
     Ok(runtime)
 }
 

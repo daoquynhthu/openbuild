@@ -46,6 +46,15 @@ impl ProviderRuntime {
         }
     }
 
+    /// Bootstrap catalog from persisted snapshot (F3a). Must be called after
+    /// construction from an async context.
+    pub async fn bootstrap_catalog(&self) {
+        let persisted = provider_catalog::load_catalog_snapshot();
+        if !persisted.providers.is_empty() {
+            self.catalog.bootstrap_from_snapshot(persisted).await;
+        }
+    }
+
     /// Set the startup resolution context (F1: hot reload preserves CLI/legacy).
     pub async fn set_startup_context(
         &self,
