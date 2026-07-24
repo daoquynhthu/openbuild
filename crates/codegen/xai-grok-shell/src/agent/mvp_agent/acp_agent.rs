@@ -3878,4 +3878,5 @@ impl MvpAgent {
     ) -> xai_grok_sampler::SamplerConfig {
         self.prepare_sampling_config_for_model(model, origin_client)
     }
+
 }
