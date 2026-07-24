@@ -278,7 +278,7 @@ impl ShellState {
         // Cmd shell state init not supported (V1 frozen).
         if shell == ShellKind::Cmd {
             return Err(crate::computer::types::ComputerError::io(
-                "Cmd shell state init not supported".into(),
+                String::from("Cmd shell state init not supported"),
             ));
         }
 
