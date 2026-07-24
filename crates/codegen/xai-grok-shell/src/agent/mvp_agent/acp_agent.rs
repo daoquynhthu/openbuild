@@ -984,7 +984,7 @@ impl acp::Agent for MvpAgent {
             session_sampling.reasoning_effort = Some(effort);
         }
         let (summary_client, summary_model) = self
-            .build_summary_client(&session_sampling)?;
+            .build_summary_client(&session_sampling).await?;
         let relay_sync = if let Some(sync) = self
             .create_relay_sync(&session_id.0, &session_info)
         {
@@ -1313,7 +1313,7 @@ impl acp::Agent for MvpAgent {
             ).await
             .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
         let (summary_client, summary_model) = self
-            .build_summary_client(&load_session_sampling)?;
+            .build_summary_client(&load_session_sampling).await?;
         let relay_sync = if let Some(sync) = self
             .create_relay_sync(&session_id.0, &session_info)
         {

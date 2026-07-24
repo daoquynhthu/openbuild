@@ -491,7 +491,7 @@ impl SessionActor {
             .as_ref()
             .map(|am| am.grok_com_config().api_key_auth_disabled())
             .unwrap_or(false);
-        crate::agent::config::resolve_aux_model_sampling_config(
+        match crate::agent::config::resolve_aux_model_sampling_config(
             slug,
             &models,
             &endpoints,
@@ -501,6 +501,17 @@ impl SessionActor {
             creds.client_version.clone(),
             None,
         )
+        .await
+        {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(
+                    error = % e, aux_model = % slug,
+                    "aux model config resolution failed"
+                );
+                None
+            }
+        }
     }
     /// Resolve a dedicated sampler for the Auto-mode classifier model `slug`,
     /// stamping session-local auth/attribution like image-describe (which relies

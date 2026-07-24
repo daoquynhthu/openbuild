@@ -20,7 +20,7 @@ impl MvpAgent {
             .unwrap_or(crate::models::default_session_summary_model())
             .to_owned()
     }
-    pub(super) fn build_summary_client(
+    pub(super) async fn build_summary_client(
         &self,
         primary: &SamplingConfig,
     ) -> Result<(OaiCompatClient, String), acp::Error> {
@@ -50,7 +50,10 @@ impl MvpAgent {
             alpha_test_key,
             client_version,
             registry_snapshot.as_deref(),
-        ) {
+        )
+        .await
+        .map_err(|e| acp::Error::internal_error().data(e.to_string()))?
+        {
             Some(mut cfg) => {
                 cfg.client_identifier = primary.client_identifier.clone();
                 cfg.attribution_callback = primary.attribution_callback.clone();

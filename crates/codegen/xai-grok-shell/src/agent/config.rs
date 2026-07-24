@@ -4509,7 +4509,7 @@ fn with_resolved_model<T>(model_id: &str, f: impl FnOnce(ModelLookup) -> T) -> T
 /// description, session summary, ...), resolved through the catalog so a
 /// `[model.*]` override redirects it to its own endpoint, credentials, and
 /// routing `model`. `None` → caller falls back to the active session's model.
-pub fn resolve_aux_model_sampling_config(
+pub async fn resolve_aux_model_sampling_config(
     model_id: &str,
     models: &IndexMap<String, ModelEntry>,
     endpoints: &EndpointsConfig,
@@ -4518,14 +4518,11 @@ pub fn resolve_aux_model_sampling_config(
     alpha_test_key: Option<String>,
     client_version: Option<String>,
     registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
-) -> Option<SamplerConfig> {
-    let handle = tokio::runtime::Handle::current();
+) -> Result<Option<SamplerConfig>, crate::agent::agent_config_error::AgentConfigError> {
     let catalog_entry = find_model_by_id(models, model_id).cloned();
     if let Some(entry) = &catalog_entry {
-        let has_provider_binding = entry.provider_id.is_some();
-        let has_registry = registry.is_some_and(|snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(entry, session_key, disable_api_key_auth);
-        match handle.block_on(sampling_config_for_model_with_registry(
+        match sampling_config_for_model_with_registry(
             entry,
             credentials,
             alpha_test_key.clone(),
@@ -4534,16 +4531,17 @@ pub fn resolve_aux_model_sampling_config(
             None,
             None,
             registry,
-        )) {
-            Ok(sampler) if sampler.api_key.is_some() => return Some(sampler),
+        )
+        .await
+        {
+            Ok(sampler) if sampler.api_key.is_some() => return Ok(Some(sampler)),
             Ok(_) => {}
-            Err(e) if has_provider_binding && has_registry => {
+            Err(e) => {
                 tracing::error!(
                     "route compiler hard error for provider-bound aux model `{}`: {e}",
                     entry.info.model
                 );
             }
-            Err(_) => {}
         }
     }
     let xai_bearer = session_key
@@ -4616,13 +4614,13 @@ pub fn resolve_aux_model_sampling_config(
             None,
             None,
         );
-        return Some(sampler);
+        return Ok(Some(sampler));
     }
     tracing::warn!(
         aux_model = % model_id,
         "no credentials for auxiliary model; falling back to active model",
     );
-    None
+    Ok(None)
 }
 /// Finalize image-describe model + sampler config for user attachments.
 /// Shared so the aux resolve happy path and the
@@ -5511,17 +5509,20 @@ reasoning_effort = "low"
                 None,
             ),
         );
-        let resolved = resolve_aux_model_sampling_config(
-            "grok-build",
-            &catalog,
-            &endpoints,
-            None,
-            false,
-            None,
-            None,
-            None,
-        )
-        .expect("override entry has an API key, so resolution succeeds");
+        let resolved = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(resolve_aux_model_sampling_config(
+                "grok-build",
+                &catalog,
+                &endpoints,
+                None,
+                false,
+                None,
+                None,
+                None,
+            ))
+            .expect("override entry has an API key, so resolution succeeds")
+            .expect("aux sampler config resolved to Some");
         assert_eq!(resolved.model, "v9m-rl-learnability-tp8");
         assert_eq!(resolved.base_url, "https://vendor.example/v1");
         assert_eq!(resolved.api_key.as_deref(), Some("vendor-key"));
@@ -11760,16 +11761,19 @@ default = "grok-4.5"
         models.insert("grok-image".into(), model);
 
         let endpoints = EndpointsConfig::default();
-        let result = resolve_aux_model_sampling_config(
-            "grok-image",
-            &models,
-            &endpoints,
-            None,
-            false,
-            None,
-            None,
-            Some(&rt.snapshot()),
-        );
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(resolve_aux_model_sampling_config(
+                "grok-image",
+                &models,
+                &endpoints,
+                None,
+                false,
+                None,
+                None,
+                Some(&rt.snapshot()),
+            ))
+            .expect("resolve should succeed");
         assert!(result.is_some());
         let config = result.unwrap();
         assert_eq!(
