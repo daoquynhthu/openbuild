@@ -77,10 +77,10 @@ fn nested_runtime_panic_in_acp_session() {
             // After Phase 2: no panic — the test passes.
         }
         Err(e) if e.is_panic() => {
-            let panic_ref: &dyn std::any::Any = e.into_panic();
-            let msg = if let Some(s) = panic_ref.downcast_ref::<String>() {
+            let panic_box: Box<dyn std::any::Any + Send> = e.into_panic();
+            let msg = if let Some(s) = panic_box.downcast_ref::<String>() {
                 s.clone()
-            } else if let Some(s) = panic_ref.downcast_ref::<&str>() {
+            } else if let Some(s) = panic_box.downcast_ref::<&str>() {
                 s.to_string()
             } else {
                 "unknown panic".to_string()

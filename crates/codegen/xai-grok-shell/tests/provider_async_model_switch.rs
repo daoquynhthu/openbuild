@@ -1,10 +1,11 @@
 //! R3-RED-02: Reproduce model-switch nested-runtime failure.
 //!
-//! The model switch handler (`model_switch::apply`) calls
-//! `prepare_sampling_config_for_model` (sync, uses Handle::block_on).
-//! This test exercises that same code path through the agent's public
-//! test seam, proving the nested-runtime panic from within an active
-//! tokio context on a single-thread LocalSet.
+//! The model switch handler (`model_switch::apply` at line 116) calls
+//! `prepare_sampling_config_for_model` (sync, uses Handle::block_on)
+//! inside an async context. This test exercises that exact code path
+//! through the model_switch handler's test seam
+//! (`test_switch_model_prepare`), proving the nested-runtime panic
+//! from within an active tokio context on a single-thread LocalSet.
 //!
 //! This test MUST fail (panic) before the Phase 2 async fix.
 //! After the fix, it must return a typed result without panicking.
@@ -66,10 +67,10 @@ fn model_switch_nested_runtime_panic() {
         entry
     };
 
-    // model_switch::apply calls prepare_sampling_config_for_model, which
-    // is sync+block_on. We exercise the same code path here.
+    // model_switch::apply (line 116) calls prepare_sampling_config_for_model.
+    // We exercise the same code path through the model_switch test seam.
     let join = local.spawn_local(async move {
-        agent.test_prepare_for_model(&model, None);
+        agent.test_switch_model_prepare(&model, None);
     });
 
     let result = local.block_on(&rt, async { join.await });
@@ -88,7 +89,7 @@ fn model_switch_nested_runtime_panic() {
                 "unknown panic".to_string()
             };
             panic!(
-                "R3-RED-02: nested-runtime panic detected (pre-fix expected): {msg}"
+                "R3-RED-02 model_switch path: nested-runtime panic (pre-fix expected): {msg}"
             );
         }
         Err(e) => {

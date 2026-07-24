@@ -237,6 +237,20 @@ pub(crate) async fn apply(
 /// Broadcast a `ModelChanged` to every client subscribed to this session so
 /// followers mirror the new model. The originating client ignores its own echo
 /// (gated by `model_switch_pending`). Broadcast-only — no eventId, not persisted.
+/// Test seam exercises the model-switch preparation path exactly as
+/// `model_switch::apply` does at line 116:
+/// `agent.prepare_sampling_config_for_model(&model, handle.origin_client.clone())`.
+/// Not gated on `#[cfg(test)]` so integration tests can call it.
+impl MvpAgent {
+    pub fn test_switch_model_prepare(
+        &self,
+        model: &crate::agent::config::ModelEntry,
+        origin_client: Option<crate::http::OriginClientInfo>,
+    ) -> xai_grok_sampler::SamplerConfig {
+        self.prepare_sampling_config_for_model(model, origin_client)
+    }
+}
+
 fn broadcast_model_changed(
     agent: &MvpAgent,
     session_id: &acp::SessionId,
