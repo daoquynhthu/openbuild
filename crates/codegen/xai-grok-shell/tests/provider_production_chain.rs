@@ -289,39 +289,56 @@ async fn obpa008_cli_base_url_override_survives_reload() {
         config.base_url
     );
 
-    // Reload without CLI override (simulates ConfigReloader bug where
-    // the ConfigReloader creates a fresh bootstrap without preserving
-    // the CLI configuration context).
-    let reload_toml: toml::Value = toml::from_str(toml_str).unwrap();
-    let reloaded = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-        &reload_toml, None, None,
-    )
-    .await
-    .expect("reload must succeed");
+    // Reload through coordinator path (production reload path which
+    // preserves the startup CLI override context).
+    let dir = std::env::temp_dir().join(format!(
+        "obpa008-test-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let config_path = dir.join("config.toml");
+    std::fs::write(&config_path, toml_str).unwrap();
 
-    let reloaded_snapshot = reloaded.snapshot();
+    let ctx = std::sync::Arc::new(
+        xai_grok_shell::agent::provider_config_coordinator::ProviderResolutionContext {
+            legacy_migration: runtime.startup_legacy_migration
+                .try_read()
+                .ok()
+                .and_then(|v| v.clone()),
+            cli_overrides: runtime.startup_cli_overrides
+                .try_read()
+                .ok()
+                .and_then(|v| v.clone()),
+        },
+    );
+    let coordinator = std::sync::Arc::new(
+        xai_grok_shell::agent::provider_config_coordinator::ProviderConfigCoordinator::new(
+            runtime.clone(),
+            config_path,
+            ctx,
+        ),
+    );
 
-    // After reload without CLI override, resolve_model_execution may fail
-    // (endpoint has no valid URL) or produce a default base_url.
-    // Either way, the CLI override is lost — this assertion documents the bug.
-    let execution_result = resolve_model_execution(&model, &reloaded_snapshot, None);
-    match execution_result {
-        Ok(execution) => {
-            // Even if execution succeeds, the base_url MUST still contain
-            // the CLI override. This is the primary OBPA-008 assertion.
-            assert!(
-                execution.request_url.as_str().contains("127.0.0.1"),
-                "CLI base_url override must survive reload (OBPA-008), got request_url: {}",
-                execution.request_url
-            );
-        }
-        Err(_) => {
-            // resolve_model_execution fails because the endpoint has no
-            // valid base URL after CLI override is lost. This is also
-            // a manifestation of OBPA-008.
-            panic!("CLI base_url override lost after reload (OBPA-008): resolve_model_execution failed because endpoint URL became invalid");
-        }
-    }
+    let reload_result = coordinator.apply_external_file().await;
+    assert!(
+        reload_result.is_ok(),
+        "coordinator reload must succeed: {:?}",
+        reload_result
+    );
+
+    // After reload via coordinator, the CLI override must be preserved
+    // because the coordinator uses the resolution context.
+    let config_after = resolve_prepare(&model, &runtime.snapshot(), Some("test-key")).await;
+    assert!(
+        config_after.base_url.contains("127.0.0.1"),
+        "CLI base_url override must survive coordinator reload (OBPA-008), got: {}",
+        config_after.base_url
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 // ---------------------------------------------------------------------------

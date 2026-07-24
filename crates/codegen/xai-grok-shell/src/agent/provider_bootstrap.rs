@@ -77,7 +77,7 @@ pub async fn bootstrap_from_config(
         )
     })?;
 
-    let (resolved, diags) = resolve_with_precedence(parsed, legacy_migration, cli_overrides);
+    let (resolved, diags) = resolve_with_precedence(parsed, legacy_migration.clone(), cli_overrides.clone());
 
     if !diags.is_empty() {
         let msg = diags
@@ -89,5 +89,10 @@ pub async fn bootstrap_from_config(
     }
 
     let input = ProviderBootstrapInput { resolved };
-    bootstrap_provider_runtime(input).await
+    let runtime = bootstrap_provider_runtime(input).await?;
+    // F1: Preserve startup resolution context for hot reload.
+    runtime
+        .set_startup_context(legacy_migration, cli_overrides)
+        .await;
+    Ok(runtime)
 }

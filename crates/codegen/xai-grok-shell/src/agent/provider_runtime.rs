@@ -16,10 +16,13 @@ use super::provider_catalog::{self, CatalogShutdownError, ProviderCatalogService
 /// Provides transactional rebuild and explicit refresh.
 /// Shares a CancellationToken with the catalog for coordinated shutdown (P9-009).
 /// Exposes catalog revision events for model view rebuild (P9-014).
+/// Preserves startup resolution context (F1) for hot reload.
 #[derive(Debug)]
 pub struct ProviderRuntime {
     pub registry: Arc<ProviderRegistry>,
     pub catalog: Arc<ProviderCatalogService>,
+    pub startup_legacy_migration: RwLock<Option<ProviderConfig>>,
+    pub startup_cli_overrides: RwLock<Option<ProviderConfig>>,
     config_revision: RwLock<u64>,
     cancel_token: CancellationToken,
 }
@@ -36,9 +39,23 @@ impl ProviderRuntime {
         Self {
             registry: Arc::new(ProviderRegistry::new()),
             catalog,
+            startup_legacy_migration: RwLock::new(None),
+            startup_cli_overrides: RwLock::new(None),
             config_revision: RwLock::new(0),
             cancel_token: token,
         }
+    }
+
+    /// Set the startup resolution context (F1: hot reload preserves CLI/legacy).
+    pub async fn set_startup_context(
+        &self,
+        legacy_migration: Option<ProviderConfig>,
+        cli_overrides: Option<ProviderConfig>,
+    ) {
+        let mut lm = self.startup_legacy_migration.write().await;
+        *lm = legacy_migration;
+        let mut co = self.startup_cli_overrides.write().await;
+        *co = cli_overrides;
     }
 
     /// Register a provider definition.

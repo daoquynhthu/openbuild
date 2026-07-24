@@ -1470,8 +1470,14 @@ pub async fn run_leader(
                     let config_path = grok_home::grok_home().join("config.toml");
                     let resolution_context = Arc::new(
                         crate::agent::provider_config_coordinator::ProviderResolutionContext {
-                            legacy_migration: None,
-                            cli_overrides: None,
+                            legacy_migration: rt.startup_legacy_migration
+                                .try_read()
+                                .ok()
+                                .and_then(|v| v.clone()),
+                            cli_overrides: rt.startup_cli_overrides
+                                .try_read()
+                                .ok()
+                                .and_then(|v| v.clone()),
                         },
                     );
                     Arc::new(
