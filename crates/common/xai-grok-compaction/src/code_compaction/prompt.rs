@@ -46,7 +46,7 @@ your response.
 
 /// Which summarization prompt a full-replace pass should send.
 ///
-/// The prompt is owned by the harness's [`CompactionSampler`] impl (it appends
+/// The prompt is owned by the harness's `CompactionSampler` impl (it appends
 /// the prompt as the final user message before sampling), not by the shared
 /// orchestrator. This enum lets each harness select the right one in one place
 /// so the structured (grok-build) and short self-summary prompts stay

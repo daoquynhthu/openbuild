@@ -56,7 +56,7 @@ impl ToolDescriptionWithSchema {
 ///   session set.
 /// - `Some(vec![])` (explicit empty array) — "unbind every session".
 ///   The tool stays registered against the connection but becomes
-///   unreachable from any session until [`crate::Method::BindToolSession`]
+///   unreachable from any session until `crate::Method::BindToolSession`
 ///   adds a new binding.
 /// - `Some(vec![s1, ...])` — replace the per-tool session set with
 ///   exactly the listed ids. Each id MUST already be in the

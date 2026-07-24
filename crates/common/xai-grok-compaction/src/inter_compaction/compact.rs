@@ -52,7 +52,7 @@ pub struct ChunkedCompactionOutput {
 ///
 /// Steps:
 /// 1. Filter items with
-///    [`filter_turns_for_inter_compaction`](crate::history::filter::filter_turns_for_inter_compaction).
+///    `filter_turns_for_inter_compaction`.
 /// 2. [`separate_prior_user_queries`] — split prior `<grok_user_queries>`
 ///    blocks out of every prior compaction summary item. The LLM never sees
 ///    them. Shared with intra-compaction's `History` target so both

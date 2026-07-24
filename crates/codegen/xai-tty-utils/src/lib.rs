@@ -577,7 +577,7 @@ impl ProcessTerminator for FakeProcessTerminator {
     }
 }
 
-/// - Unix: holds the validated group-leader id ([`ProcessGroupId`]); dispatches
+/// - Unix: holds the validated group-leader id (`ProcessGroupId`); dispatches
 ///   to `killpg(pgid, signal)`.
 /// - Windows: holds a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
 ///
@@ -1415,7 +1415,7 @@ mod tests {
         );
     }
 
-    /// [`ProcessGroupId`] rejects degenerate pids (0, 1, own group) at
+    /// `ProcessGroupId` rejects degenerate pids (0, 1, own group) at
     /// construction so `killpg` can never broadcast outside a child's group.
     #[cfg(unix)]
     #[test]

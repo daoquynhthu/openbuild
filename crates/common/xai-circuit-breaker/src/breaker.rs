@@ -14,7 +14,7 @@ use crate::window::SlidingWindow;
 
 static NOOP_OBSERVER: NoopObserver = NoopObserver;
 
-/// Cheaply-clonable handle around a shared [`CircuitBreakerInner`].
+/// Cheaply-clonable handle around a shared `CircuitBreakerInner`.
 #[derive(Clone)]
 pub struct CircuitBreaker {
     inner: Arc<CircuitBreakerInner>,

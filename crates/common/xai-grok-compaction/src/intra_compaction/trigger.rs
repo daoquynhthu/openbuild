@@ -10,7 +10,7 @@ use super::config::{IntraCompactionConfig, IntraCompactionMode};
 /// Information about why intra-compaction was triggered.
 ///
 /// Constructed by [`should_compact`] and threaded through to
-/// [`crate::compact`] and the agent's event stream.
+/// `crate::compact` and the agent's event stream.
 #[derive(Debug, Clone)]
 pub struct IntraCompactionTrigger {
     /// Token count of the prompt most recently sent to the model.

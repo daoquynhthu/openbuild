@@ -5,7 +5,7 @@
 //! - non-Linux (macOS/Windows): `cpal` (coreaudio/wasapi), linked into the binary;
 //! - Linux: a subprocess recorder (`pw-record`/`parec`/`arecord`), because the
 //!   static-musl release binary cannot link `cpal` -> `alsa-sys`. See
-//!   [`capture_linux`] for the full rationale.
+//!   `capture_linux` for the full rationale.
 
 #[cfg(not(target_os = "linux"))]
 mod capture;

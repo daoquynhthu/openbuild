@@ -24,7 +24,7 @@ pub struct InterCompactionConfig {
     pub sampling_timeout_secs: u64,
     /// Which compaction strategy to use.
     pub compaction_strategy: CompactionStrategy,
-    /// [DivideAndConquer] Max tokens per chunk before sending to the LLM.
+    /// `DivideAndConquer` Max tokens per chunk before sending to the LLM.
     /// (Basic strategy ignores this and emits a single chunk.)
     pub dnc_chunk_token_limit: u32,
     /// User messages with character count > this threshold are truncated

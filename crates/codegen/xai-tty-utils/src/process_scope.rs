@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError, Weak};
 use crate::{ProcessGroup, new_process_group};
 
 /// A `Send + Sync` kill-handle for one unit's child-process trees. Cheap to
-/// clone (shares one inner via `Arc`). See the [module docs](self) for the
+/// clone (shares one inner via `Arc`). See the `self` module docs for the
 /// ownership model and PID-reuse safety argument.
 #[derive(Clone)]
 pub struct ProcessScope {

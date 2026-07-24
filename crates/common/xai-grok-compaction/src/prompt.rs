@@ -1,7 +1,7 @@
 //! The shared compaction prompt seam.
 //!
 //! [`CompactionPrompt`] is the system+user prompt pair every orchestrator's
-//! [`CompactionSampler`](crate::sampler::CompactionSampler) call takes. The
+//! `CompactionSampler` call takes. The
 //! per-strategy prompt *content* lives with each subsystem:
 //!
 //! - steps prompt → [`crate::steps::format_compaction_prompt`]

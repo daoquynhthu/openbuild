@@ -185,7 +185,7 @@ pub enum OutcomeStatus {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HookInfo {
-    /// Full name including scope prefix (e.g., "global/safety:pre_tool_use[0].hooks[0]").
+    /// Full name including scope prefix (e.g., `"global/safety:pre_tool_use[0].hooks[0]"`).
     pub name: String,
     /// Event type this hook runs on.
     pub event: HookEvent,
@@ -238,7 +238,7 @@ pub struct PluginInfo {
     /// Deprecated: always `true`. Trust/untrust has been replaced by
     /// enable/disable. Kept for serialization compatibility; will be removed.
     pub trusted: bool,
-    /// Whether the plugin is enabled (not in [plugins].disabled list).
+    /// Whether the plugin is enabled (not in `[plugins].disabled` list).
     pub enabled: bool,
     /// Version from manifest (if available).
     pub version: Option<String>,
