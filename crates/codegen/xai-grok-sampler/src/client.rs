@@ -402,6 +402,7 @@ impl SamplingClient {
     /// default, HTTP/1.1 when `config.force_http1` is set) and
     /// pre-computes the default request headers. This does not perform
     /// any network I/O.
+    #[deprecated(note = "use from_prepared() instead — direct SamplerConfig construction bypasses the production chain")]
     pub fn new(config: SamplerConfig) -> Result<Self> {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
