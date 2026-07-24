@@ -944,7 +944,10 @@ impl acp::Agent for MvpAgent {
                     session_sampling_override = Some(
                         self.prepare_sampling_config_for_model(&model, origin_client)
                             .await
-                            .unwrap_or_else(|_| self.sampling_config.borrow().clone()),
+                            .map_err(|e| acp::Error::invalid_params().data(format!(
+                                "Failed to configure model '{}': {e}",
+                                model.info.model,
+                            )))?,
                     );
                 }
             }
@@ -971,6 +974,7 @@ impl acp::Agent for MvpAgent {
                     &self.models_manager.current_model_id(),
                     origin_client.clone(),
                 ).await
+                .map_err(|e| acp::Error::internal_error().data(e.to_string()))?
         };
         if let Some(effort) = self.models_manager.current_reasoning_effort()
             && self
@@ -1306,7 +1310,8 @@ impl acp::Agent for MvpAgent {
             .resolve_sampling_config_for_model(
                 &self.models_manager.current_model_id(),
                 origin_client.clone(),
-            ).await;
+            ).await
+            .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
         let (summary_client, summary_model) = self
             .build_summary_client(&load_session_sampling)?;
         let relay_sync = if let Some(sync) = self
