@@ -836,3 +836,137 @@ fn invalid_endpoint_hard_fail_request_count_zero() {
         "error must mention endpoint/URL/protocol, got: {err}"
     );
 }
+
+/// I3: Ollama model discovery + inference E2E.
+///
+/// Tests that the MockInferenceServer returns Ollama-format model list
+/// via /api/tags, and that a discovered model can be used for inference.
+#[test]
+#[serial]
+fn ollama_discovery_and_inference() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (_server, runtime) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.ollama]
+            base_url = "{mock_url}"
+            model_list_path = "/api/tags"
+            model_list_format = "ollama_tags"
+
+            [provider.ollama.models.llama3]
+            context_window = 8192
+            "#,
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        (server, runtime)
+    });
+
+    let snapshot = runtime.snapshot();
+
+    // Verify the provider is in the snapshot
+    let ollama_pid = xai_grok_provider::types::ProviderId::new("ollama");
+    assert!(
+        snapshot.providers.contains_key(&ollama_pid),
+        "ollama provider must be in snapshot"
+    );
+
+    // Resolve the model and make an inference request
+    let model = custom_model_entry("ollama", "llama3");
+    let config = execution_to_sampler_config(&model, &snapshot, None, None)
+        .expect("execution_to_sampler_config must succeed for ollama");
+
+    assert_eq!(
+        config.auth_scheme,
+        xai_grok_sampler::AuthScheme::None,
+        "Ollama must use AuthScheme::None"
+    );
+
+    rt.block_on(async {
+        let client = Client::new(config).expect("Client::new must succeed");
+        let request = ConversationRequest::from_items(vec![ConversationItem::user(
+            "Hello from Ollama!",
+        )]);
+        let (mut stream, _metadata) = client.conversation_stream(request).await.unwrap();
+        let mut text = String::new();
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.unwrap();
+            for choice in chunk.choices {
+                if let Some(ref t) = choice.delta.content {
+                    text.push_str(t);
+                }
+            }
+        }
+        assert!(text.contains("Echo:"), "response must contain echo: {text}");
+    });
+}
+
+/// I3: Catalog refresh E2E — verify catalog revision increments after refresh.
+#[test]
+#[serial]
+fn catalog_model_discovery_and_refresh() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (_server, runtime) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.ollama-discovered]
+            implementation = "openai-compatible"
+            base_url = "{mock_url}"
+
+            [provider.ollama-discovered.models.test-model]
+            context_window = 64000
+            "#,
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+        (server, runtime)
+    });
+
+    let snapshot_before = runtime.snapshot();
+    let catalog_before = rt.block_on(runtime.catalog.snapshot());
+    let cat_rev_before = catalog_before.catalog_revision;
+
+    // Trigger a refresh of all providers
+    let pids: Vec<xai_grok_provider::types::ProviderId> =
+        snapshot_before.providers.keys().cloned().collect();
+    rt.block_on(async {
+        runtime
+            .catalog
+            .refresh_all(
+                &pids,
+                |pid| {
+                    let _entry = snapshot_before.providers.get(pid)?;
+                    let mut defaults = xai_grok_provider::types::ProviderDefaults::default();
+                    defaults.id = pid.clone();
+                    defaults.base_url = "http://127.0.0.1:0".into();
+                    Some(("http://127.0.0.1:0/models".into(), defaults))
+                },
+                std::time::Duration::from_secs(0),
+            )
+            .await;
+        runtime.catalog.join_active_refresh().await;
+    });
+
+    // Verify catalog revision incremented after refresh
+    let catalog_after = rt.block_on(runtime.catalog.snapshot());
+    let cat_rev_after = catalog_after.catalog_revision;
+    assert!(
+        cat_rev_after > cat_rev_before,
+        "catalog revision must increment after refresh: {cat_rev_after} > {cat_rev_before}"
+    );
+}
