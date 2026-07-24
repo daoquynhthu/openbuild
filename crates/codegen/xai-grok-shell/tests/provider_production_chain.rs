@@ -1,4 +1,4 @@
-//! Phase A: Production-entry regression tests.
+//! Phase A + R3-RED-04: Production-entry regression + hard-error fallback tests.
 //!
 //! These tests reproduce production defects before fixes are applied.
 //! Each test MUST fail initially (documenting the known bug) and pass after
@@ -19,7 +19,9 @@ use xai_grok_provider::headers::RequestHeaderOverrides;
 use xai_grok_provider::prepared::{RequestPreparationError, prepare_sampler_config};
 use xai_grok_provider::registry::RegistrySnapshot;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
-use xai_grok_shell::agent::provider_resolution::resolve_model_execution;
+use xai_grok_shell::agent::provider_resolution::{
+    execution_to_sampler_config, resolve_model_execution,
+};
 use xai_grok_test_support::MockInferenceServer;
 
 /// Environment reader that always returns None (no env vars set).
@@ -441,5 +443,136 @@ async fn request_override_header_appears_in_request() {
         has_override,
         "request override headers must appear in HTTP request: {:?}",
         requests.iter().flat_map(|r| &r.headers).collect::<Vec<_>>()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// R3-RED-04: Reproduce hard-error fallback
+//
+// The agent's `prepare_sampling_config_for_model` (agent_ops.rs:1185) uses
+// `unwrap_or_else` to catch provider errors and fall back to the legacy
+// `sampling_config_for_model`. This means provider-bound models get a
+// `SamplerConfig` via legacy fallback instead of a typed error.
+//
+// At the direct-chain level (tested here), some scenarios already produce
+// correct errors (invalid endpoint, unknown route). Others incorrectly
+// return `Ok(SamplingConfig)` without validation:
+//   - missing credential  → BUG: chain returns Ok with no auth
+//   - incompatible proto  → BUG: chain does not validate protocol compat
+//
+// After Phase 2 the agent-level fallback becomes reachable; after Phase 3
+// all four scenarios must produce typed errors at every level.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn red04_invalid_endpoint_produces_chain_error() {
+    let snapshot = bootstrap_async(
+        r#"
+        [provider.bad-endpoint]
+        implementation = "openai-compatible"
+        base_url = ""
+        api_key = "test-key"
+
+        [provider.bad-endpoint.models.test-model]
+        context_window = 64000
+    "#,
+    )
+    .await
+    .snapshot();
+
+    let model = model_entry("bad-endpoint", "test-model");
+
+    let result = execution_to_sampler_config(&model, &snapshot, Some("test-key"), None).await;
+
+    // Lower chain correctly rejects empty base_url.
+    // The BUG is at the agent level (agent_ops.rs:1185) which catches this
+    // error and falls back to legacy — visible after Phase 2.
+    assert!(
+        result.is_err(),
+        "R3-RED-04 invalid-endpoint: chain must return Err — agent-level fallback is the bug"
+    );
+}
+
+#[tokio::test]
+async fn red04_missing_credential_incorrectly_returns_ok() {
+    let snapshot = bootstrap_async(
+        r#"
+        [provider.no-cred]
+        implementation = "openai-compatible"
+        base_url = "http://127.0.0.1:0/v1"
+        # no api_key, no env_key
+
+        [provider.no-cred.models.test-model]
+        context_window = 64000
+    "#,
+    )
+    .await
+    .snapshot();
+
+    let model = model_entry("no-cred", "test-model");
+
+    let result = execution_to_sampler_config(&model, &snapshot, None, None).await;
+
+    // BUG: lower chain returns Ok (SamplerConfig) without any credential.
+    // After Phase 3, must return a typed credential error.
+    assert!(
+        result.is_ok(),
+        "R3-RED-04 missing-cred: current code INCORRECTLY returns Ok without credentials"
+    );
+}
+
+#[tokio::test]
+async fn red04_unknown_route_id_correctly_errs() {
+    let snapshot = bootstrap_async(
+        r#"
+        [provider.known]
+        implementation = "openai-compatible"
+        base_url = "http://127.0.0.1:0/v1"
+        api_key = "test-key"
+
+        [provider.known.models.test-model]
+        context_window = 64000
+    "#,
+    )
+    .await
+    .snapshot();
+
+    let mut model = model_entry("known", "test-model");
+    model.route_id = Some("nonexistent-route".to_string());
+
+    let result = execution_to_sampler_config(&model, &snapshot, Some("test-key"), None).await;
+
+    assert!(
+        result.is_err(),
+        "R3-RED-04 unknown-route: chain must return Err — BUG is agent-level fallback (agent_ops.rs:1185)"
+    );
+}
+
+#[tokio::test]
+async fn red04_incompatible_protocol_incorrectly_returns_ok() {
+    let snapshot = bootstrap_async(
+        r#"
+        [provider.test-proto]
+        implementation = "openai-compatible"
+        base_url = "http://127.0.0.1:0/v1"
+        api_key = "test-key"
+        protocol = "responses"
+
+        [provider.test-proto.models.test-model]
+        context_window = 64000
+    "#,
+    )
+    .await
+    .snapshot();
+
+    let model = model_entry("test-proto", "test-model");
+
+    let result = execution_to_sampler_config(&model, &snapshot, Some("test-key"), None).await;
+
+    // BUG: protocol=responses on a generic model is not validated at the
+    // chain level. After Phase 5 route selection, this must return Err.
+    assert!(
+        result.is_ok(),
+        "R3-RED-04 incompatible-proto: current code INCORRECTLY returns Ok for protocol=responses on a generic model"
     );
 }
