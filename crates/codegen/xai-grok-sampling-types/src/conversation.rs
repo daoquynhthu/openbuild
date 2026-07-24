@@ -2748,7 +2748,7 @@ pub fn transform_conversation_cwd(
 /// degraded inline. The variant would have shipped without any
 /// production producer. If a future error path between
 /// `tool_completed` and `push_tool_result` is added, add a fresh
-/// variant here so [`synthetic_dangling_result_text`]'s exhaustive
+/// variant here so `synthetic_dangling_result_text`'s exhaustive
 /// match flags every renderer.
 #[derive(Debug, Clone, Copy)]
 pub enum DanglingToolCallReason {

@@ -52,8 +52,8 @@ pub struct ParsedProviderConfig {
 
 /// Serde-facing input for a single provider's configuration.
 /// Values exist only during resolution; after resolution they are consumed
-/// into [`ProviderRuntimeConfig`](crate::resolution::ProviderRuntimeConfig).
-/// `api_key` is immediately wrapped in [`SecretValue`](crate::auth::SecretValue)
+/// into `ProviderRuntimeConfig` (crate::resolution::ProviderRuntimeConfig).
+/// `api_key` is immediately wrapped in `SecretValue` (crate::auth::SecretValue)
 /// and never exposed as a plain `String` beyond this point.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[non_exhaustive]
@@ -105,8 +105,8 @@ impl ProviderConfigInput {
         diags
     }
 
-    /// Consume this input and produce a [`ProviderRuntimeConfig`].
-    /// `api_key` is wrapped in [`SecretValue`] and never returned as `String`.
+    /// Consume this input and produce a `ProviderRuntimeConfig`.
+    /// `api_key` is wrapped in `SecretValue` and never returned as `String`.
     pub fn into_runtime_config(self) -> crate::resolution::ProviderRuntimeConfig {
         let env_keys = self.env_key.unwrap_or_default();
         crate::resolution::ProviderRuntimeConfig {

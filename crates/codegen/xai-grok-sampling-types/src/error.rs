@@ -10,7 +10,7 @@ use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, SamplingError>;
 
-/// Why the model's response was classified as "empty" by [`ConversationResponse::empty_reason`].
+/// Why the model's response was classified as "empty".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EmptyReason {
