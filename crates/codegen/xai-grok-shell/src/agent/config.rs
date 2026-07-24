@@ -4686,9 +4686,14 @@ pub async fn sampling_config_for_model_with_registry(
     route: Option<&xai_grok_provider::route::Route>,
     registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
 ) -> Result<SamplerConfig, crate::agent::provider_resolution::ProviderResolutionError> {
-    // When registry is available and model has a provider_id, delegate
-    // to the route compiler for full provider-aware resolution.
-    if let (Some(snapshot), Some(pid)) = (registry, model.provider_id.as_deref()) {
+    // G2: When registry is available, provider_id is required. Fallback to
+    // `sampling_config_for_model` only when no registry is configured.
+    if let Some(snapshot) = registry {
+        let pid = model.provider_id.as_deref().ok_or_else(|| {
+            crate::agent::provider_resolution::ProviderResolutionError::NoProviderId(
+                model.info.model.clone(),
+            )
+        })?;
         // E1: Route compiler produces the full request URL from the snapshot route.
         // No longer pass credentials.base_url as a post-compile override.
         let execution = crate::agent::provider_resolution::resolve_model_execution(
@@ -4728,7 +4733,7 @@ pub async fn sampling_config_for_model_with_registry(
         let config = xai_grok_sampler::SamplerConfig::from(prepared);
         return Ok(config);
     }
-    // No registry or no provider_id — use legacy path (P7-003: remove this).
+    // No registry configured — fall back to legacy sampler (test-only paths).
     Ok(sampling_config_for_model(
         model,
         credentials,
