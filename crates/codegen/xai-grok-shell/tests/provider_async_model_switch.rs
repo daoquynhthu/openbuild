@@ -39,8 +39,10 @@ fn build_agent() -> (tokio::runtime::Runtime, tokio::task::LocalSet, MvpAgent) {
                 .await
                 .expect("bootstrap_from_config must succeed");
 
-        let mut cfg = Config::default();
-        cfg.provider_runtime = Some(provider_runtime);
+        let cfg = Config {
+            provider_runtime: Some(provider_runtime),
+            ..Default::default()
+        };
 
         let temp_dir = tempfile::tempdir().unwrap();
         let auth_manager = Arc::new(AuthManager::new(
@@ -73,7 +75,7 @@ fn model_switch_nested_runtime_panic() {
         agent.test_switch_model_prepare(&model, None);
     });
 
-    let result = local.block_on(&rt, async { join.await });
+    let result = local.block_on(&rt, join);
 
     match result {
         Ok(()) => {

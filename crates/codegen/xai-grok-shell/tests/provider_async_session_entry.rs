@@ -42,8 +42,10 @@ fn nested_runtime_panic_in_acp_session() {
                 .await
                 .expect("bootstrap_from_config must succeed");
 
-        let mut cfg = Config::default();
-        cfg.provider_runtime = Some(provider_runtime);
+        let cfg = Config {
+            provider_runtime: Some(provider_runtime),
+            ..Default::default()
+        };
 
         let temp_dir = tempfile::tempdir().unwrap();
         let auth_manager = Arc::new(AuthManager::new(
@@ -70,7 +72,7 @@ fn nested_runtime_panic_in_acp_session() {
         agent.test_prepare_for_model(&model, None);
     });
 
-    let result = local.block_on(&rt, async { join.await });
+    let result = local.block_on(&rt, join);
 
     match result {
         Ok(()) => {

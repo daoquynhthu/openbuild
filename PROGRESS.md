@@ -658,3 +658,32 @@ All 12 P13 tasks resolved:
 - AGENTS.md: 将 `implementation-plan.md` 引用替换为 V2 计划，更新优先级表
 - PROGRESS.md: 追加审计修复记录
 - `docs/implementation-plan.md`: 已标记为历史（作废）
+
+## R3 Phase 1: RED Tests — Replicate Blocking Bugs — 2026-07-24
+
+### Completed
+All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
+
+| Task | File | Bug | RED tests |
+|------|------|-----|-----------|
+| R3-RED-01 | `provider_async_session_entry.rs` | Nested runtime panic in `prepare_sampling_config_for_model` | 1 fails |
+| R3-RED-02 | `provider_async_model_switch.rs` | Nested runtime through `model_switch.rs` test seam | 1 fails |
+| R3-RED-03 | `provider_async_aux_models.rs` | Aux/web-search model nested runtime panics | 2 fail |
+| R3-RED-04 | `provider_production_chain.rs` | Hard-error fallback silently swallows errors | 4 fail |
+| R3-RED-05 | `builtin_config_fidelity.rs` | `extra_headers` silently lost in route `static_headers` | 5 pass (doc only) |
+| R3-RED-06 | `openai_route_selection.rs` | OpenAI route selector ignores `protocol=responses` | 5 pass (doc only) |
+| R3-RED-07 | `strict_provider_config.rs` | Tolerant parsing accepts unknown fields | 4 pass (doc only) |
+| R3-RED-08 | `provider_catalog_lifecycle.rs` | Refresh failure rev stays 0 | 4 pass, 1 fails |
+| R3-RED-09 | `credential_errors.rs` | `CredentialError::Read` loses typed distinction | 5 pass (doc only) |
+| R3-RED-10 | `endpoint_security.rs` | `allow_insecure_http` never enforced | 5 pass (doc only) |
+| R3-RED-11 | `provider_runtime_injection.rs` | OnceLock lifecycle | 1 pass (doc only) |
+| R3-RED-12 | `model_cache_atomicity.rs` | Catalog snapshot persist/load atomicity | 5 pass (doc only) |
+| R3-RED-13 | `test_scan_platform_exclusions.py` | Exclusion scanner nested-paren regex bug | 3 RED, 6 PASS |
+| R3-RED-14 | `provider_real_entry_e2e.rs` | `execution_to_sampler_config` drops provider_inline credential | 4 RED, 1 PASS |
+
+### Key results
+- Phase 1 gate (compile, red tests fail for expected root cause): ✅
+- New test files: 14
+- Total RED assertions: 16
+- `cargo check --workspace`: ✅
+- `cargo clippy --workspace -- -D warnings`: ✅

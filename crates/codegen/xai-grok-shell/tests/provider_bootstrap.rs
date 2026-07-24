@@ -23,6 +23,7 @@ fn xai_spec() -> ResolvedProviderSpec {
                 extra_headers: IndexMap::new(),
             },
             inline_api_key: None,
+            env_keys: vec![],
         },
     }
 }
@@ -43,6 +44,7 @@ fn openai_spec() -> ResolvedProviderSpec {
                 extra_headers: IndexMap::new(),
             },
             inline_api_key: None,
+            env_keys: vec![],
         },
     }
 }
@@ -65,6 +67,7 @@ fn custom_deepseek_spec() -> ResolvedProviderSpec {
                 extra_headers: IndexMap::new(),
             },
             inline_api_key: None,
+            env_keys: vec![],
         },
     }
 }

@@ -181,7 +181,7 @@ async fn obpa005_provider_inline_key_flows_to_auth_header() {
         xai_grok_sampling_types::ConversationItem::user("hello"),
     ]);
     let (mut stream, _) = client.conversation_stream(request).await.unwrap();
-    while let Some(_) = stream.next().await {}
+    while (stream.next().await).is_some() {}
 
     let requests = server.requests();
     let request_with_auth: Vec<_> = requests
@@ -244,7 +244,7 @@ async fn obpa007_custom_protocol_not_overridden_by_chat() {
         xai_grok_sampling_types::ConversationItem::user("hello"),
     ]);
     let (mut stream, _) = client.conversation_stream(request).await.unwrap();
-    while let Some(_) = stream.next().await {}
+    while (stream.next().await).is_some() {}
 
     let requests = server.requests();
     let responses_req: Vec<_> = requests
@@ -382,7 +382,7 @@ async fn provider_extra_header_flows_to_request() {
         xai_grok_sampling_types::ConversationItem::user("hello"),
     ]);
     let (mut stream, _) = client.conversation_stream(request).await.unwrap();
-    while let Some(_) = stream.next().await {}
+    while (stream.next().await).is_some() {}
 
     let requests = server.requests();
     let has_custom_header = requests.iter().any(|r| {
@@ -431,7 +431,7 @@ async fn request_override_header_appears_in_request() {
         xai_grok_sampling_types::ConversationItem::user("hello"),
     ]);
     let (mut stream, _) = client.conversation_stream(request).await.unwrap();
-    while let Some(_) = stream.next().await {}
+    while (stream.next().await).is_some() {}
 
     let requests = server.requests();
     let has_override = requests.iter().any(|r| {

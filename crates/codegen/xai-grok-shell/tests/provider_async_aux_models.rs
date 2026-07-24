@@ -82,7 +82,7 @@ fn aux_model_nested_runtime_panic() {
         );
     });
 
-    let result = local.block_on(&rt, async { join.await });
+    let result = local.block_on(&rt, join);
 
     match result {
         Ok(()) => {}
@@ -122,7 +122,7 @@ fn web_search_nested_runtime_panic() {
         );
     });
 
-    let result = local.block_on(&rt, async { join.await });
+    let result = local.block_on(&rt, join);
 
     match result {
         Ok(()) => {}

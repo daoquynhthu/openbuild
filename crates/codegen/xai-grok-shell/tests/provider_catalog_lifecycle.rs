@@ -175,7 +175,7 @@ async fn superseded_refresh_cannot_publish_after_newer_revision() {
     svc.bootstrap_from_snapshot(empty).await;
 
     svc.refresh_all(
-        &[slow_pid.clone()],
+        std::slice::from_ref(&slow_pid),
         |pid| {
             if pid == &slow_pid {
                 Some((slow_url.clone(), defaults.clone()))
