@@ -72,7 +72,16 @@ impl ProviderRuntime {
         let _ = self.registry.register_definition(provider);
     }
 
-    /// Current registry snapshot.
+    /// Current registry snapshot (F4: session consistency).
+    ///
+    /// Each call returns an `Arc` to the latest committed state. The snapshot
+    /// is atomic and immutable: concurrent rebuilds replace the pointer without
+    /// affecting already-held `Arc` references. This guarantees:
+    ///   1. Each new inference request reads the current snapshot.
+    ///   2. Within a single request, the snapshot is fixed (Arc immutability).
+    ///   3. Model switching re-resolves by calling snapshot() again.
+    ///   4. A hot reload during an in-flight request does NOT change the
+    ///      snapshot used by that request — the old `Arc` remains valid.
     pub fn snapshot(&self) -> Arc<RegistrySnapshot> {
         self.registry.snapshot()
     }
