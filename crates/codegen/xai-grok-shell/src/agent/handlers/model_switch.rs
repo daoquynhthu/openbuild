@@ -115,7 +115,7 @@ pub(crate) async fn apply(
     let mut model_sampling = agent
         .prepare_sampling_config_for_model(&model, handle.origin_client.clone())
         .await
-        .unwrap_or_else(|_| agent.sampling_config.borrow().clone());
+        .map_err(|e| acp::Error::invalid_params().data(format!("failed to configure model '{}': {e}", model.info.model)))?;
     if let Some(eff) = effort_override {
         if agent
             .models_manager
