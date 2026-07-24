@@ -723,3 +723,22 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `cargo check -p xai-grok-shell --tests`: clean ✅ (zero warnings)
 - `cargo clippy -p xai-grok-shell --lib`: clean ✅
 - No `Handle::current().block_on()` remains in `prepare_sampling_config_for_model` path ✅
+
+### ASYNC-02: Migrate ACP session creation with proper error propagation
+
+#### Changes made
+- `resolve_sampling_config_for_model`: returns `Result<SamplingConfig, AgentConfigError>` instead of silently falling back to default config
+- `apply_agent_model_override`: returns `Result<(ModelId, SamplingConfig), AgentConfigError>` instead of silently falling back
+- `new_session`: configuration errors from custom model override mapped to `acp::Error::invalid_params`; default model errors mapped to `acp::Error::internal_error`
+- `load_session`: configuration errors mapped to `acp::Error::internal_error`
+- `spawn_and_register_session`: errors from both `resolve_sampling_config_for_model` and `apply_agent_model_override` mapped to `acp::Error::internal_error`
+- All error messages go through `AgentConfigError::Display` (redacted, no secrets)
+
+#### Files changed
+- `crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs` — return types + error propagation
+- `crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs` — callers use `map_err` with `?`
+- `docs/provider-adapter-v1/execution-v3/phases/R3-ASYNC-02.md` — evidence
+
+#### Key results
+- `cargo check -p xai-grok-shell --lib --tests`: clean ✅
+- `cargo clippy -p xai-grok-shell --lib`: clean ✅
