@@ -3865,3 +3865,17 @@ impl acp::Agent for MvpAgent {
         Ok(())
     }
 }
+
+impl MvpAgent {
+    /// Test seam: exposes `prepare_sampling_config_for_model` for
+    /// R3-RED-01. This is the production sync path that internally
+    /// calls `Handle::block_on`, causing a nested-runtime panic when
+    /// invoked from within an active tokio context (spawned task).
+    pub fn test_prepare_for_model(
+        &self,
+        model: &crate::agent::config::ModelEntry,
+        origin_client: Option<crate::http::OriginClientInfo>,
+    ) -> xai_grok_sampler::SamplerConfig {
+        self.prepare_sampling_config_for_model(model, origin_client)
+    }
+}
