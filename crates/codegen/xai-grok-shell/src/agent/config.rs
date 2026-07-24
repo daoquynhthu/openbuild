@@ -4591,19 +4591,19 @@ pub fn resolve_aux_model_sampling_config(
             api_key: Some(bearer),
             env_key: None,
             api_base_url: None,
-            provider_id: None,
+            // G3: route through xAI provider if registered so it uses the
+            // same registry snapshot, credential context, and route compiler
+            // as the main model. Falls back to legacy only when xAI is not
+            // a configured provider (e.g. pre-migration configs).
+            provider_id: if registry.and_then(|snap| snap.providers.get(&xai_grok_provider::types::ProviderId::new("xai"))).is_some() {
+                Some("xai".into())
+            } else {
+                None
+            },
             route_id: None,
         };
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
-        let sampler = sampling_config_for_model(
-            &entry,
-            credentials,
-            alpha_test_key,
-            client_version,
-            None,
-            None,
-            None,
-        );
+        let sampler = sampling_config_for_model(&entry, credentials, alpha_test_key, client_version, None, None, None);
         return Some(sampler);
     }
     tracing::warn!(
@@ -4867,6 +4867,7 @@ fn resolve_hidden_default_web_search_sampling_config(
     alpha_test_key: Option<String>,
     client_version: Option<String>,
     endpoints: &EndpointsConfig,
+    registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
 ) -> SamplerConfig {
     let entry = ModelEntry {
         info: ModelInfo {
@@ -4904,7 +4905,11 @@ fn resolve_hidden_default_web_search_sampling_config(
         api_key: None,
         env_key: None,
         api_base_url: None,
-        provider_id: None,
+        provider_id: if registry.and_then(|snap| snap.providers.get(&xai_grok_provider::types::ProviderId::new("xai"))).is_some() {
+            Some("xai".into())
+        } else {
+            None
+        },
         route_id: None,
     };
     let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
@@ -4979,6 +4984,7 @@ pub fn resolve_web_search_sampling_config(
             alpha_test_key,
             client_version,
             endpoints,
+            registry,
         ))
     } else {
         None
