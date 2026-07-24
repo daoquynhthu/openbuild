@@ -76,7 +76,7 @@ impl Provider for FactoryProvider {
         // D3: Build auth candidates — provider inline key first, then env keys
         let mut candidates: Vec<CredentialCandidate> = Vec::new();
         if overrides.api_key.is_some() {
-            candidates.push(CredentialCandidate::RequestOverride);
+            candidates.push(CredentialCandidate::ProviderInline);
         }
         if !all_env_keys.is_empty() {
             candidates.push(CredentialCandidate::ProviderEnvironment(all_env_keys));

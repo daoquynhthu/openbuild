@@ -4688,24 +4688,31 @@ pub async fn sampling_config_for_model_with_registry(
 ) -> Result<SamplerConfig, crate::agent::provider_resolution::ProviderResolutionError> {
     // When registry is available and model has a provider_id, delegate
     // to the route compiler for full provider-aware resolution.
-    if let (Some(snapshot), Some(_pid)) = (registry, model.provider_id.as_deref()) {
-        let base_url = credentials.base_url.clone();
-        #[allow(deprecated)]
+    if let (Some(snapshot), Some(pid)) = (registry, model.provider_id.as_deref()) {
+        // E1: Route compiler produces the full request URL from the snapshot route.
+        // No longer pass credentials.base_url as a post-compile override.
         let execution = crate::agent::provider_resolution::resolve_model_execution(
             model,
             snapshot,
-            Some(&base_url),
+            None,
         )?;
         let model_inline = credentials
             .api_key
             .as_deref()
+            .map(|k| xai_grok_provider::auth::SecretValue::new(k.to_string()));
+        // E2: Look up provider inline key from the snapshot's ConfiguredProvider
+        let provider_pid = xai_grok_provider::types::ProviderId::new(pid);
+        let provider_inline = snapshot
+            .providers
+            .get(&provider_pid)
+            .and_then(|cp| cp.config.api_key.as_ref())
             .map(|k| xai_grok_provider::auth::SecretValue::new(k.to_string()));
         let env = crate::agent::credential_context::ProcessEnvironment;
         let session = crate::agent::credential_context::NoopSessionResolver;
         let creds = xai_grok_provider::auth::RequestCredentialContext::new(
             None,
             model_inline.as_ref(),
-            None,
+            provider_inline.as_ref(),
             &env,
             &session,
         );

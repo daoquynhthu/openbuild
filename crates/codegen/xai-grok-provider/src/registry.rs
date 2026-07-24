@@ -228,6 +228,7 @@ impl ProviderRegistry {
                         protocol: spec.config.public.protocol.clone(),
                         model_list_path: spec.config.public.model_list_path.clone(),
                         model_list_format,
+                        api_key: spec.config.inline_api_key.as_ref().map(|s| s.inner().to_string()),
                         env_key: if spec.config.env_keys.is_empty() {
                             None
                         } else {
@@ -264,6 +265,7 @@ impl ProviderRegistry {
                         protocol: spec.config.public.protocol.clone(),
                         model_list_path: spec.config.public.model_list_path.clone(),
                         model_list_format,
+                        api_key: spec.config.inline_api_key.as_ref().map(|s| s.inner().to_string()),
                         env_key: if spec.config.env_keys.is_empty() {
                             None
                         } else {

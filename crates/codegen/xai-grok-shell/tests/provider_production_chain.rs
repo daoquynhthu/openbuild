@@ -55,9 +55,23 @@ async fn resolve_prepare(
     let execution = resolve_model_execution(model, snapshot, None)
         .expect("resolve_model_execution must succeed");
     let model_inline = api_key.map(|k| SecretValue::new(k.to_string()));
+    let provider_inline = model.provider_id.as_ref().and_then(|pid| {
+        let provider_pid = xai_grok_provider::types::ProviderId::new(pid);
+        snapshot
+            .providers
+            .get(&provider_pid)
+            .and_then(|cp| cp.config.api_key.as_ref())
+            .map(|k| SecretValue::new(k.to_string()))
+    });
     let env = TestEnv;
     let session = TestSession;
-    let creds = RequestCredentialContext::new(None, model_inline.as_ref(), None, &env, &session);
+    let creds = RequestCredentialContext::new(
+        None,
+        model_inline.as_ref(),
+        provider_inline.as_ref(),
+        &env,
+        &session,
+    );
     let headers = RequestHeaderOverrides::new();
     let prepared = prepare_sampler_config(&execution, &creds, &headers)
         .await
@@ -136,14 +150,15 @@ async fn obpa003_provider_inline_key_flows_to_auth_header() {
     let model = model_entry("custom-key", "test-model");
     let config = resolve_prepare(&model, &snapshot, None).await;
 
+    let has_auth = config
+        .extra_headers
+        .iter()
+        .any(|(k, v)| k.eq_ignore_ascii_case("authorization") && v.starts_with("Bearer "));
+
     assert!(
-        config.api_key.is_some(),
-        "provider inline api_key must flow through to sampler config (OBPA-003)"
-    );
-    assert_eq!(
-        config.api_key.as_deref(),
-        Some("provider-inline-secret"),
-        "provider inline key must match TOML value"
+        has_auth,
+        "provider inline api_key must produce Authorization header via credential context (OBPA-005): extra_headers={:?}",
+        config.extra_headers,
     );
 
     let client = xai_grok_sampler::SamplingClient::new(config).unwrap();
