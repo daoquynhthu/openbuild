@@ -486,7 +486,7 @@ async fn concurrent_different_version_installs_do_not_corrupt_each_other() {
     // The active symlink points at whichever racer swapped last; it must
     // resolve and run regardless.
     let resolved =
-        xai_grok_paths::normalize::normalized_absolute(home.join("bin").join("grok")).unwrap();
+        xai_grok_paths::normalize::normalized_absolute(&home.join("bin").join("grok")).unwrap();
     assert_eq!(std::fs::read(&resolved).unwrap(), artifact);
     let name = resolved.file_name().unwrap().to_string_lossy().to_string();
     assert!(
