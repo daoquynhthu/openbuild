@@ -92,6 +92,7 @@ pub struct ProviderConfigCoordinator {
     pub config_path: PathBuf,
     pub resolution_context: Arc<ProviderResolutionContext>,
     update_lock: Mutex<()>,
+    degraded: std::sync::atomic::AtomicBool,
     #[cfg(test)]
     pub pre_cas_hook: std::sync::Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
     #[cfg(test)]
@@ -109,6 +110,7 @@ impl ProviderConfigCoordinator {
             config_path,
             resolution_context,
             update_lock: Mutex::new(()),
+            degraded: std::sync::atomic::AtomicBool::new(false),
             #[cfg(test)]
             pre_cas_hook: std::sync::Mutex::new(None),
             #[cfg(test)]
@@ -176,6 +178,13 @@ impl ProviderConfigCoordinator {
         patch: &ProviderConfigPatch,
     ) -> Result<ConfigApplyOutcome, ConfigApplyError> {
         let _lock = self.update_lock.lock().await;
+
+        // H2: Block saves while coordinator is degraded
+        if self.is_degraded() {
+            return Err(ConfigApplyError::WriteError(
+                "coordinator is degraded — re-read disk and complete consistency recovery before retrying".into(),
+            ));
+        }
 
         // Step 1: Read old bytes + compute SHA-256
         let old_bytes = std::fs::read(&self.config_path).map_err(|e| {
@@ -252,20 +261,39 @@ impl ProviderConfigCoordinator {
         }
         match self.runtime.registry.commit(prepared) {
             Ok(rev) => Ok(ConfigApplyOutcome::Applied { new_revision: rev }),
-            Err(e) => {
-                // Commit failed — rollback file to old bytes if no external edit
+            Err(commit_err) => {
+                // H2: Commit failed — rollback file using the same atomic_replace
+                // primitive (H1). If rollback ALSO fails, return combined error
+                // and mark coordinator degraded.
                 let post_write = std::fs::read(&self.config_path).unwrap_or_default();
                 let post_write_sha = Sha256::digest(&post_write);
                 if post_write_sha == candidate_sha {
                     // File still has what we wrote — safe to restore old content
-                    let _ = std::fs::write(&self.config_path, &old_content);
+                    if let Err(rollback_err) =
+                        xai_grok_paths::atomic_write::atomic_replace(
+                            &self.config_path,
+                            old_content.as_bytes(),
+                        )
+                    {
+                        self.degraded.store(true, std::sync::atomic::Ordering::SeqCst);
+                        return Err(ConfigApplyError::WriteError(format!(
+                            "commit failed ({commit_err}) AND rollback also failed ({rollback_err}) — coordinator degraded"
+                        )));
+                    }
                 } else {
                     // File was modified by another party — cannot safely rollback
                     return Err(ConfigApplyError::ConsistencyEmergency);
                 }
-                Err(ConfigApplyError::CommitError(e.to_string()))
+                Err(ConfigApplyError::CommitError(commit_err.to_string()))
             }
         }
+    }
+
+    /// Returns true if the coordinator is in degraded state (H2).
+    /// While degraded, further save operations are blocked until the
+    /// operator re-reads disk and completes consistency recovery.
+    pub fn is_degraded(&self) -> bool {
+        self.degraded.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     pub fn registry(&self) -> Arc<ProviderRegistry> {
