@@ -1,7 +1,8 @@
 # R3-RED-02 Evidence
 
 - Baseline commit: 6875625349a4a067dbb41d1249adae4143fc35d9
-- Result commit: (to be filled after commit)
+- Result commit: 9b99aa722d29a790ef55c7c8a989892d7cd26973
+- Parent commit: f5a7611b33448170e8eb987f42e593a0fe4d57fe
 - Files changed:
   - `crates/codegen/xai-grok-shell/tests/provider_async_model_switch.rs` (test)
 - Failing test before fix: `model_switch_nested_runtime_panic`

@@ -2,6 +2,7 @@
 
 - Baseline commit: 6875625349a4a067dbb41d1249adae4143fc35d9
 - Result commit: f5a7611b33448170e8eb987f42e593a0fe4d57fe
+- Parent commit: 6875625349a4a067dbb41d1249adae4143fc35d9
 - Files changed:
   - `crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs` (test seam)
   - `crates/codegen/xai-grok-shell/tests/provider_async_session_entry.rs` (test)
