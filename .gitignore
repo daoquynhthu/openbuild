@@ -29,4 +29,4 @@ scripts/provider-v1/scan_platform_exclusions.py
 scripts/provider-v1/tests/debug_*.py
 scripts/provider-v1/tests/quick_test*.py
 scripts/provider-v1/tests/test_check_ps1.ps1
-scripts/provider-v1/tests/test_scan_platform_exclusions.py
+# scripts/provider-v1/tests/test_scan_platform_exclusions.py  # R3-RED-13: now tracked
