@@ -147,7 +147,7 @@ impl PtyController {
     /// Receive a single chunk from the reader channel, blocking up to `timeout`.
     ///
     /// Returns `None` on timeout or channel disconnect (child exited).
-    /// Use this instead of [`drain_output`] when timing accuracy matters —
+    /// Use this instead of `drain_output` when timing accuracy matters —
     /// processing each chunk inline preserves inter-chunk timing.
     pub fn recv_chunk(&self, timeout: Duration) -> Option<Vec<u8>> {
         self.reader_rx.recv_timeout(timeout).ok()

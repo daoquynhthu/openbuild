@@ -323,7 +323,7 @@ pub enum ScenarioStep {
     /// Assert the captured terminal output contains an OSC 52 clipboard write.
     AssertOsc52Contains { text: String },
     /// Assert NO OSC 52 clipboard payload contains `text` (negative of
-    /// [`AssertOsc52Contains`]). Used to prove a label prefix was excluded
+    /// `AssertOsc52Contains`). Used to prove a label prefix was excluded
     /// from a selection/copy, e.g. that copying a Read tool header yields the
     /// path alone rather than the full `Read {path}` line.
     AssertOsc52NotContains { text: String },
@@ -336,7 +336,7 @@ pub enum ScenarioStep {
     /// non-default background (the text is outside any selection highlight).
     AssertTextNotHighlighted { text: String },
     /// Assert the captured **raw** PTY output contains at least `min` Kitty
-    /// graphics APC sequences (`\x1b_G`). Mirrors [`AssertOsc52Contains`]: the
+    /// graphics APC sequences (`\x1b_G`). Mirrors `AssertOsc52Contains`: the
     /// graphics escapes are written into the synchronized-update frame buffer,
     /// outside the vt100 cell grid, so a screen-text snapshot can't see them —
     /// this scans the raw bytes instead. Proves an inline diagram was emitted.
@@ -346,7 +346,7 @@ pub enum ScenarioStep {
     },
     /// Poll the raw PTY output until at least `min` Kitty graphics APC sequences
     /// appear (or `timeout_ms` expires). Preferred over a fixed `wait` before
-    /// [`AssertKittyGraphics`]: it returns as soon as the diagram is placed and
+    /// `AssertKittyGraphics`: it returns as soon as the diagram is placed and
     /// doesn't flake under load.
     WaitForKittyGraphics {
         #[serde(default = "default_assert_min")]
@@ -355,7 +355,7 @@ pub enum ScenarioStep {
         timeout_ms: u64,
     },
     /// Assert the captured **raw** PTY output contains NO Kitty graphics APC
-    /// sequences. The inverse of [`AssertKittyGraphics`]: proves a feature (e.g.
+    /// sequences. The inverse of `AssertKittyGraphics`: proves a feature (e.g.
     /// a Mermaid diagram) was rendered as text, never transmitted as an inline
     /// image.
     AssertNoKittyGraphics {},

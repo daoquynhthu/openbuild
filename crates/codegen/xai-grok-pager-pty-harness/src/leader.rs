@@ -107,7 +107,7 @@ impl LeaderCluster {
         out
     }
 
-    /// Poll [`session_updates`](Self::session_updates) until a record with
+    /// Poll `session_updates` until a record with
     /// `sessionUpdate == "turn_completed"` appears, returning that (inner)
     /// update payload, or error on timeout. Scans ALL sessions under the
     /// cluster (fine for the single-session clusters these tests build).

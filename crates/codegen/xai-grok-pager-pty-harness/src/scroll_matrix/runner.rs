@@ -3,7 +3,7 @@
 //!
 //! ## Blocking model
 //!
-//! A cell's body ([`run_cell_inner`]) is host-paced end to end — PTY drains,
+//! A cell's body (`run_cell_inner`) is host-paced end to end — PTY drains,
 //! `thread::sleep` gesture gaps, finalize polling — so [`run_cell`] runs it
 //! on `spawn_blocking` (driving the async session spawns via
 //! `Handle::block_on`, which requires a **multi-thread** runtime) and applies
@@ -85,7 +85,7 @@ fn sgr_wheel_report(button: u16) -> String {
 
 /// Run one matrix cell against `binary`, capturing the recorder JSONL to
 /// `artifacts_dir/<cell_id>.jsonl` (kept for post-mortems). Never panics and
-/// never hangs past [`CELL_HARD_CAP`]; every abnormality becomes a `Fail`
+/// never hangs past `CELL_HARD_CAP`; every abnormality becomes a `Fail`
 /// report with a phase note. Requires a multi-thread tokio runtime (see the
 /// module docs).
 pub async fn run_cell(cell: &MatrixCell, binary: &Path, artifacts_dir: &Path) -> CellReport {

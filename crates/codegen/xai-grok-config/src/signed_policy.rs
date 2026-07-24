@@ -154,7 +154,7 @@ pub fn verify_signed_payload(
 /// deployment-signed payload is trusted on signature alone; a team-signed payload
 /// must match the active team. Lenient on a missing active team — an `auth.json`
 /// read blip must not brick a session (a cross-team attacker has a team of their
-/// own). The at-rest checks use [`signed_principal_matches`] instead.
+/// own). The at-rest checks use `signed_principal_matches` instead.
 pub fn check_fetch_identity(
     payload: &SignedPayload,
     active_team_id: Option<&str>,
@@ -218,7 +218,7 @@ fn non_regular_file_at(path: &std::path::Path) -> bool {
 /// edit is caught, not just a deletion. A signed-ABSENT slot must be empty on disk: a
 /// locally planted `requirements.toml` (the highest-precedence layer) is tamper, not
 /// noise. An unreadable file is [`SigError::Unreadable`] (refetch, don't refuse — a
-/// read blip); anything non-regular squatting the slot ([`non_regular_file_at`])
+/// read blip); anything non-regular squatting the slot (`non_regular_file_at`)
 /// reads as tamper.
 pub fn check_on_disk_matches(
     home: &std::path::Path,
@@ -340,7 +340,7 @@ enum DiskStatus {
 /// checks are projections over the same facts: the refetch trigger flags ANY
 /// deviation; the gate applies the fail-closed rules.
 struct SignedCacheFacts {
-    /// The payload's effective principal matches ours ([`signed_principal_matches`]).
+    /// The payload's effective principal matches ours (`signed_principal_matches`).
     identity_ok: bool,
     expired: bool,
     /// The SIGNED opt-in — read from the payload, never the forgeable marker.
