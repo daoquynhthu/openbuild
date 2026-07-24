@@ -406,9 +406,10 @@ fn is_safe_snapshot_delete_target_in(snapshot_path: &Path, btrfs_mounts: &[PathB
     let Some(grandparent) = canonical_parent.parent() else {
         return false;
     };
-    btrfs_mounts
-        .iter()
-        .any(|m| m == grandparent || xai_grok_paths::normalize::normalized_absolute(m).is_ok_and(|c| c == grandparent))
+    btrfs_mounts.iter().any(|m| {
+        m == grandparent
+            || xai_grok_paths::normalize::normalized_absolute(m).is_ok_and(|c| c == grandparent)
+    })
 }
 
 /// Metadata persisted alongside a direct btrfs snapshot for crash recovery

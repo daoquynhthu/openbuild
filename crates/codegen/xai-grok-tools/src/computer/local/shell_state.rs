@@ -277,9 +277,9 @@ impl ShellState {
     ) -> Result<Self, crate::computer::types::ComputerError> {
         // Cmd shell state init not supported (V1 frozen).
         if shell == ShellKind::Cmd {
-            return Err(crate::computer::types::ComputerError::io(
-                String::from("Cmd shell state init not supported"),
-            ));
+            return Err(crate::computer::types::ComputerError::io(String::from(
+                "Cmd shell state init not supported",
+            )));
         }
 
         let dump_script = shell.dump_script();

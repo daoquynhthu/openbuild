@@ -67,9 +67,9 @@ pub(crate) async fn try_canonicalize(path: &Path) -> std::io::Result<PathBuf> {
         xai_grok_paths::normalize::normalized_absolute(&owned)
             .map_err(|e| std::io::Error::other(e.to_string()))
     })
-        .await
-        .unwrap_or_else(|_| Err(std::io::Error::other("canonicalize task panicked")))
-        .map(|p| dunce::simplified(&p).to_path_buf())
+    .await
+    .unwrap_or_else(|_| Err(std::io::Error::other("canonicalize task panicked")))
+    .map(|p| dunce::simplified(&p).to_path_buf())
 }
 
 /// OS-specific special characters that appear in generated filenames but that

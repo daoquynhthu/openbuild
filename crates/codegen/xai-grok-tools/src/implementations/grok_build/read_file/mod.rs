@@ -775,8 +775,9 @@ mod tests {
         let result = xai_tool_runtime::Tool::run(&tool, ctx, input)
             .await
             .unwrap();
-        let expected_path = xai_grok_paths::normalize::normalized_absolute(&tmp.path().join("subdir"))
-            .unwrap_or_else(|_| tmp.path().join("subdir"));
+        let expected_path =
+            xai_grok_paths::normalize::normalized_absolute(&tmp.path().join("subdir"))
+                .unwrap_or_else(|_| tmp.path().join("subdir"));
         let expected = format!("Failed to read file: {}", expected_path.display());
         match result {
             ReadFileOutput::FileReadError(msg) => {
@@ -1155,7 +1156,8 @@ mod tests {
     }
     fn test_resources_with_gitignore(cwd: &std::path::Path) -> Resources {
         let mut resources = test_resources(cwd);
-        let canonical = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+        let canonical = xai_grok_paths::normalize::normalized_absolute(cwd)
+            .unwrap_or_else(|_| cwd.to_path_buf());
         let gi = build_gitignore(&canonical, &["build/", "node_modules/", "*.log"]);
         resources.insert(GitignoreFilter::new(gi, canonical));
         resources

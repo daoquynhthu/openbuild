@@ -647,7 +647,8 @@ async fn dashboard_change_location_persists_worktree_toggle() {
     // The destination must be a git repo for worktree mode to persist.
     let tmp = tempfile::tempdir().unwrap();
     std::fs::create_dir(tmp.path().join(".git")).unwrap();
-    let target = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap_or_else(|_| tmp.path().to_path_buf());
+    let target = xai_grok_paths::normalize::normalized_absolute(tmp.path())
+        .unwrap_or_else(|_| tmp.path().to_path_buf());
     dispatch(
         Action::DashboardChangeLocation {
             input: target.to_string_lossy().into_owned(),
@@ -685,7 +686,8 @@ async fn dashboard_change_location_to_non_git_clears_worktree_toggle() {
     }
     // A fresh tempdir with no `.git` anywhere above it.
     let tmp = tempfile::tempdir().unwrap();
-    let target = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap_or_else(|_| tmp.path().to_path_buf());
+    let target = xai_grok_paths::normalize::normalized_absolute(tmp.path())
+        .unwrap_or_else(|_| tmp.path().to_path_buf());
     dispatch(
         Action::DashboardChangeLocation {
             input: target.to_string_lossy().into_owned(),

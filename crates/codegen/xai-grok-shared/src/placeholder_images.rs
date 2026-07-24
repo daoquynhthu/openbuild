@@ -1019,7 +1019,8 @@ mod tests {
         let link = allowed_dir.path().join("link.png");
         std::os::unix::fs::symlink(&target, &link).unwrap();
 
-        let allowed_canon = xai_grok_paths::normalize::normalized_absolute(allowed_dir.path()).unwrap();
+        let allowed_canon =
+            xai_grok_paths::normalize::normalized_absolute(allowed_dir.path()).unwrap();
         let err =
             load_placeholder_image(link.to_str().unwrap(), std::slice::from_ref(&allowed_canon))
                 .unwrap_err();
@@ -1042,7 +1043,8 @@ mod tests {
             .join("..")
             .join(outside_dir.path().file_name().unwrap())
             .join(&unique);
-        let allowed_canon = xai_grok_paths::normalize::normalized_absolute(allowed_dir.path()).unwrap();
+        let allowed_canon =
+            xai_grok_paths::normalize::normalized_absolute(allowed_dir.path()).unwrap();
         let err = load_placeholder_image(
             traversal.to_str().unwrap(),
             std::slice::from_ref(&allowed_canon),
@@ -1085,7 +1087,8 @@ mod tests {
         for sub in HOME_IMAGE_SUBDIRS {
             let p = home.path().join(sub);
             std::fs::create_dir(&p).unwrap();
-            expected_subdir_canons.push(xai_grok_paths::normalize::normalized_absolute(&p).unwrap());
+            expected_subdir_canons
+                .push(xai_grok_paths::normalize::normalized_absolute(&p).unwrap());
         }
 
         let prefixes =
@@ -1099,7 +1102,10 @@ mod tests {
             );
         }
         // $HOME itself is NOT in the list.
-        assert!(!prefixes.contains(&xai_grok_paths::normalize::normalized_absolute(home.path()).unwrap()));
+        assert!(
+            !prefixes
+                .contains(&xai_grok_paths::normalize::normalized_absolute(home.path()).unwrap())
+        );
         // At least workspace + each subdir, sorted+deduped. Uses `>=`
         // not `==` so the test stays green if `$TMPDIR` happens to
         // resolve inside one of the home subdirs (e.g. CI runners that
@@ -1226,9 +1232,11 @@ mod tests {
 
         let attached_uri = format!("file://{}", link.display()); // non-canonical
         let mut raw = vec![make_acp_image(&attached_uri)];
-        let canonical_placeholder = xai_grok_paths::normalize::normalized_absolute(&real_target).unwrap();
+        let canonical_placeholder =
+            xai_grok_paths::normalize::normalized_absolute(&real_target).unwrap();
         let query = format!("[Image #1: {}]", canonical_placeholder.display());
-        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(outside_root.path()).unwrap()];
+        let allowed =
+            vec![xai_grok_paths::normalize::normalized_absolute(outside_root.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(
             n, 0,
@@ -1321,7 +1329,8 @@ mod tests {
         let query = format!("[Image #1: {}]", canon.display());
         // Allowlist is workspace only — the placeholder canon is
         // outside it.
-        let allowed = vec![xai_grok_paths::normalize::normalized_absolute(workspace.path()).unwrap()];
+        let allowed =
+            vec![xai_grok_paths::normalize::normalized_absolute(workspace.path()).unwrap()];
         let n = recover_orphan_placeholders_with_prefixes(&query, &mut raw, &allowed);
         assert_eq!(n, 0);
         assert!(raw.is_empty());
@@ -1433,7 +1442,8 @@ mod tests {
             let canon = xai_grok_paths::normalize::normalized_absolute(&png).unwrap();
             // Allowlist is the root — without the deny-list, this
             // path would be accepted.
-            let allowed = vec![xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap()];
+            let allowed =
+                vec![xai_grok_paths::normalize::normalized_absolute(root.path()).unwrap()];
             let err = load_placeholder_image(canon.to_str().unwrap(), &allowed).unwrap_err();
             assert!(
                 matches!(err, PlaceholderLoadError::OutsideAllowedPrefixes),

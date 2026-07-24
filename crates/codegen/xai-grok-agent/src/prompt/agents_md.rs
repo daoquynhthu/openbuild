@@ -125,10 +125,11 @@ async fn read_agents_config_with_options(
         // Insert after repo root (index 0 after reverse) so it's higher priority
         // than repo root AGENTS.md but lower priority than intermediate dirs and cwd.
         if let Some(user_dir) = workspace_user_dir {
-            let user_dir_canonical =
-                xai_grok_paths::normalize::normalized_absolute(user_dir).unwrap_or_else(|_| user_dir.to_path_buf());
+            let user_dir_canonical = xai_grok_paths::normalize::normalized_absolute(user_dir)
+                .unwrap_or_else(|_| user_dir.to_path_buf());
             let already_in_chain = chain.iter().any(|d| {
-                xai_grok_paths::normalize::normalized_absolute(d).unwrap_or_else(|_| d.clone()) == user_dir_canonical
+                xai_grok_paths::normalize::normalized_absolute(d).unwrap_or_else(|_| d.clone())
+                    == user_dir_canonical
             });
             if !already_in_chain {
                 // chain[0] is repo root after reverse; insert right after it.
@@ -163,7 +164,8 @@ async fn read_agents_config_with_options(
     files
         .into_iter()
         .filter(|path| {
-            let canonical = xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.clone());
+            let canonical = xai_grok_paths::normalize::normalized_absolute(path)
+                .unwrap_or_else(|_| path.clone());
             seen_canonical.insert(canonical)
         })
         .filter_map(|file_path| {

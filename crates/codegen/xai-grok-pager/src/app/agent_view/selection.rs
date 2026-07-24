@@ -1560,7 +1560,9 @@ mod tests {
             anchor_content_width: Some(content_width),
         };
         assert_eq!(
-            parent.reconstruct_drag_copy(&drag).map(|(t, k)| (t.replace('\\', "/"), k)),
+            parent
+                .reconstruct_drag_copy(&drag)
+                .map(|(t, k)| (t.replace('\\', "/"), k)),
             Some(("src/lib.rs".to_string(), SelectionKind::Linear))
         );
     }

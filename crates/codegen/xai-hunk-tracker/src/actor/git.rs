@@ -45,9 +45,10 @@ fn open_or_discover(
             let repo_root = repo.workdir()?.to_path_buf();
 
             // Canonicalize both paths to handle symlinks (e.g., /var -> /private/var on macOS)
-            let canonical_working_dir =
-                xai_grok_paths::normalize::normalized_absolute(working_dir).unwrap_or_else(|_| working_dir.to_path_buf());
-            let canonical_repo_root = xai_grok_paths::normalize::normalized_absolute(&repo_root).unwrap_or(repo_root);
+            let canonical_working_dir = xai_grok_paths::normalize::normalized_absolute(working_dir)
+                .unwrap_or_else(|_| working_dir.to_path_buf());
+            let canonical_repo_root =
+                xai_grok_paths::normalize::normalized_absolute(&repo_root).unwrap_or(repo_root);
 
             let prefix = canonical_working_dir
                 .strip_prefix(&canonical_repo_root)
@@ -364,7 +365,8 @@ impl HunkTrackerActor {
             // Canonicalize to handle symlinks (e.g., /var -> /private/var on macOS).
             let canonical_abs_path = canonicalize_or_parent(&abs_path);
             let canonical_working_dir =
-                xai_grok_paths::normalize::normalized_absolute(&working_dir_for_strip).unwrap_or(working_dir_for_strip);
+                xai_grok_paths::normalize::normalized_absolute(&working_dir_for_strip)
+                    .unwrap_or(working_dir_for_strip);
 
             let working_dir_relative = match canonical_abs_path.strip_prefix(&canonical_working_dir)
             {
@@ -461,7 +463,8 @@ impl HunkTrackerActor {
                 };
             };
 
-            let canonical_working_dir = xai_grok_paths::normalize::normalized_absolute(&working_dir).unwrap_or(working_dir);
+            let canonical_working_dir =
+                xai_grok_paths::normalize::normalized_absolute(&working_dir).unwrap_or(working_dir);
 
             // Resolve HEAD tree once for all lookups
             let tree = (|| {

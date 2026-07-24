@@ -833,8 +833,10 @@ fn claude_install_visible(
     let Some(cwd) = cwd else {
         return false;
     };
-    let cwd = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
-    let project = xai_grok_paths::normalize::normalized_absolute(project).unwrap_or_else(|_| project.to_path_buf());
+    let cwd =
+        xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let project = xai_grok_paths::normalize::normalized_absolute(project)
+        .unwrap_or_else(|_| project.to_path_buf());
     cwd.starts_with(&project)
 }
 

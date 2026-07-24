@@ -81,10 +81,10 @@ impl PathOrPaths {
 ///
 /// Canonicalizes both sides (resolving symlinks and `..`) before the prefix check.
 fn is_path_contained(resolved: &Path, plugin_root: &Path) -> bool {
-    let canonical_root =
-        xai_grok_paths::normalize::normalized_absolute(plugin_root).unwrap_or_else(|_| plugin_root.to_path_buf());
-    let canonical_resolved =
-        xai_grok_paths::normalize::normalized_absolute(resolved).unwrap_or_else(|_| resolved.to_path_buf());
+    let canonical_root = xai_grok_paths::normalize::normalized_absolute(plugin_root)
+        .unwrap_or_else(|_| plugin_root.to_path_buf());
+    let canonical_resolved = xai_grok_paths::normalize::normalized_absolute(resolved)
+        .unwrap_or_else(|_| resolved.to_path_buf());
     // Fail-closed >MAX_PATH caveat: see workspace clippy.toml.
     canonical_resolved.starts_with(&canonical_root)
 }

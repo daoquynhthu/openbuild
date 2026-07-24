@@ -1646,14 +1646,16 @@ impl WorkspaceHandle {
     /// Canonicalize a confinement root directory.
     async fn canonicalize_root_dir(root: &std::path::Path) -> WorkspaceResult<PathBuf> {
         let root = root.to_owned();
-        let canonical = tokio::task::spawn_blocking(move || xai_grok_paths::normalize::normalized_absolute(&root))
-            .await
-            .map_err(|join_err| {
-                WorkspaceError::HubError(format!("canonicalize task panicked: {join_err}"))
-            })?
-            .map_err(|e| {
-                WorkspaceError::HubError(format!("failed to canonicalize workspace root: {e}"))
-            })?;
+        let canonical = tokio::task::spawn_blocking(move || {
+            xai_grok_paths::normalize::normalized_absolute(&root)
+        })
+        .await
+        .map_err(|join_err| {
+            WorkspaceError::HubError(format!("canonicalize task panicked: {join_err}"))
+        })?
+        .map_err(|e| {
+            WorkspaceError::HubError(format!("failed to canonicalize workspace root: {e}"))
+        })?;
         Ok(dunce::simplified(&canonical).to_path_buf())
     }
     /// Resolve a caller-provided path safely. Accepts a path relative to the
@@ -1716,7 +1718,11 @@ impl WorkspaceHandle {
         let mut check_path = normalized.clone();
         loop {
             let cp = check_path.clone();
-            match tokio::task::spawn_blocking(move || xai_grok_paths::normalize::normalized_absolute(&cp)).await {
+            match tokio::task::spawn_blocking(move || {
+                xai_grok_paths::normalize::normalized_absolute(&cp)
+            })
+            .await
+            {
                 Ok(Ok(canonical)) => {
                     let canonical = dunce::simplified(&canonical).to_path_buf();
                     if !canonical.starts_with(canonical_root) {

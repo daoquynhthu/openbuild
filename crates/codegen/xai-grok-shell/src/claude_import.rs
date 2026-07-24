@@ -419,7 +419,8 @@ fn scan_claude_path_dirs(cwd: &Path, plan: &mut ImportPlan) {
         for (kind, sub) in [(PathKind::Skill, "skills"), (PathKind::Rule, "rules")] {
             let dir = home.join(".claude").join(sub);
             if dir.is_dir() {
-                let canonical = xai_grok_paths::normalize::normalized_absolute(&dir).unwrap_or_else(|_| dir.clone());
+                let canonical = xai_grok_paths::normalize::normalized_absolute(&dir)
+                    .unwrap_or_else(|_| dir.clone());
                 global_added.insert(canonical);
                 plan.global_items.push(ImportableItem::PathEntry {
                     kind,
@@ -433,7 +434,8 @@ fn scan_claude_path_dirs(cwd: &Path, plan: &mut ImportPlan) {
     for (kind, sub) in [(PathKind::Skill, "skills"), (PathKind::Rule, "rules")] {
         let dir = project_root.join(".claude").join(sub);
         if dir.is_dir() {
-            let canonical = xai_grok_paths::normalize::normalized_absolute(&dir).unwrap_or_else(|_| dir.clone());
+            let canonical = xai_grok_paths::normalize::normalized_absolute(&dir)
+                .unwrap_or_else(|_| dir.clone());
             if global_added.contains(&canonical) {
                 debug!(
                     path = %dir.display(),
@@ -2123,8 +2125,12 @@ extra_rule_dirs = ["/c/rules"]
         // asserting that calling the project-side branch with the same path
         // would skip. Direct end-to-end coverage of the home-collision case
         // requires `GROK_HOME` plumbing which is intentionally out of scope.
-        let global = xai_grok_paths::normalize::normalized_absolute(&home.join(".claude").join("skills")).unwrap();
-        let project = xai_grok_paths::normalize::normalized_absolute(&home.join(".claude").join("skills")).unwrap();
+        let global =
+            xai_grok_paths::normalize::normalized_absolute(&home.join(".claude").join("skills"))
+                .unwrap();
+        let project =
+            xai_grok_paths::normalize::normalized_absolute(&home.join(".claude").join("skills"))
+                .unwrap();
         assert_eq!(global, project, "sanity: paths canonicalize to the same");
     }
 

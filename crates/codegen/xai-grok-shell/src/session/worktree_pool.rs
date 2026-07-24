@@ -1909,7 +1909,8 @@ pool_size = 3
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_pool_fill_creates_worktrees() {
         let (_dir, repo_path) = create_temp_git_repo(5);
-        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).expect("canonicalize repo path");
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path)
+            .expect("canonicalize repo path");
 
         let config = PoolConfig {
             pool_size: 2,
@@ -1943,7 +1944,8 @@ pool_size = 3
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_pool_fill_replenishes_after_acquire() {
         let (_dir, repo_path) = create_temp_git_repo(5);
-        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).expect("canonicalize repo path");
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path)
+            .expect("canonicalize repo path");
 
         let config = PoolConfig {
             pool_size: 2,
@@ -1983,7 +1985,8 @@ pool_size = 3
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn test_pool_release_and_reacquire() {
         let (_dir, repo_path) = create_temp_git_repo(10);
-        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path).expect("canonicalize repo path");
+        let repo_path = xai_grok_paths::normalize::normalized_absolute(&repo_path)
+            .expect("canonicalize repo path");
 
         let config = PoolConfig {
             pool_size: 2,

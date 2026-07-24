@@ -1623,8 +1623,11 @@ pub fn validate_hooks_path(path: &str) -> Result<(), Box<dyn std::error::Error>>
             }
             Ok(resolved)
         })
-        .map_err(|e: xai_grok_paths::normalize::PathError| format!("Cannot resolve hook path: {e}"))?;
-    let canonical_home = xai_grok_paths::normalize::normalized_absolute(&grok_home).unwrap_or_else(|_| grok_home.clone());
+        .map_err(|e: xai_grok_paths::normalize::PathError| {
+            format!("Cannot resolve hook path: {e}")
+        })?;
+    let canonical_home = xai_grok_paths::normalize::normalized_absolute(&grok_home)
+        .unwrap_or_else(|_| grok_home.clone());
     if !canonical.starts_with(&canonical_home) {
         return Err(format!(
             "Hook path must be under ~/.grok/ ({}). Got: {}",

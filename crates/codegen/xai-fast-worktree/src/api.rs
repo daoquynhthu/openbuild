@@ -862,7 +862,9 @@ fn read_worktree_gitdir(worktree_path: &std::path::Path) -> Option<std::path::Pa
         path.to_path_buf()
     };
     // Canonicalize to clean up any `..` components
-    xai_grok_paths::normalize::normalized_absolute(&resolved).ok().or(Some(resolved))
+    xai_grok_paths::normalize::normalized_absolute(&resolved)
+        .ok()
+        .or(Some(resolved))
 }
 
 /// Delete `snapshot_path`, falling back to the delegate's `delete_snapshot`
@@ -1573,7 +1575,8 @@ pub mod gc {
     /// physical paths, so also match the canonicalized worktree path — a
     /// symlinked `$GROK_HOME` or custom worktree path would otherwise never match.
     fn cwd_within(wt_path: &Path, live_cwds: &[PathBuf]) -> bool {
-        let wt_canon = xai_grok_paths::normalize::normalized_absolute(wt_path).unwrap_or_else(|_| wt_path.to_path_buf());
+        let wt_canon = xai_grok_paths::normalize::normalized_absolute(wt_path)
+            .unwrap_or_else(|_| wt_path.to_path_buf());
         live_cwds
             .iter()
             .any(|cwd| cwd.starts_with(wt_path) || cwd.starts_with(&wt_canon))

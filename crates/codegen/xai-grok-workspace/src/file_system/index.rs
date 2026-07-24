@@ -599,7 +599,8 @@ impl FileIndex {
         options: WalkOptions,
     ) -> io::Result<Self> {
         let root = root.as_ref();
-        let root_canonical = xai_grok_paths::normalize::normalized_absolute(root).unwrap_or_else(|_| root.to_path_buf());
+        let root_canonical = xai_grok_paths::normalize::normalized_absolute(root)
+            .unwrap_or_else(|_| root.to_path_buf());
 
         let mut builder = WalkBuilder::new(&root_canonical);
         builder

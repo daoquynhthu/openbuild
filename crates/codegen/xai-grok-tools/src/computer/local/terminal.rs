@@ -4145,7 +4145,11 @@ mod tests {
             // live_count below so we can observe the `1` end of the transition.
             // The actor's first poll tick fires right after spawn, and `true`
             // could already be reaped by then, making the `== 1` check racy.
-            let sleep_cmd = if cfg!(target_os = "windows") { "Start-Sleep -Seconds 1" } else { "sleep 1" };
+            let sleep_cmd = if cfg!(target_os = "windows") {
+                "Start-Sleep -Seconds 1"
+            } else {
+                "sleep 1"
+            };
             let mut bg_req = make_request(sleep_cmd);
             bg_req.tool_call_id = "bg-reap-1".to_string();
             let bg = backend

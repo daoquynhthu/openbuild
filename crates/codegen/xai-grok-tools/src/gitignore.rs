@@ -109,7 +109,11 @@ mod tests {
         // Build an absolute path outside the gitignore root.
         let tmp = tempfile::tempdir().unwrap();
         let abs_root = xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap();
-        let abs_path = abs_root.parent().unwrap().join("nonexistent").join("file.md");
+        let abs_path = abs_root
+            .parent()
+            .unwrap()
+            .join("nonexistent")
+            .join("file.md");
 
         // Proves the raw crate panics with these inputs.
         assert!(

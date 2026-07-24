@@ -399,12 +399,23 @@ fn linked_worktree_scope_includes_main_and_siblings() {
     let sibling = root.path().join("sibling");
     repository.worktree("linked", &linked, None).unwrap();
     repository.worktree("sibling", &sibling, None).unwrap();
-    let main_project = scoped_project(root.path(), &xai_grok_paths::normalize::normalized_absolute(&main).unwrap());
-    let linked_project = scoped_project(root.path(), &xai_grok_paths::normalize::normalized_absolute(&linked).unwrap());
-    let sibling_project = scoped_project(root.path(), &xai_grok_paths::normalize::normalized_absolute(&sibling).unwrap());
+    let main_project = scoped_project(
+        root.path(),
+        &xai_grok_paths::normalize::normalized_absolute(&main).unwrap(),
+    );
+    let linked_project = scoped_project(
+        root.path(),
+        &xai_grok_paths::normalize::normalized_absolute(&linked).unwrap(),
+    );
+    let sibling_project = scoped_project(
+        root.path(),
+        &xai_grok_paths::normalize::normalized_absolute(&sibling).unwrap(),
+    );
 
-    let project_dirs =
-        projects::scoped_project_dirs(root.path(), &xai_grok_paths::normalize::normalized_absolute(&linked).unwrap());
+    let project_dirs = projects::scoped_project_dirs(
+        root.path(),
+        &xai_grok_paths::normalize::normalized_absolute(&linked).unwrap(),
+    );
     assert!(project_dirs.contains(&main_project));
     assert!(project_dirs.contains(&linked_project));
     assert!(project_dirs.contains(&sibling_project));

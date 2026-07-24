@@ -1593,10 +1593,7 @@ mod tests {
         o.plan_file = Some(path.clone());
 
         let json = serde_json::to_string(&o).unwrap();
-        let expected = format!(
-            "\"plan_file\":{}",
-            serde_json::to_string(&path).unwrap()
-        );
+        let expected = format!("\"plan_file\":{}", serde_json::to_string(&path).unwrap());
         assert!(
             json.contains(&expected),
             "plan_file must appear on the wire as a string: {json}",
@@ -2080,7 +2077,10 @@ mod tests {
         let _ = t.record_not_achieved_streak();
         let _ = t.claim_strategist_fire(|_, _| true);
         t.record_strategy_recommendation(
-            std::env::temp_dir().join("goal/strategy.md").to_string_lossy().to_string(),
+            std::env::temp_dir()
+                .join("goal/strategy.md")
+                .to_string_lossy()
+                .to_string(),
             "split it".into(),
         );
 
@@ -2102,7 +2102,10 @@ mod tests {
             let _ = t.record_not_achieved_streak();
             let _ = t.claim_strategist_fire(|_, _| true);
             t.record_strategy_recommendation(
-                std::env::temp_dir().join("s.md").to_string_lossy().to_string(),
+                std::env::temp_dir()
+                    .join("s.md")
+                    .to_string_lossy()
+                    .to_string(),
                 "do X".into(),
             );
         };
@@ -2141,13 +2144,13 @@ mod tests {
     fn strategy_recommendation_record_round_trip() {
         let mut t = make_tracker();
         activate_tracker(&mut t);
-        let p = std::env::temp_dir().join("goal/strategy.md").to_string_lossy().to_string();
+        let p = std::env::temp_dir()
+            .join("goal/strategy.md")
+            .to_string_lossy()
+            .to_string();
         t.record_strategy_recommendation(p.clone(), "split the monolith".into());
         let o = t.snapshot().unwrap();
-        assert_eq!(
-            o.last_strategy_path.as_deref(),
-            Some(p.as_str())
-        );
+        assert_eq!(o.last_strategy_path.as_deref(), Some(p.as_str()));
         assert_eq!(
             o.last_strategy_recommendation.as_deref(),
             Some("split the monolith")
@@ -2960,7 +2963,10 @@ mod tests {
         o.classifier_max_runs = Some(3);
         o.last_classifier_verdict = Some(GoalClassifierVerdict::NotAchieved);
         o.last_classifier_details_path = Some(
-            std::env::temp_dir().join("goal-classifier-abc.md").to_string_lossy().to_string(),
+            std::env::temp_dir()
+                .join("goal-classifier-abc.md")
+                .to_string_lossy()
+                .to_string(),
         );
         o.last_classifier_at = Some("2026-05-24T12:00:00Z".to_string());
         o.last_classifier_gaps = Some("- [skeptic 0, high] still on fire".to_string());
@@ -2978,7 +2984,13 @@ mod tests {
         );
         assert_eq!(
             restored.last_classifier_details_path.as_deref(),
-            Some(std::env::temp_dir().join("goal-classifier-abc.md").to_string_lossy().to_string().as_str())
+            Some(
+                std::env::temp_dir()
+                    .join("goal-classifier-abc.md")
+                    .to_string_lossy()
+                    .to_string()
+                    .as_str()
+            )
         );
         assert_eq!(
             restored.last_classifier_at.as_deref(),
@@ -3650,10 +3662,7 @@ mod tests {
             "plan_baseline_file must appear on the wire: {json}",
         );
         let restored: GoalOrchestration = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            restored.plan_baseline_file.as_deref(),
-            Some(path.as_path()),
-        );
+        assert_eq!(restored.plan_baseline_file.as_deref(), Some(path.as_path()),);
 
         let none = make_base_orchestration();
         let json_none = serde_json::to_string(&none).unwrap();

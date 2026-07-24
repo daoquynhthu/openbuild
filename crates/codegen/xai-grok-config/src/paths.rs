@@ -28,7 +28,9 @@ const CLAUDE_MANAGED_SETTINGS_PATH: &str = "/etc/claude-code/managed-settings.js
 pub fn default_grok_home() -> PathBuf {
     #[allow(deprecated)]
     let home = std::env::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    xai_grok_paths::normalize::normalized_absolute(&home).unwrap_or(home).join(".grok")
+    xai_grok_paths::normalize::normalized_absolute(&home)
+        .unwrap_or(home)
+        .join(".grok")
 }
 
 /// Per-user config directory: `$GROK_HOME` or `~/.grok`. Created if needed.

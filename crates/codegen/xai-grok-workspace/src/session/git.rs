@@ -794,8 +794,10 @@ pub async fn git_info(cwd: &Path) -> Result<GitInfoData> {
     let cwd = cwd.to_path_buf();
     tokio::task::spawn_blocking(move || {
         let repo = Repository::discover(&cwd)?;
-        let root = xai_grok_paths::normalize::normalized_absolute(repo.workdir().unwrap_or_else(|| repo.path()))
-            .unwrap_or_else(|_| repo.workdir().unwrap_or_else(|| repo.path()).to_path_buf());
+        let root = xai_grok_paths::normalize::normalized_absolute(
+            repo.workdir().unwrap_or_else(|| repo.path()),
+        )
+        .unwrap_or_else(|_| repo.workdir().unwrap_or_else(|| repo.path()).to_path_buf());
         let current_branch = repo
             .head()
             .ok()
@@ -859,8 +861,10 @@ pub async fn list_branches(git_root: &Path) -> Result<GitBranchListData> {
     let root = git_root.to_path_buf();
     tokio::task::spawn_blocking(move || {
         let repo = Repository::discover(&root)?;
-        let repo_root = xai_grok_paths::normalize::normalized_absolute(repo.workdir().unwrap_or_else(|| repo.path()))
-            .unwrap_or_else(|_| repo.workdir().unwrap_or_else(|| repo.path()).to_path_buf());
+        let repo_root = xai_grok_paths::normalize::normalized_absolute(
+            repo.workdir().unwrap_or_else(|| repo.path()),
+        )
+        .unwrap_or_else(|_| repo.workdir().unwrap_or_else(|| repo.path()).to_path_buf());
         let current_branch = repo
             .head()
             .ok()
@@ -2516,7 +2520,10 @@ mod tests {
             .unwrap();
         let metadata = resolve_persisted_session_git_metadata_sync(tmp.path());
         assert_eq!(
-            xai_grok_paths::normalize::normalized_absolute(Path::new(metadata.git_root_dir.as_deref().unwrap())).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(Path::new(
+                metadata.git_root_dir.as_deref().unwrap()
+            ))
+            .unwrap(),
             xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap(),
         );
         assert_eq!(
@@ -2613,7 +2620,10 @@ mod tests {
         .unwrap();
         let metadata = resolve_persisted_session_git_metadata_sync(&wt_path);
         assert_eq!(
-            xai_grok_paths::normalize::normalized_absolute(Path::new(metadata.git_root_dir.as_deref().unwrap())).unwrap(),
+            xai_grok_paths::normalize::normalized_absolute(Path::new(
+                metadata.git_root_dir.as_deref().unwrap()
+            ))
+            .unwrap(),
             xai_grok_paths::normalize::normalized_absolute(&wt_path).unwrap(),
         );
         assert_eq!(

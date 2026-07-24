@@ -1066,9 +1066,12 @@ impl AgentBuilder {
                 .ok()
                 .and_then(|repo| repo.workdir().map(|p| p.to_path_buf()));
             let gitignore = crate::prompt::ignore::build_gitignore(git_root.as_deref());
-            let canonical_cwd = xai_grok_paths::normalize::normalized_absolute(&self.working_directory)
-                .unwrap_or_else(|_| self.working_directory.clone());
-            let canonical_root = git_root.as_ref().and_then(|r| xai_grok_paths::normalize::normalized_absolute(r).ok());
+            let canonical_cwd =
+                xai_grok_paths::normalize::normalized_absolute(&self.working_directory)
+                    .unwrap_or_else(|_| self.working_directory.clone());
+            let canonical_root = git_root
+                .as_ref()
+                .and_then(|r| xai_grok_paths::normalize::normalized_absolute(r).ok());
             let chain: Vec<PathBuf> = if let Some(ref root) = canonical_root {
                 let mut dirs = Vec::new();
                 let mut current = Some(canonical_cwd.as_path());

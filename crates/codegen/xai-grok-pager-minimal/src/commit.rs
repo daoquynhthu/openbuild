@@ -1017,7 +1017,10 @@ mod tests {
             }
         }
         let normalized = text.replace('\\', "/");
-        assert!(normalized.contains("src/main.rs"), "rendered text: {text:?}");
+        assert!(
+            normalized.contains("src/main.rs"),
+            "rendered text: {text:?}"
+        );
         assert!(
             !text.contains("/alternate/worktree"),
             "session prefix should be elided: {text:?}"

@@ -447,7 +447,9 @@ const HOME_VENDOR_DIRS: &[&str] = &[".grok", ".agents", ".claude", ".cursor"];
 
 /// Testable core of [`is_global_config_dir`] with `$HOME` injected.
 fn is_global_config_dir_impl(dir: &Path, grok_home: &Path, home: Option<&Path>) -> bool {
-    let canon = |p: &Path| xai_grok_paths::normalize::normalized_absolute(p).unwrap_or_else(|_| p.to_path_buf());
+    let canon = |p: &Path| {
+        xai_grok_paths::normalize::normalized_absolute(p).unwrap_or_else(|_| p.to_path_buf())
+    };
     if canon(dir) == canon(grok_home) {
         return true;
     }

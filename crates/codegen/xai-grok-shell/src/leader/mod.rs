@@ -1383,8 +1383,10 @@ fn resolve_binary_impl(
 /// Whether `path` is located within `dir`, canonicalizing both where possible so
 /// symlinked / relative paths compare correctly.
 fn path_is_under(path: &Path, dir: &Path) -> bool {
-    let path = xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.to_path_buf());
-    let dir = xai_grok_paths::normalize::normalized_absolute(dir).unwrap_or_else(|_| dir.to_path_buf());
+    let path =
+        xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.to_path_buf());
+    let dir =
+        xai_grok_paths::normalize::normalized_absolute(dir).unwrap_or_else(|_| dir.to_path_buf());
     path.starts_with(&dir)
 }
 fn spawn_leader_subprocess(env_urls: &LeaderEnvUrls) -> Result<u32, ConnectionError> {

@@ -588,10 +588,13 @@ pub fn persona_is_deletable(persona: &PersonaDetail) -> bool {
 /// Delete a local persona file from disk.
 pub fn delete_persona_file(path: &Path) -> Result<(), String> {
     if !persona_path_is_deletable(path) {
-        if xai_grok_paths::normalize::normalized_absolute(path).ok().is_some_and(|c| {
-            c.components()
-                .any(|comp| matches!(comp, std::path::Component::Normal(s) if s == "bundled"))
-        }) {
+        if xai_grok_paths::normalize::normalized_absolute(path)
+            .ok()
+            .is_some_and(|c| {
+                c.components()
+                    .any(|comp| matches!(comp, std::path::Component::Normal(s) if s == "bundled"))
+            })
+        {
             return Err("Cannot delete bundled personas".to_string());
         }
         return Err("Persona file is not in a known personas directory".to_string());

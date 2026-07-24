@@ -584,7 +584,9 @@ mod tests {
         let resolved = resolve_skill_path("sub", &tmp.path().to_string_lossy());
         assert_eq!(
             resolved,
-            xai_grok_paths::normalize::normalized_absolute(&sub).unwrap().to_string_lossy()
+            xai_grok_paths::normalize::normalized_absolute(&sub)
+                .unwrap()
+                .to_string_lossy()
         );
     }
 
@@ -597,7 +599,9 @@ mod tests {
         let resolved = resolve_skill_path("../..", &cwd.to_string_lossy());
         assert_eq!(
             resolved,
-            xai_grok_paths::normalize::normalized_absolute(tmp.path()).unwrap().to_string_lossy()
+            xai_grok_paths::normalize::normalized_absolute(tmp.path())
+                .unwrap()
+                .to_string_lossy()
         );
     }
 

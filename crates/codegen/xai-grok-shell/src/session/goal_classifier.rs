@@ -2585,13 +2585,7 @@ mod tests {
         let details_path = std::env::temp_dir().join("d.md");
         let handle = tokio::spawn(async move {
             let _ = spawner
-                .spawn_classifier(
-                    "clf-x",
-                    0,
-                    role_prompt("prompt"),
-                    &details_path,
-                    None,
-                )
+                .spawn_classifier("clf-x", 0, role_prompt("prompt"), &details_path, None)
                 .await;
         });
         let SubagentEvent::Spawn(request) = rx.recv().await.expect("spawn event") else {
@@ -6255,13 +6249,7 @@ mod tests {
         let class_path = std::env::temp_dir().join("goal-classifier-test-1.md");
         let spawn_task = tokio::spawn(async move {
             spawner
-                .spawn_classifier(
-                    "classifier-id",
-                    0,
-                    role_prompt("prompt"),
-                    &class_path,
-                    None,
-                )
+                .spawn_classifier("classifier-id", 0, role_prompt("prompt"), &class_path, None)
                 .await
         });
         tokio::time::sleep(Duration::from_millis(50)).await;

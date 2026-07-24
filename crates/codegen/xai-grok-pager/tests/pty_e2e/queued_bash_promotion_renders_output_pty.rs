@@ -21,7 +21,8 @@ async fn queued_bash_promotion_renders_output_pty() {
 
     let project = tempfile::tempdir().expect("create project dir");
     std::fs::create_dir_all(project.path().join(".git")).expect("create .git");
-    let cwd = xai_grok_paths::normalize::normalized_absolute(project.path()).expect("canonicalize project");
+    let cwd = xai_grok_paths::normalize::normalized_absolute(project.path())
+        .expect("canonicalize project");
     let marker = cwd.join("claim1_marker.txt");
 
     let binary = pager_binary().expect("resolve pager binary");

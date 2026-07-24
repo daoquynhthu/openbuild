@@ -146,7 +146,8 @@ pub struct SkillManager {
 /// Canonicalize a skill path, falling back to the raw path for not-yet-created
 /// files or symlink-resolution failures.
 fn canonical_path(path: &str) -> PathBuf {
-    xai_grok_paths::normalize::normalized_absolute(Path::new(path)).unwrap_or_else(|_| PathBuf::from(path))
+    xai_grok_paths::normalize::normalized_absolute(Path::new(path))
+        .unwrap_or_else(|_| PathBuf::from(path))
 }
 
 /// Why a reconciliation is pending.
@@ -164,8 +165,8 @@ fn dedup_by_canonical_path(primary: &[SkillInfo], secondary: &[SkillInfo]) -> Ve
     let mut seen_paths = HashSet::new();
     let mut result = Vec::with_capacity(primary.len() + secondary.len());
     for skill in primary.iter().chain(secondary.iter()) {
-        let canonical =
-            xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path)).unwrap_or_else(|_| PathBuf::from(&skill.path));
+        let canonical = xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path))
+            .unwrap_or_else(|_| PathBuf::from(&skill.path));
         if seen_paths.insert(canonical) {
             result.push(skill.clone());
         }
@@ -181,8 +182,8 @@ fn dedupe_by_canonical_path_and_name(
     let mut seen_names = HashSet::new();
     let mut result = Vec::with_capacity(primary.len() + secondary.len());
     for skill in primary.iter().chain(secondary.iter()) {
-        let canonical =
-            xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path)).unwrap_or_else(|_| PathBuf::from(&skill.path));
+        let canonical = xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path))
+            .unwrap_or_else(|_| PathBuf::from(&skill.path));
         if !seen_paths.insert(canonical) {
             continue;
         }
@@ -323,7 +324,8 @@ impl SkillManager {
             self.display_cwd = Some(display.clone());
         }
         self.cwd = cwd.map(|p| xai_grok_paths::normalize::normalized_absolute(&p).unwrap_or(p));
-        self.git_root = git_root.map(|p| xai_grok_paths::normalize::normalized_absolute(&p).unwrap_or(p));
+        self.git_root =
+            git_root.map(|p| xai_grok_paths::normalize::normalized_absolute(&p).unwrap_or(p));
         let unconditional = self.conditional.take_unconditional(startup_skills);
         let has_skills = !unconditional.is_empty();
         self.startup_skills = unconditional;

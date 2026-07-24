@@ -1592,7 +1592,9 @@ mod reasoning_compaction_regression_tests {
             endpoint_path: None,
             endpoint_query: None,
             request_url: None,
-            protocol_id: Some(xai_grok_sampling_types::ProtocolId("chat_completions".into())),
+            protocol_id: Some(xai_grok_sampling_types::ProtocolId(
+                "chat_completions".into(),
+            )),
             max_completion_tokens: Some(1000),
             temperature: Some(0.7),
             top_p: None,

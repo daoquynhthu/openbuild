@@ -194,11 +194,17 @@ mod tests {
         #[test]
         fn project_in_non_system_dir_is_safe() {
             let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            let project = base.join("__test_workspace_classifier").join("my-project").join("src");
+            let project = base
+                .join("__test_workspace_classifier")
+                .join("my-project")
+                .join("src");
             let _ = std::fs::create_dir_all(&project);
             let result = is_project_dir(&project);
             let _ = std::fs::remove_dir_all(base.join("__test_workspace_classifier"));
-            assert!(result, "a deep path in cwd should be classified as a project");
+            assert!(
+                result,
+                "a deep path in cwd should be classified as a project"
+            );
         }
 
         #[test]
@@ -350,7 +356,9 @@ mod tests {
         #[test]
         fn unicode_paths_work() {
             let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            let dir = base.join("__test_classifier_unicode").join("\u{D3F4}\u{B9AC}\u{B9C8}\u{CF13}");
+            let dir = base
+                .join("__test_classifier_unicode")
+                .join("\u{D3F4}\u{B9AC}\u{B9C8}\u{CF13}");
             let _ = std::fs::create_dir_all(&dir);
             let result = is_project_dir(&dir);
             let _ = std::fs::remove_dir_all(base.join("__test_classifier_unicode"));
@@ -360,7 +368,10 @@ mod tests {
         #[test]
         fn spaces_work() {
             let base = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            let dir = base.join("__test_classifier_spaces").join("My Projects").join("cool app");
+            let dir = base
+                .join("__test_classifier_spaces")
+                .join("My Projects")
+                .join("cool app");
             let _ = std::fs::create_dir_all(&dir);
             let result = is_project_dir(&dir);
             let _ = std::fs::remove_dir_all(base.join("__test_classifier_spaces"));

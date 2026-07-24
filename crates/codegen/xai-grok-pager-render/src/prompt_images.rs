@@ -1633,9 +1633,10 @@ fn resolve_orphan_placeholders(
                 }
                 aggregate_bytes = next_total;
                 let data = base64::engine::general_purpose::STANDARD.encode(&loaded.data);
-                let uri = xai_grok_paths::normalize::normalized_absolute(std::path::Path::new(&ph.path))
-                    .ok()
-                    .map(|p| format!("file://{}", p.display()));
+                let uri =
+                    xai_grok_paths::normalize::normalized_absolute(std::path::Path::new(&ph.path))
+                        .ok()
+                        .map(|p| format!("file://{}", p.display()));
                 recovered.push(
                     ImageContent::new(data, loaded.mime_type)
                         .uri(uri)
@@ -2823,7 +2824,10 @@ mod tests {
         let images = try_read_images_from_paste(&visible.display().to_string());
         assert_eq!(images.len(), 1);
         assert_eq!(images[0].source_path.as_deref(), Some(visible.as_path()));
-        assert_ne!(visible, xai_grok_paths::normalize::normalized_absolute(&visible).unwrap());
+        assert_ne!(
+            visible,
+            xai_grok_paths::normalize::normalized_absolute(&visible).unwrap()
+        );
     }
 
     fn dropped_non_image_paths(text: &str) -> Vec<PathBuf> {
@@ -4162,7 +4166,9 @@ mod tests {
 
         let text = format!(
             "look at [Image #1: {}] please",
-            xai_grok_paths::normalize::normalized_absolute(&path).unwrap().display(),
+            xai_grok_paths::normalize::normalized_absolute(&path)
+                .unwrap()
+                .display(),
         );
         let allowed = [xai_grok_paths::normalize::normalized_absolute(dir.path()).unwrap()];
         let blocks = build_content_blocks_with_prefixes(text, vec![], Some(&allowed));

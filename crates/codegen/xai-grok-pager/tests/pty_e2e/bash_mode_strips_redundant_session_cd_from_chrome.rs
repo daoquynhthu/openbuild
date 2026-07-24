@@ -18,7 +18,8 @@ async fn bash_mode_strips_redundant_session_cd_from_chrome() {
 
     let project = tempfile::tempdir().expect("create project dir");
     std::fs::create_dir_all(project.path().join(".git")).expect("create .git");
-    let cwd = xai_grok_paths::normalize::normalized_absolute(project.path()).expect("canonicalize project");
+    let cwd = xai_grok_paths::normalize::normalized_absolute(project.path())
+        .expect("canonicalize project");
     let cwd_str = cwd.to_string_lossy();
 
     let binary = pager_binary().expect("resolve pager binary");

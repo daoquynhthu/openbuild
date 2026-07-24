@@ -110,8 +110,8 @@ fn seed_previous_good(home: &Path, platform: &str) -> PathBuf {
 fn assert_active_grok_runs(home: &Path) {
     let link = home.join(".grok").join("bin").join("grok");
     assert!(link.is_symlink(), "grok must remain a symlink");
-    let resolved =
-        xai_grok_paths::normalize::normalized_absolute(&link).unwrap_or_else(|e| panic!("grok symlink dangles: {e}"));
+    let resolved = xai_grok_paths::normalize::normalized_absolute(&link)
+        .unwrap_or_else(|e| panic!("grok symlink dangles: {e}"));
     let name = resolved.file_name().unwrap().to_string_lossy().to_string();
     assert!(
         !name.contains(".tmp"),

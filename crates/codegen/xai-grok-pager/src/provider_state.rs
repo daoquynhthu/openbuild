@@ -418,7 +418,10 @@ mod tests {
     fn provider_state_uses_same_runtime_arc() {
         let rt = real_runtime();
         let state = ProviderState::new(rt.clone());
-        assert!(Arc::ptr_eq(&rt, state.runtime_ref()), "ProviderState must hold the same Arc<ProviderRuntime>");
+        assert!(
+            Arc::ptr_eq(&rt, state.runtime_ref()),
+            "ProviderState must hold the same Arc<ProviderRuntime>"
+        );
     }
 
     #[test]

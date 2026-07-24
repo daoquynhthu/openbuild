@@ -290,20 +290,22 @@ impl AgentArgs {
     pub fn canonical_plugin_dirs(&self) -> Vec<PathBuf> {
         self.plugin_dirs
             .iter()
-            .filter_map(|p| match xai_grok_paths::normalize::normalized_absolute(p) {
-                Ok(canonical) if canonical.is_dir() => Some(canonical),
-                Ok(_) => {
-                    eprintln!(
-                        "grok: --plugin-dir {}: not a directory; skipping",
-                        p.display()
-                    );
-                    None
-                }
-                Err(e) => {
-                    eprintln!("grok: --plugin-dir {}: {e}; skipping", p.display());
-                    None
-                }
-            })
+            .filter_map(
+                |p| match xai_grok_paths::normalize::normalized_absolute(p) {
+                    Ok(canonical) if canonical.is_dir() => Some(canonical),
+                    Ok(_) => {
+                        eprintln!(
+                            "grok: --plugin-dir {}: not a directory; skipping",
+                            p.display()
+                        );
+                        None
+                    }
+                    Err(e) => {
+                        eprintln!("grok: --plugin-dir {}: {e}; skipping", p.display());
+                        None
+                    }
+                },
+            )
             .collect()
     }
 }

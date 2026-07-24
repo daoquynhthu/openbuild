@@ -1500,7 +1500,8 @@ mod tests {
     }
     fn test_resources_with_gitignore(cwd: &std::path::Path) -> Resources {
         let mut resources = test_resources(cwd);
-        let canonical = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+        let canonical = xai_grok_paths::normalize::normalized_absolute(cwd)
+            .unwrap_or_else(|_| cwd.to_path_buf());
         let gi = build_gitignore(&canonical, &["build/", "dist/", "*.min.js"]);
         resources.insert(GitignoreFilter::new(gi, canonical));
         resources

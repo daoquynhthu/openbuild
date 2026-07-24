@@ -188,7 +188,8 @@ where
     if !enabled.claude && !enabled.codex && !enabled.cursor {
         return Vec::new();
     }
-    let canonical_cwd = xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
+    let canonical_cwd =
+        xai_grok_paths::normalize::normalized_absolute(cwd).unwrap_or_else(|_| cwd.to_path_buf());
     let mut cwd_spellings = vec![canonical_cwd];
     if cwd_spellings[0].as_path() != cwd {
         cwd_spellings.push(cwd.to_path_buf());
@@ -753,7 +754,10 @@ mod tests {
             },
             |_, _| panic!("claude scanner called"),
             |received, _| {
-                assert_eq!(received, xai_grok_paths::normalize::normalized_absolute(&cwd).unwrap());
+                assert_eq!(
+                    received,
+                    xai_grok_paths::normalize::normalized_absolute(&cwd).unwrap()
+                );
                 assert!(!received.to_string_lossy().starts_with(r"\\?\"));
                 Vec::new()
             },

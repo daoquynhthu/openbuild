@@ -365,7 +365,10 @@ mod tests {
         );
         assert!(Path::new(&got).is_absolute(), "got {got}");
         assert!(got.ends_with("file.txt"), "got {got}");
-        assert!(!got.starts_with(&cwd.to_string_lossy().replace('\\', "/")), "got {got}");
+        assert!(
+            !got.starts_with(&cwd.to_string_lossy().replace('\\', "/")),
+            "got {got}"
+        );
     }
 
     #[test]

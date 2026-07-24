@@ -18,7 +18,8 @@ async fn read_tool_header_selection_copies_path_only_pty() {
     // File lives under the isolated HOME so the agent sandbox can read it.
     let target = content.home().join(READ_HDR_FILE);
     std::fs::write(&target, "hello from read header selection test\n").expect("write target file");
-    let abs_path = xai_grok_paths::normalize::normalized_absolute(&target).unwrap_or(target.clone());
+    let abs_path =
+        xai_grok_paths::normalize::normalized_absolute(&target).unwrap_or(target.clone());
     let path_display = abs_path.to_string_lossy().into_owned();
     // Filename alone is what the fish-shortened header may show; always present.
     let path_tail = READ_HDR_FILE;

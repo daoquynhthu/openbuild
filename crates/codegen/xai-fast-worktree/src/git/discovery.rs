@@ -121,7 +121,10 @@ mod tests {
         std::fs::write(worktree.join(".git"), "gitdir: ../repo/.git/worktrees/wt\n").unwrap();
 
         let resolved = find_worktree_git_dir(&worktree).unwrap();
-        assert_eq!(resolved, xai_grok_paths::normalize::normalized_absolute(&real_git).unwrap());
+        assert_eq!(
+            resolved,
+            xai_grok_paths::normalize::normalized_absolute(&real_git).unwrap()
+        );
     }
 
     #[test]

@@ -161,7 +161,8 @@ pub fn collect_skill_config_dirs(
         if !dir.is_dir() {
             return;
         }
-        let canonical = xai_grok_paths::normalize::normalized_absolute(&dir).unwrap_or_else(|_| dir.clone());
+        let canonical =
+            xai_grok_paths::normalize::normalized_absolute(&dir).unwrap_or_else(|_| dir.clone());
         if seen.insert(canonical) {
             dirs.push(dir);
         }
@@ -272,7 +273,8 @@ fn collect_discovered_paths(
     out: &mut Vec<(PathBuf, SkillScope)>,
 ) {
     for path in paths {
-        let canonical = xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or_else(|_| path.clone());
+        let canonical =
+            xai_grok_paths::normalize::normalized_absolute(&path).unwrap_or_else(|_| path.clone());
         if seen.insert(canonical) {
             out.push((path, scope));
         }
@@ -428,8 +430,8 @@ fn dedupe_skills(skills: Vec<SkillInfo>) -> Vec<SkillInfo> {
 
     let mut deduped: Vec<SkillInfo> = Vec::with_capacity(skills.len());
     for mut skill in skills {
-        let canonical_path =
-            xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path)).unwrap_or_else(|_| PathBuf::from(&skill.path));
+        let canonical_path = xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path))
+            .unwrap_or_else(|_| PathBuf::from(&skill.path));
 
         if let Some(&kept_idx) = seen_paths.get(&canonical_path) {
             // A file reached via both auto-discovery and `[skills].paths` is
@@ -473,8 +475,10 @@ fn dedupe_skills(skills: Vec<SkillInfo>) -> Vec<SkillInfo> {
                         // evicts it (a stale copy must not shadow the skill
                         // genuinely named after its own directory).
                         let evicted = &deduped[winner_idx];
-                        let evicted_path = xai_grok_paths::normalize::normalized_absolute(Path::new(&evicted.path))
-                            .unwrap_or_else(|_| PathBuf::from(&evicted.path));
+                        let evicted_path = xai_grok_paths::normalize::normalized_absolute(
+                            Path::new(&evicted.path),
+                        )
+                        .unwrap_or_else(|_| PathBuf::from(&evicted.path));
                         seen_paths.remove(&evicted_path);
                         seen_paths.insert(canonical_path, winner_idx);
                         deduped[winner_idx] = skill;
@@ -637,8 +641,8 @@ pub fn filter_skills(skills: Vec<SkillInfo>, ignore_paths: &[String]) -> Vec<Ski
     skills
         .into_iter()
         .filter(|skill| {
-            let canonical =
-                xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path)).unwrap_or_else(|_| PathBuf::from(&skill.path));
+            let canonical = xai_grok_paths::normalize::normalized_absolute(Path::new(&skill.path))
+                .unwrap_or_else(|_| PathBuf::from(&skill.path));
             // >MAX_PATH caveat (see workspace clippy.toml) — fail-open here: over-long ignored skills stay included.
             !expanded.iter().any(|ignore| canonical.starts_with(ignore))
         })

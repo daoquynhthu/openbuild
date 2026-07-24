@@ -80,9 +80,11 @@ impl TrustStore {
     /// If the path is already trusted, this is a no-op and returns `Ok(())`.
     pub fn grant_trust(&mut self, plugin_root: &Path) -> Result<(), TrustError> {
         let canonical =
-            xai_grok_paths::normalize::normalized_absolute(plugin_root).map_err(|e| TrustError::CanonicalizeFailed {
-                path: plugin_root.to_path_buf(),
-                source: std::io::Error::other(e.to_string()),
+            xai_grok_paths::normalize::normalized_absolute(plugin_root).map_err(|e| {
+                TrustError::CanonicalizeFailed {
+                    path: plugin_root.to_path_buf(),
+                    source: std::io::Error::other(e.to_string()),
+                }
             })?;
 
         if self.trusted.contains(&canonical) {
@@ -123,9 +125,11 @@ impl TrustStore {
     /// If the path is not currently trusted, this is a no-op.
     pub fn revoke_trust(&mut self, plugin_root: &Path) -> Result<(), TrustError> {
         let canonical =
-            xai_grok_paths::normalize::normalized_absolute(plugin_root).map_err(|e| TrustError::CanonicalizeFailed {
-                path: plugin_root.to_path_buf(),
-                source: std::io::Error::other(e.to_string()),
+            xai_grok_paths::normalize::normalized_absolute(plugin_root).map_err(|e| {
+                TrustError::CanonicalizeFailed {
+                    path: plugin_root.to_path_buf(),
+                    source: std::io::Error::other(e.to_string()),
+                }
             })?;
 
         if !self.trusted.remove(&canonical) {

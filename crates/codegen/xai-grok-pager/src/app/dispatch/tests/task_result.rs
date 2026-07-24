@@ -2268,7 +2268,10 @@ fn provider_config_saved_success_no_follow_up_effects() {
         },
         &mut app,
     );
-    assert!(effects.is_empty(), "save success must not emit follow-up effects");
+    assert!(
+        effects.is_empty(),
+        "save success must not emit follow-up effects"
+    );
 }
 
 #[test]
@@ -2281,5 +2284,8 @@ fn provider_config_saved_failure_no_follow_up_effects() {
         },
         &mut app,
     );
-    assert!(effects.is_empty(), "save failure must not emit follow-up effects");
+    assert!(
+        effects.is_empty(),
+        "save failure must not emit follow-up effects"
+    );
 }

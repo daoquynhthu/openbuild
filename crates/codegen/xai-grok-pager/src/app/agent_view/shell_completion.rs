@@ -131,11 +131,11 @@ impl AgentView {
 #[cfg(test)]
 mod shell_suggestion_key_tests {
     use super::*;
-    use std::path::PathBuf;
     use crate::app::actions::{Action, Effect};
     use crate::app::app_view::InputOutcome;
     use crate::views::suggestion_controller::{CompletionItemParsed, SuggestionSource};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use std::path::PathBuf;
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
@@ -987,11 +987,13 @@ mod shell_suggestion_key_tests {
         agent.prompt.suggestions.dropdown.open = true;
         let completed = format!("cd {}", dir.display());
         let range = 3..input.len();
-        agent.prompt.suggestions.dropdown.items = vec![
-            file_item(&completed, &dir.to_string_lossy(), range),
-        ];
+        agent.prompt.suggestions.dropdown.items =
+            vec![file_item(&completed, &dir.to_string_lossy(), range)];
         let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
-        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept path completion");
+        assert!(
+            matches!(outcome, InputOutcome::Changed),
+            "Enter must accept path completion"
+        );
         assert_eq!(agent.prompt.text(), &completed);
     }
 
@@ -1004,11 +1006,13 @@ mod shell_suggestion_key_tests {
         agent.prompt.suggestions.dropdown.open = true;
         let completed = format!("dir {}", share.display());
         let range = 4..input.len();
-        agent.prompt.suggestions.dropdown.items = vec![
-            file_item(&completed, &share.to_string_lossy(), range),
-        ];
+        agent.prompt.suggestions.dropdown.items =
+            vec![file_item(&completed, &share.to_string_lossy(), range)];
         let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
-        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept share path");
+        assert!(
+            matches!(outcome, InputOutcome::Changed),
+            "Enter must accept share path"
+        );
         assert_eq!(agent.prompt.text(), &completed);
     }
 
@@ -1021,11 +1025,13 @@ mod shell_suggestion_key_tests {
         agent.prompt.suggestions.dropdown.open = true;
         let completed = format!("cd {}", dir.display());
         let range = 3..input.len();
-        agent.prompt.suggestions.dropdown.items = vec![
-            file_item(&completed, &dir.to_string_lossy(), range),
-        ];
+        agent.prompt.suggestions.dropdown.items =
+            vec![file_item(&completed, &dir.to_string_lossy(), range)];
         let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
-        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept spaced path");
+        assert!(
+            matches!(outcome, InputOutcome::Changed),
+            "Enter must accept spaced path"
+        );
     }
 
     // --- cmd.exe completion adapter tests (P12-010) ---
@@ -1038,22 +1044,29 @@ mod shell_suggestion_key_tests {
         let mut agent = pwsh_agent(&input);
         agent.prompt.suggestions.dropdown.open = true;
         let completed = format!("dir {}", dir.display());
-        agent.prompt.suggestions.dropdown.items = vec![
-            file_item(&completed, &completed, 4..input.len()),
-        ];
+        agent.prompt.suggestions.dropdown.items =
+            vec![file_item(&completed, &completed, 4..input.len())];
         let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
-        assert!(matches!(outcome, InputOutcome::Changed), "Enter must accept cmd spaced path");
+        assert!(
+            matches!(outcome, InputOutcome::Changed),
+            "Enter must accept cmd spaced path"
+        );
     }
 
     #[test]
     fn cmd_sequential_operator_preserved() {
         let mut agent = pwsh_agent("dir && echo");
         agent.prompt.suggestions.dropdown.open = true;
-        agent.prompt.suggestions.dropdown.items = vec![
-            token_item("dir && echo done", "done", 8..12),
-        ];
+        agent.prompt.suggestions.dropdown.items =
+            vec![token_item("dir && echo done", "done", 8..12)];
         let outcome = agent.handle_prompt_key_for_test(&key(KeyCode::Enter));
-        assert!(matches!(outcome, InputOutcome::Changed), "Enter must preserve sequential operator");
-        assert!(agent.prompt.text().contains("&&"), "sequential && must be preserved");
+        assert!(
+            matches!(outcome, InputOutcome::Changed),
+            "Enter must preserve sequential operator"
+        );
+        assert!(
+            agent.prompt.text().contains("&&"),
+            "sequential && must be preserved"
+        );
     }
 }

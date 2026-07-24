@@ -613,15 +613,16 @@ impl GitignoreFilter {
     /// For non-existent files (new file creation), canonicalizes the parent
     /// directory to handle symlinks (e.g., macOS `/var` → `/private/var`).
     pub fn is_ignored(&self, path: &std::path::Path) -> bool {
-        let normalized = xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| {
-            path.parent()
-                .and_then(|parent| {
-                    xai_grok_paths::normalize::normalized_absolute(parent)
-                        .ok()
-                        .map(|p| p.join(path.file_name().unwrap_or_default()))
-                })
-                .unwrap_or_else(|| path.to_path_buf())
-        });
+        let normalized =
+            xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| {
+                path.parent()
+                    .and_then(|parent| {
+                        xai_grok_paths::normalize::normalized_absolute(parent)
+                            .ok()
+                            .map(|p| p.join(path.file_name().unwrap_or_default()))
+                    })
+                    .unwrap_or_else(|| path.to_path_buf())
+            });
         crate::gitignore::is_ignored(&self.gitignore, &normalized, Some(&self.git_root))
     }
 }

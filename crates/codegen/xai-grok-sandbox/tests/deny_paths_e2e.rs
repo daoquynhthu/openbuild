@@ -171,7 +171,8 @@ fn subprocess_entry() {
         Err(_) => return,
     };
     let workspace = std::env::var(WORKSPACE_ENV).expect(WORKSPACE_ENV);
-    let workspace = xai_grok_paths::normalize::normalized_absolute(&workspace).expect("canonicalize workspace");
+    let workspace =
+        xai_grok_paths::normalize::normalized_absolute(&workspace).expect("canonicalize workspace");
     let workspace = workspace.as_path();
     let targets = list_from_env(TARGETS_ENV);
     let controls = list_from_env(CONTROLS_ENV);
@@ -331,7 +332,8 @@ fn run_deny_case(
             .as_nanos()
     ));
     fs::create_dir_all(&tmp).expect("create temp workspace");
-    let tmp = xai_grok_paths::normalize::normalized_absolute(&tmp).expect("canonicalize temp workspace");
+    let tmp =
+        xai_grok_paths::normalize::normalized_absolute(&tmp).expect("canonicalize temp workspace");
     let _cleanup = TempDirGuard(tmp.clone());
 
     // Define the custom profile whose `deny` list holds the entries under test.

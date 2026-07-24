@@ -273,7 +273,10 @@ pub(crate) enum ResolvedAgent {
 pub(crate) fn resolve_agent_arg(agent: &str) -> ResolvedAgent {
     let path = std::path::Path::new(agent);
     if path.exists() && path.is_file() {
-        ResolvedAgent::FilePath(xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.to_path_buf()))
+        ResolvedAgent::FilePath(
+            xai_grok_paths::normalize::normalized_absolute(path)
+                .unwrap_or_else(|_| path.to_path_buf()),
+        )
     } else {
         ResolvedAgent::Name(agent.to_string())
     }

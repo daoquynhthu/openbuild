@@ -1040,7 +1040,8 @@ mod factory_tests {
 
         // Step 2: Start watcher AFTER indexing so the Remove event for the
         // upcoming deletion is the first event the watcher ever sees.
-        let watch_dir = xai_grok_paths::normalize::normalized_absolute(&global).unwrap_or(global.clone());
+        let watch_dir =
+            xai_grok_paths::normalize::normalized_absolute(&global).unwrap_or(global.clone());
         let watcher = match crate::watcher::MemoryFileWatcher::start(&watch_dir) {
             Some(w) => w,
             None => {

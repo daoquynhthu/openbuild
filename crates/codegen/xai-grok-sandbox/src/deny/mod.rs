@@ -132,7 +132,8 @@ pub(crate) fn apply_deny_paths_to_capability_set(
         // colliding with a denied path can be removed for all alias forms too.
         let mut rule_paths: Vec<PathBuf> = Vec::new();
         for path in deny_paths {
-            let canonical = xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.clone());
+            let canonical = xai_grok_paths::normalize::normalized_absolute(path)
+                .unwrap_or_else(|_| path.clone());
             // Dir-ness (subpath vs literal) is decided by existence and applies
             // to all alias forms of this path.
             let use_subpath = deny_path_is_dir(&canonical);

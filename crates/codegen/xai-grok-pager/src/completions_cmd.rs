@@ -18,9 +18,7 @@ pub fn run(shell: &str) {
     let shell: Shell = match shell.parse() {
         Ok(s) => s,
         Err(_) => {
-            eprintln!(
-                "Unknown shell: '{shell}'. Supported: bash, zsh, fish, powershell, elvish"
-            );
+            eprintln!("Unknown shell: '{shell}'. Supported: bash, zsh, fish, powershell, elvish");
             return;
         }
     };

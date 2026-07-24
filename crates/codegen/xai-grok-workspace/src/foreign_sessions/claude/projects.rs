@@ -8,7 +8,10 @@ pub(super) fn scoped_project_dirs(config_dir: &Path, cwd: &Path) -> Vec<PathBuf>
     let mut paths = vec![cwd.to_path_buf()];
     if let Ok(repository) = git2::Repository::discover(cwd) {
         if let Some(workdir) = repository.workdir() {
-            paths.push(xai_grok_paths::normalize::normalized_absolute(workdir).unwrap_or_else(|_| workdir.to_path_buf()));
+            paths.push(
+                xai_grok_paths::normalize::normalized_absolute(workdir)
+                    .unwrap_or_else(|_| workdir.to_path_buf()),
+            );
             if repository.path() != repository.commondir()
                 && let Some(main_workdir) = repository.commondir().parent()
             {
@@ -22,7 +25,10 @@ pub(super) fn scoped_project_dirs(config_dir: &Path, cwd: &Path) -> Vec<PathBuf>
             for name in worktrees.iter().flatten().take(MAX_PROJECT_DIRS) {
                 if let Ok(worktree) = repository.find_worktree(name) {
                     let path = worktree.path();
-                    paths.push(xai_grok_paths::normalize::normalized_absolute(path).unwrap_or_else(|_| path.to_path_buf()));
+                    paths.push(
+                        xai_grok_paths::normalize::normalized_absolute(path)
+                            .unwrap_or_else(|_| path.to_path_buf()),
+                    );
                 }
             }
         }

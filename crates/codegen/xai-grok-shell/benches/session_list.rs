@@ -321,11 +321,12 @@ fn create_same_repo_cwds(home: &Path) -> SameRepoTopology {
         .commit(Some("HEAD"), &signature, &signature, "fixture", &tree, &[])
         .expect("create initial git commit");
 
-    let main = xai_grok_paths::normalize::normalized_absolute(&repo_dir).expect("canonicalize main checkout");
+    let main = xai_grok_paths::normalize::normalized_absolute(&repo_dir)
+        .expect("canonicalize main checkout");
     let worktree_base = xai_grok_shell::session::worktree::worktree_base_dir(&main);
     fs::create_dir_all(&worktree_base).expect("create worktree base");
-    let canonical_worktree_base =
-        xai_grok_paths::normalize::normalized_absolute(&worktree_base).expect("canonicalize worktree base");
+    let canonical_worktree_base = xai_grok_paths::normalize::normalized_absolute(&worktree_base)
+        .expect("canonicalize worktree base");
     let mut linked = Vec::with_capacity(LINKED_WORKTREE_COUNT);
     for index in 1..=LINKED_WORKTREE_COUNT {
         let name = format!("session-list-{index:02}");
