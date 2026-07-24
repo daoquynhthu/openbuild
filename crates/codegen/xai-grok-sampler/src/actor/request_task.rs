@@ -85,6 +85,7 @@ enum AttemptOutcome {
 ///
 /// Returns the request id so the actor can clean it up from
 /// `active_requests` via [`tokio::task::JoinSet::join_next`].
+#[allow(deprecated)]
 pub(crate) async fn run_request_task(
     request_id: RequestId,
     request: ConversationRequest,

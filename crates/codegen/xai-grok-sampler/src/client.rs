@@ -571,6 +571,7 @@ impl SamplingClient {
     /// `prepare_sampler_config` (in the `xai-grok-provider` crate) and pass it
     /// here. Direct `SamplerConfig` construction is only for legacy/crate-internal
     /// use.
+    #[allow(deprecated)]
     pub fn from_prepared(config: impl Into<SamplerConfig>) -> Result<Self> {
         Self::new(config.into())
     }
