@@ -30,7 +30,7 @@ impl MvpAgent {
                             tokio::task::spawn_local(async move {
                                 let this = agent_ref.get();
                                 let parent_sid = request.parent_session_id.clone();
-                                let mut ctx = this.build_subagent_spawn_context(&parent_sid);
+                                let mut ctx = this.build_subagent_spawn_context(&parent_sid).await;
                                 let parent_handle = {
                                     let parent_sid_acp = acp::SessionId::new(parent_sid.clone());
                                     this.sessions.borrow().get(&parent_sid_acp).cloned()
@@ -212,6 +212,7 @@ impl MvpAgent {
                                 let this = agent_ref.get();
                                 let outcome = match this
                                     .try_build_subagent_spawn_context(&request.parent_session_id)
+                                    .await
                                 {
                                     Some(ctx) => crate::agent::subagent::describe_subagent_type(
                                         &request.subagent_type,
@@ -293,18 +294,19 @@ impl MvpAgent {
     /// so a missing parent is a real invariant violation and panics. Read-only
     /// callers that can race a parent teardown (e.g. `DescribeType`) must use
     /// [`Self::try_build_subagent_spawn_context`] instead.
-    pub(super) fn build_subagent_spawn_context(
+    pub(super) async fn build_subagent_spawn_context(
         &self,
         parent_session_id: &str,
     ) -> crate::agent::subagent::SubagentSpawnContext {
         self.try_build_subagent_spawn_context(parent_session_id)
+            .await
             .expect("parent session must exist when spawning subagents")
     }
     /// Fallible variant of [`Self::build_subagent_spawn_context`]: returns
     /// `None` when the parent `SessionHandle` is absent (evicted / torn down)
     /// instead of panicking, so read-only paths that can race a teardown can
     /// fail open.
-    pub(super) fn try_build_subagent_spawn_context(
+    pub(super) async fn try_build_subagent_spawn_context(
         &self,
         parent_session_id: &str,
     ) -> Option<crate::agent::subagent::SubagentSpawnContext> {
@@ -466,7 +468,7 @@ impl MvpAgent {
             terminal,
             session_env,
             memory_config: self.memory_config.clone(),
-            web_search_sampling_config: self.prepare_web_search_sampling_config(),
+            web_search_sampling_config: self.prepare_web_search_sampling_config().await,
             web_fetch_config: self.prepare_web_fetch_config(),
             image_gen_config: self.prepare_image_gen_config(),
             video_gen_config: self.prepare_video_gen_config(),

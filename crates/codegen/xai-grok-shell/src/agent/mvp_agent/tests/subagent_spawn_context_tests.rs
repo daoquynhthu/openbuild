@@ -45,7 +45,7 @@ async fn subagent_spawn_context_inherits_parent_permission_handle() {
             handle.permission_handle = permission_handle;
             agent.sessions.borrow_mut().insert(sid.clone(), handle);
 
-            let ctx = agent.build_subagent_spawn_context(sid.0.as_ref());
+            let ctx = agent.build_subagent_spawn_context(sid.0.as_ref()).await;
             let inherited = ctx
                 .permission_handle
                 .expect("subagent context must inherit parent permission handle");
@@ -89,7 +89,7 @@ async fn subagent_spawn_context_shares_parent_goal_loop_gate() {
     let parent_gate = handle.tool_context.goal_loop_active_gate.clone();
     agent.sessions.borrow_mut().insert(sid.clone(), handle);
 
-    let ctx = agent.build_subagent_spawn_context(sid.0.as_ref());
+    let ctx = agent.build_subagent_spawn_context(sid.0.as_ref()).await;
 
     // Flipping the parent gate must surface through the child flag (shared Arc).
     assert!(!ctx.goal_loop_active.load(Relaxed));
@@ -114,7 +114,7 @@ async fn subagent_spawn_context_inherits_parent_ask_user_question_gate() {
         .sessions
         .borrow_mut()
         .insert(sid_off.clone(), handle_off);
-    let ctx_off = agent.build_subagent_spawn_context(sid_off.0.as_ref());
+    let ctx_off = agent.build_subagent_spawn_context(sid_off.0.as_ref()).await;
     assert!(
         !ctx_off.ask_user_question_enabled,
         "subagent must inherit the parent's disabled ask_user_question gate (--no-ask-user)"
@@ -127,7 +127,7 @@ async fn subagent_spawn_context_inherits_parent_ask_user_question_gate() {
         .sessions
         .borrow_mut()
         .insert(sid_on.clone(), handle_on);
-    let ctx_on = agent.build_subagent_spawn_context(sid_on.0.as_ref());
+    let ctx_on = agent.build_subagent_spawn_context(sid_on.0.as_ref()).await;
     assert!(
         ctx_on.ask_user_question_enabled,
         "subagent must inherit the parent's enabled ask_user_question gate"

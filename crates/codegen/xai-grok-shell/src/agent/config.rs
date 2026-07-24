@@ -4953,7 +4953,7 @@ pub(crate) fn resolve_model_route(
     registry?.get_route(&route_id).map(|r| (*r).clone())
 }
 
-pub fn resolve_web_search_sampling_config(
+pub async fn resolve_web_search_sampling_config(
     model_id: &str,
     models: &IndexMap<String, ModelEntry>,
     session_key: Option<&str>,
@@ -4963,12 +4963,11 @@ pub fn resolve_web_search_sampling_config(
     endpoints: &EndpointsConfig,
     registry: Option<&xai_grok_provider::registry::RegistrySnapshot>,
 ) -> Option<SamplerConfig> {
-    let handle = tokio::runtime::Handle::current();
     let resolved = if let Some(entry) = find_model_by_id(models, model_id).cloned() {
         let has_provider_binding = entry.provider_id.is_some();
         let has_registry = registry.is_some_and(|snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
-        match handle.block_on(sampling_config_for_model_with_registry(
+        match sampling_config_for_model_with_registry(
             &entry,
             credentials,
             alpha_test_key,
@@ -4977,7 +4976,9 @@ pub fn resolve_web_search_sampling_config(
             None,
             None,
             registry,
-        )) {
+        )
+        .await
+        {
             Ok(cfg) => Some(cfg),
             Err(e) if has_provider_binding && has_registry => {
                 tracing::error!(
@@ -5447,17 +5448,19 @@ reasoning_effort = "low"
     #[test]
     fn hidden_default_web_search_resolution_is_explicit_and_responses_only() {
         let endpoints = EndpointsConfig::default();
-        let resolved = resolve_web_search_sampling_config(
-            crate::models::default_web_search_model(),
-            &IndexMap::new(),
-            Some("session-token"),
-            false,
-            None,
-            None,
-            &endpoints,
-            None,
-        )
-        .expect("hidden default web search model should resolve");
+        let resolved = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(resolve_web_search_sampling_config(
+                crate::models::default_web_search_model(),
+                &IndexMap::new(),
+                Some("session-token"),
+                false,
+                None,
+                None,
+                &endpoints,
+                None,
+            ))
+            .expect("hidden default web search model should resolve");
         assert_eq!(resolved.model, crate::models::default_web_search_model());
         assert_eq!(resolved.base_url, endpoints.proxy_url());
         assert_eq!(resolved.api_backend, ApiBackend::Responses);
@@ -5541,17 +5544,19 @@ reasoning_effort = "low"
                 None,
             ),
         );
-        let resolved = resolve_web_search_sampling_config(
-            "ws-model",
-            &models,
-            Some("session-token"),
-            true,
-            None,
-            None,
-            &endpoints,
-            None,
-        )
-        .expect("web search model should resolve");
+        let resolved = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(resolve_web_search_sampling_config(
+                "ws-model",
+                &models,
+                Some("session-token"),
+                true,
+                None,
+                None,
+                &endpoints,
+                None,
+            ))
+            .expect("web search model should resolve");
         assert_eq!(
             resolved.api_key.as_deref(),
             Some("session-token"),
@@ -11713,16 +11718,18 @@ default = "grok-4.5"
         models.insert("grok-search".into(), model);
 
         let endpoints = EndpointsConfig::default();
-        let result = resolve_web_search_sampling_config(
-            "grok-search",
-            &models,
-            Some("session-token"),
-            false,
-            None,
-            None,
-            &endpoints,
-            Some(&rt.snapshot()),
-        );
+        let result = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(resolve_web_search_sampling_config(
+                "grok-search",
+                &models,
+                Some("session-token"),
+                false,
+                None,
+                None,
+                &endpoints,
+                Some(&rt.snapshot()),
+            ));
         assert!(result.is_some());
         let config = result.unwrap();
         assert_eq!(
