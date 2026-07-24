@@ -1,7 +1,7 @@
 //! `/docs` -- open How-to Guides (in-TUI) or online Build docs.
 //!
 //! Bare `/docs` opens the same DocPicker as command-palette "How-to Guides".
-//! `/docs web` opens https://docs.x.ai/build/overview in the browser.
+//! `/docs web` opens `<https://docs.x.ai/build/overview>` in the browser.
 //! `/docs <title>` opens a single guide by title (case-insensitive).
 
 use crate::app::actions::Action;

@@ -4,14 +4,14 @@
 //!
 //! Usage:
 //!   cargo run --bin trace_classify -- \
-//!       --trace /path/to/trace-<id>-all-turns.json \
-//!       [--output out.jsonl] \
-//!       [--model grok-4.5] \
-//!       [--api-base-url https://api.x.ai/v1] \
-//!       [--api-key <key> | $XAI_API_KEY | <grok-home>/auth.json] \
-//!       [--min-confidence 0.7] \
-//!       [--include-reasoning true] \
-//!       [--grok-home <path>]
+//!       --trace /path/to/trace-`<id>`-all-turns.json \
+//!       [`--output out.jsonl`] \
+//!       [`--model grok-4.5`] \
+//!       [`--api-base-url https://api.x.ai/v1`] \
+//!       [`--api-key <key>` | `$XAI_API_KEY` | `<grok-home>/auth.json`] \
+//!       [`--min-confidence 0.7`] \
+//!       [`--include-reasoning true`] \
+//!       [`--grok-home <path>`]
 //!
 //! The binary name is `trace_classify` (underscore) — that's the file
 //! name in `src/bin/`, which cargo's auto-discovery uses verbatim.
@@ -52,7 +52,7 @@ struct Cli {
     api_base_url: String,
 
     /// API key. Overrides `$XAI_API_KEY` when set; falls back to
-    /// `$XAI_API_KEY`, then `<grok-home>/auth.json` (`xai::api_key`
+    /// `$XAI_API_KEY`, then `` `<grok-home>/auth.json` `` (`xai::api_key`
     /// scope) when absent or empty.
     #[arg(long)]
     api_key: Option<String>,

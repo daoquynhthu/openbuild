@@ -5,7 +5,7 @@
 //! - [`agent`] — AgentSession, AgentId, TurnState (business types)
 //! - [`agent_view`] — AgentView (per-agent view-model: input + draw)
 //! - [`app_view`] — AppView (root component: input routing + draw)
-//! - [`dispatch`] — Action → state mutation + Vec<Effect> (sync, testable)
+//! - [`dispatch`] — Action → state mutation + `Vec<Effect>` (sync, testable)
 //! - [`effects`] — Effect → async task spawning
 //! - [`acp_handler`] — ACP notification routing
 //! - [`event_loop`] — biased tokio::select! loop

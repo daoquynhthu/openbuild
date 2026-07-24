@@ -230,7 +230,7 @@ pub trait SlashCommand: Send + Sync {
     /// scroll / search / selection back to the terminal (K7). Commands that
     /// drive those deleted surfaces — `/find`, `/copy`, `/dashboard` — have
     /// nothing to act on, so the central dispatch gate refuses them with a
-    /// "/<x> is not available in minimal mode" message (committed as a system
+    /// "`/<x>` is not available in minimal mode" message (committed as a system
     /// block).
     ///
     /// Defaults to `true` — a **denylist, not an allowlist**: the many

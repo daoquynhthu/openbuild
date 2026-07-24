@@ -2,7 +2,7 @@
 //!
 //! The command parses optional flags (`--worktree`, `--no-worktree`) and
 //! an optional free-form directive, then returns
-//! [`Action::Fork`](crate::app::actions::Action::Fork) carrying a
+//! [`Action::Fork`] carrying a
 //! [`ForkArgs`] payload. The actual placeholder construction, modal
 //! routing, and effect emission live in `dispatch::dispatch_fork`.
 //!
@@ -16,7 +16,7 @@ use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
 /// Parsed arguments for the `/fork` slash command.
 ///
 /// Returned by [`parse_fork_args`] and carried in
-/// [`Action::Fork`](crate::app::actions::Action::Fork) for the
+/// [`Action::Fork`] for the
 /// dispatcher to consume.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ForkArgs {

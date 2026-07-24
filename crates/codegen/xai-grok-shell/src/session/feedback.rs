@@ -209,7 +209,7 @@ pub struct FeedbackHeuristics {
     tier3_prompt: String,
     tier3_max_triggers: u32,
 
-    /// Per-tier trigger counts (replaces the old HashSet<FeedbackTier> dedup).
+    /// Per-tier trigger counts (replaces the old `HashSet<FeedbackTier>` dedup).
     /// A tier can trigger up to its configured max_triggers times (0 = unlimited).
     trigger_counts: std::collections::HashMap<FeedbackTier, u32>,
 

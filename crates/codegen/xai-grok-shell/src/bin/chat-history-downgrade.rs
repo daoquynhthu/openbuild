@@ -2,7 +2,7 @@
 //! Used for data processing pipeline.
 //!
 //! Usage:
-//!   chat-history-downgrade <INPUT> <OUTPUT>
+//!   chat-history-downgrade `<INPUT>` `<OUTPUT>`
 //!
 //! ## Reasoning-shape compatibility
 //!
