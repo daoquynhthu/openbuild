@@ -1169,8 +1169,6 @@ mod platform {
 // ---------------------------------------------------------------------------
 #[cfg(not(target_os = "macos"))]
 mod platform {
-    use std::process::{Command, Stdio};
-
     use super::ImageData;
     /// No subprocess-free pasteboard probe exists off-macOS.
     pub(super) fn clipboard_image_snapshot() -> (Option<u64>, bool) {
@@ -1623,11 +1621,11 @@ mod platform {
 
     #[cfg(target_os = "linux")]
     fn tool_available(spec: &ToolSpec) -> bool {
-        let mut cmd = Command::new(spec.write_text[0]);
+        let mut cmd = std::process::Command::new(spec.write_text[0]);
         cmd.arg("--version")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
         xai_grok_tools::util::detach_std_command(&mut cmd);
         // Availability = the tool ran and exited in time (any exit status).
         let Ok(mut child) = cmd.spawn() else {
@@ -1744,11 +1742,11 @@ mod platform {
         // keeps its fd to the unlinked temp file.
         let stdin = super::spool_for_stdin(data)?;
 
-        let mut cmd = Command::new(bin);
+        let mut cmd = std::process::Command::new(bin);
         cmd.args(args)
-            .stdin(Stdio::from(stdin))
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stdin(std::process::Stdio::from(stdin))
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
         xai_grok_tools::util::detach_std_command(&mut cmd);
         let mut child = cmd
             .spawn()
@@ -1768,11 +1766,11 @@ mod platform {
         deadline: std::time::Duration,
     ) -> anyhow::Result<(std::process::ExitStatus, Vec<u8>)> {
         let (bin, args) = argv.split_first().expect("argv non-empty");
-        let mut cmd = Command::new(bin);
+        let mut cmd = std::process::Command::new(bin);
         cmd.args(args)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null());
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null());
         xai_grok_tools::util::detach_std_command(&mut cmd);
         let mut child = cmd
             .spawn()
