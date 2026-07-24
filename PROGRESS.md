@@ -687,3 +687,39 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - Total RED assertions: 16
 - `cargo check --workspace`: ✅
 - `cargo clippy --workspace -- -D warnings`: ✅
+
+## Phase 2: GREEN — Make Production Chain Async — 2026-07-24
+
+### ASYNC-01: AgentConfigError + async prepare_sampling_config_for_model
+
+#### Changes made
+- Created `crates/codegen/xai-grok-shell/src/agent/agent_config_error.rs` with `AgentConfigError` enum (wraps `ProviderError`, `RequestPreparationError`, `CredentialError`, `ProviderResolutionError`)
+- Added `pub mod agent_config_error` to `agent/mod.rs`
+- Changed `prepare_sampling_config_for_model` from `sync fn` returning `SamplerConfig` to `async fn` returning `Result<SamplerConfig, AgentConfigError>`
+- Removed `Handle::current().block_on()` from inside `prepare_sampling_config_for_model` (direct `.await` on `sampling_config_for_model_with_registry`)
+- Fixed `RefCell` held across await lint by scoping `self.cfg.borrow()` in a block
+
+#### Caller migration
+| Caller | Location | Change |
+|--------|----------|--------|
+| `model_switch.rs::apply` | line 116 | Added `.await.unwrap_or_else(fallback)` |
+| `acp_agent.rs::new_session` custom model branch | line 923 | Restructured to separate async from closure |
+| `acp_agent.rs::new_session` default model branch | line 963 | Replaced `unwrap_or_else` with `if let else` to allow `.await` |
+| `acp_agent.rs::load_session` | line 1299 | Added `.await` |
+| `agent_ops.rs::resolve_sampling_config_for_model` | line 1219 | Made async; changed error to fallback |
+| `agent_ops.rs::apply_agent_model_override` | line 1245 | Made async; changed error to fallback |
+| `agent_ops.rs::spawn_and_register_session` (x2) | lines 3168, 3278 | Added `.await` |
+
+#### Test seam migration
+| Seam | Location | Change |
+|------|----------|--------|
+| `acp_agent.rs::test_prepare_for_model` | line 3876 | Made async → returns `Result` |
+| `model_switch.rs::test_switch_model_prepare` | line 247 | Made async → returns `Result` |
+| `provider_async_session_entry.rs` (test) | line 72 | Added `.await` |
+| `provider_async_model_switch.rs` (test) | line 75 | Added `.await` |
+
+#### Key results
+- `cargo check -p xai-grok-shell --lib`: clean ✅
+- `cargo check -p xai-grok-shell --tests`: clean ✅ (zero warnings)
+- `cargo clippy -p xai-grok-shell --lib`: clean ✅
+- No `Handle::current().block_on()` remains in `prepare_sampling_config_for_model` path ✅

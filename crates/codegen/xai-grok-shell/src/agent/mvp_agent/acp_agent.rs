@@ -917,11 +917,6 @@ impl acp::Agent for MvpAgent {
             {
                 Ok(model) if model.info.user_selectable => {
                     model_agent_type = Some(model.info().agent_type.clone());
-                    let origin_client = self
-                        .origin_client_info_from_meta(arguments.meta.as_ref());
-                    session_sampling_override = Some(
-                        self.prepare_sampling_config_for_model(&model, origin_client),
-                    );
                     Some(custom_model)
                 }
                 Ok(_) => {
@@ -941,6 +936,19 @@ impl acp::Agent for MvpAgent {
                     None
                 }
             });
+        if let Some(custom_model) = build_custom_model_id {
+            if let Ok(model) = self.resolve_model_id(&acp::ModelId::new(custom_model)) {
+                if model.info.user_selectable {
+                    let origin_client = self
+                        .origin_client_info_from_meta(arguments.meta.as_ref());
+                    session_sampling_override = Some(
+                        self.prepare_sampling_config_for_model(&model, origin_client)
+                            .await
+                            .unwrap_or_else(|_| self.sampling_config.borrow().clone()),
+                    );
+                }
+            }
+        }
         if model_agent_type.is_none() && custom_model_id.is_none()
             && let Ok(default_model) = self
                 .resolve_model_id(&self.models_manager.current_model_id())
@@ -955,14 +963,15 @@ impl acp::Agent for MvpAgent {
             );
         }
         let origin_client = self.origin_client_info_from_meta(arguments.meta.as_ref());
-        let mut session_sampling = session_sampling_override
-            .unwrap_or_else(|| {
-                self
-                    .resolve_sampling_config_for_model(
-                        &self.models_manager.current_model_id(),
-                        origin_client.clone(),
-                    )
-            });
+        let mut session_sampling = if let Some(override_sampling) = session_sampling_override {
+            override_sampling
+        } else {
+            self
+                .resolve_sampling_config_for_model(
+                    &self.models_manager.current_model_id(),
+                    origin_client.clone(),
+                ).await
+        };
         if let Some(effort) = self.models_manager.current_reasoning_effort()
             && self
                 .models_manager
@@ -1297,7 +1306,7 @@ impl acp::Agent for MvpAgent {
             .resolve_sampling_config_for_model(
                 &self.models_manager.current_model_id(),
                 origin_client.clone(),
-            );
+            ).await;
         let (summary_client, summary_model) = self
             .build_summary_client(&load_session_sampling)?;
         let relay_sync = if let Some(sync) = self
@@ -3871,12 +3880,12 @@ impl MvpAgent {
     /// R3-RED-01. This is the production sync path that internally
     /// calls `Handle::block_on`, causing a nested-runtime panic when
     /// invoked from within an active tokio context (spawned task).
-    pub fn test_prepare_for_model(
+    pub async fn test_prepare_for_model(
         &self,
         model: &crate::agent::config::ModelEntry,
         origin_client: Option<crate::http::OriginClientInfo>,
-    ) -> xai_grok_sampler::SamplerConfig {
-        self.prepare_sampling_config_for_model(model, origin_client)
+    ) -> Result<xai_grok_sampler::SamplerConfig, crate::agent::agent_config_error::AgentConfigError> {
+        self.prepare_sampling_config_for_model(model, origin_client).await
     }
 
 }

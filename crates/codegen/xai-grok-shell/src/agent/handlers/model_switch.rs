@@ -112,8 +112,10 @@ pub(crate) async fn apply(
             }
         }
     }
-    let mut model_sampling =
-        agent.prepare_sampling_config_for_model(&model, handle.origin_client.clone());
+    let mut model_sampling = agent
+        .prepare_sampling_config_for_model(&model, handle.origin_client.clone())
+        .await
+        .unwrap_or_else(|_| agent.sampling_config.borrow().clone());
     if let Some(eff) = effort_override {
         if agent
             .models_manager
@@ -242,12 +244,12 @@ pub(crate) async fn apply(
 /// `agent.prepare_sampling_config_for_model(&model, handle.origin_client.clone())`.
 /// Not gated on `#[cfg(test)]` so integration tests can call it.
 impl MvpAgent {
-    pub fn test_switch_model_prepare(
+    pub async fn test_switch_model_prepare(
         &self,
         model: &crate::agent::config::ModelEntry,
         origin_client: Option<crate::http::OriginClientInfo>,
-    ) -> xai_grok_sampler::SamplerConfig {
-        self.prepare_sampling_config_for_model(model, origin_client)
+    ) -> Result<xai_grok_sampler::SamplerConfig, crate::agent::agent_config_error::AgentConfigError> {
+        self.prepare_sampling_config_for_model(model, origin_client).await
     }
 }
 

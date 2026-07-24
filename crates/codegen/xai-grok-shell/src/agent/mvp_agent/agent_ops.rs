@@ -1087,11 +1087,11 @@ impl MvpAgent {
         );
         Ok(entry.clone())
     }
-    pub(crate) fn prepare_sampling_config_for_model(
+    pub(crate) async fn prepare_sampling_config_for_model(
         &self,
         model: &ModelEntry,
         origin_client: Option<crate::http::OriginClientInfo>,
-    ) -> SamplingConfig {
+    ) -> Result<xai_grok_sampler::SamplerConfig, crate::agent::agent_config_error::AgentConfigError> {
         let preferred = self.cfg.borrow().grok_com_config.preferred_method;
         let session = match preferred {
             Some(crate::auth::PreferredAuthMethod::ApiKey) => None,
@@ -1147,49 +1147,50 @@ impl MvpAgent {
                 ),
             );
         }
-        let cfg = self.cfg.borrow();
-        let alpha_test_key = cfg.endpoints.alpha_test_key.clone();
-        let client_version = cfg.client_version.clone();
-        let deployment_id = crate::managed_config::resolve_deployment_id(
-            cfg.endpoints.deployment_key.as_deref(),
-        );
-        let registry_snapshot = cfg
-            .provider_registry()
-            .map(|reg| reg.snapshot());
-        let has_provider_binding = model.provider_id.is_some();
-        let has_registry = registry_snapshot
-            .as_ref()
-            .is_some_and(|snap| snap.revision > 0);
-        drop(cfg);
+        let (alpha_test_key, client_version, deployment_id, registry_snapshot, has_provider_binding, has_registry) = {
+            let cfg = self.cfg.borrow();
+            let alpha_test_key = cfg.endpoints.alpha_test_key.clone();
+            let client_version = cfg.client_version.clone();
+            let deployment_id = crate::managed_config::resolve_deployment_id(
+                cfg.endpoints.deployment_key.as_deref(),
+            );
+            let registry_snapshot = cfg
+                .provider_registry()
+                .map(|reg| reg.snapshot());
+            let has_provider_binding = model.provider_id.is_some();
+            let has_registry = registry_snapshot
+                .as_ref()
+                .is_some_and(|snap| snap.revision > 0);
+            (alpha_test_key, client_version, deployment_id, registry_snapshot, has_provider_binding, has_registry)
+        };
         let user_id = self
             .auth_manager
             .current_or_expired()
             .filter(|a| a.is_xai_auth())
             .map(|a| a.user_id);
 
-        // P7-003: when model has provider binding AND registry revision>0,
-        // route compiler errors MUST propagate (no legacy fallback).
-        let handle = tokio::runtime::Handle::current();
-        let registry_result = handle.block_on(
-            crate::agent::config::sampling_config_for_model_with_registry(
-                model,
-                credentials,
-                alpha_test_key.clone(),
-                client_version.clone(),
-                deployment_id.clone(),
-                user_id.clone(),
-                None,
-                registry_snapshot.as_deref(),
-            ),
-        );
-        let mut config = registry_result.unwrap_or_else(|e| {
-            if has_provider_binding && has_registry {
+        let registry_result = crate::agent::config::sampling_config_for_model_with_registry(
+            model,
+            credentials,
+            alpha_test_key.clone(),
+            client_version.clone(),
+            deployment_id.clone(),
+            user_id.clone(),
+            None,
+            registry_snapshot.as_deref(),
+        )
+        .await;
+
+        let mut config = match registry_result {
+            Ok(c) => c,
+            Err(e) if has_provider_binding && has_registry => {
                 tracing::error!(
                     "route compiler hard error for provider-bound model `{}`: {e}",
                     model.info.model
                 );
+                return Err(e.into());
             }
-            crate::agent::config::sampling_config_for_model(
+            Err(_) => crate::agent::config::sampling_config_for_model(
                 model,
                 crate::agent::config::ResolvedCredentials {
                     api_key: None,
@@ -1202,22 +1203,24 @@ impl MvpAgent {
                 deployment_id,
                 user_id,
                 None,
-            )
-        });
+            ),
+        };
         config.origin_client = origin_client;
-        config
+        Ok(config)
     }
     /// Resolve sampling config for a model by ID, falling back to the global
     /// default on resolution failure. This ensures API-key auth routes to
     /// the public API (via resolve_credentials) instead of the global config's
     /// cli-chat-proxy base_url.
-    pub(super) fn resolve_sampling_config_for_model(
+    pub(super) async fn resolve_sampling_config_for_model(
         &self,
         model_id: &acp::ModelId,
         origin_client: Option<crate::http::OriginClientInfo>,
     ) -> SamplingConfig {
         if let Ok(model) = self.resolve_model_id(model_id) {
             self.prepare_sampling_config_for_model(&model, origin_client.clone())
+                .await
+                .unwrap_or_else(|_| self.sampling_config.borrow().clone())
         } else {
             let mut c = self.sampling_config.borrow().clone();
             c.origin_client = origin_client;
@@ -1230,7 +1233,7 @@ impl MvpAgent {
     /// `pinned_model` is resolved once by the caller (shared with harness
     /// inheritance). `None` — no override, or model not in catalog — keeps the
     /// session defaults.
-    fn apply_agent_model_override(
+    async fn apply_agent_model_override(
         &self,
         pinned_model: Option<&(acp::ModelId, ModelEntry)>,
         default_model_id: acp::ModelId,
@@ -1240,7 +1243,10 @@ impl MvpAgent {
         let Some((id, model)) = pinned_model else {
             return (default_model_id, default_sampling);
         };
-        let new_config = self.prepare_sampling_config_for_model(model, origin_client);
+        let new_config = self
+            .prepare_sampling_config_for_model(model, origin_client)
+            .await
+            .unwrap_or_else(|_| self.sampling_config.borrow().clone());
         tracing::info!(
             model = % id.0, "agent profile model override applied to parent session"
         );
@@ -3161,7 +3167,7 @@ impl MvpAgent {
             && !self.auth_manager.current_or_expired().is_some_and(|a| a.is_zdr_team());
         let origin_client = self.origin_client_info_from_meta(init.meta.as_ref());
         let sampling_config = self
-            .resolve_sampling_config_for_model(&session_model_id, origin_client.clone());
+            .resolve_sampling_config_for_model(&session_model_id, origin_client.clone()).await;
         if self.auth_method_id.load().is_none() {
             return Err(acp::Error::auth_required().data("no auth method id provided"));
         }
@@ -3276,7 +3282,7 @@ impl MvpAgent {
                 session_model_id,
                 sampling_config,
                 origin_client.clone(),
-            );
+            ).await;
         let max_turns = {
             let cfg = self.cfg.borrow();
             cfg.cli_agent_overrides

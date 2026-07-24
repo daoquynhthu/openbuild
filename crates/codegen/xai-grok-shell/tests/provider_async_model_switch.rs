@@ -72,7 +72,7 @@ fn model_switch_nested_runtime_panic() {
     // model_switch::apply (line 116) calls prepare_sampling_config_for_model.
     // We exercise the same code path through the model_switch test seam.
     let join = local.spawn_local(async move {
-        agent.test_switch_model_prepare(&model, None);
+        let _ = agent.test_switch_model_prepare(&model, None).await;
     });
 
     let result = local.block_on(&rt, join);

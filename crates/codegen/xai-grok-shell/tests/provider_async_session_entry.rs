@@ -66,10 +66,9 @@ fn nested_runtime_panic_in_acp_session() {
     };
 
     // Spawn inside the LocalSet so we stay on one thread.
-    // The spawned task calls test_prepare_for_model which internally
-    // does Handle::block_on — on a single-thread runtime this panics.
+    // Phase 2: prepare_sampling_config_for_model is async — no block_on, no panic.
     let join = local.spawn_local(async move {
-        agent.test_prepare_for_model(&model, None);
+        let _ = agent.test_prepare_for_model(&model, None).await;
     });
 
     let result = local.block_on(&rt, join);
