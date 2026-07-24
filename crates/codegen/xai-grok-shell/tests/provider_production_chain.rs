@@ -16,7 +16,7 @@ use xai_grok_provider::auth::{
 };
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::headers::RequestHeaderOverrides;
-use xai_grok_provider::prepared::prepare_sampler_config;
+use xai_grok_provider::prepared::{prepare_sampler_config, RequestPreparationError};
 use xai_grok_provider::registry::RegistrySnapshot;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
 use xai_grok_shell::agent::provider_resolution::resolve_model_execution;
@@ -47,11 +47,12 @@ fn model_entry(provider_id: &str, model: &str) -> ModelEntry {
     entry
 }
 
-async fn resolve_prepare(
+async fn resolve_prepare_with_overrides(
     model: &ModelEntry,
     snapshot: &RegistrySnapshot,
     api_key: Option<&str>,
-) -> xai_grok_sampler::SamplerConfig {
+    request_headers: &RequestHeaderOverrides,
+) -> Result<xai_grok_sampler::SamplerConfig, RequestPreparationError> {
     let execution = resolve_model_execution(model, snapshot, None)
         .expect("resolve_model_execution must succeed");
     let model_inline = api_key.map(|k| SecretValue::new(k.to_string()));
@@ -72,11 +73,19 @@ async fn resolve_prepare(
         &env,
         &session,
     );
-    let headers = RequestHeaderOverrides::new();
-    let prepared = prepare_sampler_config(&execution, &creds, &headers)
+    let prepared = prepare_sampler_config(&execution, &creds, request_headers)
+        .await?;
+    Ok(xai_grok_sampler::SamplerConfig::from(prepared))
+}
+
+async fn resolve_prepare(
+    model: &ModelEntry,
+    snapshot: &RegistrySnapshot,
+    api_key: Option<&str>,
+) -> xai_grok_sampler::SamplerConfig {
+    resolve_prepare_with_overrides(model, snapshot, api_key, &RequestHeaderOverrides::new())
         .await
-        .expect("prepare_sampler_config must succeed");
-    xai_grok_sampler::SamplerConfig::from(prepared)
+        .expect("resolve_prepare must succeed")
 }
 
 async fn bootstrap_async(toml_str: &str) -> Arc<xai_grok_shell::agent::provider_runtime::ProviderRuntime> {
@@ -130,7 +139,7 @@ async fn obpa001_no_nested_runtime_panic_after_fix() {
 // A2.2: OBPA-003/005 — Provider inline key does not appear in request
 // ---------------------------------------------------------------------------
 #[tokio::test]
-async fn obpa003_provider_inline_key_flows_to_auth_header() {
+async fn obpa005_provider_inline_key_flows_to_auth_header() {
     let server = MockInferenceServer::start().await.unwrap();
     let mock_url = server.url();
 
@@ -313,4 +322,97 @@ async fn obpa008_cli_base_url_override_survives_reload() {
             panic!("CLI base_url override lost after reload (OBPA-008): resolve_model_execution failed because endpoint URL became invalid");
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Phase E gate: provider extra header appears in HTTP request
+// ---------------------------------------------------------------------------
+#[tokio::test]
+async fn provider_extra_header_flows_to_request() {
+    let server = MockInferenceServer::start().await.unwrap();
+    let mock_url = server.url();
+
+    let toml_str = format!(
+        r#"
+        [provider.custom-header]
+        implementation = "openai-compatible"
+        base_url = "{mock_url}"
+        api_key = "test-key"
+        extra_headers = {{ "X-Provider-Custom" = "provider-value" }}
+
+        [provider.custom-header.models.test-model]
+        context_window = 64000
+        "#,
+    );
+    let snapshot = bootstrap_async(&toml_str).await.snapshot();
+    let model = model_entry("custom-header", "test-model");
+    let config = resolve_prepare(&model, &snapshot, None).await;
+
+    let client = xai_grok_sampler::SamplingClient::new(config).unwrap();
+    let request = xai_grok_sampling_types::ConversationRequest::from_items(vec![
+        xai_grok_sampling_types::ConversationItem::user("hello"),
+    ]);
+    let (mut stream, _) = client.conversation_stream(request).await.unwrap();
+    while let Some(_) = stream.next().await {}
+
+    let requests = server.requests();
+    let has_custom_header = requests.iter().any(|r| {
+        r.headers
+            .iter()
+            .any(|(k, v)| k.eq_ignore_ascii_case("X-Provider-Custom") && v == "provider-value")
+    });
+    assert!(
+        has_custom_header,
+        "provider extra_headers must appear in HTTP request: {:?}",
+        requests.iter().flat_map(|r| &r.headers).collect::<Vec<_>>()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Phase E gate: request override header merge works
+// ---------------------------------------------------------------------------
+#[tokio::test]
+async fn request_override_header_appears_in_request() {
+    let server = MockInferenceServer::start().await.unwrap();
+    let mock_url = server.url();
+
+    let toml_str = format!(
+        r#"
+        [provider.custom-req]
+        implementation = "openai-compatible"
+        base_url = "{mock_url}"
+        api_key = "test-key"
+
+        [provider.custom-req.models.test-model]
+        context_window = 64000
+        "#,
+    );
+    let snapshot = bootstrap_async(&toml_str).await.snapshot();
+    let model = model_entry("custom-req", "test-model");
+
+    let req_overrides = RequestHeaderOverrides::from_slice(&[("X-Request-Override", "req-value")])
+        .expect("valid request overrides");
+
+    let config = resolve_prepare_with_overrides(&model, &snapshot, None, &req_overrides)
+        .await
+        .expect("resolve_prepare must succeed");
+
+    let client = xai_grok_sampler::SamplingClient::new(config).unwrap();
+    let request = xai_grok_sampling_types::ConversationRequest::from_items(vec![
+        xai_grok_sampling_types::ConversationItem::user("hello"),
+    ]);
+    let (mut stream, _) = client.conversation_stream(request).await.unwrap();
+    while let Some(_) = stream.next().await {}
+
+    let requests = server.requests();
+    let has_override = requests.iter().any(|r| {
+        r.headers
+            .iter()
+            .any(|(k, v)| k.eq_ignore_ascii_case("X-Request-Override") && v == "req-value")
+    });
+    assert!(
+        has_override,
+        "request override headers must appear in HTTP request: {:?}",
+        requests.iter().flat_map(|r| &r.headers).collect::<Vec<_>>()
+    );
 }
