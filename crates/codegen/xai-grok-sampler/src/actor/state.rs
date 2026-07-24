@@ -88,7 +88,9 @@ mod tests {
             temperature: None,
             top_p: None,
             api_backend: ApiBackend::ChatCompletions,
-            protocol_id: Some(xai_grok_sampling_types::ProtocolId("chat_completions".into())),
+            protocol_id: Some(xai_grok_sampling_types::ProtocolId(
+                "chat_completions".into(),
+            )),
             auth_scheme: Default::default(),
             extra_headers: IndexMap::new(),
             context_window: 8192,

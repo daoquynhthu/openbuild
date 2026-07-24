@@ -22,12 +22,22 @@ def scan_file(path: Path) -> list[dict]:
     text = path.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
 
-    # Pattern: #[cfg(...not(target_os = "windows")...)]
-    # or #[cfg_attr(...not(target_os = "windows")...)]
+    # Patterns for platform exclusions:
+    # 1. #[cfg(not(target_os = "windows"))] — explicit Windows exclusion
+    # 2. #[cfg(unix)] — positive unix cfg (equivalent on non-Windows)
+    # 3. #[cfg(all(test, unix))] — unix + test combo
+    # 4. #[cfg_attr(windows, ignore)] — test ignore on Windows
+    # 5. #[cfg(any(unix, ...))] — unix in any-clause
+    # 6. #[cfg(not(windows))] — short form (uncommon but possible)
     cfg_pattern = re.compile(
         r'#\[\s*cfg(?:\((?P<inner>[^)]+)\)|_attr\((?P<attr_inner>[^)]+)\))',
     )
-    not_windows = re.compile(r'not\(\s*target_os\s*=\s*"windows"\s*\)')
+    not_windows = re.compile(
+        r'not\(\s*target_os\s*=\s*"windows"\s*\)|'
+        r'(?<!\w)unix(?!\w)|'
+        r'not\(\s*windows\s*\)'
+    )
+    windows_ignore = re.compile(r'target_os\s*=\s*"windows".*ignore|ignore.*target_os\s*=\s*"windows"')
 
     # Track whether we're inside a test module to build symbol path
     current_mods = []
@@ -44,7 +54,8 @@ def scan_file(path: Path) -> list[dict]:
 
         for m in cfg_pattern.finditer(stripped):
             inner = m.group("inner") or m.group("attr_inner") or ""
-            if not_windows.search(inner):
+            is_attr = m.group("attr_inner") is not None
+            if not_windows.search(inner) or (is_attr and windows_ignore.search(inner)):
                 # Determine symbol context
                 # Look for the next fn/mod/struct definition
                 symbol = "unknown"

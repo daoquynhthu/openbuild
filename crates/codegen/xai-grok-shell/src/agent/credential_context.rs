@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use xai_grok_provider::auth::{CredentialCandidate, CredentialError, SecretValue};
 
-pub use xai_grok_provider::auth::{EnvironmentReader, RequestCredentialContext, SessionCredentialResolver};
+pub use xai_grok_provider::auth::{
+    EnvironmentReader, RequestCredentialContext, SessionCredentialResolver,
+};
 
 /// Deterministic environment reader for testing.
 #[derive(Default)]
@@ -43,8 +45,7 @@ pub(crate) struct NoopSessionResolver;
 impl SessionCredentialResolver for NoopSessionResolver {
     fn resolve(
         &self,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
-    {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>> {
         Box::pin(async { Ok(None) })
     }
 }
@@ -65,8 +66,7 @@ impl XaiSessionResolver {
 impl SessionCredentialResolver for XaiSessionResolver {
     fn resolve(
         &self,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
-    {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>> {
         let auth = self.manager.current_or_expired();
         Box::pin(async move {
             match auth {

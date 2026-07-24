@@ -103,14 +103,11 @@ impl AuthPolicy {
             required,
         }
     }
-
 }
 
 /// Resolve candidates using the legacy env/session-only path (no request context).
 /// Candidates that require request-time values (RequestOverride, Inline) are skipped.
-fn resolve_candidates_legacy(
-    candidates: &[CredentialCandidate],
-) -> Option<String> {
+fn resolve_candidates_legacy(candidates: &[CredentialCandidate]) -> Option<String> {
     for candidate in candidates {
         match candidate {
             CredentialCandidate::RequestOverride
@@ -193,9 +190,15 @@ impl<'a> RequestCredentialContext<'a> {
     /// request override > model inline > provider inline > model env > provider env >
     /// built-in env > session.
     pub async fn resolve_candidates(&self, candidates: &[CredentialCandidate]) -> Option<String> {
-        let has_req = candidates.iter().any(|c| matches!(c, CredentialCandidate::RequestOverride));
-        let has_model = candidates.iter().any(|c| matches!(c, CredentialCandidate::ModelInline));
-        let has_prov = candidates.iter().any(|c| matches!(c, CredentialCandidate::ProviderInline));
+        let has_req = candidates
+            .iter()
+            .any(|c| matches!(c, CredentialCandidate::RequestOverride));
+        let has_model = candidates
+            .iter()
+            .any(|c| matches!(c, CredentialCandidate::ModelInline));
+        let has_prov = candidates
+            .iter()
+            .any(|c| matches!(c, CredentialCandidate::ProviderInline));
         let model_env_keys: Vec<String> = candidates
             .iter()
             .filter_map(|c| match c {
@@ -220,7 +223,9 @@ impl<'a> RequestCredentialContext<'a> {
             })
             .flatten()
             .collect();
-        let has_sess = candidates.iter().any(|c| matches!(c, CredentialCandidate::Session(_)));
+        let has_sess = candidates
+            .iter()
+            .any(|c| matches!(c, CredentialCandidate::Session(_)));
 
         // 1. RequestOverride
         if let Some(v) = self.request_override.filter(|_| has_req) {
@@ -253,9 +258,7 @@ impl<'a> RequestCredentialContext<'a> {
             }
         }
         // 7. Session (always last)
-        if has_sess
-            && let Ok(Some(v)) = self.session.resolve().await
-        {
+        if has_sess && let Ok(Some(v)) = self.session.resolve().await {
             return Some(v.inner().to_string());
         }
         None
@@ -725,5 +728,4 @@ mod tests {
         assert_eq!(name, "Authorization");
         assert_eq!(value, "Bearer sk-override");
     }
-
 }

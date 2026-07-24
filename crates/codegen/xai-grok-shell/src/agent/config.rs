@@ -4525,18 +4525,16 @@ pub fn resolve_aux_model_sampling_config(
         let has_provider_binding = entry.provider_id.is_some();
         let has_registry = registry.is_some_and(|snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(entry, session_key, disable_api_key_auth);
-        match handle.block_on(
-            sampling_config_for_model_with_registry(
-                entry,
-                credentials,
-                alpha_test_key.clone(),
-                client_version.clone(),
-                None,
-                None,
-                None,
-                registry,
-            ),
-        ) {
+        match handle.block_on(sampling_config_for_model_with_registry(
+            entry,
+            credentials,
+            alpha_test_key.clone(),
+            client_version.clone(),
+            None,
+            None,
+            None,
+            registry,
+        )) {
             Ok(sampler) if sampler.api_key.is_some() => return Some(sampler),
             Ok(_) => {}
             Err(e) if has_provider_binding && has_registry => {
@@ -4595,7 +4593,13 @@ pub fn resolve_aux_model_sampling_config(
             // same registry snapshot, credential context, and route compiler
             // as the main model. Falls back to legacy only when xAI is not
             // a configured provider (e.g. pre-migration configs).
-            provider_id: if registry.and_then(|snap| snap.providers.get(&xai_grok_provider::types::ProviderId::new("xai"))).is_some() {
+            provider_id: if registry
+                .and_then(|snap| {
+                    snap.providers
+                        .get(&xai_grok_provider::types::ProviderId::new("xai"))
+                })
+                .is_some()
+            {
                 Some("xai".into())
             } else {
                 None
@@ -4603,7 +4607,15 @@ pub fn resolve_aux_model_sampling_config(
             route_id: None,
         };
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
-        let sampler = sampling_config_for_model(&entry, credentials, alpha_test_key, client_version, None, None, None);
+        let sampler = sampling_config_for_model(
+            &entry,
+            credentials,
+            alpha_test_key,
+            client_version,
+            None,
+            None,
+            None,
+        );
         return Some(sampler);
     }
     tracing::warn!(
@@ -4696,11 +4708,8 @@ pub async fn sampling_config_for_model_with_registry(
         })?;
         // E1: Route compiler produces the full request URL from the snapshot route.
         // No longer pass credentials.base_url as a post-compile override.
-        let execution = crate::agent::provider_resolution::resolve_model_execution(
-            model,
-            snapshot,
-            None,
-        )?;
+        let execution =
+            crate::agent::provider_resolution::resolve_model_execution(model, snapshot, None)?;
         let model_inline = credentials
             .api_key
             .as_deref()
@@ -4728,7 +4737,9 @@ pub async fn sampling_config_for_model_with_registry(
         )
         .await
         .map_err(|e| {
-            crate::agent::provider_resolution::ProviderResolutionError::AuthCredential(e.to_string())
+            crate::agent::provider_resolution::ProviderResolutionError::AuthCredential(
+                e.to_string(),
+            )
         })?;
         let config = xai_grok_sampler::SamplerConfig::from(prepared);
         return Ok(config);
@@ -4803,9 +4814,8 @@ pub fn sampling_config_for_model(
     result.max_completion_tokens = max_completion_tokens;
     result.temperature = temperature;
     result.top_p = top_p;
-    result.protocol_id = Some(
-        xai_grok_sampler::protocols::api_backend_to_protocol_id(&api_backend).into(),
-    );
+    result.protocol_id =
+        Some(xai_grok_sampler::protocols::api_backend_to_protocol_id(&api_backend).into());
     result.api_backend = api_backend;
     result.auth_scheme = auth_scheme;
     result.extra_headers = extra_headers;
@@ -4905,7 +4915,13 @@ fn resolve_hidden_default_web_search_sampling_config(
         api_key: None,
         env_key: None,
         api_base_url: None,
-        provider_id: if registry.and_then(|snap| snap.providers.get(&xai_grok_provider::types::ProviderId::new("xai"))).is_some() {
+        provider_id: if registry
+            .and_then(|snap| {
+                snap.providers
+                    .get(&xai_grok_provider::types::ProviderId::new("xai"))
+            })
+            .is_some()
+        {
             Some("xai".into())
         } else {
             None
@@ -4954,18 +4970,16 @@ pub fn resolve_web_search_sampling_config(
         let has_provider_binding = entry.provider_id.is_some();
         let has_registry = registry.is_some_and(|snap| snap.revision > 0);
         let credentials = resolve_credentials_enforced(&entry, session_key, disable_api_key_auth);
-        match handle.block_on(
-            sampling_config_for_model_with_registry(
-                &entry,
-                credentials,
-                alpha_test_key,
-                client_version,
-                None,
-                None,
-                None,
-                registry,
-            ),
-        ) {
+        match handle.block_on(sampling_config_for_model_with_registry(
+            &entry,
+            credentials,
+            alpha_test_key,
+            client_version,
+            None,
+            None,
+            None,
+            registry,
+        )) {
             Ok(cfg) => Some(cfg),
             Err(e) if has_provider_binding && has_registry => {
                 tracing::error!(
@@ -11501,9 +11515,7 @@ default = "grok-4.5"
             ),
         );
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        runtime
-            .block_on(rt.rebuild(&config_map))
-            .expect("rebuild");
+        runtime.block_on(rt.rebuild(&config_map)).expect("rebuild");
         let snapshot = rt.snapshot();
 
         let mut model = ModelEntry::fallback("grok-4.5", &EndpointsConfig::default());
@@ -11551,9 +11563,7 @@ default = "grok-4.5"
             ),
         );
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        runtime
-            .block_on(rt.rebuild(&config_map))
-            .expect("rebuild");
+        runtime.block_on(rt.rebuild(&config_map)).expect("rebuild");
         let snapshot = rt.snapshot();
 
         // Model with provider_id pointing to a non-existent provider
@@ -11600,9 +11610,7 @@ default = "grok-4.5"
             ),
         );
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        runtime
-            .block_on(rt.rebuild(&config_map))
-            .expect("rebuild");
+        runtime.block_on(rt.rebuild(&config_map)).expect("rebuild");
         let snapshot = rt.snapshot();
 
         // Model with explicit route_id pointing to non-existent route
@@ -11652,9 +11660,7 @@ default = "grok-4.5"
             ),
         );
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        runtime
-            .block_on(rt.rebuild(&config_map))
-            .expect("rebuild");
+        runtime.block_on(rt.rebuild(&config_map)).expect("rebuild");
         // The xAI provider has valid routes (responses protocol).
         // We can't inject an unknown protocol without modifying the route,
         // but we can test that the protocol validation works by using a

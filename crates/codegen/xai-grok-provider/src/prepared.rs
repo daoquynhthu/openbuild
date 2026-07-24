@@ -109,11 +109,11 @@ pub async fn prepare_sampler_config(
     // ResolvedModelExecution carries them separately.
     let provider_extra: indexmap::IndexMap<String, String> = indexmap::IndexMap::new();
     let merged = merge_headers(
-        &[], // Layer 1: transport-required
+        &[],                                                         // Layer 1: transport-required
         &execution.static_headers, // Layer 2: route static headers
         &provider_extra,           // Layer 3: provider extra headers (reserved)
         auth_header.as_ref().map(|(n, v)| (n.as_ref(), v.as_ref())), // Layer 4: auth
-        override_map, // Layer 5: request overrides
+        override_map,              // Layer 5: request overrides
     )
     .map_err(|e| RequestPreparationError::HeaderConflict(e.to_string()))?;
 
@@ -187,7 +187,10 @@ mod tests {
     use std::pin::Pin;
 
     use super::*;
-    use crate::auth::{CredentialCandidate, CredentialError, EnvironmentReader, SecretValue, SessionCredentialResolver, SessionKind};
+    use crate::auth::{
+        CredentialCandidate, CredentialError, EnvironmentReader, SecretValue,
+        SessionCredentialResolver, SessionKind,
+    };
     use url::Url;
 
     // ── Test helper types for EnvironmentReader / SessionCredentialResolver ──
@@ -311,7 +314,10 @@ mod tests {
     async fn missing_required_bearer_credential_fails_before_http_send() {
         let execution = dummy_execution(AuthPolicy::bearer(vec![], true));
         let result = prepare_sampler_config(&execution, &empty_credential(), &no_headers()).await;
-        assert!(result.is_err(), "required bearer with no candidates must error");
+        assert!(
+            result.is_err(),
+            "required bearer with no candidates must error"
+        );
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("required Bearer credential"),
@@ -325,9 +331,16 @@ mod tests {
 
     #[tokio::test]
     async fn missing_required_header_credential_fails_before_http_send() {
-        let execution = dummy_execution(AuthPolicy::header(http::HeaderName::from_static("x-api-key"), vec![], true));
+        let execution = dummy_execution(AuthPolicy::header(
+            http::HeaderName::from_static("x-api-key"),
+            vec![],
+            true,
+        ));
         let result = prepare_sampler_config(&execution, &empty_credential(), &no_headers()).await;
-        assert!(result.is_err(), "required header with no candidates must error");
+        assert!(
+            result.is_err(),
+            "required header with no candidates must error"
+        );
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("x-api-key"),
@@ -343,7 +356,10 @@ mod tests {
     async fn optional_bearer_without_candidates_succeeds() {
         let execution = dummy_execution(AuthPolicy::bearer(vec![], false));
         let result = prepare_sampler_config(&execution, &empty_credential(), &no_headers()).await;
-        assert!(result.is_ok(), "optional bearer with no candidates must succeed");
+        assert!(
+            result.is_ok(),
+            "optional bearer with no candidates must succeed"
+        );
         let config = result.unwrap();
         // No auth header should be present
         let auth_value = config.headers.inner().get("authorization");
@@ -352,9 +368,16 @@ mod tests {
 
     #[tokio::test]
     async fn optional_header_without_candidates_succeeds() {
-        let execution = dummy_execution(AuthPolicy::header(http::HeaderName::from_static("x-api-key"), vec![], false));
+        let execution = dummy_execution(AuthPolicy::header(
+            http::HeaderName::from_static("x-api-key"),
+            vec![],
+            false,
+        ));
         let result = prepare_sampler_config(&execution, &empty_credential(), &no_headers()).await;
-        assert!(result.is_ok(), "optional header with no candidates must succeed");
+        assert!(
+            result.is_ok(),
+            "optional header with no candidates must succeed"
+        );
     }
 
     // ── P8-010A: Bearer credential precedence and format ──
@@ -462,10 +485,9 @@ mod tests {
             vec![CredentialCandidate::RequestOverride],
             true,
         ));
-        execution.static_headers.insert(
-            "x-custom".to_string(),
-            "custom-value".to_string(),
-        );
+        execution
+            .static_headers
+            .insert("x-custom".to_string(), "custom-value".to_string());
 
         let val = SecretValue::new("sk-key".to_string());
         let ctx = RequestCredentialContext {
@@ -488,10 +510,9 @@ mod tests {
             vec![CredentialCandidate::RequestOverride],
             true,
         ));
-        execution.static_headers.insert(
-            "x-custom".to_string(),
-            "original".to_string(),
-        );
+        execution
+            .static_headers
+            .insert("x-custom".to_string(), "original".to_string());
 
         let val = SecretValue::new("sk-key".to_string());
         let ctx = RequestCredentialContext {
@@ -501,7 +522,12 @@ mod tests {
             environment: &TestEnv,
             session: &TestSession,
         };
-        let result = prepare_sampler_config(&execution, &ctx, &header_override(&[("x-custom", "override")])).await;
+        let result = prepare_sampler_config(
+            &execution,
+            &ctx,
+            &header_override(&[("x-custom", "override")]),
+        )
+        .await;
         let config = result.expect("must succeed");
         let custom = config.headers.inner().get("x-custom");
         assert_eq!(
@@ -519,10 +545,12 @@ mod tests {
             .expect("no-auth must succeed");
         assert_eq!(config.protocol_id, "chat_completions");
         assert_eq!(config.model_id.0, "test-model");
-        assert!(config
-            .request_url
-            .as_str()
-            .contains("127.0.0.1:1/v1/chat/completions"));
+        assert!(
+            config
+                .request_url
+                .as_str()
+                .contains("127.0.0.1:1/v1/chat/completions")
+        );
     }
 
     // ── P8-010B: Header auth (x-api-key / Anthropic-style) ──
@@ -629,19 +657,15 @@ mod tests {
         let result = prepare_sampler_config(&execution, &ctx, &no_headers()).await;
         let config = result.expect("AuthPolicy::None must always succeed");
         let has_auth = config.headers.inner().contains_key("authorization");
-        assert!(
-            !has_auth,
-            "no-auth must ignore credential candidates"
-        );
+        assert!(!has_auth, "no-auth must ignore credential candidates");
     }
 
     #[tokio::test]
     async fn no_auth_static_headers_are_still_preserved() {
         let mut execution = dummy_execution(AuthPolicy::None);
-        execution.static_headers.insert(
-            "x-custom".to_string(),
-            "custom-value".to_string(),
-        );
+        execution
+            .static_headers
+            .insert("x-custom".to_string(), "custom-value".to_string());
         let config = prepare_sampler_config(&execution, &empty_credential(), &no_headers())
             .await
             .expect("AuthPolicy::None must succeed");

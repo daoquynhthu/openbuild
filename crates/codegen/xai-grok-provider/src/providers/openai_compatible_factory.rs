@@ -378,15 +378,24 @@ mod tests {
         let route_a = configured_a.routes.values().next().unwrap();
         assert_eq!(&*route_a.protocol_id.0, "chat_completions");
         let endpoint_debug_a = format!("{:?}", route_a.endpoint);
-        assert!(endpoint_debug_a.contains("/chat/completions"), "provider-a endpoint: {endpoint_debug_a}");
+        assert!(
+            endpoint_debug_a.contains("/chat/completions"),
+            "provider-a endpoint: {endpoint_debug_a}"
+        );
 
         let route_b = configured_b.routes.values().next().unwrap();
         assert_eq!(&*route_b.protocol_id.0, "responses");
         let endpoint_debug_b = format!("{:?}", route_b.endpoint);
-        assert!(endpoint_debug_b.contains("/responses"), "provider-b endpoint: {endpoint_debug_b}");
+        assert!(
+            endpoint_debug_b.contains("/responses"),
+            "provider-b endpoint: {endpoint_debug_b}"
+        );
 
         // Endpoint URL isolation (different base URLs)
-        assert_ne!(endpoint_debug_a, endpoint_debug_b, "provider endpoints must differ");
+        assert_ne!(
+            endpoint_debug_a, endpoint_debug_b,
+            "provider endpoints must differ"
+        );
 
         // Extra header isolation
         assert!(
@@ -409,9 +418,21 @@ mod tests {
         // Auth env key isolation (auth policy must reference correct env keys)
         let auth_a = format!("{:?}", route_a.auth);
         let auth_b = format!("{:?}", route_b.auth);
-        assert!(auth_a.contains("CUSTOM_A_KEY"), "provider-a auth must reference CUSTOM_A_KEY");
-        assert!(!auth_a.contains("CUSTOM_B_KEY"), "provider-a must not reference CUSTOM_B_KEY");
-        assert!(auth_b.contains("CUSTOM_B_KEY"), "provider-b auth must reference CUSTOM_B_KEY");
-        assert!(!auth_b.contains("CUSTOM_A_KEY"), "provider-b must not reference CUSTOM_A_KEY");
+        assert!(
+            auth_a.contains("CUSTOM_A_KEY"),
+            "provider-a auth must reference CUSTOM_A_KEY"
+        );
+        assert!(
+            !auth_a.contains("CUSTOM_B_KEY"),
+            "provider-a must not reference CUSTOM_B_KEY"
+        );
+        assert!(
+            auth_b.contains("CUSTOM_B_KEY"),
+            "provider-b auth must reference CUSTOM_B_KEY"
+        );
+        assert!(
+            !auth_b.contains("CUSTOM_A_KEY"),
+            "provider-b must not reference CUSTOM_A_KEY"
+        );
     }
 }

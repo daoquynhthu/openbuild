@@ -16,7 +16,7 @@ use xai_grok_provider::auth::{
 };
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::headers::RequestHeaderOverrides;
-use xai_grok_provider::prepared::{prepare_sampler_config, RequestPreparationError};
+use xai_grok_provider::prepared::{RequestPreparationError, prepare_sampler_config};
 use xai_grok_provider::registry::RegistrySnapshot;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
 use xai_grok_shell::agent::provider_resolution::resolve_model_execution;
@@ -35,8 +35,9 @@ struct TestSession;
 impl SessionCredentialResolver for TestSession {
     fn resolve(
         &self,
-    ) -> Pin<Box<dyn std::future::Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
-    {
+    ) -> Pin<
+        Box<dyn std::future::Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>,
+    > {
         Box::pin(async { Ok(None) })
     }
 }
@@ -73,8 +74,7 @@ async fn resolve_prepare_with_overrides(
         &env,
         &session,
     );
-    let prepared = prepare_sampler_config(&execution, &creds, request_headers)
-        .await?;
+    let prepared = prepare_sampler_config(&execution, &creds, request_headers).await?;
     Ok(xai_grok_sampler::SamplerConfig::from(prepared))
 }
 
@@ -88,7 +88,9 @@ async fn resolve_prepare(
         .expect("resolve_prepare must succeed")
 }
 
-async fn bootstrap_async(toml_str: &str) -> Arc<xai_grok_shell::agent::provider_runtime::ProviderRuntime> {
+async fn bootstrap_async(
+    toml_str: &str,
+) -> Arc<xai_grok_shell::agent::provider_runtime::ProviderRuntime> {
     let toml: toml::Value = toml::from_str(toml_str).unwrap();
     xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
         .await
@@ -103,7 +105,8 @@ async fn bootstrap_async(toml_str: &str) -> Arc<xai_grok_shell::agent::provider_
 // tokio runtime context no longer panics from `Runtime::new().block_on()`.
 #[tokio::test]
 async fn obpa001_no_nested_runtime_panic_after_fix() {
-    let snapshot = bootstrap_async(r#"
+    let snapshot = bootstrap_async(
+        r#"
         [provider.test-provider]
         implementation = "openai-compatible"
         base_url = "http://127.0.0.1:0"
@@ -111,7 +114,8 @@ async fn obpa001_no_nested_runtime_panic_after_fix() {
 
         [provider.test-provider.models.test-model]
         context_window = 64000
-    "#)
+    "#,
+    )
     .await
     .snapshot();
 
@@ -222,8 +226,7 @@ async fn obpa007_custom_protocol_not_overridden_by_chat() {
         .expect("resolve_model_execution must succeed");
 
     assert_eq!(
-        &*execution.protocol_id.0,
-        "responses",
+        &*execution.protocol_id.0, "responses",
         "protocol=responses must produce responses protocol_id (OBPA-007)"
     );
 
@@ -242,7 +245,10 @@ async fn obpa007_custom_protocol_not_overridden_by_chat() {
     while let Some(_) = stream.next().await {}
 
     let requests = server.requests();
-    let responses_req: Vec<_> = requests.iter().filter(|r| r.path.contains("/responses")).collect();
+    let responses_req: Vec<_> = requests
+        .iter()
+        .filter(|r| r.path.contains("/responses"))
+        .collect();
     assert!(
         !responses_req.is_empty(),
         "protocol=responses must produce /responses endpoint (OBPA-007), got: {:?}",
@@ -274,7 +280,9 @@ async fn obpa008_cli_base_url_override_survives_reload() {
     // Bootstrap with CLI override
     let toml: toml::Value = toml::from_str(toml_str).unwrap();
     let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-        &toml, None, Some(cli_override),
+        &toml,
+        None,
+        Some(cli_override),
     )
     .await
     .expect("bootstrap must succeed");
@@ -304,11 +312,13 @@ async fn obpa008_cli_base_url_override_survives_reload() {
 
     let ctx = std::sync::Arc::new(
         xai_grok_shell::agent::provider_config_coordinator::ProviderResolutionContext {
-            legacy_migration: runtime.startup_legacy_migration
+            legacy_migration: runtime
+                .startup_legacy_migration
                 .try_read()
                 .ok()
                 .and_then(|v| v.clone()),
-            cli_overrides: runtime.startup_cli_overrides
+            cli_overrides: runtime
+                .startup_cli_overrides
                 .try_read()
                 .ok()
                 .and_then(|v| v.clone()),

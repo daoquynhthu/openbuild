@@ -24,9 +24,7 @@ pub fn resolve_protocol_id(id: &str) -> Result<&'static str, SamplingError> {
 
 /// Resolve a protocol ID from an `Option`.
 /// Returns error when `None` or when `Some(unknown)`.
-pub fn resolve_protocol_id_optional(
-    id: Option<&str>,
-) -> Result<&'static str, SamplingError> {
+pub fn resolve_protocol_id_optional(id: Option<&str>) -> Result<&'static str, SamplingError> {
     match id {
         Some(id_str) => resolve_protocol_id(id_str),
         None => Err(SamplingError::InvalidConfiguration(

@@ -67,9 +67,10 @@ pub async fn execution_to_sampler_config(
         &session,
     );
     let headers = xai_grok_provider::headers::RequestHeaderOverrides::new();
-    let prepared = xai_grok_provider::prepared::prepare_sampler_config(&execution, &creds, &headers)
-        .await
-        .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
+    let prepared =
+        xai_grok_provider::prepared::prepare_sampler_config(&execution, &creds, &headers)
+            .await
+            .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
     Ok(xai_grok_sampler::SamplerConfig::from(prepared))
 }
 
@@ -400,7 +401,6 @@ mod tests {
     use crate::agent::config::EndpointsConfig;
     use indexmap::IndexMap;
 
-
     fn provider_registry_with_defaults() -> xai_grok_provider::registry::ProviderRegistry {
         let reg = xai_grok_provider::registry::ProviderRegistry::new();
         xai_grok_provider::providers::register_all(&reg);
@@ -445,7 +445,10 @@ mod tests {
         let snap = reg.snapshot();
         let entry = model_entry("some-model", "test-p");
         let result = execution_to_sampler_config(&entry, &snap, Some("key"), None).await;
-        assert!(result.is_err(), "route compiler must error for missing provider");
+        assert!(
+            result.is_err(),
+            "route compiler must error for missing provider"
+        );
     }
 
     #[test]
@@ -678,12 +681,7 @@ mod tests {
                     && !trimmed.contains("-> SamplerConfig {")
                     && !trimmed.contains("PreparedSamplerConfig")
                 {
-                    failures.push(format!(
-                        "{}:{}: {}",
-                        relative.display(),
-                        i + 1,
-                        trimmed
-                    ));
+                    failures.push(format!("{}:{}: {}", relative.display(), i + 1, trimmed));
                 }
             }
         }

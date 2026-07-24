@@ -402,7 +402,9 @@ impl SamplingClient {
     /// default, HTTP/1.1 when `config.force_http1` is set) and
     /// pre-computes the default request headers. This does not perform
     /// any network I/O.
-    #[deprecated(note = "use from_prepared() instead — direct SamplerConfig construction bypasses the production chain")]
+    #[deprecated(
+        note = "use from_prepared() instead — direct SamplerConfig construction bypasses the production chain"
+    )]
     pub fn new(config: SamplerConfig) -> Result<Self> {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -2092,7 +2094,9 @@ mod tests {
             temperature: None,
             top_p: None,
             api_backend: ApiBackend::ChatCompletions,
-            protocol_id: Some(xai_grok_sampling_types::ProtocolId("chat_completions".into())),
+            protocol_id: Some(xai_grok_sampling_types::ProtocolId(
+                "chat_completions".into(),
+            )),
             auth_scheme: AuthScheme::Bearer,
             extra_headers: IndexMap::new(),
             context_window: 8192,

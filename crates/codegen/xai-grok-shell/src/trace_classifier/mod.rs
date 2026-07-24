@@ -1121,7 +1121,8 @@ async fn build_sampler_client(
         }
     };
     let resolved = resolve_api_key(api_key, grok_home_path).await?;
-    let url: url::Url = base_url.parse()
+    let url: url::Url = base_url
+        .parse()
         .map_err(|e| anyhow!("invalid base_url {base_url:?}: {e}"))?;
 
     let secret = xai_grok_provider::auth::SecretValue::new(resolved);
@@ -1147,7 +1148,9 @@ async fn build_sampler_client(
         },
         model_id: xai_grok_provider::types::ModelId::new(model),
         generation: xai_grok_provider::model::GenerationOptions::new(
-            Some(LAZINESS_MAX_OUTPUT_TOKENS), None, None,
+            Some(LAZINESS_MAX_OUTPUT_TOKENS),
+            None,
+            None,
         ),
         limits: xai_grok_provider::model::ModelLimits::default(),
     };
@@ -1156,9 +1159,12 @@ async fn build_sampler_client(
         &execution,
         &credentials,
         &xai_grok_provider::headers::RequestHeaderOverrides::new(),
-    ).await.map_err(|e| anyhow!("prepare sampler config: {e}"))?;
+    )
+    .await
+    .map_err(|e| anyhow!("prepare sampler config: {e}"))?;
 
-    xai_grok_sampler::SamplingClient::from_prepared(prepared).map_err(|e| anyhow!("build SamplingClient: {e}"))
+    xai_grok_sampler::SamplingClient::from_prepared(prepared)
+        .map_err(|e| anyhow!("build SamplingClient: {e}"))
 }
 
 /// End-to-end entry point used by the binary. Writes one JSONL line

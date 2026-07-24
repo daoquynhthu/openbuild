@@ -81,7 +81,9 @@ fn resolve_one(id: String, config: ProviderConfig) -> (ProviderId, ResolvedProvi
         "openai_compatible" => Some(ModelListFormat::OpenAiCompatible),
         "ollama_tags" => Some(ModelListFormat::OllamaTags),
         _ => {
-            tracing::warn!("unknown model_list_format `{s}` for provider `{id}`, falling back to default");
+            tracing::warn!(
+                "unknown model_list_format `{s}` for provider `{id}`, falling back to default"
+            );
             None
         }
     });

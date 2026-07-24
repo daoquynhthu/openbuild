@@ -635,7 +635,10 @@ impl ProviderCatalogService {
     /// are cleaned up.
     pub async fn refresh_changed(
         &self,
-        registry_providers: &IndexMap<ProviderId, Arc<xai_grok_provider::provider::ConfiguredProvider>>,
+        registry_providers: &IndexMap<
+            ProviderId,
+            Arc<xai_grok_provider::provider::ConfiguredProvider>,
+        >,
         build_url: impl Fn(&ProviderId) -> Option<(String, xai_grok_provider::types::ProviderDefaults)>,
         ttl: Duration,
     ) {

@@ -80,7 +80,8 @@ pub async fn bootstrap_from_config(
         )
     })?;
 
-    let (resolved, diags) = resolve_with_precedence(parsed, legacy_migration.clone(), cli_overrides.clone());
+    let (resolved, diags) =
+        resolve_with_precedence(parsed, legacy_migration.clone(), cli_overrides.clone());
 
     if !diags.is_empty() {
         let msg = diags

@@ -10,9 +10,9 @@ use serial_test::serial;
 
 use futures_util::StreamExt;
 use xai_grok_provider::registry::RegistrySnapshot;
+use xai_grok_sampler::SamplerConfig;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
 use xai_grok_shell::agent::provider_resolution::ProviderResolutionError;
-use xai_grok_sampler::SamplerConfig;
 use xai_grok_shell::sampling::{ApiBackend, Client, ConversationItem, ConversationRequest};
 use xai_grok_test_support::MockInferenceServer;
 
@@ -26,9 +26,14 @@ fn execution_to_sampler_config(
     base_url_override: Option<&str>,
 ) -> Result<SamplerConfig, ProviderResolutionError> {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
-        model, registry, api_key, base_url_override,
-    ))
+    rt.block_on(
+        xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
+            model,
+            registry,
+            api_key,
+            base_url_override,
+        ),
+    )
 }
 
 /// Create a ModelEntry for a custom OpenAI-compatible provider.
@@ -79,7 +84,9 @@ fn full_chain_toml_to_decoded_events() {
         let snapshot = runtime.snapshot();
         assert_eq!(snapshot.revision, 1, "bootstrap must produce revision=1");
         assert!(
-            snapshot.providers.contains_key(&xai_grok_provider::types::ProviderId::new("test-provider")),
+            snapshot
+                .providers
+                .contains_key(&xai_grok_provider::types::ProviderId::new("test-provider")),
             "test-provider must be in snapshot"
         );
 
@@ -93,15 +100,17 @@ fn full_chain_toml_to_decoded_events() {
 
     // Verify config has correct values from the chain
     assert_eq!(config.model, "test-model");
-    assert!(config.base_url.contains("127.0.0.1"), "base_url must be mock server");
+    assert!(
+        config.base_url.contains("127.0.0.1"),
+        "base_url must be mock server"
+    );
 
     // Phase 3: Make request (async)
     rt.block_on(async {
         let client = Client::new(config).expect("Client::new must succeed");
 
-        let request = ConversationRequest::from_items(vec![ConversationItem::user(
-            "Hello, E2E test!",
-        )]);
+        let request =
+            ConversationRequest::from_items(vec![ConversationItem::user("Hello, E2E test!")]);
 
         let (mut stream, _metadata) = client
             .conversation_stream(request)
@@ -335,7 +344,10 @@ fn openai_responses_chain_selects_responses_route() {
     // Verify the endpoint path is /responses (not /chat/completions)
     assert!(
         config.endpoint_path.as_deref() == Some("/responses")
-            || config.request_url.as_deref().is_some_and(|u| u.contains("/responses")),
+            || config
+                .request_url
+                .as_deref()
+                .is_some_and(|u| u.contains("/responses")),
         "xAI config must use /responses endpoint, got endpoint_path={:?}, request_url={:?}",
         config.endpoint_path,
         config.request_url
@@ -401,7 +413,10 @@ fn anthropic_messages_chain_x_api_key_version_path() {
     // Verify the endpoint path is /messages
     assert!(
         config.endpoint_path.as_deref() == Some("/messages")
-            || config.request_url.as_deref().is_some_and(|u| u.contains("/messages")),
+            || config
+                .request_url
+                .as_deref()
+                .is_some_and(|u| u.contains("/messages")),
         "Anthropic config must use /messages endpoint, got endpoint_path={:?}, request_url={:?}",
         config.endpoint_path,
         config.request_url
@@ -414,7 +429,10 @@ fn anthropic_messages_chain_x_api_key_version_path() {
         config.extra_headers.keys().collect::<Vec<_>>()
     );
     assert_eq!(
-        config.extra_headers.get("anthropic-version").map(String::as_str),
+        config
+            .extra_headers
+            .get("anthropic-version")
+            .map(String::as_str),
         Some("2023-06-01"),
         "anthropic-version must be 2023-06-01"
     );
@@ -678,9 +696,8 @@ fn two_custom_providers_no_state_cross_contamination() {
     rt.block_on(async {
         // Provider A
         let client_a = Client::new(config_a).expect("Client::new for provider-a must succeed");
-        let request_a = ConversationRequest::from_items(vec![ConversationItem::user(
-            "Hello from provider A!",
-        )]);
+        let request_a =
+            ConversationRequest::from_items(vec![ConversationItem::user("Hello from provider A!")]);
         let (mut stream_a, _) = client_a.conversation_stream(request_a).await.unwrap();
         let mut text_a = String::new();
         while let Some(chunk_result) = stream_a.next().await {
@@ -691,13 +708,15 @@ fn two_custom_providers_no_state_cross_contamination() {
                 }
             }
         }
-        assert!(text_a.contains("Echo:"), "provider-a response must contain echo");
+        assert!(
+            text_a.contains("Echo:"),
+            "provider-a response must contain echo"
+        );
 
         // Provider B
         let client_b = Client::new(config_b).expect("Client::new for provider-b must succeed");
-        let request_b = ConversationRequest::from_items(vec![ConversationItem::user(
-            "Hello from provider B!",
-        )]);
+        let request_b =
+            ConversationRequest::from_items(vec![ConversationItem::user("Hello from provider B!")]);
         let (mut stream_b, _) = client_b.conversation_stream(request_b).await.unwrap();
         let mut text_b = String::new();
         while let Some(chunk_result) = stream_b.next().await {
@@ -708,7 +727,10 @@ fn two_custom_providers_no_state_cross_contamination() {
                 }
             }
         }
-        assert!(text_b.contains("Echo:"), "provider-b response must contain echo");
+        assert!(
+            text_b.contains("Echo:"),
+            "provider-b response must contain echo"
+        );
 
         // Verify each provider received requests on its own mock server
         let requests_a = server_a.requests();
@@ -717,14 +739,20 @@ fn two_custom_providers_no_state_cross_contamination() {
         assert!(!requests_b.is_empty(), "server B must receive requests");
 
         // Verify correct API keys were used via Bearer auth
-        let body_a = requests_a[0].body.as_ref().expect("request A must have body");
+        let body_a = requests_a[0]
+            .body
+            .as_ref()
+            .expect("request A must have body");
         assert_eq!(
             body_a.get("model").and_then(|m| m.as_str()),
             Some("model-alpha"),
             "provider-a request must have model-alpha"
         );
 
-        let body_b = requests_b[0].body.as_ref().expect("request B must have body");
+        let body_b = requests_b[0]
+            .body
+            .as_ref()
+            .expect("request B must have body");
         assert_eq!(
             body_b.get("model").and_then(|m| m.as_str()),
             Some("model-beta"),
@@ -832,7 +860,10 @@ fn invalid_endpoint_hard_fail_request_count_zero() {
     );
     let err = result.unwrap_err().to_string();
     assert!(
-        err.contains("endpoint") || err.contains("Endpoint") || err.contains("URL") || err.contains("protocol"),
+        err.contains("endpoint")
+            || err.contains("Endpoint")
+            || err.contains("URL")
+            || err.contains("protocol"),
         "error must mention endpoint/URL/protocol, got: {err}"
     );
 }
@@ -892,9 +923,8 @@ fn ollama_discovery_and_inference() {
 
     rt.block_on(async {
         let client = Client::new(config).expect("Client::new must succeed");
-        let request = ConversationRequest::from_items(vec![ConversationItem::user(
-            "Hello from Ollama!",
-        )]);
+        let request =
+            ConversationRequest::from_items(vec![ConversationItem::user("Hello from Ollama!")]);
         let (mut stream, _metadata) = client.conversation_stream(request).await.unwrap();
         let mut text = String::new();
         while let Some(chunk_result) = stream.next().await {

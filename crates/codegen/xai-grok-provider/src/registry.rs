@@ -219,7 +219,9 @@ impl ProviderRegistry {
                         ))
                     })?;
                     let model_list_format = spec.config.public.model_list_format.map(|f| match f {
-                        crate::types::ModelListFormat::OpenAiCompatible => "openai_compatible".to_string(),
+                        crate::types::ModelListFormat::OpenAiCompatible => {
+                            "openai_compatible".to_string()
+                        }
                         crate::types::ModelListFormat::OllamaTags => "ollama_tags".to_string(),
                     });
                     let overrides = ProviderConfig {
@@ -228,7 +230,11 @@ impl ProviderRegistry {
                         protocol: spec.config.public.protocol.clone(),
                         model_list_path: spec.config.public.model_list_path.clone(),
                         model_list_format,
-                        api_key: spec.config.inline_api_key.as_ref().map(|s| s.inner().to_string()),
+                        api_key: spec
+                            .config
+                            .inline_api_key
+                            .as_ref()
+                            .map(|s| s.inner().to_string()),
                         env_key: if spec.config.env_keys.is_empty() {
                             None
                         } else {
@@ -256,7 +262,9 @@ impl ProviderRegistry {
                         })?;
                     let provider = factory.create(spec)?;
                     let model_list_format = spec.config.public.model_list_format.map(|f| match f {
-                        crate::types::ModelListFormat::OpenAiCompatible => "openai_compatible".to_string(),
+                        crate::types::ModelListFormat::OpenAiCompatible => {
+                            "openai_compatible".to_string()
+                        }
                         crate::types::ModelListFormat::OllamaTags => "ollama_tags".to_string(),
                     });
                     let overrides = ProviderConfig {
@@ -265,7 +273,11 @@ impl ProviderRegistry {
                         protocol: spec.config.public.protocol.clone(),
                         model_list_path: spec.config.public.model_list_path.clone(),
                         model_list_format,
-                        api_key: spec.config.inline_api_key.as_ref().map(|s| s.inner().to_string()),
+                        api_key: spec
+                            .config
+                            .inline_api_key
+                            .as_ref()
+                            .map(|s| s.inner().to_string()),
                         env_key: if spec.config.env_keys.is_empty() {
                             None
                         } else {
@@ -877,7 +889,7 @@ mod tests {
                                 extra_headers: IndexMap::new(),
                             },
                             inline_api_key: None,
-                        env_keys: vec![],
+                            env_keys: vec![],
                         },
                     },
                 ),
@@ -896,7 +908,7 @@ mod tests {
                                 extra_headers: IndexMap::new(),
                             },
                             inline_api_key: None,
-                        env_keys: vec![],
+                            env_keys: vec![],
                         },
                     },
                 ),

@@ -269,13 +269,12 @@ impl ProviderConfigCoordinator {
                 let post_write_sha = Sha256::digest(&post_write);
                 if post_write_sha == candidate_sha {
                     // File still has what we wrote — safe to restore old content
-                    if let Err(rollback_err) =
-                        xai_grok_paths::atomic_write::atomic_replace(
-                            &self.config_path,
-                            old_content.as_bytes(),
-                        )
-                    {
-                        self.degraded.store(true, std::sync::atomic::Ordering::SeqCst);
+                    if let Err(rollback_err) = xai_grok_paths::atomic_write::atomic_replace(
+                        &self.config_path,
+                        old_content.as_bytes(),
+                    ) {
+                        self.degraded
+                            .store(true, std::sync::atomic::Ordering::SeqCst);
                         return Err(ConfigApplyError::WriteError(format!(
                             "commit failed ({commit_err}) AND rollback also failed ({rollback_err}) — coordinator degraded"
                         )));

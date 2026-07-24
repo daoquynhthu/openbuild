@@ -108,7 +108,11 @@ impl<Body> Endpoint<Body> {
         path: EndpointPart<Body>,
         query: Option<std::collections::HashMap<String, String>>,
     ) -> Self {
-        Self { base_url, path, query }
+        Self {
+            base_url,
+            path,
+            query,
+        }
     }
 
     /// Return the default path string (Static variant) or empty string for Dynamic.
