@@ -53,18 +53,14 @@ impl Provider for FactoryProvider {
     }
 
     fn configure(&self, overrides: crate::config::ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides
-            .base_url
-            .clone()
-            .unwrap_or_else(|| self.base_url.clone());
+        let base_url = crate::providers::configure::resolve_base_url(
+            overrides.base_url.as_deref(),
+            &self.base_url,
+        );
         let display_name = format!("{} (OpenAI Compatible)", self.id.0);
 
         // D1: Resolve protocol from overrides, fall back to chat_completions
-        let protocol = overrides
-            .protocol
-            .as_deref()
-            .unwrap_or("chat_completions")
-            .to_owned();
+        let protocol = crate::providers::configure::resolve_protocol(overrides.protocol.as_deref());
         let path = protocol_path(&protocol).unwrap_or("/chat/completions");
 
         // D3: Merge profile env keys with user-provided env keys

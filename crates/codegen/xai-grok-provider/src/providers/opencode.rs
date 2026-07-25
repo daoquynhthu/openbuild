@@ -62,10 +62,20 @@ impl Provider for OpenCodeProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides
-            .base_url
-            .clone()
-            .unwrap_or_else(|| self.defaults.base_url.clone());
+        let base_url = crate::providers::configure::resolve_base_url(
+            overrides.base_url.as_deref(),
+            &self.defaults.base_url,
+        );
+        let candidates = crate::providers::configure::build_credential_candidates(
+            overrides.api_key.is_some(),
+            overrides.env_key.as_deref().unwrap_or_default(),
+            &self.defaults.env_key,
+        );
+        let auth = if candidates.is_empty() {
+            AuthPolicy::None
+        } else {
+            AuthPolicy::bearer(candidates, false)
+        };
         let route = Route::make(
             "opencode-chat",
             Some(self.defaults.id.clone()),
@@ -75,7 +85,7 @@ impl Provider for OpenCodeProvider {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            AuthPolicy::None,
+            auth,
         );
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("opencode-chat");

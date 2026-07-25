@@ -76,8 +76,8 @@ impl Provider for OpenAiCompatibleProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides.base_url.clone().unwrap_or_default();
-        let resolved_url = if base_url.is_empty() {
+        let raw_url = overrides.base_url.clone().unwrap_or_default();
+        let resolved_url = if raw_url.is_empty() {
             overrides
                 .id
                 .as_deref()
@@ -85,7 +85,7 @@ impl Provider for OpenAiCompatibleProvider {
                 .unwrap_or("http://localhost:8080/v1")
                 .into()
         } else {
-            base_url
+            raw_url
         };
         let route = Route::make(
             "openai-compatible-chat",

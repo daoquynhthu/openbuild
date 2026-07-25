@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::auth::{AuthPolicy, CredentialCandidate};
+use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
@@ -62,16 +62,16 @@ impl Provider for OpenAIProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides
-            .base_url
-            .clone()
-            .unwrap_or_else(|| self.defaults.base_url.clone());
-        let auth = AuthPolicy::bearer(
-            vec![CredentialCandidate::ProviderEnvironment(vec![
-                "OPENAI_API_KEY".into(),
-            ])],
-            true,
+        let base_url = crate::providers::configure::resolve_base_url(
+            overrides.base_url.as_deref(),
+            &self.defaults.base_url,
         );
+        let candidates = crate::providers::configure::build_credential_candidates(
+            overrides.api_key.is_some(),
+            overrides.env_key.as_deref().unwrap_or_default(),
+            &self.defaults.env_key,
+        );
+        let auth = AuthPolicy::bearer(candidates, true);
         let route_chat = Arc::new(Route::make(
             "openai-chat",
             Some(self.defaults.id.clone()),

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::auth::{AuthPolicy, CredentialCandidate};
+use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
@@ -62,10 +62,15 @@ impl Provider for XaiProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides
-            .base_url
-            .clone()
-            .unwrap_or_else(|| self.defaults.base_url.clone());
+        let base_url = crate::providers::configure::resolve_base_url(
+            overrides.base_url.as_deref(),
+            &self.defaults.base_url,
+        );
+        let candidates = crate::providers::configure::build_credential_candidates(
+            overrides.api_key.is_some(),
+            overrides.env_key.as_deref().unwrap_or_default(),
+            &self.defaults.env_key,
+        );
         let mut route = Route::make(
             "xai-responses",
             Some(self.defaults.id.clone()),
@@ -75,13 +80,14 @@ impl Provider for XaiProvider {
                 path: EndpointPart::Static("/responses".into()),
                 query: None,
             },
-            AuthPolicy::bearer(
-                vec![CredentialCandidate::ProviderEnvironment(vec![
-                    "XAI_API_KEY".into(),
-                ])],
-                true,
-            ),
+            AuthPolicy::bearer(candidates, true),
         );
+        // Merge extra headers from config
+        if let Some(ref extra) = overrides.extra_headers {
+            for (key, value) in extra {
+                route.static_headers.insert(key.clone(), value.clone());
+            }
+        }
         // Preserve legacy x-grok-* headers for backward compatibility.
         route
             .static_headers

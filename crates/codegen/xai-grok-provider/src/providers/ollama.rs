@@ -61,10 +61,20 @@ impl Provider for OllamaProvider {
     }
 
     fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
-        let base_url = overrides
-            .base_url
-            .clone()
-            .unwrap_or_else(|| self.defaults.base_url.clone());
+        let base_url = crate::providers::configure::resolve_base_url(
+            overrides.base_url.as_deref(),
+            &self.defaults.base_url,
+        );
+        let candidates = crate::providers::configure::build_credential_candidates(
+            overrides.api_key.is_some(),
+            overrides.env_key.as_deref().unwrap_or_default(),
+            &self.defaults.env_key,
+        );
+        let auth = if candidates.is_empty() {
+            crate::auth::AuthPolicy::None
+        } else {
+            crate::auth::AuthPolicy::bearer(candidates, false)
+        };
         let route = Route::make(
             "ollama-chat",
             Some(self.defaults.id.clone()),
@@ -74,7 +84,7 @@ impl Provider for OllamaProvider {
                 path: EndpointPart::Static("/chat/completions".into()),
                 query: None,
             },
-            crate::auth::AuthPolicy::None,
+            auth,
         );
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("ollama-chat");
