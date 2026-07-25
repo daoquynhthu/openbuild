@@ -5,11 +5,12 @@ use indexmap::IndexMap;
 use parking_lot::RwLock;
 
 use crate::config::ProviderConfig;
+use crate::endpoint::{EndpointInput, EndpointPart};
 use crate::error::ProviderError;
 use crate::provider::{ConfiguredProvider, SharedProvider};
 use crate::resolution::{ProviderImplementation, ResolvedProviderSet};
 use crate::route::Route;
-use crate::types::{ProviderId, RouteId};
+use crate::types::{LLMRequest, ProviderId, RouteId};
 
 /// Result of `prepare()` — a validated snapshot ready for atomic commit.
 #[derive(Debug)]
@@ -341,6 +342,43 @@ impl ProviderRegistry {
                 route
                     .validate()
                     .map_err(|e| ProviderError::InvalidRouteId(format!("route {}: {e}", rid.0)))?;
+
+                // PARSE-04: Validate endpoint renders
+                let dummy_input = EndpointInput {
+                    request: LLMRequest::new("dummy"),
+                    body: (),
+                };
+                if let EndpointPart::Static(_) = &route.endpoint.path {
+                    route.endpoint.render(&dummy_input).map_err(|e| {
+                        ProviderError::InvalidEndpoint(format!(
+                            "route `{}` endpoint error: {e}",
+                            rid.0
+                        ))
+                    })?;
+                }
+
+                // PARSE-04: Validate required auth has candidates
+                if let crate::auth::AuthPolicy::Bearer { required: true, ref candidates } = route.auth
+                    && candidates.is_empty()
+                {
+                        return Err(ProviderError::Config(format!(
+                            "route `{}` requires Bearer auth but has no credential candidates",
+                            rid.0
+                        )));
+                }
+
+                // PARSE-04: Validate headers parse
+                for (name, value) in &route.static_headers {
+                    http::HeaderName::from_bytes(name.as_bytes())
+                        .map_err(|_| ProviderError::InvalidHeader(format!(
+                            "route `{}` invalid header name: {name:?}", rid.0
+                        )))?;
+                    http::HeaderValue::from_str(value)
+                        .map_err(|_| ProviderError::InvalidHeader(format!(
+                            "route `{}` invalid header value for `{name}`", rid.0
+                        )))?;
+                }
+
                 new_routes.insert(key, route.clone());
             }
 
@@ -477,12 +515,16 @@ mod tests {
         }
         fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
             let rid = RouteId::new("chat");
+            let base = overrides
+                .base_url
+                .clone()
+                .unwrap_or_else(|| "https://dummy.test/v1".into());
             let route = Arc::new(Route::make(
                 rid.0.clone(),
                 Some(self.id.clone()),
                 "chat_completions",
                 Endpoint {
-                    base_url: overrides.base_url.clone(),
+                    base_url: Some(base),
                     path: EndpointPart::Static("/chat/completions".into()),
                     query: None,
                 },
@@ -1572,6 +1614,174 @@ mod tests {
         assert!(
             err.contains("nonexistent"),
             "error must mention the missing default route: {err}"
+        );
+    }
+
+    // ── PARSE-04: prepare rejects invalid endpoint URLs ──
+
+    #[derive(Debug)]
+    struct BadEndpointProvider {
+        id: ProviderId,
+        defaults: ProviderDefaults,
+    }
+
+    impl BadEndpointProvider {
+        fn new() -> Self {
+            Self {
+                id: ProviderId::new("bad-ep"),
+                defaults: ProviderDefaults::default(),
+            }
+        }
+    }
+
+    impl Provider for BadEndpointProvider {
+        fn id(&self) -> &ProviderId { &self.id }
+        fn name(&self) -> &str { "BadEndpoint" }
+        fn defaults(&self) -> &ProviderDefaults { &self.defaults }
+        fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
+            let rid = RouteId::new("chat");
+            let route = Arc::new(Route::make(
+                rid.0.clone(),
+                Some(self.id.clone()),
+                "chat_completions",
+                Endpoint {
+                    base_url: Some("http://remote.insecure.api/v1".into()),
+                    path: EndpointPart::Static("/chat".into()),
+                    query: None,
+                },
+                AuthPolicy::None,
+            ));
+            let routes = IndexMap::from([(rid.clone(), route)]);
+            ConfiguredProvider::new(
+                self.id.clone(),
+                self.name().to_string(),
+                overrides,
+                routes,
+                rid.clone(),
+                Arc::new(DefaultRouteSelector { default_route_id: rid }),
+                ModelSourceSpec::Dynamic,
+            )
+        }
+    }
+
+    #[test]
+    fn prepare_rejects_remote_http_endpoint() {
+        let reg = ProviderRegistry::new();
+        reg.register_definition(Arc::new(BadEndpointProvider::new()))
+            .unwrap();
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("bad-ep"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("bad-ep"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("bad-ep"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                        env_keys: vec![],
+                    },
+                },
+            )]),
+        };
+        let result = reg.prepare(&resolved);
+        assert!(result.is_err(), "remote http endpoint must be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("endpoint") || err.contains("http"),
+            "error must mention endpoint URL issue: {err}"
+        );
+    }
+
+    // ── PARSE-04: prepare rejects missing base_url ──
+
+    #[derive(Debug)]
+    struct NoBaseUrlProvider {
+        id: ProviderId,
+        defaults: ProviderDefaults,
+    }
+
+    impl NoBaseUrlProvider {
+        fn new() -> Self {
+            Self {
+                id: ProviderId::new("no-base"),
+                defaults: ProviderDefaults::default(),
+            }
+        }
+    }
+
+    impl Provider for NoBaseUrlProvider {
+        fn id(&self) -> &ProviderId { &self.id }
+        fn name(&self) -> &str { "NoBaseUrl" }
+        fn defaults(&self) -> &ProviderDefaults { &self.defaults }
+        fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
+            let rid = RouteId::new("chat");
+            let route = Arc::new(Route::make(
+                rid.0.clone(),
+                Some(self.id.clone()),
+                "chat_completions",
+                Endpoint {
+                    base_url: None,
+                    path: EndpointPart::Static("/chat".into()),
+                    query: None,
+                },
+                AuthPolicy::None,
+            ));
+            let routes = IndexMap::from([(rid.clone(), route)]);
+            ConfiguredProvider::new(
+                self.id.clone(),
+                self.name().to_string(),
+                overrides,
+                routes,
+                rid.clone(),
+                Arc::new(DefaultRouteSelector { default_route_id: rid }),
+                ModelSourceSpec::Dynamic,
+            )
+        }
+    }
+
+    #[test]
+    fn prepare_rejects_route_without_base_url() {
+        let reg = ProviderRegistry::new();
+        reg.register_definition(Arc::new(NoBaseUrlProvider::new()))
+            .unwrap();
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("no-base"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("no-base"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("no-base"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                        env_keys: vec![],
+                    },
+                },
+            )]),
+        };
+        let result = reg.prepare(&resolved);
+        assert!(result.is_err(), "route without base_url must be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("base_url"),
+            "error must mention missing base_url: {err}"
         );
     }
 }

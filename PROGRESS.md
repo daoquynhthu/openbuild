@@ -895,3 +895,52 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `ProviderError::RouteSelectionError` variant added to `error.rs`
 - `pub(crate) mod openai` to enable cross-module selector access
 - 8 files modified
+
+---
+
+## Phase 6: Parse Validation & Diagnostics — 2026-07-25 (partial)
+
+### Completed
+- **PARSE-01**: `#[serde(deny_unknown_fields)]` on `ParsedProviderEntry` — typo `implementation` now rejected at parse time; 2 new tests verify rejection with field name in error message
+- **PARSE-02**: `ProviderConfig::validate()` with semantic checks:
+  - unknown protocol → error-level diagnostic
+  - unknown model_list_format → error-level diagnostic
+  - unsupported kind → error-level diagnostic
+  - missing kind for non-builtin without base_url/profile → error-level diagnostic
+  - insecure HTTP → warning-level diagnostic (kept as warning for flexibility)
+- **PARSE-04**: `prepare()` enhanced with:
+  - endpoint render validation (rejects http remote unless `allow_insecure_http`, rejects missing base_url)
+  - required auth candidate check (Bearer required + empty candidates → error)
+  - header name/value parsing validation
+- **PARSE-05**: `ConfigDiagnostic` extended with:
+  - `severity: DiagnosticSeverity` (Warning/Error)
+  - `category: String` for classification
+  - error-level diagnostics skip the provider during resolution
+- Duplicate provider identity in same layer → error-level diagnostic (was warning)
+- `ProviderConfig::validate()` is called from `resolve_provider_set()` before resolution
+- New tests: `unknown_toml_field_*_rejected` (2), `unknown_protocol/kind_is_error_at_resolution` (2), `known_kind_openai_compatible_is_accepted`, `custom_provider_without_kind_but_with_base_url_is_accepted`, `duplicate_in_same_layer_is_error`, `prepare_rejects_remote_http_endpoint`, `prepare_rejects_route_without_base_url`, `error_diagnostic_contains_provider_id_field_and_category`
+- Removed old `parse_accepts` based tests (replaced by validation/resolution tests)
+- Clippy fixes: collapsed nested `if` statements in `config.rs` and `registry.rs`
+
+### Files modified
+- `xai-grok-provider/src/config.rs` — `deny_unknown_fields`, `validate()`, `validate_headers()`, collapsible-if fix
+- `xai-grok-provider/src/resolution.rs` — call `validate()` in `resolve_provider_set()`, error for duplicate identity
+- `xai-grok-provider/src/registry.rs` — `prepare()` endpoint/auth/header validation, collapsible-if fix
+- `xai-grok-provider/src/error.rs` — `ProviderError::RouteSelectionError` added (from Phase 5)
+- `xai-grok-provider/tests/strict_provider_config.rs` — replaced old parse-accepts tests with validation/resolution tests
+
+### Key Results
+- `cargo check -p xai-grok-provider` — clean ✅
+- `cargo clippy -p xai-grok-provider` — 0 warnings ✅
+- `cargo test -p xai-grok-provider` — 262 pass, 0 fail ✅
+- 10 new tests, 1 unused function removed, 2 clippy warnings fixed
+
+### Gate (R3-PARSE)
+- R3-RED-07: strict_provider_config now validates at resolution — ✅
+- Unknown fields rejected at parse time (`deny_unknown_fields`) — ✅
+- Invalid config produces error diagnostics, provider skipped during resolution — ✅
+- Old snapshot preserved after failed hot reload (existing test) — ✅
+
+### Remaining (PARSE-03)
+- Integration tests for TOML merge, legacy migration duplicate rejection
+- Verify old-style strict_provider_config tests fully updated

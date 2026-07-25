@@ -150,12 +150,23 @@ pub fn resolve_provider_set(
         if cfg.enabled == Some(false) {
             continue;
         }
+
+        // Run semantic validation (R3-PARSE-02)
+        let mut cfg_diags = cfg.validate();
+        let has_error = cfg_diags.iter().any(|d| d.is_error());
+        diagnostics.append(&mut cfg_diags);
+
+        if has_error {
+            continue;
+        }
+
         let (pid, spec) = resolve_one(id, cfg);
         if providers.contains_key(&pid) {
-            diagnostics.push(ConfigDiagnostic::new(
+            diagnostics.push(ConfigDiagnostic::new_error(
                 pid.0.clone(),
                 "provider",
-                format!("duplicate provider `{}` — keeping first entry", pid.0),
+                "duplicate_identity",
+                format!("duplicate provider `{}` in the same configuration layer", pid.0),
             ));
             continue;
         }
@@ -298,6 +309,7 @@ mod tests {
                 "dup".into(),
                 ProviderConfig {
                     id: Some("dup".into()),
+                    base_url: Some("https://first.url/v1".into()),
                     ..Default::default()
                 },
             ),
@@ -313,6 +325,7 @@ mod tests {
         let (set, diags) = resolve_provider_set(configs);
         assert_eq!(diags.len(), 1);
         assert!(diags[0].to_string().contains("dup"));
+        assert!(diags[0].is_error(), "duplicate must be an error level");
         assert_eq!(set.providers.len(), 1);
     }
 
@@ -362,6 +375,7 @@ mod tests {
                 ProviderConfig {
                     id: Some("test".into()),
                     api_key: Some("toml-key".into()),
+                    base_url: Some("https://test.api/v1".into()),
                     ..Default::default()
                 },
             )]),
@@ -448,6 +462,7 @@ mod tests {
         let legacy = Some(ProviderConfig {
             id: Some("legacy-only".into()),
             api_key: Some("legacy-key".into()),
+            base_url: Some("https://legacy.api/v1".into()),
             ..Default::default()
         });
         let (set, _) = resolve_with_precedence(toml, legacy, None);
@@ -465,6 +480,7 @@ mod tests {
         let cli = Some(ProviderConfig {
             id: Some("cli-only".into()),
             api_key: Some("cli-key".into()),
+            base_url: Some("https://cli.api/v1".into()),
             ..Default::default()
         });
         let (set, _) = resolve_with_precedence(toml, None, cli);

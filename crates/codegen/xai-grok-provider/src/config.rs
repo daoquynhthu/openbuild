@@ -6,12 +6,23 @@ use serde::Deserialize;
 use crate::error::ProviderError;
 use crate::types::ProviderId;
 
-/// A single configuration diagnostic: a non-fatal warning or error with
-/// a path that points to the exact TOML field.
+/// Severity level for a configuration diagnostic (R3-PARSE-05).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticSeverity {
+    Warning,
+    Error,
+}
+
+/// A single configuration diagnostic with severity, provider ID, field path,
+/// category, and safe value summary (R3-PARSE-05).
+///
+/// Never contains API keys or Authorization header values.
 #[derive(Debug, Clone)]
 pub struct ConfigDiagnostic {
+    pub severity: DiagnosticSeverity,
     pub provider_id: String,
     pub field_path: String,
+    pub category: String,
     pub message: String,
 }
 
@@ -22,10 +33,31 @@ impl ConfigDiagnostic {
         message: impl Into<String>,
     ) -> Self {
         Self {
+            severity: DiagnosticSeverity::Warning,
             provider_id: provider_id.into(),
             field_path: field_path.into(),
+            category: "validation".into(),
             message: message.into(),
         }
+    }
+
+    pub fn new_error(
+        provider_id: impl Into<String>,
+        field_path: impl Into<String>,
+        category: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            severity: DiagnosticSeverity::Error,
+            provider_id: provider_id.into(),
+            field_path: field_path.into(),
+            category: category.into(),
+            message: message.into(),
+        }
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.severity == DiagnosticSeverity::Error
     }
 }
 
@@ -33,8 +65,8 @@ impl fmt::Display for ConfigDiagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "provider `{}`.`{}`: {}",
-            self.provider_id, self.field_path, self.message
+            "provider `{}`.`{}` [{}]: {}",
+            self.provider_id, self.field_path, self.category, self.message
         )
     }
 }
@@ -76,11 +108,11 @@ fn is_known_protocol(protocol: &str) -> bool {
 
 impl ProviderConfigInput {
     /// Validate config fields and return diagnostics for any issues.
+    /// Error-level diagnostics prevent the provider from being used (R3-PARSE-02).
     pub fn validate(&self, provider_id: &str) -> Vec<ConfigDiagnostic> {
         let mut diags = Vec::new();
 
-        // allow_insecure_http must be explicit boolean (it defaults to false).
-        // serde defaults to None, but the semantic default is false.
+        // Insecure HTTP is an error unless explicitly opted in.
         if self.allow_insecure_http == Some(true) {
             diags.push(ConfigDiagnostic::new(
                 provider_id,
@@ -89,15 +121,16 @@ impl ProviderConfigInput {
             ));
         }
 
-        // Protocol validation: unknown protocols get a diagnostic.
+        // Protocol validation: unknown protocols produce an error.
         if let Some(proto) = self
             .protocol
             .as_ref()
             .filter(|p| !is_known_protocol(p.as_str()))
         {
-            diags.push(ConfigDiagnostic::new(
+            diags.push(ConfigDiagnostic::new_error(
                 provider_id,
                 "protocol",
+                "unknown_value",
                 format!("unknown protocol `{proto}` — must be one of: chat_completions, responses, messages"),
             ));
         }
@@ -126,9 +159,10 @@ impl ProviderConfigInput {
 }
 
 /// Single parsed [provider.*] entry — the deserialization target.
+/// Unknown fields are rejected at parse time (R3-PARSE-01).
 #[derive(Debug, Clone, Default, Deserialize)]
 #[non_exhaustive]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ParsedProviderEntry {
     pub enabled: Option<bool>,
     pub kind: Option<String>,
@@ -274,6 +308,88 @@ impl fmt::Debug for ProviderConfig {
 }
 
 impl ProviderConfig {
+    /// Validate all config fields and return diagnostics for any issues.
+    /// Error-level diagnostics prevent the provider from being committed (R3-PARSE-02).
+    pub fn validate(&self) -> Vec<ConfigDiagnostic> {
+        let mut diags = Vec::new();
+        let provider_id = self.id.as_deref().unwrap_or("?");
+
+        // Insecure HTTP
+        if self.allow_insecure_http == Some(true) {
+            diags.push(ConfigDiagnostic::new(
+                provider_id,
+                "allow_insecure_http",
+                "insecure HTTP is enabled — this is a security risk",
+            ));
+        }
+
+        // Unknown protocol
+        if let Some(proto) = self
+            .protocol
+            .as_ref()
+            .filter(|p| !is_known_protocol(p.as_str()))
+        {
+            diags.push(ConfigDiagnostic::new_error(
+                provider_id,
+                "protocol",
+                "unknown_value",
+                format!(
+                    "unknown protocol `{proto}` — must be one of: chat_completions, responses, messages"
+                ),
+            ));
+        }
+
+        // Unknown model_list_format
+        if let Some(fmt) = self.model_list_format.as_deref()
+            && !matches!(fmt, "openai_compatible" | "ollama_tags" | "ollama")
+        {
+                diags.push(ConfigDiagnostic::new_error(
+                    provider_id,
+                    "model_list_format",
+                    "unknown_value",
+                    format!(
+                        "unknown model_list_format `{fmt}` — must be one of: openai_compatible, ollama_tags"
+                    ),
+                ));
+        }
+
+        // Unknown kind
+        if let Some(kind) = self.kind.as_deref() {
+            let is_builtin_id = matches!(
+                provider_id,
+                "xai" | "openai" | "anthropic" | "opencode" | "ollama"
+            );
+            if kind != "openai_compatible" && !is_builtin_id {
+                diags.push(ConfigDiagnostic::new_error(
+                    provider_id,
+                    "kind",
+                    "unsupported_value",
+                    format!(
+                        "unsupported provider kind `{kind}` — must be \"openai_compatible\" or omitted for built-in providers"
+                    ),
+                ));
+            }
+        }
+
+        // Missing kind for non-builtin provider without id match, no profile, and no base_url
+        if self.kind.is_none() {
+            let is_builtin_id = matches!(
+                provider_id,
+                "xai" | "openai" | "anthropic" | "opencode" | "ollama"
+            );
+            if !is_builtin_id && self.base_url.is_none() && self.profile.is_none() {
+                diags.push(ConfigDiagnostic::new_error(
+                    provider_id,
+                    "kind",
+                    "missing_field",
+                    "custom provider must specify `kind`, `profile`, `base_url`, or use a built-in provider ID",
+                ));
+            }
+        }
+
+        diags
+    }
+
     /// Validate header names in extra_headers.
     pub fn validate_headers(&self) -> Result<(), ProviderError> {
         if let Some(ref headers) = self.extra_headers {
