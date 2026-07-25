@@ -362,8 +362,8 @@ LINK : fatal error LNK4319: A PDB limit was hit while adding public symbols.
 
 | 条目 | 严重度 | 状态 |
 |------|--------|------|
-| DOC-01: `rustdoc::output_filename_collision` 未知 lint | 严重 — 阻塞 docs CI job | ❌ 未修复 |
-| WSMK-01: Windows LNK4319 PDB 限制 | 中等 — 阻塞 Windows smoke CI job | ❌ 预存问题 |
+| DOC-01: `rustdoc::output_filename_collision` 未知 lint | 严重 — 阻塞 docs CI job | ❌ 未修复 -Fixed |
+| WSMK-01: Windows LNK4319 PDB 限制 | 中等 — 阻塞 Windows smoke CI job | ❌ 预存问题 -Fixed |
 | SMK-01: Linux smoke PTY 不可用 | 中等 — 阻塞 Linux smoke CI job | ❌ 预存问题 |
 | SMK-02: macOS smoke PTY 不可用 | 中等 — 阻塞 macOS smoke CI job | ❌ 预存问题 |
 | PTY-01: PTY E2E 测试超时 | 中等 — 阻塞 provider E2E CI job | ❌ 预存问题 |

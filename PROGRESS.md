@@ -1212,6 +1212,17 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `git diff --check`: clean ✅
 - Force-pushed `feat/provider-adapter` to origin (replaced 8 stale CI/doc commits)
 
+## Phase 14: CI 失败修复 — DOC-01 & WSMK-01 — 2026-07-26
+
+### 完成内容
+- DOC-01: `RUSTDOCFLAGS` 添加 `--allow unknown_lints`，使 `rustdoc::output_filename_collision` allow 在 Rust 1.92.0 上不再触发未知 lint 硬错误
+- WSMK-01: `.cargo/config.toml` Windows MSVC 目标添加 `-C link-args=/DEBUG:LongSymbolTruncate`，绕过 MSVC 14.51 的 PDB 符号限制
+
+### 关键结果
+- `cargo check -p xai-grok-provider --all-targets` ✅
+- `cargo clippy -p xai-grok-provider --all-targets -- -D warnings` ✅
+- `cargo fmt --all -- --check` ✅
+
 ### Remaining (deferred/out of scope)
 - Removing `configure_providers` test-only usage (no production callers, but called from tests)
 - Updating `provider-matrix.md` and `rollback.md` (content still accurate)
