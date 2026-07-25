@@ -40,6 +40,9 @@ pub enum ProviderError {
     #[error("ambiguous model reference: {0}")]
     AmbiguousModel(String),
 
+    #[error("route selection error: {0}")]
+    RouteSelectionError(String),
+
     #[error("configuration error: {0}")]
     Config(String),
 

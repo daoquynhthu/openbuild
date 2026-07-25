@@ -855,9 +855,6 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `unimplemented!()` eliminated from `FactoryProvider::defaults()` ✅
 - `validate_insecure_http_policy` helper added with 4 tests ✅
 
-### Next
-- Proceed to Phase 6 (PARSE series) — Reject unknown TOML fields, semantic validation, etc.
-
 ---
 
 ## Phase 5: ROUTE Series — 2026-07-25
@@ -865,16 +862,23 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 ### R3-ROUTE-01: ModelDefaults.preferred_protocol + Route helpers
 - Added `preferred_protocol: Option<String>` field to `ModelDefaults` in `src/model.rs`
 - Added `Route::supports_protocol()` and `Route::protocol()` helpers in `src/route.rs`
+- Serde derives + skip_serializing_if properly configured ✅
 
 ### R3-ROUTE-02: OpenAiRouteSelector
 - Created `OpenAiRouteSelector` in `src/providers/openai.rs`
 - o1/o3 model prefixes → `responses` route; all others → default (chat/responses based on `protocol` config field)
 - Updated `OpenAIProvider::configure()` to use selector
-- 7 route selection tests all pass
+- Selector validates selected route is in `referenced` set and returns `ProviderError::RouteSelectionError` if not ✅
+- 8 route selection tests all pass (including `o1_model_selects_only_responses`)
 
 ### R3-ROUTE-03: Registry prepare() validation
-- Default route existence check in `Registry::prepare()`
-- Route ownership validation (`route.provider_id == pid`)
+- Default route existence check in `Registry::prepare()` (`registry.rs:314-319`)
+- Route ownership validation (`route.provider_id == pid`) (`registry.rs:333-338`)
+- Selector referenced route IDs validated against route set (`registry.rs:303-311`)
+- 3 new tests added:
+  - `prepare_rejects_route_not_owned_by_provider` ✅
+  - `prepare_rejects_default_route_absent` ✅
+  - `prepare_rejects_openai_selector_with_missing_responses_route` ✅
 
 ### R3-ROUTE-04: Protocol inference investigation
 - Searched Shell + Sampler production code for model-name-based or URL-based protocol inference
@@ -886,6 +890,8 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `provider_e2e.rs::precedence_env_var_sets_api_key`: serialized env-mutating tests with global `ENV_LOCK` mutex to prevent parallel-test env var interference
 
 ### Key Results
-- `cargo test -p xai-grok-provider` — 245/245 pass ✅
+- `cargo test -p xai-grok-provider` — 256/256 pass ✅ (+11 new tests)
 - `cargo clippy -p xai-grok-provider` — 0 warnings ✅
-- 7 files modified, 166 insertions, 32 deletions
+- `ProviderError::RouteSelectionError` variant added to `error.rs`
+- `pub(crate) mod openai` to enable cross-module selector access
+- 8 files modified

@@ -133,3 +133,32 @@ fn default_route_id_is_responses_when_protocol_responses() {
         "default_route_id must be responses when protocol=responses"
     );
 }
+
+/// R3-ROUTE-02: Responses-required models cannot reach Chat Completions.
+///
+/// An o1 model must always select the responses route, never the chat route.
+/// This is verified at both the selector level (unit) and the registry level
+/// (prepare() rejects selectors whose referenced routes are incomplete).
+#[test]
+fn o1_model_selects_only_responses() {
+    let configured = openai_configured(None);
+
+    // o1-preview → responses
+    let selected = configured
+        .route_selector
+        .select("o1-preview")
+        .expect("o1 must select a route");
+    assert_eq!(
+        selected.0, "openai-responses",
+        "o1-preview must NEVER route to chat"
+    );
+    // o3-mini → responses
+    let selected = configured
+        .route_selector
+        .select("o3-mini")
+        .expect("o3 must select a route");
+    assert_eq!(
+        selected.0, "openai-responses",
+        "o3-mini must NEVER route to chat"
+    );
+}

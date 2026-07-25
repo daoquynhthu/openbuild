@@ -1291,4 +1291,287 @@ mod tests {
         );
         assert_eq!(reg.snapshot().revision, 2, "final revision must be 2");
     }
+
+    // ── R3-ROUTE-03 tests ──
+
+    #[derive(Debug)]
+    struct WrongOwnerProvider {
+        id: ProviderId,
+        defaults: ProviderDefaults,
+    }
+
+    impl WrongOwnerProvider {
+        fn new() -> Self {
+            Self {
+                id: ProviderId::new("owner"),
+                defaults: ProviderDefaults::default(),
+            }
+        }
+    }
+
+    impl Provider for WrongOwnerProvider {
+        fn id(&self) -> &ProviderId {
+            &self.id
+        }
+        fn name(&self) -> &str {
+            "WrongOwner"
+        }
+        fn defaults(&self) -> &ProviderDefaults {
+            &self.defaults
+        }
+        fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
+            let rid = RouteId::new("chat");
+            let route = Arc::new(Route::make(
+                rid.0.clone(),
+                // Route claims to belong to a DIFFERENT provider
+                Some(ProviderId::new("intruder")),
+                "chat_completions",
+                Endpoint {
+                    base_url: overrides.base_url.clone(),
+                    path: EndpointPart::Static("/chat/completions".into()),
+                    query: None,
+                },
+                AuthPolicy::None,
+            ));
+            let routes = IndexMap::from([(rid.clone(), route)]);
+            ConfiguredProvider::new(
+                self.id.clone(),
+                self.name().to_string(),
+                overrides,
+                routes,
+                rid.clone(),
+                Arc::new(DefaultRouteSelector { default_route_id: rid }),
+                ModelSourceSpec::Dynamic,
+            )
+        }
+    }
+
+    #[test]
+    fn prepare_rejects_route_not_owned_by_provider() {
+        let reg = ProviderRegistry::new();
+        reg.register_definition(Arc::new(WrongOwnerProvider::new()))
+            .unwrap();
+
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("owner"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("owner"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("owner"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                        env_keys: vec![],
+                    },
+                },
+            )]),
+        };
+        let result = reg.prepare(&resolved);
+        assert!(result.is_err(), "route with wrong owner must be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("intruder") && err.contains("owner"),
+            "error must mention both provider IDs: {err}"
+        );
+    }
+
+    #[derive(Debug)]
+    struct MissingDefaultProvider {
+        id: ProviderId,
+        defaults: ProviderDefaults,
+    }
+
+    impl MissingDefaultProvider {
+        fn new() -> Self {
+            Self {
+                id: ProviderId::new("missing-default"),
+                defaults: ProviderDefaults::default(),
+            }
+        }
+    }
+
+    impl Provider for MissingDefaultProvider {
+        fn id(&self) -> &ProviderId {
+            &self.id
+        }
+        fn name(&self) -> &str {
+            "MissingDefault"
+        }
+        fn defaults(&self) -> &ProviderDefaults {
+            &self.defaults
+        }
+        fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
+            let rid = RouteId::new("chat");
+            let route = Arc::new(Route::make(
+                rid.0.clone(),
+                Some(self.id.clone()),
+                "chat_completions",
+                Endpoint {
+                    base_url: overrides.base_url.clone(),
+                    path: EndpointPart::Static("/chat/completions".into()),
+                    query: None,
+                },
+                AuthPolicy::None,
+            ));
+            let routes = IndexMap::from([(rid.clone(), route)]);
+            // default_route_id points to "nonexistent", not "chat"
+            let missing = RouteId::new("nonexistent");
+            ConfiguredProvider::new(
+                self.id.clone(),
+                self.name().to_string(),
+                overrides,
+                routes,
+                missing.clone(),
+                Arc::new(DefaultRouteSelector {
+                    default_route_id: missing,
+                }),
+                ModelSourceSpec::Dynamic,
+            )
+        }
+    }
+
+    #[derive(Debug)]
+    struct OpenAiMissingResponsesProvider {
+        id: ProviderId,
+        defaults: ProviderDefaults,
+    }
+
+    impl OpenAiMissingResponsesProvider {
+        fn new() -> Self {
+            Self {
+                id: ProviderId::new("openai-gate"),
+                defaults: ProviderDefaults::default(),
+            }
+        }
+    }
+
+    impl Provider for OpenAiMissingResponsesProvider {
+        fn id(&self) -> &ProviderId {
+            &self.id
+        }
+        fn name(&self) -> &str {
+            "OpenAI-Gate"
+        }
+        fn defaults(&self) -> &ProviderDefaults {
+            &self.defaults
+        }
+        fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
+            let chat_rid = RouteId::new("openai-chat");
+            let responses_rid = RouteId::new("openai-responses");
+            let route = Arc::new(Route::make(
+                chat_rid.0.clone(),
+                Some(self.id.clone()),
+                "chat_completions",
+                Endpoint {
+                    base_url: overrides.base_url.clone(),
+                    path: EndpointPart::Static("/chat/completions".into()),
+                    query: None,
+                },
+                AuthPolicy::None,
+            ));
+            // Only chat route in the set — no responses route
+            let routes = IndexMap::from([(chat_rid.clone(), route)]);
+            ConfiguredProvider::new(
+                self.id.clone(),
+                self.name().to_string(),
+                overrides,
+                routes,
+                chat_rid.clone(),
+                Arc::new(crate::providers::openai::OpenAiRouteSelector::new(
+                    chat_rid.clone(),
+                    responses_rid,
+                    chat_rid,
+                )),
+                ModelSourceSpec::Dynamic,
+            )
+        }
+    }
+
+    #[test]
+    fn prepare_rejects_openai_selector_with_missing_responses_route() {
+        let reg = ProviderRegistry::new();
+        reg.register_definition(Arc::new(OpenAiMissingResponsesProvider::new()))
+            .unwrap();
+
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("openai-gate"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("openai-gate"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("openai-gate"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                        env_keys: vec![],
+                    },
+                },
+            )]),
+        };
+        let result = reg.prepare(&resolved);
+        assert!(
+            result.is_err(),
+            "prepare must reject selector referencing non-existent responses route"
+        );
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("openai-responses"),
+            "error must mention the missing responses route: {err}"
+        );
+    }
+
+    #[test]
+    fn prepare_rejects_default_route_absent() {
+        let reg = ProviderRegistry::new();
+        reg.register_definition(Arc::new(MissingDefaultProvider::new()))
+            .unwrap();
+
+        let resolved = ResolvedProviderSet {
+            providers: IndexMap::from([(
+                ProviderId::new("missing-default"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: ProviderId::new("missing-default"),
+                    implementation: ProviderImplementation::Builtin {
+                        definition_id: ProviderId::new("missing-default"),
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: None,
+                            protocol: None,
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: IndexMap::new(),
+                        },
+                        inline_api_key: None,
+                        env_keys: vec![],
+                    },
+                },
+            )]),
+        };
+        let result = reg.prepare(&resolved);
+        assert!(result.is_err(), "default route absent from route set must be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("nonexistent"),
+            "error must mention the missing default route: {err}"
+        );
+    }
 }

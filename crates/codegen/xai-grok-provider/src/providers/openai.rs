@@ -62,11 +62,18 @@ impl OpenAiRouteSelector {
 impl RouteSelector for OpenAiRouteSelector {
     fn select(&self, model_id: &str) -> Result<RouteId, ProviderError> {
         let lower = model_id.to_lowercase();
-        if lower.starts_with("o1") || lower.starts_with("o3") {
-            Ok(self.responses_route_id.clone())
+        let selected = if lower.starts_with("o1") || lower.starts_with("o3") {
+            &self.responses_route_id
         } else {
-            Ok(self.default_route_id.clone())
+            &self.default_route_id
+        };
+        if !self.referenced.contains(selected) {
+            return Err(ProviderError::RouteSelectionError(format!(
+                "selected route `{}` for model `{}` is not in the provider's route set",
+                selected.0, model_id
+            )));
         }
+        Ok(selected.clone())
     }
 
     fn referenced_route_ids(&self) -> &[RouteId] {

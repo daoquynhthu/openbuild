@@ -9,7 +9,7 @@ use crate::registry::ProviderRegistry;
 pub mod configure;
 mod anthropic;
 mod ollama;
-mod openai;
+pub(crate) mod openai;
 mod openai_compatible;
 pub mod openai_compatible_factory;
 mod opencode;
