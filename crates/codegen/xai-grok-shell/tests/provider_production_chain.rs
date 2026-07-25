@@ -111,12 +111,11 @@ async fn obpa001_no_nested_runtime_panic_after_fix() {
     let snapshot = bootstrap_async(
         r#"
         [provider.test-provider]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "http://127.0.0.1:0"
         api_key = "test-key"
 
-        [provider.test-provider.models.test-model]
-        context_window = 64000
+
     "#,
     )
     .await
@@ -153,12 +152,10 @@ async fn obpa005_provider_inline_key_flows_to_auth_header() {
     let toml_str = format!(
         r#"
         [provider.custom-key]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "{mock_url}"
         api_key = "provider-inline-secret"
 
-        [provider.custom-key.models.test-model]
-        context_window = 64000
         "#,
     );
 
@@ -212,13 +209,10 @@ async fn obpa007_custom_protocol_not_overridden_by_chat() {
     let toml_str = format!(
         r#"
         [provider.custom-protocol]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "{mock_url}"
         api_key = "test-key"
         protocol = "responses"
-
-        [provider.custom-protocol.models.test-model]
-        context_window = 64000
         "#,
     );
 
@@ -273,11 +267,10 @@ async fn obpa008_cli_base_url_override_survives_reload() {
 
     let toml_str = r#"
         [provider.test-provider]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         api_key = "test-key"
 
-        [provider.test-provider.models.test-model]
-        context_window = 64000
+
     "#;
 
     // Bootstrap with CLI override
@@ -365,13 +358,10 @@ async fn provider_extra_header_flows_to_request() {
     let toml_str = format!(
         r#"
         [provider.custom-header]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "{mock_url}"
         api_key = "test-key"
         extra_headers = {{ "X-Provider-Custom" = "provider-value" }}
-
-        [provider.custom-header.models.test-model]
-        context_window = 64000
         "#,
     );
     let snapshot = bootstrap_async(&toml_str).await.snapshot();
@@ -409,12 +399,9 @@ async fn request_override_header_appears_in_request() {
     let toml_str = format!(
         r#"
         [provider.custom-req]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "{mock_url}"
         api_key = "test-key"
-
-        [provider.custom-req.models.test-model]
-        context_window = 64000
         "#,
     );
     let snapshot = bootstrap_async(&toml_str).await.snapshot();
@@ -470,12 +457,9 @@ async fn red04_invalid_endpoint_produces_chain_error() {
     let snapshot = bootstrap_async(
         r#"
         [provider.bad-endpoint]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = ""
         api_key = "test-key"
-
-        [provider.bad-endpoint.models.test-model]
-        context_window = 64000
     "#,
     )
     .await
@@ -499,12 +483,9 @@ async fn red04_missing_credential_incorrectly_returns_ok() {
     let snapshot = bootstrap_async(
         r#"
         [provider.no-cred]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "http://127.0.0.1:0/v1"
         # no api_key, no env_key
-
-        [provider.no-cred.models.test-model]
-        context_window = 64000
     "#,
     )
     .await
@@ -527,12 +508,9 @@ async fn red04_unknown_route_id_correctly_errs() {
     let snapshot = bootstrap_async(
         r#"
         [provider.known]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "http://127.0.0.1:0/v1"
         api_key = "test-key"
-
-        [provider.known.models.test-model]
-        context_window = 64000
     "#,
     )
     .await
@@ -554,13 +532,10 @@ async fn red04_incompatible_protocol_incorrectly_returns_ok() {
     let snapshot = bootstrap_async(
         r#"
         [provider.test-proto]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "http://127.0.0.1:0/v1"
         api_key = "test-key"
         protocol = "responses"
-
-        [provider.test-proto.models.test-model]
-        context_window = 64000
     "#,
     )
     .await

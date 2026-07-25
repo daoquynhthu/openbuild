@@ -65,13 +65,9 @@ fn full_chain_toml_to_decoded_events() {
         let toml_str = format!(
             r#"
             [provider.test-provider]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "{mock_url}"
             api_key = "test-key-123"
-
-            [provider.test-provider.models.test-model]
-            context_window = 128000
-            max_output_tokens = 8192
             "#
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
@@ -155,7 +151,7 @@ fn resolve_fails_for_unknown_provider() {
         let toml_str = format!(
             r#"
             [provider.test-provider]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "{mock_url}"
             "#
         );
@@ -195,14 +191,10 @@ fn openai_chat_chain_endpoint_bearer_model_events_usage() {
         let toml_str = format!(
             r#"
             [provider.openai-test]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "{mock_url}"
             api_key = "sk-test-openai-key"
             protocol = "chat_completions"
-
-            [provider.openai-test.models.gpt-4o-test]
-            context_window = 128000
-            max_output_tokens = 4096
             "#
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
@@ -462,12 +454,9 @@ fn opencode_public_chain_no_auth() {
         let toml_str = format!(
             r#"
             [provider.opencode-test]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "{mock_url}"
             # no api_key → AuthPolicy::None / no auth
-
-            [provider.opencode-test.models.public-model]
-            context_window = 64000
             "#
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
@@ -544,12 +533,9 @@ fn custom_base_url_no_auth() {
         let toml_str = format!(
             r#"
             [provider.custom-noauth]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "{mock_url}"
             # no api_key → no auth
-
-            [provider.custom-noauth.models.custom-model]
-            context_window = 64000
             "#
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
@@ -636,20 +622,14 @@ fn two_custom_providers_no_state_cross_contamination() {
         let toml_str = format!(
             r#"
             [provider.provider-a]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "{url_a}"
             api_key = "key-a-123"
 
-            [provider.provider-a.models.model-alpha]
-            context_window = 64000
-
             [provider.provider-b]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "{url_b}"
             api_key = "key-b-456"
-
-            [provider.provider-b.models.model-beta]
-            context_window = 128000
             "#
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
@@ -832,11 +812,8 @@ fn invalid_endpoint_hard_fail_request_count_zero() {
     let snapshot = rt.block_on(async {
         let toml_str = r#"
             [provider.bad-endpoint]
-            implementation = "openai-compatible"
-            base_url = "://invalid-url"
-
-            [provider.bad-endpoint.models.test-model]
-            context_window = 64000
+            kind = "openai_compatible"
+            base_url = "http://nonexistent-unresolvable-host/"
             "#;
         let toml: toml::Value = toml::from_str(toml_str).unwrap();
 
@@ -887,9 +864,6 @@ fn ollama_discovery_and_inference() {
             base_url = "{mock_url}"
             model_list_path = "/api/tags"
             model_list_format = "ollama_tags"
-
-            [provider.ollama.models.llama3]
-            context_window = 8192
             "#,
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
@@ -952,11 +926,8 @@ fn catalog_model_discovery_and_refresh() {
         let toml_str = format!(
             r#"
             [provider.ollama-discovered]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "{mock_url}"
-
-            [provider.ollama-discovered.models.test-model]
-            context_window = 64000
             "#,
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();

@@ -32,13 +32,9 @@ fn build_agent_and_snapshot() -> (
     let snapshot = local.block_on(&rt, async {
         let toml_str = r#"
             [provider.test-aux]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "http://127.0.0.1:9999/v1"
             api_key = "test-aux-key"
-
-            [provider.test-aux.models.aux-model]
-            context_window = 128000
-            max_output_tokens = 8192
         "#;
         let toml: toml::Value = toml::from_str(toml_str).unwrap();
 

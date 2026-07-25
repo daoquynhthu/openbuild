@@ -77,12 +77,9 @@ async fn e2e_provider_inline_key_dropped() {
     let snapshot = bootstrap(
         r#"
         [provider.test]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "http://127.0.0.1:0"
         api_key = "sk-provider-inline"
-
-        [provider.test.models.m]
-        context_window = 128000
         "#,
     )
     .await;
@@ -113,13 +110,10 @@ async fn e2e_responses_protocol_respected() {
     let snapshot = bootstrap(
         r#"
         [provider.test]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "http://127.0.0.1:0"
         api_key = "test-key"
         protocol = "responses"
-
-        [provider.test.models.m]
-        context_window = 64000
         "#,
     )
     .await;
@@ -148,11 +142,8 @@ async fn e2e_missing_credential_hard_error() {
     let snapshot = bootstrap(
         r#"
         [provider.test]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "http://127.0.0.1:0"
-
-        [provider.test.models.m]
-        context_window = 64000
         "#,
     )
     .await;
@@ -177,12 +168,9 @@ async fn e2e_custom_provider_inline_key_lost() {
     let snapshot = bootstrap(
         r#"
         [provider.custom]
-        implementation = "openai-compatible"
+        kind = "openai_compatible"
         base_url = "http://127.0.0.1:0"
         api_key = "custom-inline-key"
-
-        [provider.custom.models.m]
-        context_window = 64000
         "#,
     )
     .await;
@@ -220,9 +208,6 @@ async fn e2e_openai_builtin_inline_key_dropped() {
         implementation = "openai"
         base_url = "http://127.0.0.1:0"
         api_key = "sk-openai"
-
-        [provider.openai.models.gpt-4o]
-        context_window = 128000
         "#,
     )
     .await;

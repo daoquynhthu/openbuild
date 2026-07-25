@@ -27,13 +27,9 @@ fn nested_runtime_panic_in_acp_session() {
     let agent = local.block_on(&rt, async {
         let toml_str = r#"
             [provider.test-provider]
-            implementation = "openai-compatible"
+            kind = "openai_compatible"
             base_url = "http://127.0.0.1:9999/v1"
             api_key = "test-key-123"
-
-            [provider.test-provider.models.test-model]
-            context_window = 128000
-            max_output_tokens = 8192
         "#;
         let toml: toml::Value = toml::from_str(toml_str).unwrap();
 
