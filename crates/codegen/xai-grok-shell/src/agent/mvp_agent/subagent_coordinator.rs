@@ -437,11 +437,18 @@ impl MvpAgent {
             }
             None => (None, None),
         };
+        // Drop RefCell borrows before the await below
+        let sampling_config = self.sampling_config.borrow().clone();
+        let auto_compact_threshold_tiers =
+            crate::agent::subagent::AutoCompactThresholdTiers::capture(&self.cfg.borrow());
+        let write_file_enabled = self.cfg.borrow().resolve_write_file().value;
+        let goal_enabled = self.cfg.borrow().resolve_goal().value;
+
         Some(crate::agent::subagent::SubagentSpawnContext {
             lsp: parent_lsp,
             gateway: self.gateway.clone(),
             client_hooks: Default::default(),
-            sampling_config: self.sampling_config.borrow().clone(),
+            sampling_config,
             managed_mcp_proxy_base_url: parent_managed_mcp_proxy_base_url
                 .unwrap_or_else(|| self.cli_chat_proxy_base_url()),
             alpha_test_key: self.alpha_test_key(),
@@ -460,8 +467,7 @@ impl MvpAgent {
             subagent_event_tx: self.subagent_event_tx.clone(),
             parent_depth,
             inference_idle_timeout_secs,
-            auto_compact_threshold_tiers:
-                crate::agent::subagent::AutoCompactThresholdTiers::capture(&self.cfg.borrow()),
+            auto_compact_threshold_tiers,
             hunk_tracker_handle,
             hunk_tracking_enabled,
             fs,
@@ -473,8 +479,8 @@ impl MvpAgent {
             image_gen_config: self.prepare_image_gen_config(),
             video_gen_config: self.prepare_video_gen_config(),
             app_builder_deployer_config: self.prepare_app_builder_deployer_config(),
-            write_file_enabled: self.cfg.borrow().resolve_write_file().value,
-            goal_enabled: self.cfg.borrow().resolve_goal().value,
+            write_file_enabled,
+            goal_enabled,
             ask_user_question_enabled,
             parent_cmd_tx: parent_cmd_tx.clone(),
             parent_session_info: {

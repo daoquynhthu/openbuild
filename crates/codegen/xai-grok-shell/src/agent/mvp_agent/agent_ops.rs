@@ -1385,14 +1385,16 @@ impl MvpAgent {
             .borrow()
             .provider_registry()
             .map(|reg| reg.snapshot());
+        let api_key_auth_disabled = self.cfg.borrow().grok_com_config.api_key_auth_disabled();
+        let endpoints = self.cfg.borrow().endpoints.clone();
         let mut cfg = config::resolve_web_search_sampling_config(
             &model_id,
             &models,
             session.as_ref().map(|a| a.key.as_str()),
-            self.cfg.borrow().grok_com_config.api_key_auth_disabled(),
+            api_key_auth_disabled,
             alpha_test_key.clone(),
             client_version,
-            &self.cfg.borrow().endpoints,
+            &endpoints,
             registry_snapshot.as_deref(),
         )
         .await?;
