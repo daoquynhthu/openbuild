@@ -1,4 +1,4 @@
-//! P8-011: `PreparedSamplerConfig` — the only sampler input after Phase 8.
+//! `PreparedSamplerConfig` — the only sampler input in production chain.
 //!
 //! Production chain: `ResolvedModelExecution → prepare_sampler_config → PreparedSamplerConfig → Sampler`.
 
@@ -30,7 +30,7 @@ pub struct PreparedSamplerConfig {
 #[error("unsupported protocol `{0}` — expected chat_completions, responses, or messages")]
 pub struct UnsupportedProtocolError(pub String);
 
-/// Bridge conversion for P8-011: `PreparedSamplerConfig` → `SamplerConfig`.
+/// Bridge conversion: `PreparedSamplerConfig` → `SamplerConfig`.
 ///
 /// This conversion preserves the resolved auth headers from the prepared config
 /// and infers the `auth_scheme` from the header contents. The resulting

@@ -130,8 +130,7 @@ pub fn configure_providers(
             merged = merged.merge(cli.clone());
         }
 
-        // Legacy path — store_config/register_route removed in P5-007.
-        // Configuration now flows through prepare/commit (P6).
+        // Configuration flows through configure() on registry.
         let _ = registry.configure(&pid, merged);
     }
 }
@@ -288,8 +287,7 @@ mod tests {
 
     #[test]
     fn configure_providers_stores_config() {
-        // Note: after P5-007, configure_providers no longer writes to legacy store.
-        // Config flow now goes through prepare/commit (P6).
+        // configure_providers writes through registry.configure().
         let reg = dummy_registry();
         let toml: toml::Value = toml::from_str(
             r#"

@@ -48,7 +48,7 @@ struct RegistryState {
     >,
     snapshot: Arc<RegistrySnapshot>,
     sealed: bool,
-    /// Legacy config store — only accessed through test-only methods after P5-007.
+    /// Legacy config store — only accessed through test-only methods.
     legacy_configs: HashMap<ProviderId, ProviderConfig>,
 }
 
@@ -139,7 +139,7 @@ impl ProviderRegistry {
         self.state.read().snapshot.providers.get(id).cloned()
     }
 
-    // ── Legacy API — no production callers after P5-007 ──
+    // ── Legacy API — no production callers ──
 
     #[doc(hidden)]
     pub fn store_config(&self, id: &ProviderId, config: ProviderConfig) {
@@ -154,11 +154,6 @@ impl ProviderRegistry {
             .get(id)
             .cloned()
             .or_else(|| state.snapshot.providers.get(id).map(|cp| cp.config.clone()))
-    }
-
-    #[doc(hidden)]
-    pub fn register_route(&self, _id: impl Into<String>, _route: Route) {
-        tracing::debug!("register_route called (legacy path, no-op)");
     }
 
     pub fn get_route(&self, id: &str) -> Option<Arc<Route>> {

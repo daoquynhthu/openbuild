@@ -700,10 +700,8 @@ mod tests {
     // The compiler enforces this — any attempt to add serde derives would
     // cause a compile error at the derive site.
 
-    // P8-001: Inline/Public semantics tests
-    //
-    // After P8-002/P8-011, CredentialCandidate + prepare_sampler_config provide
-    // proper inline resolution and Public/None distinction.
+    // CredentialCandidate + prepare_sampler_config provide
+    // inline resolution and Public/None distinction.
 
     use std::future::Future;
     use std::pin::Pin;
