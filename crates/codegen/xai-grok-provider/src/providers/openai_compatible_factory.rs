@@ -61,9 +61,11 @@ impl Provider for FactoryProvider {
         );
         let display_name = format!("{} (OpenAI Compatible)", self.id.0);
 
-        // D1: Resolve protocol from overrides, fall back to chat_completions
+        // D1: Resolve protocol from overrides, use protocol name as path fallback
         let protocol = crate::providers::configure::resolve_protocol(overrides.protocol.as_deref());
-        let path = protocol_path(&protocol).unwrap_or("/chat/completions");
+        let path: String = protocol_path(&protocol)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| protocol.clone());
 
         // D3: Merge profile env keys with user-provided env keys
         let mut all_env_keys = self.profile_env_key.clone();
@@ -90,7 +92,7 @@ impl Provider for FactoryProvider {
             protocol.as_str(),
             Endpoint {
                 base_url: Some(base_url),
-                path: EndpointPart::Static(path.into()),
+                path: EndpointPart::Static(path),
                 query: None,
             },
             AuthPolicy::bearer(candidates, false),

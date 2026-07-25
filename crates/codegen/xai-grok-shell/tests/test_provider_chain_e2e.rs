@@ -826,6 +826,40 @@ fn invalid_endpoint_hard_fail_request_count_zero() {
     );
 }
 
+/// P14-009C: Unknown protocol hard failure — bootstrap fails at parse validation.
+///
+/// An unknown protocol string (e.g. `protocol = "unknown_proto"`) is rejected
+/// at config parse/validation time by `ProviderConfigInput::validate`, which
+/// produces an error-level diagnostic. Bootstrap correctly treats this as a
+/// hard failure. No HTTP request is made because the provider never registers.
+#[test]
+fn unknown_protocol_hard_fail_at_parse_no_requests() {
+    let toml_str = r#"
+        [provider.test-unknown-proto]
+        kind = "openai_compatible"
+        base_url = "http://127.0.0.1:0"
+        api_key = "test-key"
+        protocol = "unknown_proto"
+        "#;
+    let toml: toml::Value = toml::from_str(toml_str).unwrap();
+
+    let result = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
+            &toml, None, None,
+        ));
+
+    assert!(
+        result.is_err(),
+        "unknown protocol must fail at bootstrap, got Ok"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.to_lowercase().contains("protocol") && err.contains("unknown"),
+        "error must mention unknown protocol, got: {err}"
+    );
+}
+
 /// I3: Ollama model discovery + inference E2E.
 ///
 /// Tests that the MockInferenceServer returns Ollama-format model list
