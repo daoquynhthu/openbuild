@@ -856,4 +856,36 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `validate_insecure_http_policy` helper added with 4 tests ✅
 
 ### Next
-- Proceed to Phase 5 (ROUTE series) or address deferred R3-ERR-03
+- Proceed to Phase 6 (PARSE series) — Reject unknown TOML fields, semantic validation, etc.
+
+---
+
+## Phase 5: ROUTE Series — 2026-07-25
+
+### R3-ROUTE-01: ModelDefaults.preferred_protocol + Route helpers
+- Added `preferred_protocol: Option<String>` field to `ModelDefaults` in `src/model.rs`
+- Added `Route::supports_protocol()` and `Route::protocol()` helpers in `src/route.rs`
+
+### R3-ROUTE-02: OpenAiRouteSelector
+- Created `OpenAiRouteSelector` in `src/providers/openai.rs`
+- o1/o3 model prefixes → `responses` route; all others → default (chat/responses based on `protocol` config field)
+- Updated `OpenAIProvider::configure()` to use selector
+- 7 route selection tests all pass
+
+### R3-ROUTE-03: Registry prepare() validation
+- Default route existence check in `Registry::prepare()`
+- Route ownership validation (`route.provider_id == pid`)
+
+### R3-ROUTE-04: Protocol inference investigation
+- Searched Shell + Sampler production code for model-name-based or URL-based protocol inference
+- **Zero instances found** — protocol is always determined through `ApiBackend` enum or `route.protocol_id`, originating from provider/route layer
+- No model-name-based or URL-based inference to remove
+
+### Fixes
+- `request_inspection.rs::opencode_has_no_auth_route`: replaced brittle `!auth_str.contains("Bearer")` with match-arm validation — OpenCode may use `Bearer(optional)` when its default env key is advertised
+- `provider_e2e.rs::precedence_env_var_sets_api_key`: serialized env-mutating tests with global `ENV_LOCK` mutex to prevent parallel-test env var interference
+
+### Key Results
+- `cargo test -p xai-grok-provider` — 245/245 pass ✅
+- `cargo clippy -p xai-grok-provider` — 0 warnings ✅
+- 7 files modified, 166 insertions, 32 deletions
