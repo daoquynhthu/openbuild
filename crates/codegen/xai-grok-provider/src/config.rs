@@ -314,11 +314,24 @@ impl ProviderConfig {
         let mut diags = Vec::new();
         let provider_id = self.id.as_deref().unwrap_or("?");
 
-        // Insecure HTTP
+        // Malformed base URL (PARSE-02: must be error)
+        if let Some(ref url_str) = self.base_url
+            && let Err(e) = url::Url::parse(url_str)
+        {
+                diags.push(ConfigDiagnostic::new_error(
+                    provider_id,
+                    "base_url",
+                    "invalid_value",
+                    format!("malformed base URL `{url_str}` — {e}"),
+                ));
+        }
+
+        // Insecure HTTP is an error (PARSE-02: non-functional only)
         if self.allow_insecure_http == Some(true) {
-            diags.push(ConfigDiagnostic::new(
+            diags.push(ConfigDiagnostic::new_error(
                 provider_id,
                 "allow_insecure_http",
+                "security_policy",
                 "insecure HTTP is enabled — this is a security risk",
             ));
         }

@@ -1,7 +1,7 @@
 # R3-PARSE-02 Evidence
 
-- Baseline commit: `0ac240a`
-- Result commit: (pending)
+- Baseline commit: `328aa78`
+- Result commit: (pending)<!--eb7be42-->
 - Files changed:
   - `xai-grok-provider/src/config.rs` — validate() now rejects custom providers without kind/profile, validates header names as error diagnostics
   - `xai-grok-provider/src/resolution.rs` — test fixtures add kind/openai_compatible to pass new validation
