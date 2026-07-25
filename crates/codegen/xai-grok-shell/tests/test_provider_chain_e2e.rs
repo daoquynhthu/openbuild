@@ -860,6 +860,83 @@ fn unknown_protocol_hard_fail_at_parse_no_requests() {
     );
 }
 
+/// R3-E2E-04: Ambiguous bare model reference hard failure — no requests.
+///
+/// A bare model name matching multiple providers is rejected by
+/// resolve_cli_model_reference with AmbiguousModel before any HTTP request.
+#[test]
+fn ambiguous_model_hard_fail_no_requests() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server, runtime) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.provider-a]
+            kind = "openai_compatible"
+            base_url = "{mock_url}"
+            api_key = "key-a"
+            [provider.provider-b]
+            kind = "openai_compatible"
+            base_url = "{mock_url}"
+            api_key = "key-b"
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+        (server, runtime)
+    });
+
+    let snapshot = runtime.snapshot();
+    let catalog_snapshot = rt.block_on(runtime.catalog.snapshot());
+    let merged = xai_grok_shell::agent::provider_resolution::merge_model_catalog(
+        &snapshot,
+        &catalog_snapshot,
+        &Default::default(),
+        &Default::default(),
+        &Default::default(),
+    );
+
+    // Insert two providers with the same bare model name to trigger ambiguity
+    let mut catalog = merged;
+    let mut e1 = custom_model_entry("provider-a", "shared-model");
+    e1.provider_id = Some("provider-a".into());
+    catalog.insert("provider-a/shared-model".into(), e1);
+    let mut e2 = custom_model_entry("provider-b", "shared-model");
+    e2.provider_id = Some("provider-b".into());
+    catalog.insert("provider-b/shared-model".into(), e2);
+
+    let result = xai_grok_shell::agent::provider_resolution::resolve_cli_model_reference(
+        "shared-model",
+        None,
+        &catalog,
+    );
+
+    assert!(
+        result.is_err(),
+        "ambiguous model must fail, got Ok: {:?}",
+        result
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.to_lowercase().contains("ambiguous") || err.to_lowercase().contains("multiple"),
+        "error must mention ambiguity, got: {err}"
+    );
+
+    // Only bootstrap model-discovery requests reached the mock server
+    let requests = server.requests();
+    assert!(
+        requests.len() <= 2,
+        "at most 2 bootstrap model-discovery requests on ambiguous model, got: {}",
+        requests.len()
+    );
+}
+
 /// I3: Ollama model discovery + inference E2E.
 ///
 /// Tests that the MockInferenceServer returns Ollama-format model list
