@@ -620,10 +620,10 @@ All 12 P13 tasks resolved:
 
 ### Files modified
 - `crates/codegen/xai-grok-test-support/src/mock_server.rs` — Ollama `/api/tags` endpoint
-- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — 10 E2E tests
+- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — 13 E2E tests
 
 ### Key results
-- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 10/10 pass ✅
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 13/13 pass ✅
 - `cargo check -p xai-grok-shell`: passes ✅
 - `cargo clippy -p xai-grok-shell`: passes ✅ (zero new warnings)
 - No new dependencies introduced
@@ -639,6 +639,14 @@ All 12 P13 tasks resolved:
 | Two custom compatible | P14-008 |
 | Missing auth hard fail | `missing_auth_hard_fail_request_count_zero` |
 | Invalid endpoint hard fail | `invalid_endpoint_hard_fail_request_count_zero` |
+| Unknown protocol hard fail | `unknown_protocol_hard_fail_at_parse_no_requests` |
+
+### P14-009C: Unknown protocol hard failure — 2026-07-25
+
+- Added `unknown_protocol_hard_fail_at_parse_no_requests` test in `test_provider_chain_e2e.rs`
+- Fixed factory fallback: replaced `unwrap_or("/chat/completions")` with `unwrap_or_else(|_| protocol.clone())` — no silent fallback to chat completions
+- The existing `ProviderConfigInput::validate` already produces error diagnostics for unknown protocols, causing `bootstrap_from_config` to reject them at parse time
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 13/13 pass ✅
 
 ### Phase 14后续：全方位审计与修复（2026-07-23）
 
