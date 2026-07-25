@@ -262,6 +262,15 @@ impl ProviderRegistry {
                             ProviderError::Config("OpenAiCompatible factory not registered".into())
                         })?;
                     let provider = factory.create(spec)?;
+
+                    // R3-E2E-04: OpenAI-compatible provider must not use the responses protocol
+                    if spec.config.public.protocol.as_deref() == Some("responses") {
+                        return Err(ProviderError::Config(format!(
+                            "protocol `responses` is not supported for OpenAI-compatible provider `{}`",
+                            pid.0
+                        )));
+                    }
+
                     let model_list_format = spec.config.public.model_list_format.map(|f| match f {
                         crate::types::ModelListFormat::OpenAiCompatible => {
                             "openai_compatible".to_string()

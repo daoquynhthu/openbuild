@@ -199,10 +199,10 @@ async fn obpa005_provider_inline_key_flows_to_auth_header() {
 }
 
 // ---------------------------------------------------------------------------
-// A2.3: OBPA-007 — Custom protocol is fixed as Chat Completions
+// A2.3: OBPA-007 — Custom protocol correctly uses chat_completions
 // ---------------------------------------------------------------------------
 #[tokio::test]
-async fn obpa007_custom_protocol_not_overridden_by_chat() {
+async fn obpa007_custom_protocol_uses_chat_completions() {
     let server = MockInferenceServer::start().await.unwrap();
     let mock_url = server.url();
 
@@ -212,7 +212,7 @@ async fn obpa007_custom_protocol_not_overridden_by_chat() {
         kind = "openai_compatible"
         base_url = "{mock_url}"
         api_key = "test-key"
-        protocol = "responses"
+        protocol = "chat_completions"
         "#,
     );
 
@@ -223,15 +223,15 @@ async fn obpa007_custom_protocol_not_overridden_by_chat() {
         .expect("resolve_model_execution must succeed");
 
     assert_eq!(
-        &*execution.protocol_id.0, "responses",
-        "protocol=responses must produce responses protocol_id (OBPA-007)"
+        &*execution.protocol_id.0, "chat_completions",
+        "protocol=chat_completions must produce chat_completions protocol_id (OBPA-007)"
     );
 
     let config = resolve_prepare(&model, &snapshot, Some("test-key")).await;
     assert_eq!(
         config.api_backend,
-        xai_grok_sampler::ApiBackend::Responses,
-        "protocol=responses must produce Responses backend (OBPA-007)"
+        xai_grok_sampler::ApiBackend::ChatCompletions,
+        "protocol=chat_completions must produce ChatCompletions backend (OBPA-007)"
     );
 
     let client = xai_grok_sampler::SamplingClient::new(config).unwrap();
@@ -242,13 +242,13 @@ async fn obpa007_custom_protocol_not_overridden_by_chat() {
     while (stream.next().await).is_some() {}
 
     let requests = server.requests();
-    let responses_req: Vec<_> = requests
+    let chat_req: Vec<_> = requests
         .iter()
-        .filter(|r| r.path.contains("/responses"))
+        .filter(|r| r.path.contains("/chat/completions"))
         .collect();
     assert!(
-        !responses_req.is_empty(),
-        "protocol=responses must produce /responses endpoint (OBPA-007), got: {:?}",
+        !chat_req.is_empty(),
+        "protocol=chat_completions must produce /chat/completions endpoint (OBPA-007), got: {:?}",
         requests.iter().map(|r| &r.path).collect::<Vec<_>>()
     );
 }
@@ -526,27 +526,26 @@ async fn red04_unknown_route_id_correctly_errs() {
 }
 
 #[tokio::test]
-async fn red04_incompatible_protocol_incorrectly_returns_ok() {
-    let snapshot = bootstrap_async(
-        r#"
+async fn openai_compatible_rejects_responses_protocol() {
+    let toml_str = r#"
         [provider.test-proto]
         kind = "openai_compatible"
         base_url = "http://127.0.0.1:0/v1"
         api_key = "test-key"
         protocol = "responses"
-    "#,
-    )
-    .await
-    .snapshot();
+    "#;
+    let toml: toml::Value = toml::from_str(toml_str).unwrap();
 
-    let model = model_entry("test-proto", "test-model");
+    let result =
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None).await;
 
-    let result = execution_to_sampler_config(&model, &snapshot, Some("test-key"), None).await;
-
-    // BUG: protocol=responses on a generic model is not validated at the
-    // chain level. After Phase 5 route selection, this must return Err.
     assert!(
-        result.is_ok(),
-        "R3-RED-04 incompatible-proto: current code INCORRECTLY returns Ok for protocol=responses on a generic model"
+        result.is_err(),
+        "openai_compatible with protocol=responses must fail at bootstrap"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.to_lowercase().contains("responses"),
+        "error must mention responses protocol, got: {err}"
     );
 }

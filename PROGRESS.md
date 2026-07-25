@@ -1037,3 +1037,28 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 16/16 pass ✅
 - `cargo check -p xai-grok-shell`: clean ✅
 - `cargo clippy -p xai-grok-shell`: 0 warnings ✅
+
+## R3-E2E-04: Incompatible OpenAI route requirement — 2026-07-25
+
+### Changes
+- Rejected `protocol = "responses"` for `openai_compatible` providers:
+  - Added validation in `registry.rs::prepare()` — OpenAiCompatible branch checks `protocol != "responses"` before calling `configure()`
+  - Updated `protocol_path()` in `openai_compatible_factory.rs` — removed "responses" from match (now falls to error arm)
+- Flipped RED test `red04_incompatible_protocol_incorrectly_returns_ok` → `openai_compatible_rejects_responses_protocol` — now asserts `Err` at bootstrap
+- Updated `obpa007_custom_protocol_not_overridden_by_chat` → `obpa007_custom_protocol_uses_chat_completions` — uses `chat_completions` instead
+- Updated factory isolation test to use `chat_completions` for both providers
+- Added `openai_compatible_rejects_responses_protocol` registry-level test
+- Added `responses_protocol_rejected_for_openai_compatible_no_requests` E2E test with mock server and zero-request assertion
+
+### Files modified
+- `crates/codegen/xai-grok-provider/src/providers/openai_compatible_factory.rs` — protocol_path, 2 tests
+- `crates/codegen/xai-grok-provider/src/registry.rs` — protocol check in prepare()
+- `crates/codegen/xai-grok-shell/tests/provider_production_chain.rs` — RED test flipped, OBPA-007 updated
+- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — new E2E test
+
+### Key results
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 17/17 pass ✅
+- `cargo test -p xai-grok-shell --test provider_production_chain`: 10/10 pass ✅
+- `cargo test -p xai-grok-provider`: 285/285 pass ✅
+- `cargo check -p xai-grok-provider -p xai-grok-shell`: clean ✅
+- `cargo clippy -p xai-grok-provider -p xai-grok-shell`: 0 warnings ✅

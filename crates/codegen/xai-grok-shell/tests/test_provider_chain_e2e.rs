@@ -950,6 +950,50 @@ fn ambiguous_model_hard_fail_no_requests() {
     );
 }
 
+/// R3-E2E-04: OpenAI-compatible provider with protocol=responses is rejected
+/// at bootstrap — request count zero.
+///
+/// The responses protocol is not supported for generic OpenAI-compatible
+/// providers. Bootstrap rejects the config before any HTTP request is made.
+#[test]
+fn responses_protocol_rejected_for_openai_compatible_no_requests() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let server = rt.block_on(MockInferenceServer::start()).unwrap();
+    let mock_url = server.url();
+
+    let toml_str = format!(
+        r#"
+        [provider.test-proto]
+        kind = "openai_compatible"
+        base_url = "{mock_url}"
+        api_key = "test-key"
+        protocol = "responses"
+        "#
+    );
+    let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+    let result = rt.block_on(
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None),
+    );
+
+    assert!(
+        result.is_err(),
+        "openai_compatible with protocol=responses must fail at bootstrap"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.to_lowercase().contains("responses"),
+        "error must mention responses protocol, got: {err}"
+    );
+
+    assert_eq!(
+        server.request_count(),
+        0,
+        "no HTTP request must reach mock server when protocol=responses is rejected"
+    );
+}
+
 /// R3-E2E-04: Unknown route hard fail — request count zero.
 ///
 /// A model entry with a nonexistent route_id is rejected during

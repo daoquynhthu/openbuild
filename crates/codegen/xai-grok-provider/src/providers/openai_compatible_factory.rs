@@ -31,7 +31,6 @@ struct FactoryProvider {
 fn protocol_path(protocol: &str) -> Result<&'static str, crate::error::ProviderError> {
     match protocol {
         "chat_completions" => Ok("/chat/completions"),
-        "responses" => Ok("/responses"),
         _ => Err(crate::error::ProviderError::Config(format!(
             "unsupported protocol `{protocol}` for OpenAI-compatible provider"
         ))),
@@ -356,9 +355,9 @@ mod tests {
         assert!(OpenAiCompatibleProviderFactory::env_key_for_profile(None).is_empty());
     }
 
-    /// D6 gate: two providers with different protocols, env keys, headers — fully isolated.
+    /// D6 gate: two providers with different env keys, headers — fully isolated.
     #[test]
-    fn factory_isolation_different_protocol_envkey_headers() {
+    fn factory_isolation_different_envkey_headers() {
         let factory = OpenAiCompatibleProviderFactory;
 
         // Provider A: chat_completions with custom env key and extra headers
@@ -374,13 +373,13 @@ mod tests {
         };
         let configured_a = p_a.configure(cfg_a);
 
-        // Provider B: responses protocol with different env key and headers
+        // Provider B: chat_completions with different env key and headers
         let spec_b = make_spec("provider-b", None, Some("http://mock-b:8080/v1".into()));
         let p_b = factory.create(&spec_b).unwrap();
         let cfg_b = ProviderConfig {
             id: Some("provider-b".into()),
             base_url: Some("http://mock-b:8080/v1".into()),
-            protocol: Some("responses".into()),
+            protocol: Some("chat_completions".into()),
             env_key: Some(vec!["CUSTOM_B_KEY".into()]),
             extra_headers: Some(IndexMap::from([("X-Custom-B".into(), "value-b".into())])),
             ..Default::default()
@@ -397,17 +396,11 @@ mod tests {
         );
 
         let route_b = configured_b.routes.values().next().unwrap();
-        assert_eq!(&*route_b.protocol_id.0, "responses");
+        assert_eq!(&*route_b.protocol_id.0, "chat_completions");
         let endpoint_debug_b = format!("{:?}", route_b.endpoint);
         assert!(
-            endpoint_debug_b.contains("/responses"),
+            endpoint_debug_b.contains("/chat/completions"),
             "provider-b endpoint: {endpoint_debug_b}"
-        );
-
-        // Endpoint URL isolation (different base URLs)
-        assert_ne!(
-            endpoint_debug_a, endpoint_debug_b,
-            "provider endpoints must differ"
         );
 
         // Extra header isolation
@@ -446,6 +439,52 @@ mod tests {
         assert!(
             !auth_b.contains("CUSTOM_A_KEY"),
             "provider-b must not reference CUSTOM_A_KEY"
+        );
+    }
+
+    #[test]
+    fn openai_compatible_rejects_responses_protocol() {
+        use crate::registry::ProviderRegistry;
+
+        let reg = ProviderRegistry::new();
+        let _ = reg.register_factory(
+            crate::registry::ProviderFactoryKind::OpenAiCompatible,
+            Arc::new(OpenAiCompatibleProviderFactory),
+        );
+
+        let resolved = crate::resolution::ResolvedProviderSet {
+            providers: IndexMap::from([(
+                crate::types::ProviderId::new("test-provider"),
+                crate::resolution::ResolvedProviderSpec {
+                    id: crate::types::ProviderId::new("test-provider"),
+                    implementation: crate::resolution::ProviderImplementation::OpenAiCompatible {
+                        profile: None,
+                    },
+                    config: crate::resolution::ProviderRuntimeConfig {
+                        public: crate::resolution::ProviderPublicConfig {
+                            base_url: Some("http://mock:8080/v1".into()),
+                            protocol: Some("responses".into()),
+                            model_list_path: None,
+                            allow_insecure_http: false,
+                            model_list_format: None,
+                            extra_headers: Default::default(),
+                        },
+                        inline_api_key: Some(crate::auth::SecretValue::new("test-key".into())),
+                        env_keys: vec![],
+                    },
+                },
+            )]),
+        };
+
+        let result = reg.prepare(&resolved);
+        assert!(
+            result.is_err(),
+            "openai_compatible must reject protocol=responses"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.to_lowercase().contains("responses"),
+            "error must mention responses protocol, got: {err_msg}"
         );
     }
 }
