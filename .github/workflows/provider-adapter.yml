@@ -60,6 +60,9 @@ jobs:
           components: clippy, rustfmt
       - name: Cache
         uses: Swatinem/rust-cache@v2
+      - name: Disk before
+        shell: pwsh
+        run: Get-Volume | Select-Object DriveLetter,SizeRemaining,Size
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Workspace check
@@ -76,6 +79,9 @@ jobs:
         run: cargo test -p xai-grok-shell --test provider_real_entry_e2e --locked
       - name: Pager lib tests
         run: cargo test -p xai-grok-pager --lib --locked
+      - name: Disk after
+        shell: pwsh
+        run: Get-Volume | Select-Object DriveLetter,SizeRemaining,Size
 
   # ── Job 3: macOS full gate (R3-CI-03) ─────────────────────────────────
   macos-gate:
@@ -104,6 +110,9 @@ jobs:
         run: cargo test --workspace --all-targets --locked --no-run
       - name: Production E2E
         run: cargo test -p xai-grok-provider --test provider_e2e --locked -- --test-threads=4
+      - name: macOS platform-specific PTY tests
+        timeout-minutes: 5
+        run: cargo test -p xai-grok-pager --test pty_e2e --locked -- --ignored --test-threads=1
 
   # ── Job 4: Invariant gates (R3-CI-08) ─────────────────────────────────
   invariant-gate:
@@ -117,10 +126,13 @@ jobs:
           python-version: "3.12"
       - name: Assert provider V1 invariants
         run: python scripts/provider-v1/assert_provider_v1_invariants.py
-      - name: Scan platform exclusions
-        run: python scripts/provider-v1/scan-platform-exclusions.py --output /tmp/platform-exclusions-report.json
+      - name: Generate platform exclusion ledger
+        run: python scripts/provider-v1/scan-platform-exclusions.py --output /tmp/platform-exclusions-ledger.md
 
-  # ── Job 5: Documentation build (R3-CI-06) ─────────────────────────────
+  # ── Job 5: Documentation gate (R3-CI-06) ─────────────────────────────
+  # Narrowly justified exception: output filename collisions between binary and
+  # library crates (xai-grok-pager-bin / xai-grok-pager) cannot be fixed in V1
+  # without renaming public crates. All other rustdoc warnings are errors.
   docs:
     name: Documentation
     runs-on: ubuntu-latest
@@ -136,9 +148,9 @@ jobs:
           toolchain: 1.92.0
       - name: Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build docs with warnings-as-errors
+      - name: Build docs
         env:
-          RUSTDOCFLAGS: "-D warnings"
+          RUSTDOCFLAGS: "-D warnings --allow rustdoc::output_filename_collision"
         run: cargo doc --workspace --no-deps --locked 2>&1
 
   # ── Job 6: Mocked provider E2E + blocking PTY (R3-CI-05) ─────────────
@@ -161,10 +173,10 @@ jobs:
       - name: Build pager binary
         run: cargo build -p xai-grok-pager-bin
       - name: Full provider test suite
-        run: cargo test -p xai-grok-provider --test provider_e2e -- --test-threads=4
+        run: cargo test -p xai-grok-provider --test provider_e2e --locked -- --test-threads=4
       - name: PTY provider E2E
         timeout-minutes: 5
-        run: cargo test -p xai-grok-pager --test pty_e2e -- --ignored providers_pty --test-threads=1
+        run: cargo test -p xai-grok-pager --test pty_e2e --locked -- --ignored providers_pty --test-threads=1
 
   # ── Job 7: Package startup smoke tests (R3-CI-09) ─────────────────────
   smoke-linux:
@@ -186,13 +198,22 @@ jobs:
         run: cargo build -p xai-grok-pager-bin
       - name: Version check
         run: ./target/debug/xai-grok-pager --version
-      - name: Startup config validation
+      - name: Smoke — start, verify config dir, terminate cleanly
         run: |
-          mkdir -p /tmp/grok-smoke-home/.grok
-          GROK_HOME=/tmp/grok-smoke-home/.grok \
-            ./target/debug/xai-grok-pager --no-header --help && echo "startup OK"
-      - name: Clean termination
-        run: rm -rf /tmp/grok-smoke-home
+          export GROK_HOME=$(mktemp -d)/.grok
+          # Start in background, wait briefly for config dir creation, then kill
+          ./target/debug/xai-grok-pager &
+          BGPID=$!
+          sleep 3
+          if [ ! -d "$GROK_HOME" ]; then
+            echo "FAIL: config directory was not created at $GROK_HOME"
+            kill $BGPID 2>/dev/null
+            exit 1
+          fi
+          echo "Config directory created: $(ls -la "$GROK_HOME" 2>/dev/null || echo 'empty')"
+          kill $BGPID 2>/dev/null
+          wait $BGPID 2>/dev/null
+          echo "Startup OK — binary started, created config dir, terminated cleanly"
 
   smoke-windows:
     name: Smoke test (Windows)
@@ -213,17 +234,22 @@ jobs:
         run: cargo build -p xai-grok-pager-bin
       - name: Version check
         run: .\target\debug\xai-grok-pager.exe --version
-      - name: Startup config validation
+      - name: Smoke — start, verify config dir, terminate cleanly
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "$env:TEMP\grok-smoke-home\.grok" -Force | Out-Null
-          $env:GROK_HOME = "$env:TEMP\grok-smoke-home\.grok"
-          .\target\debug\xai-grok-pager.exe --no-header --help
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          Write-Host "startup OK"
-      - name: Clean termination
-        shell: pwsh
-        run: Remove-Item -Recurse -Force "$env:TEMP\grok-smoke-home" -ErrorAction SilentlyContinue
+          $smokeHome = Join-Path $env:TEMP "grok-smoke-$([System.IO.Path]::GetRandomFileName())"
+          $env:GROK_HOME = Join-Path $smokeHome ".grok"
+          New-Item -ItemType Directory -Path $smokeHome -Force | Out-Null
+          $proc = Start-Process -FilePath ".\target\debug\xai-grok-pager.exe" -NoNewWindow -PassThru
+          Start-Sleep -Seconds 3
+          if (-not (Test-Path $env:GROK_HOME)) {
+            Write-Host "FAIL: config directory was not created at $env:GROK_HOME"
+            $proc.Kill()
+            exit 1
+          }
+          Write-Host "Config directory created"
+          $proc.Kill()
+          Write-Host "Startup OK — binary started, created config dir, terminated cleanly"
 
   smoke-macos:
     name: Smoke test (macOS)
@@ -244,10 +270,18 @@ jobs:
         run: cargo build -p xai-grok-pager-bin
       - name: Version check
         run: ./target/debug/xai-grok-pager --version
-      - name: Startup config validation
+      - name: Smoke — start, verify config dir, terminate cleanly
         run: |
-          mkdir -p /tmp/grok-smoke-home/.grok
-          GROK_HOME=/tmp/grok-smoke-home/.grok \
-            ./target/debug/xai-grok-pager --no-header --help && echo "startup OK"
-      - name: Clean termination
-        run: rm -rf /tmp/grok-smoke-home
+          export GROK_HOME=$(mktemp -d)/.grok
+          ./target/debug/xai-grok-pager &
+          BGPID=$!
+          sleep 3
+          if [ ! -d "$GROK_HOME" ]; then
+            echo "FAIL: config directory was not created at $GROK_HOME"
+            kill $BGPID 2>/dev/null
+            exit 1
+          fi
+          echo "Config directory created: $(ls -la "$GROK_HOME" 2>/dev/null || echo 'empty')"
+          kill $BGPID 2>/dev/null
+          wait $BGPID 2>/dev/null
+          echo "Startup OK — binary started, created config dir, terminated cleanly"

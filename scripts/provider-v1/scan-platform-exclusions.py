@@ -106,7 +106,8 @@ def scan_file(path: Path) -> list[dict]:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Scan for Windows platform exclusions")
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path, help="Write exclusion ledger to this path")
+    parser.add_argument("--check-ledger", action="store_true", help="Exit non-zero if any OPEN exclusions exist")
     args = parser.parse_args()
 
     all_results = []
@@ -127,23 +128,38 @@ def main():
 
     unique.sort(key=lambda r: (r["file"], int(r["line"]), r["symbol/test"]))
 
-    lines = [
-        "# Windows Test Exclusion Ledger",
-        f"# Generated: scan-platform-exclusions.py",
-        f"# Total: {len(unique)} entries",
-        "",
-        "| ID | file | line | symbol/test | cfg expression | classification | owner phase | repair task | rationale evidence | status |",
-        "|---|---|---|---|---|---|---|---|---|---|",
-    ]
-    for r in unique:
-        lines.append(
-            f"| {r['ID']} | {r['file']} | {r['line']} | {r['symbol/test']} | {r['cfg expression']} | "
-            f"{r['classification']} | {r['owner phase']} | {r['repair task']} | {r['rationale evidence']} | {r['status']} |"
-        )
+    if args.check_ledger:
+        open_entries = [r for r in unique if r["status"] == "OPEN"]
+        if open_entries:
+            print(f"CHECK-LEDGER FAIL: {len(open_entries)} unresolved exclusion(s)")
+            for r in open_entries:
+                print(f"  {r['ID']}  {r['file']}:{r['line']}  {r['symbol/test']}")
+            sys.exit(1)
+        else:
+            print(f"CHECK-LEDGER PASS: all {len(unique)} exclusions resolved")
+        return
 
-    output = "\n".join(lines)
-    args.output.write_text(output, encoding="utf-8")
-    print(f"Wrote {len(unique)} entries to {args.output}", file=sys.stderr)
+    if args.output:
+        lines = [
+            "# Windows Test Exclusion Ledger",
+            f"# Generated: scan-platform-exclusions.py",
+            f"# Total: {len(unique)} entries",
+            "",
+            "| ID | file | line | symbol/test | cfg expression | classification | owner phase | repair task | rationale evidence | status |",
+            "|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        for r in unique:
+            lines.append(
+                f"| {r['ID']} | {r['file']} | {r['line']} | {r['symbol/test']} | {r['cfg expression']} | "
+                f"{r['classification']} | {r['owner phase']} | {r['repair task']} | {r['rationale evidence']} | {r['status']} |"
+            )
+
+        output = "\n".join(lines)
+        args.output.write_text(output, encoding="utf-8")
+        print(f"Wrote {len(unique)} entries to {args.output}", file=sys.stderr)
+    else:
+        print("Specify --output to write the ledger or --check-ledger to verify", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

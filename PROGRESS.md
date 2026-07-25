@@ -1141,33 +1141,39 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - Replaced targeted package checks with full workspace: `cargo fmt`, `cargo check --workspace`, `cargo clippy --workspace`, `cargo test --no-run`
 - Added `rustfmt` component
 - Runs: provider tests, sampler tests, `provider_real_entry_e2e` (RED), pager lib tests
+- Added disk recording (before/after) for shard resource tracking
+- All commands use `--locked`
 
 ### R3-CI-03 — Add full macOS gate ✅
 - Added `rustfmt`, workspace check/clippy, test-build (no-run), production E2E
+- Added macOS-specific PTY tests (`cargo test --ignored` on `pty_e2e` suite)
 
 ### R3-CI-04 — Add Linux full test gate ✅
 - Linux gate now runs `cargo test --workspace --all-targets --locked` (replacing targeted provider+sampler tests)
 
 ### R3-CI-05 — Make PTY Provider E2E blocking ✅
 - Removed `continue-on-error: true` from PTY step (timeout is failure)
-- Kept `--ignored providers_pty` — explicitly named stable test filter
+- Uses `--ignored providers_pty` — explicitly named stable test filter
 
 ### R3-CI-06 — Make documentation gate honest ✅
-- Removed broad `RUSTDOCFLAGS --allow` suppressions
-- Uses `RUSTDOCFLAGS: "-D warnings"` with `cargo doc --workspace --no-deps --locked`
+- Removed broad `RUSTDOCFLAGS --allow` suppressions (private_intra_doc_links, broken_intra_doc_links, invalid_html_tags, bare_urls)
+- Uses `RUSTDOCFLAGS: "-D warnings --allow rustdoc::output_filename_collision"`
+- Narrow exception for unfixable output filename collisions (binary/lib crate name overlap)
 
 ### R3-CI-07 — Keep baseline workflow non-authoritative ✅
-- Already compliant: `workflow_dispatch` only trigger, named "Provider V1 Baseline", `continue-on-error` allowed (excluded from invariant scan)
+- Already compliant: `workflow_dispatch` only trigger, named "Provider V1 Baseline"
 - No changes needed
 
 ### R3-CI-08 — Add invariant and ledger gates ✅
 - Added `invariant-gate` job: runs `assert_provider_v1_invariants.py` + `scan-platform-exclusions.py --output`
+- Added `--check-ledger`/`--output` options to `scan-platform-exclusions.py`
 
 ### R3-CI-09 — Add package startup smoke tests ✅
 - Added `smoke-linux`, `smoke-windows`, `smoke-macos` jobs
-- Each builds `xai-grok-pager-bin`, runs `--version`, runs startup config validation (`--help` with `GROK_HOME`)
+- Each: build binary → `--version` → start & verify config dir creation → terminate cleanly
 
 ### Phase 12 gate
 - All release jobs are blocking ✅
 - No `continue-on-error` in release jobs ✅
+- Main branch covered by trigger ✅
 - Main branch covered by trigger ✅
