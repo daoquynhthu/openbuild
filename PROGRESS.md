@@ -1101,3 +1101,19 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 ### Key results
 - `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 20/20 pass ✅
 - `cargo clippy -p xai-grok-provider -p xai-grok-shell --tests -- -D warnings`: 0 warnings ✅
+
+## R3-E2E-06: Catalog restart matrix — 2026-07-25
+
+### Changes
+- Added `catalog_restart_matrix_discovery_failure_recovery` E2E test covering:
+  1. Initial discovery loads models via explicit `refresh_all`
+  2. Failed refresh (network error) marks `Failed` state, prior models preserved
+  3. Prior models remain visible in snapshot after failure
+  4. Recovery refresh after failure produces `Fresh` state with incremented revision
+
+### Files modified
+- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — new catalog restart E2E test
+
+### Key results
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 21/21 pass ✅
+- `cargo clippy -p xai-grok-shell --tests -- -D warnings`: 0 warnings ✅
