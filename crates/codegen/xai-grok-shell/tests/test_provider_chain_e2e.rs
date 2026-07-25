@@ -1329,6 +1329,158 @@ fn catalog_model_discovery_and_refresh() {
     );
 }
 
+/// R3-E2E-06: Catalog restart matrix — discovery, failure, recovery.
+///
+/// 1. Initial discovery loads models via explicit refresh_all
+/// 2. Failed refresh (network error) marks state=Failed without removing models
+/// 3. Prior models remain visible after failure
+/// 4. Successful refresh after failure emits a new revision with Fresh state
+#[test]
+fn catalog_restart_matrix_discovery_failure_recovery() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server, runtime) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.test-provider]
+            kind = "openai_compatible"
+            base_url = "{mock_url}"
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
+            &toml, None, None,
+        )
+        .await
+        .expect("bootstrap must succeed");
+
+        (server, runtime)
+    });
+
+    let snapshot = runtime.snapshot();
+    let pid = ProviderId::new("test-provider");
+    let pids = vec![pid.clone()];
+
+    // ── 1. Explicit initial discovery ──
+    rt.block_on(async {
+        runtime
+            .catalog
+            .refresh_all(
+                &pids,
+                |pid| {
+                    let _entry = snapshot.providers.get(pid)?;
+                    let mut defaults = xai_grok_provider::types::ProviderDefaults::default();
+                    defaults.id = pid.clone();
+                    defaults.base_url = server.url();
+                    Some((format!("{}/models", server.url()), defaults))
+                },
+                std::time::Duration::from_secs(0),
+            )
+            .await;
+        runtime.catalog.join_active_refresh().await;
+    });
+
+    let catalog_initial = rt.block_on(runtime.catalog.snapshot());
+    let initial_models: Vec<_> = catalog_initial
+        .providers
+        .get(&pid)
+        .map(|e| e.models.clone())
+        .unwrap_or_default();
+    assert!(
+        !initial_models.is_empty(),
+        "initial discovery must load models"
+    );
+    let initial_rev = catalog_initial.catalog_revision;
+    assert!(
+        initial_rev > 0,
+        "initial catalog revision must be > 0: {initial_rev}"
+    );
+
+    // ── 2 & 3. Failed refresh preserves prior models ──
+    rt.block_on(async {
+        runtime
+            .catalog
+            .refresh_all(
+                &pids,
+                |pid| {
+                    let _entry = snapshot.providers.get(pid)?;
+                    let mut defaults = xai_grok_provider::types::ProviderDefaults::default();
+                    defaults.id = pid.clone();
+                    defaults.base_url = "http://127.0.0.1:0".into();
+                    Some(("http://127.0.0.1:1/nonexistent-models".into(), defaults))
+                },
+                std::time::Duration::from_secs(0),
+            )
+            .await;
+        runtime.catalog.join_active_refresh().await;
+    });
+
+    let catalog_after_fail = rt.block_on(runtime.catalog.snapshot());
+    let fail_entry = catalog_after_fail
+        .providers
+        .get(&pid)
+        .expect("provider must still be in catalog after failed refresh");
+    assert!(
+        matches!(fail_entry.state, xai_grok_shell::agent::provider_catalog::ProviderCatalogState::Failed(_)),
+        "failed refresh must mark state as Failed, got: {:?}",
+        fail_entry.state
+    );
+    assert!(
+        !fail_entry.models.is_empty(),
+        "prior models must survive a failed refresh"
+    );
+    assert_eq!(
+        fail_entry.models.len(),
+        initial_models.len(),
+        "model count must be preserved after failed refresh"
+    );
+
+    // ── 4. Successful refresh after failure ──
+    let fail_rev = catalog_after_fail.catalog_revision;
+    rt.block_on(async {
+        runtime
+            .catalog
+            .refresh_all(
+                &pids,
+                |pid| {
+                    let _entry = snapshot.providers.get(pid)?;
+                    let mut defaults = xai_grok_provider::types::ProviderDefaults::default();
+                    defaults.id = pid.clone();
+                    defaults.base_url = server.url();
+                    Some((format!("{}/models", server.url()), defaults))
+                },
+                std::time::Duration::from_secs(0),
+            )
+            .await;
+        runtime.catalog.join_active_refresh().await;
+    });
+
+    let catalog_after_recovery = rt.block_on(runtime.catalog.snapshot());
+    let recovery_entry = catalog_after_recovery
+        .providers
+        .get(&pid)
+        .expect("provider must be in catalog after recovery");
+    assert!(
+        matches!(recovery_entry.state, xai_grok_shell::agent::provider_catalog::ProviderCatalogState::Fresh),
+        "recovery refresh must produce Fresh state, got: {:?}",
+        recovery_entry.state
+    );
+    assert!(
+        catalog_after_recovery.catalog_revision > fail_rev,
+        "catalog revision must increment after recovery refresh: {} > {}",
+        catalog_after_recovery.catalog_revision,
+        fail_rev
+    );
+    assert!(
+        !recovery_entry.models.is_empty(),
+        "recovery refresh must load models"
+    );
+}
+
 /// R3-E2E-05: Hot-reload matrix — valid config change, invalid config rejection, provider removal.
 ///
 /// Simulates hot-reload lifecycle:
