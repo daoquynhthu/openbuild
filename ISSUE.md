@@ -282,3 +282,89 @@
 | S03 | xai-grok-shell/src/extensions/suggest/shell_token.rs | 已记录 — 9 个 `#[cfg(not(windows))]` 测试守卫，每个都有对应的 `#[cfg(windows)]` 变体，代表真实平台行为差异。 |
 | S04 | xai-grok-provider/src/providers/mod.rs:46 | 已评估 — 此处的 `std::env::var` 调用是 provider 配置期间的环境变量检测（`XAI_API_KEY`→xAI），属于配置解析层，与请求级凭据解析路径不同。 |
 | — | xai-grok-shell/src/agent/provider_resolution.rs:643,669 | Fixed — 两个 pre-existing clippy 警告 |
+
+---
+
+## CI 诊断: 2026-07-26 (Run 30164563159, Commit c3fb820)
+
+### 范围
+审查 GitHub Actions 运行 `30164563159`（push 到 `feat/provider-adapter`，base `c3fb820`，force push 前）的全部失败作业日志，定位每个失败的根因、是否已修复、以及 provider-adapter 团队可操作的修复项。
+
+### 审计方法
+- `gh run view 30164563159 --log --job <job-id>` 逐作业读取完整日志
+- 将每个失败归类为：provider-adapter 代码问题、格式问题、文档工具链问题、预存平台问题、已知基线
+
+### 失败作业总览（8 个作业，9 个失败步骤）
+
+| 作业 | 步骤 | 退出码 | 根因 | 可操作 | 
+|------|------|--------|------|--------|
+| macOS gate | Format check | 1 | `cargo fmt --all -- --check` — provider crate 20+ 文件的格式漂移 | ✅ 已修复 (Phase 13, `1d0f6e9`) |
+| Linux gate | Format check | 1 | 同上 | ✅ 已修复 |
+| Windows gate | Format check | 1 | 同上（后续步骤未运行） | ✅ 已修复 |
+| Documentation | Build docs | 101 | `RUSTDOCFLAGS: "-D warnings --allow rustdoc::output_filename_collision"` — `rustdoc::output_filename_collision` lint 在 Rust 1.92.0 中不存在，`-D unknown-lints` 将其转为硬错误 | ❌ 需修复 CI 配置 |
+| Invariant gate | Assert provider V1 invariants | 1 | 3 个基线违规（已知，已记录） | ✅ 已知基线 |
+| Smoke test (Windows) | Build binary | 1 | `LINK : fatal error LNK4319: A PDB limit was hit while adding public symbols` — 调试符号超长，PDB 限制 | ❌ 预存问题 |
+| Smoke test (Linux) | Smoke — start | 1 | 二进制启动失败：`Error: No such device or address (os error 6)` — CI headless 环境无 PTY/TTY | ❌ 预存问题 |
+| Smoke test (macOS) | Smoke — start | 1 | 同上 `Error: No such device or address` | ❌ 预存问题 |
+| Provider E2E | PTY provider E2E | 超时 5m | `providers_pty` 测试在 headless CI 中挂起 | ❌ 预存问题 |
+
+### 详细根因分析
+
+#### DOC-01: Documentation build 失败 (`cargo doc` exit 101)
+
+**CI 配置** (`.github/workflows/provider-adapter.yml:152-153`):
+```yaml
+RUSTDOCFLAGS: "-D warnings --allow rustdoc::output_filename_collision"
+```
+
+**错误**:
+```
+error[E0602]: unknown lint: `rustdoc::output_filename_collision`
+```
+
+**分析**: `--allow rustdoc::output_filename_collision` 是 workflow 作者希望绕过的已知问题：`xai-grok-pager-bin`（二进制 crate）和 `xai-grok-pager`（库 crate）都在 `target/doc/` 输出名为 `xai_grok_pager/index.html` 的文档页，导致 `rustdoc::output_filename_collision` 警告。但此 lint 在 Rust 1.92.0 中尚未存在（可能在 1.94+ 引入或用不同名称）。由于 `RUSTFLAGS: "-D warnings"` 隐含 `-D unknown-lints`，未知 lint 名称导致硬错误。
+
+**修复方向**: 检测当前 Rust 版本支持的 lint 名称，或移除 `--allow` 并改用其他方式抑制该警告（如 `#[allow]` 属性在源码级别，或 `RUSTDOCFLAGS` 只设 `-D warnings` 并接受两个 crate 的文档碰撞（不算功能性错误）。
+
+#### WSMK-01: Windows Smoke 链接失败 (LNK4319)
+
+**错误**:
+```
+LINK : fatal error LNK4319: A PDB limit was hit while adding public symbols.
+```
+前导有几十个 `warning LNK4318: Very long symbol name encountered while producing debug information`。
+
+**分析**: Visual Studio 链接器在生成 PDB 调试信息时，遇到超长符号名（由 Rust 泛型展开/宏展开导致），超过内部缓冲区的 PDB 限制。这是 Rust 泛型代码 + Windows MSVC 工具链的已知交互问题，在大型单体 crate（如 `xai-grok-pager-bin`，依赖链包含数百个 crate）中更容易触发。
+
+**修复方向**: 
+- 在 `.cargo/config.toml` 或 CI 环境中为 Windows 设置 `rustflags = ["-C", "link-args=/DEBUG:LongSymbolTruncate"]`
+- 或减少调试符号级别（`strip = "symbols"` 或 `debug = 0`）
+
+#### SMK-01/02: Linux/macOS Smoke 启动失败
+
+**错误**: `Error: No such device or address (os error 6)`
+
+**分析**: `xai-grok-pager` 是一个 TUI 应用程序，启动时需要打开 terminal/PTY 设备。在 GitHub Actions headless CI 环境中，没有可用的 TTY 设备，因此 `os error 6` 意味着 `ENXIO`（无此设备或地址）。这不是 provider-adapter 相关的问题，而是 TUI 应用程序在 CI 中运行的根本性限制。
+
+**修复方向**: 
+- Smoke test 需改为：确认二进制可构建 + `--version` 可输出 + 可执行文件存在，不尝试实际启动 TUI 进程
+- 或使用 `script`/`unbuffer` 等工具模拟 TTY
+
+#### PTY-01: Provider PTY E2E 超时
+
+**分析**: `cargo test -p xai-grok-pager --test pty_e2e --locked -- --ignored providers_pty` 超时 5 分钟。这与 SMK-01/02 同根因——PTY 测试在 headless CI 中没有可用的 PTY，测试挂起等待 PTY I/O。PTY E2E 测试本来就是 `--ignored` 状态，表示已知的特殊环境需求。
+
+**修复方向**: 
+- 保留 `--ignored` 状态，不对 CI 环境强制执行 PTY 测试
+- 或添加可选的 `CI_SKIP_PTY` 环境变量检查
+
+### 状态汇总
+
+| 条目 | 严重度 | 状态 |
+|------|--------|------|
+| DOC-01: `rustdoc::output_filename_collision` 未知 lint | 严重 — 阻塞 docs CI job | ❌ 未修复 |
+| WSMK-01: Windows LNK4319 PDB 限制 | 中等 — 阻塞 Windows smoke CI job | ❌ 预存问题 |
+| SMK-01: Linux smoke PTY 不可用 | 中等 — 阻塞 Linux smoke CI job | ❌ 预存问题 |
+| SMK-02: macOS smoke PTY 不可用 | 中等 — 阻塞 macOS smoke CI job | ❌ 预存问题 |
+| PTY-01: PTY E2E 测试超时 | 中等 — 阻塞 provider E2E CI job | ❌ 预存问题 |
+| INV-01: 3 个不变性基线违规 | 建议 — 已知，已记录 | ✅ 基线 |
