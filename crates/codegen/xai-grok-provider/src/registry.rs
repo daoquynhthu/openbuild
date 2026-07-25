@@ -367,25 +367,32 @@ impl ProviderRegistry {
                 }
 
                 // PARSE-04: Validate required auth has candidates
-                if let crate::auth::AuthPolicy::Bearer { required: true, ref candidates } = route.auth
+                if let crate::auth::AuthPolicy::Bearer {
+                    required: true,
+                    ref candidates,
+                } = route.auth
                     && candidates.is_empty()
                 {
-                        return Err(ProviderError::Config(format!(
-                            "route `{}` requires Bearer auth but has no credential candidates",
-                            rid.0
-                        )));
+                    return Err(ProviderError::Config(format!(
+                        "route `{}` requires Bearer auth but has no credential candidates",
+                        rid.0
+                    )));
                 }
 
                 // PARSE-04: Validate headers parse
                 for (name, value) in &route.static_headers {
-                    http::HeaderName::from_bytes(name.as_bytes())
-                        .map_err(|_| ProviderError::InvalidHeader(format!(
-                            "route `{}` invalid header name: {name:?}", rid.0
-                        )))?;
-                    http::HeaderValue::from_str(value)
-                        .map_err(|_| ProviderError::InvalidHeader(format!(
-                            "route `{}` invalid header value for `{name}`", rid.0
-                        )))?;
+                    http::HeaderName::from_bytes(name.as_bytes()).map_err(|_| {
+                        ProviderError::InvalidHeader(format!(
+                            "route `{}` invalid header name: {name:?}",
+                            rid.0
+                        ))
+                    })?;
+                    http::HeaderValue::from_str(value).map_err(|_| {
+                        ProviderError::InvalidHeader(format!(
+                            "route `{}` invalid header value for `{name}`",
+                            rid.0
+                        ))
+                    })?;
                 }
 
                 new_routes.insert(key, route.clone());
@@ -1391,7 +1398,9 @@ mod tests {
                 overrides,
                 routes,
                 rid.clone(),
-                Arc::new(DefaultRouteSelector { default_route_id: rid }),
+                Arc::new(DefaultRouteSelector {
+                    default_route_id: rid,
+                }),
                 ModelSourceSpec::Dynamic,
             )
         }
@@ -1618,7 +1627,10 @@ mod tests {
             )]),
         };
         let result = reg.prepare(&resolved);
-        assert!(result.is_err(), "default route absent from route set must be rejected");
+        assert!(
+            result.is_err(),
+            "default route absent from route set must be rejected"
+        );
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("nonexistent"),
@@ -1644,9 +1656,15 @@ mod tests {
     }
 
     impl Provider for BadEndpointProvider {
-        fn id(&self) -> &ProviderId { &self.id }
-        fn name(&self) -> &str { "BadEndpoint" }
-        fn defaults(&self) -> &ProviderDefaults { &self.defaults }
+        fn id(&self) -> &ProviderId {
+            &self.id
+        }
+        fn name(&self) -> &str {
+            "BadEndpoint"
+        }
+        fn defaults(&self) -> &ProviderDefaults {
+            &self.defaults
+        }
         fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
             let rid = RouteId::new("chat");
             let route = Arc::new(Route::make(
@@ -1667,7 +1685,9 @@ mod tests {
                 overrides,
                 routes,
                 rid.clone(),
-                Arc::new(DefaultRouteSelector { default_route_id: rid }),
+                Arc::new(DefaultRouteSelector {
+                    default_route_id: rid,
+                }),
                 ModelSourceSpec::Dynamic,
             )
         }
@@ -1728,9 +1748,15 @@ mod tests {
     }
 
     impl Provider for NoBaseUrlProvider {
-        fn id(&self) -> &ProviderId { &self.id }
-        fn name(&self) -> &str { "NoBaseUrl" }
-        fn defaults(&self) -> &ProviderDefaults { &self.defaults }
+        fn id(&self) -> &ProviderId {
+            &self.id
+        }
+        fn name(&self) -> &str {
+            "NoBaseUrl"
+        }
+        fn defaults(&self) -> &ProviderDefaults {
+            &self.defaults
+        }
         fn configure(&self, overrides: ProviderConfig) -> ConfiguredProvider {
             let rid = RouteId::new("chat");
             let route = Arc::new(Route::make(
@@ -1751,7 +1777,9 @@ mod tests {
                 overrides,
                 routes,
                 rid.clone(),
-                Arc::new(DefaultRouteSelector { default_route_id: rid }),
+                Arc::new(DefaultRouteSelector {
+                    default_route_id: rid,
+                }),
                 ModelSourceSpec::Dynamic,
             )
         }

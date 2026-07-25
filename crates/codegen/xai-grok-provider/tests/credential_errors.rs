@@ -42,12 +42,15 @@ async fn absent_credential_returns_none() {
     let env = TestEnvReader(Ok(None));
     let session = TestSession(Ok(None));
     let c = ctx(&env, &session);
-        let result = c
-            .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec![
-                "MY_KEY".into(),
-            ])])
-            .await;
-    assert!(result.unwrap().is_none(), "absent credential should return None");
+    let result = c
+        .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec![
+            "MY_KEY".into(),
+        ])])
+        .await;
+    assert!(
+        result.unwrap().is_none(),
+        "absent credential should return None"
+    );
 }
 
 #[tokio::test]

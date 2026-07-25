@@ -21,10 +21,10 @@ use crate::agent::init::{bootstrap, exit_on_config_error};
 use crate::agent::models::{ModelFetchAuth, prefetch_models_blocking};
 use crate::agent::mvp_agent::MvpAgent;
 use crate::agent::provider_catalog::derive_model_list_url;
-use xai_grok_provider::types::{ModelListFormat, ProviderDefaults};
 use crate::auth::{AuthManager, AuthMode, GrokAuth, run_auth_flow};
 use crate::util::grok_home;
 use dirs;
+use xai_grok_provider::types::{ModelListFormat, ProviderDefaults};
 
 const MAX_BUFFER_SIZE: usize = 8 * 1024 * 1024;
 

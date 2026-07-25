@@ -318,12 +318,12 @@ impl ProviderConfig {
         if let Some(ref url_str) = self.base_url
             && let Err(e) = url::Url::parse(url_str)
         {
-                diags.push(ConfigDiagnostic::new_error(
-                    provider_id,
-                    "base_url",
-                    "invalid_value",
-                    format!("malformed base URL `{url_str}` — {e}"),
-                ));
+            diags.push(ConfigDiagnostic::new_error(
+                provider_id,
+                "base_url",
+                "invalid_value",
+                format!("malformed base URL `{url_str}` — {e}"),
+            ));
         }
 
         // Insecure HTTP is an error (PARSE-02: non-functional only)
@@ -356,7 +356,7 @@ impl ProviderConfig {
         if let Some(fmt) = self.model_list_format.as_deref()
             && !matches!(fmt, "openai_compatible" | "ollama_tags" | "ollama")
         {
-                diags.push(ConfigDiagnostic::new_error(
+            diags.push(ConfigDiagnostic::new_error(
                     provider_id,
                     "model_list_format",
                     "unknown_value",
@@ -524,7 +524,9 @@ mod tests {
         };
         let diags = cfg.validate();
         assert!(
-            diags.iter().any(|d| d.is_error() && d.to_string().contains("header")),
+            diags
+                .iter()
+                .any(|d| d.is_error() && d.to_string().contains("header")),
             "validate() must produce error for empty header name: {diags:?}"
         );
     }
@@ -539,7 +541,9 @@ mod tests {
         };
         let diags = cfg.validate();
         assert!(
-            diags.iter().any(|d| d.is_error() && d.to_string().contains("header")),
+            diags
+                .iter()
+                .any(|d| d.is_error() && d.to_string().contains("header")),
             "validate() must produce error for colon in header name: {diags:?}"
         );
     }

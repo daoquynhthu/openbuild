@@ -49,7 +49,11 @@ pub struct OpenAiRouteSelector {
 }
 
 impl OpenAiRouteSelector {
-    pub fn new(chat_route_id: RouteId, responses_route_id: RouteId, default_route_id: RouteId) -> Self {
+    pub fn new(
+        chat_route_id: RouteId,
+        responses_route_id: RouteId,
+        default_route_id: RouteId,
+    ) -> Self {
         let referenced = vec![chat_route_id, responses_route_id.clone()];
         Self {
             responses_route_id,
@@ -148,7 +152,9 @@ impl Provider for OpenAIProvider {
         );
         if let Some(ref extra) = overrides.extra_headers {
             for (key, value) in extra {
-                route_responses.static_headers.insert(key.clone(), value.clone());
+                route_responses
+                    .static_headers
+                    .insert(key.clone(), value.clone());
             }
         }
         let route_responses = Arc::new(route_responses);

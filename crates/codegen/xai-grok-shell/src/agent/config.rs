@@ -4739,10 +4739,9 @@ pub async fn sampling_config_for_model_with_registry(
                 e.to_string(),
             )
         })?;
-        let config = xai_grok_sampler::SamplerConfig::try_from(prepared)
-            .map_err(|e| crate::agent::provider_resolution::ProviderResolutionError::Protocol(
-                e.to_string(),
-            ))?;
+        let config = xai_grok_sampler::SamplerConfig::try_from(prepared).map_err(|e| {
+            crate::agent::provider_resolution::ProviderResolutionError::Protocol(e.to_string())
+        })?;
         return Ok(config);
     }
     // No registry configured — fall back to legacy sampler (test-only paths).

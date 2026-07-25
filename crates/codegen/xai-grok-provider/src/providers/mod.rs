@@ -6,8 +6,8 @@ use tracing;
 use crate::config::ProviderConfig;
 use crate::registry::ProviderRegistry;
 
-pub mod configure;
 mod anthropic;
+pub mod configure;
 mod ollama;
 pub(crate) mod openai;
 mod openai_compatible;

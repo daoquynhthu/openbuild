@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
-use xai_grok_provider::auth::CredentialCandidate;
 use xai_grok_provider::auth::AuthPolicy;
+use xai_grok_provider::auth::CredentialCandidate;
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::protocol::ProtocolId;
 use xai_grok_provider::registry::ProviderRegistry;
@@ -43,7 +43,10 @@ fn provider_inline_candidates<'a>(auth: &'a AuthPolicy) -> Vec<&'a CredentialCan
         AuthPolicy::Header { candidates, .. } => candidates,
         AuthPolicy::None => return Vec::new(),
     };
-    candidates.iter().filter(|c| matches!(c, CredentialCandidate::ProviderInline)).collect()
+    candidates
+        .iter()
+        .filter(|c| matches!(c, CredentialCandidate::ProviderInline))
+        .collect()
 }
 
 fn provider_env_candidates<'a>(auth: &'a AuthPolicy) -> Vec<&'a Vec<String>> {
@@ -52,13 +55,16 @@ fn provider_env_candidates<'a>(auth: &'a AuthPolicy) -> Vec<&'a Vec<String>> {
         AuthPolicy::Header { candidates, .. } => candidates,
         AuthPolicy::None => return Vec::new(),
     };
-    candidates.iter().filter_map(|c| {
-        if let CredentialCandidate::ProviderEnvironment(keys) = c {
-            Some(keys)
-        } else {
-            None
-        }
-    }).collect()
+    candidates
+        .iter()
+        .filter_map(|c| {
+            if let CredentialCandidate::ProviderEnvironment(keys) = c {
+                Some(keys)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn assert_field_fidelity(
@@ -109,9 +115,16 @@ fn assert_field_fidelity(
 
     // extra_headers must be reflected in static_headers
     let has_extra = route.static_headers.contains_key(expected_extra_key);
-    assert!(has_extra, "extra_headers must be present in route static_headers");
+    assert!(
+        has_extra,
+        "extra_headers must be present in route static_headers"
+    );
     let extra_val = route.static_headers.get(expected_extra_key);
-    assert_eq!(extra_val, Some(&expected_extra_val.to_owned()), "extra_headers value mismatch");
+    assert_eq!(
+        extra_val,
+        Some(&expected_extra_val.to_owned()),
+        "extra_headers value mismatch"
+    );
 
     // protocol_id must not be default
     let pid = ProtocolId::from(expected_protocol);

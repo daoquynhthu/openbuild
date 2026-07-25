@@ -166,7 +166,10 @@ pub fn resolve_provider_set(
                 pid.0.clone(),
                 "provider",
                 "duplicate_identity",
-                format!("duplicate provider `{}` in the same configuration layer", pid.0),
+                format!(
+                    "duplicate provider `{}` in the same configuration layer",
+                    pid.0
+                ),
             ));
             continue;
         }

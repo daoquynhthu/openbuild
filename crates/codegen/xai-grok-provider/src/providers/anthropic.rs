@@ -80,11 +80,7 @@ impl Provider for AnthropicProvider {
                 path: EndpointPart::Static("/messages".into()),
                 query: None,
             },
-            AuthPolicy::header(
-                http::HeaderName::from_static("x-api-key"),
-                candidates,
-                true,
-            ),
+            AuthPolicy::header(http::HeaderName::from_static("x-api-key"), candidates, true),
         );
         // Merge extra headers from config
         if let Some(ref extra) = overrides.extra_headers {

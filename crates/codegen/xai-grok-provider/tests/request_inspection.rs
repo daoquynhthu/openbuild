@@ -200,7 +200,10 @@ async fn opencode_has_no_auth_route() {
     match &r.auth {
         xai_grok_provider::auth::AuthPolicy::None => {}
         xai_grok_provider::auth::AuthPolicy::Bearer { required, .. } => {
-            assert!(!required, "OpenCode Bearer auth must be optional for public access");
+            assert!(
+                !required,
+                "OpenCode Bearer auth must be optional for public access"
+            );
         }
         xai_grok_provider::auth::AuthPolicy::Header { .. } => {
             panic!("OpenCode must not use Header auth");

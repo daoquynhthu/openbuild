@@ -5,8 +5,8 @@
 //! Readers receive immutable `Arc<ModelCatalogSnapshot>`.
 
 use std::num::NonZeroU64;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};

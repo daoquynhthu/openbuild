@@ -28,10 +28,14 @@ pub fn build_credential_candidates(
         candidates.push(CredentialCandidate::ProviderInline);
     }
     if !user_env_keys.is_empty() {
-        candidates.push(CredentialCandidate::ProviderEnvironment(user_env_keys.to_vec()));
+        candidates.push(CredentialCandidate::ProviderEnvironment(
+            user_env_keys.to_vec(),
+        ));
     }
     if !default_env_keys.is_empty() {
-        candidates.push(CredentialCandidate::ProviderEnvironment(default_env_keys.to_vec()));
+        candidates.push(CredentialCandidate::ProviderEnvironment(
+            default_env_keys.to_vec(),
+        ));
     }
     candidates
 }
@@ -57,9 +61,8 @@ pub fn validate_insecure_http_policy(
 ) -> Result<(), String> {
     if base_url.starts_with("http://") && !allow_insecure_http {
         Err(
-            "endpoint uses http:// but allow_insecure_http is not enabled; "
-                .to_owned()
-                    + "set allow_insecure_http=true to allow HTTP URLs",
+            "endpoint uses http:// but allow_insecure_http is not enabled; ".to_owned()
+                + "set allow_insecure_http=true to allow HTTP URLs",
         )
     } else {
         Ok(())
@@ -72,10 +75,15 @@ pub fn resolve_model_source(
     defaults: &ProviderDefaults,
 ) -> Option<(String, ModelListFormat)> {
     if let Some(path) = &public.model_list_path {
-        let fmt = public.model_list_format.unwrap_or(defaults.model_list_format);
+        let fmt = public
+            .model_list_format
+            .unwrap_or(defaults.model_list_format);
         return Some((path.clone(), fmt));
     }
-    defaults.model_list_endpoint.as_ref().map(|url| (url.clone(), defaults.model_list_format))
+    defaults
+        .model_list_endpoint
+        .as_ref()
+        .map(|url| (url.clone(), defaults.model_list_format))
 }
 
 #[cfg(test)]
@@ -84,29 +92,22 @@ mod tests {
 
     #[test]
     fn validate_insecure_http_https_allows_without_flag() {
-        assert!(
-            validate_insecure_http_policy("https://api.example.com/v1", false).is_ok()
-        );
+        assert!(validate_insecure_http_policy("https://api.example.com/v1", false).is_ok());
     }
 
     #[test]
     fn validate_insecure_http_https_allows_with_flag() {
-        assert!(
-            validate_insecure_http_policy("https://api.example.com/v1", true).is_ok()
-        );
+        assert!(validate_insecure_http_policy("https://api.example.com/v1", true).is_ok());
     }
 
     #[test]
     fn validate_insecure_http_http_rejects_without_flag() {
-        let err = validate_insecure_http_policy("http://localhost:11434/v1", false)
-            .unwrap_err();
+        let err = validate_insecure_http_policy("http://localhost:11434/v1", false).unwrap_err();
         assert!(err.contains("allow_insecure_http"));
     }
 
     #[test]
     fn validate_insecure_http_http_allows_with_flag() {
-        assert!(
-            validate_insecure_http_policy("http://localhost:11434/v1", true).is_ok()
-        );
+        assert!(validate_insecure_http_policy("http://localhost:11434/v1", true).is_ok());
     }
 }

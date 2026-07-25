@@ -1,5 +1,5 @@
-use xai_grok_provider::config::parse_provider_toml;
 use xai_grok_provider::config::ProviderConfig;
+use xai_grok_provider::config::parse_provider_toml;
 use xai_grok_provider::resolution::resolve_provider_set;
 
 fn resolve_provider_with(src: &str) -> (Vec<xai_grok_provider::config::ConfigDiagnostic>, bool) {
@@ -74,7 +74,9 @@ protocol = "unknown_protocol"
     );
     assert!(empty || diags.iter().any(|d| d.is_error()));
     assert!(
-        diags.iter().any(|d| d.to_string().contains("unknown protocol")),
+        diags
+            .iter()
+            .any(|d| d.to_string().contains("unknown protocol")),
         "unknown protocol must produce error diagnostic"
     );
 }
@@ -106,7 +108,10 @@ kind = "openai_compatible"
 "#,
     );
     let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
-    assert!(errors.is_empty(), "openai_compatible kind must not produce errors: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "openai_compatible kind must not produce errors: {errors:?}"
+    );
 }
 
 #[test]
@@ -123,7 +128,9 @@ base_url = "https://example.test/v1"
         "custom provider without kind or profile must be an error"
     );
     assert!(
-        diags.iter().any(|d| d.to_string().contains("kind") && d.to_string().contains("missing")),
+        diags
+            .iter()
+            .any(|d| d.to_string().contains("kind") && d.to_string().contains("missing")),
         "error must mention missing kind: {:?}",
         diags.iter().map(|d| d.to_string()).collect::<Vec<_>>()
     );
@@ -139,7 +146,10 @@ profile = "my-company"
 "#,
     );
     let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
-    assert!(errors.is_empty(), "custom provider with profile must be accepted: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "custom provider with profile must be accepted: {errors:?}"
+    );
 }
 
 #[test]
@@ -153,7 +163,10 @@ base_url = "https://example.test/v1"
 "#,
     );
     let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
-    assert!(errors.is_empty(), "custom provider with kind must be accepted: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "custom provider with kind must be accepted: {errors:?}"
+    );
 }
 
 // ── PARSE-03: Duplicate identity rejection ──
@@ -202,10 +215,19 @@ base_url = "https://test.api/v1"
 protocol = "nonsense"
 "#,
     );
-    let err = diags.iter().find(|d| d.is_error()).expect("must have error");
+    let err = diags
+        .iter()
+        .find(|d| d.is_error())
+        .expect("must have error");
     let text = err.to_string();
     assert!(text.contains("test"), "must contain provider ID: {text}");
     assert!(text.contains("protocol"), "must contain field path: {text}");
-    assert!(text.contains("unknown_value"), "must contain category: {text}");
-    assert!(!text.contains("sk-test"), "must NOT contain API key: {text}");
+    assert!(
+        text.contains("unknown_value"),
+        "must contain category: {text}"
+    );
+    assert!(
+        !text.contains("sk-test"),
+        "must NOT contain API key: {text}"
+    );
 }

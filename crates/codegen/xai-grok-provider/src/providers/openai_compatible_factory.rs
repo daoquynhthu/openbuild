@@ -7,7 +7,9 @@ use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider, SharedProvider};
 use crate::resolution::{ProviderImplementation, ResolvedProviderSpec};
 use crate::route::Route;
-use crate::types::{ApiBackend, AuthScheme, ModelSourceSpec, ProviderDefaults, ProviderId, RouteId};
+use crate::types::{
+    ApiBackend, AuthScheme, ModelSourceSpec, ProviderDefaults, ProviderId, RouteId,
+};
 
 pub type SharedProviderFactory = Arc<dyn ProviderFactory + Send + Sync>;
 

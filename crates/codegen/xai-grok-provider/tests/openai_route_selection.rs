@@ -97,10 +97,7 @@ fn generic_model_selects_chat_by_default() {
         .route_selector
         .select("gpt-4o")
         .expect("selector must succeed");
-    assert_eq!(
-        selected.0, "openai-chat",
-        "gpt-4o must select chat route"
-    );
+    assert_eq!(selected.0, "openai-chat", "gpt-4o must select chat route");
 
     let selected = configured
         .route_selector

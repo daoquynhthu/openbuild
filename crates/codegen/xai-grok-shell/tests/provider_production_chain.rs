@@ -77,8 +77,7 @@ async fn resolve_prepare_with_overrides(
         &session,
     );
     let prepared = prepare_sampler_config(&execution, &creds, request_headers).await?;
-    Ok(xai_grok_sampler::SamplerConfig::try_from(prepared)
-        .expect("valid protocol in test"))
+    Ok(xai_grok_sampler::SamplerConfig::try_from(prepared).expect("valid protocol in test"))
 }
 
 async fn resolve_prepare(
@@ -454,7 +453,8 @@ async fn red04_invalid_endpoint_produces_chain_error() {
     "#,
     )
     .unwrap();
-    let result = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None).await;
+    let result =
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None).await;
 
     // Empty base_url is rejected at bootstrap by config validation.
     // The BUG was that the agent-level code (agent_ops.rs:1185) would catch

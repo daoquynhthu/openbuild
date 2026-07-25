@@ -6,25 +6,28 @@
 //!
 //! **Prohibited**: manual `SamplerConfig` or `PreparedSamplerConfig` construction.
 
-use std::pin::Pin;
 use std::future::Future;
+use std::pin::Pin;
 
 use indexmap::IndexMap;
 use serial_test::serial;
 
 use futures_util::StreamExt;
 use xai_grok_provider::auth::{
-    AuthPolicy, CredentialError, CredentialCandidate, EnvironmentReader,
-    RequestCredentialContext, SecretValue, SessionCredentialResolver, SessionKind,
+    AuthPolicy, CredentialCandidate, CredentialError, EnvironmentReader, RequestCredentialContext,
+    SecretValue, SessionCredentialResolver, SessionKind,
 };
 use xai_grok_provider::headers::RequestHeaderOverrides;
-use xai_grok_provider::prepared::{prepare_sampler_config, RequestPreparationError};
-use xai_grok_provider::resolution::ResolvedModelExecution;
-use xai_grok_provider::registry::RegistrySnapshot;
-use xai_grok_provider::types::{ModelId, ProviderId, RouteId};
 use xai_grok_provider::model::{GenerationOptions, ModelLimits};
+use xai_grok_provider::prepared::{RequestPreparationError, prepare_sampler_config};
 use xai_grok_provider::protocol::ProtocolId;
-use xai_grok_provider::resolution::{ProviderImplementation, ProviderPublicConfig, ProviderRuntimeConfig, ResolvedProviderSet, ResolvedProviderSpec};
+use xai_grok_provider::registry::RegistrySnapshot;
+use xai_grok_provider::resolution::ResolvedModelExecution;
+use xai_grok_provider::resolution::{
+    ProviderImplementation, ProviderPublicConfig, ProviderRuntimeConfig, ResolvedProviderSet,
+    ResolvedProviderSpec,
+};
+use xai_grok_provider::types::{ModelId, ProviderId, RouteId};
 use xai_grok_sampler::SamplerConfig;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
 use xai_grok_shell::agent::provider_resolution::ProviderResolutionError;
@@ -358,7 +361,6 @@ fn openai_responses_chain_selects_responses_route() {
         config.endpoint_path,
         config.request_url
     );
-
 }
 
 /// P14-005: Anthropic Messages chain — verify x-api-key, anthropic-version, path, decoder.
@@ -438,7 +440,6 @@ fn anthropic_messages_chain_x_api_key_version_path() {
         Some("2023-06-01"),
         "anthropic-version must be 2023-06-01"
     );
-
 }
 
 /// P14-006: OpenCode public chain — no auth header, anonymous inference succeeds.
@@ -720,10 +721,24 @@ fn two_custom_providers_no_state_cross_contamination() {
         );
 
         // Verify each provider received requests on its own mock server
-        let requests_a: Vec<_> = server_a.requests().into_iter().filter(|r| r.body.is_some()).collect();
-        let requests_b: Vec<_> = server_b.requests().into_iter().filter(|r| r.body.is_some()).collect();
-        assert!(!requests_a.is_empty(), "server A must receive inference requests");
-        assert!(!requests_b.is_empty(), "server B must receive inference requests");
+        let requests_a: Vec<_> = server_a
+            .requests()
+            .into_iter()
+            .filter(|r| r.body.is_some())
+            .collect();
+        let requests_b: Vec<_> = server_b
+            .requests()
+            .into_iter()
+            .filter(|r| r.body.is_some())
+            .collect();
+        assert!(
+            !requests_a.is_empty(),
+            "server A must receive inference requests"
+        );
+        assert!(
+            !requests_b.is_empty(),
+            "server B must receive inference requests"
+        );
 
         // Verify correct API keys were used via Bearer auth
         let body_a = requests_a[0]
@@ -821,10 +836,12 @@ fn invalid_endpoint_hard_fail_request_count_zero() {
             base_url = "http://nonexistent-unresolvable-host/"
             "#;
         let toml: toml::Value = toml::from_str(toml_str).unwrap();
-        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
-            .await
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None).await
     });
-    assert!(result.is_err(), "non-https remote endpoint must fail at bootstrap");
+    assert!(
+        result.is_err(),
+        "non-https remote endpoint must fail at bootstrap"
+    );
     let err = result.unwrap_err().to_string();
     assert!(
         err.contains("endpoint") || err.contains("https"),
@@ -849,11 +866,9 @@ fn unknown_protocol_hard_fail_at_parse_no_requests() {
         "#;
     let toml: toml::Value = toml::from_str(toml_str).unwrap();
 
-    let result = tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-            &toml, None, None,
-        ));
+    let result = tokio::runtime::Runtime::new().unwrap().block_on(
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None),
+    );
 
     assert!(
         result.is_err(),
@@ -1012,11 +1027,10 @@ fn hot_reload_invalid_config_preserves_snapshot_no_requests() {
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
 
-        let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-            &toml, None, None,
-        )
-        .await
-        .expect("bootstrap must succeed");
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
 
         (server, runtime)
     });
@@ -1051,10 +1065,7 @@ fn hot_reload_invalid_config_preserves_snapshot_no_requests() {
 
     let result = runtime.registry.rebuild_from_resolved(&invalid_resolved);
 
-    assert!(
-        result.is_err(),
-        "hot-reload with invalid config must fail"
-    );
+    assert!(result.is_err(), "hot-reload with invalid config must fail");
     let err = result.unwrap_err().to_string();
     assert!(
         err.to_lowercase().contains("responses"),
@@ -1135,8 +1146,7 @@ struct FailingSessionResolver;
 impl SessionCredentialResolver for FailingSessionResolver {
     fn resolve(
         &self,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
-    {
+    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>> {
         Box::pin(async { Err(CredentialError::Backend("session store unreachable".into())) })
     }
 }
@@ -1166,10 +1176,7 @@ fn credential_backend_hard_fail_no_requests() {
         protocol_id: ProtocolId::from("chat_completions"),
         request_url: url::Url::parse(&format!("{mock_url}/chat/completions")).unwrap(),
         static_headers: Default::default(),
-        auth_policy: AuthPolicy::bearer(
-            vec![CredentialCandidate::Session(SessionKind::Xai)],
-            true,
-        ),
+        auth_policy: AuthPolicy::bearer(vec![CredentialCandidate::Session(SessionKind::Xai)], true),
         model_id: ModelId::new("test-model"),
         generation: GenerationOptions::default(),
         limits: ModelLimits::default(),
@@ -1188,7 +1195,8 @@ fn credential_backend_hard_fail_no_requests() {
     );
 
     assert_eq!(
-        server.request_count(), 0,
+        server.request_count(),
+        0,
         "no HTTP request must reach mock server on credential backend failure"
     );
 }
@@ -1343,11 +1351,10 @@ fn catalog_restart_matrix_discovery_failure_recovery() {
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
 
-        let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-            &toml, None, None,
-        )
-        .await
-        .expect("bootstrap must succeed");
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
 
         (server, runtime)
     });
@@ -1416,7 +1423,10 @@ fn catalog_restart_matrix_discovery_failure_recovery() {
         .get(&pid)
         .expect("provider must still be in catalog after failed refresh");
     assert!(
-        matches!(fail_entry.state, xai_grok_shell::agent::provider_catalog::ProviderCatalogState::Failed(_)),
+        matches!(
+            fail_entry.state,
+            xai_grok_shell::agent::provider_catalog::ProviderCatalogState::Failed(_)
+        ),
         "failed refresh must mark state as Failed, got: {:?}",
         fail_entry.state
     );
@@ -1456,7 +1466,10 @@ fn catalog_restart_matrix_discovery_failure_recovery() {
         .get(&pid)
         .expect("provider must be in catalog after recovery");
     assert!(
-        matches!(recovery_entry.state, xai_grok_shell::agent::provider_catalog::ProviderCatalogState::Fresh),
+        matches!(
+            recovery_entry.state,
+            xai_grok_shell::agent::provider_catalog::ProviderCatalogState::Fresh
+        ),
         "recovery refresh must produce Fresh state, got: {:?}",
         recovery_entry.state
     );
@@ -1498,11 +1511,10 @@ fn hot_reload_config_change_invalid_removal() {
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
 
-        let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-            &toml, None, None,
-        )
-        .await
-        .expect("bootstrap must succeed");
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
 
         (server, runtime)
     });
@@ -1535,7 +1547,11 @@ fn hot_reload_config_change_invalid_removal() {
         )]),
     };
     let result = runtime.registry.rebuild_from_resolved(&changed_resolved);
-    assert!(result.is_ok(), "valid config change must succeed: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "valid config change must succeed: {:?}",
+        result
+    );
     let new_revision = result.unwrap();
     assert!(
         new_revision > original_revision,
@@ -1569,7 +1585,11 @@ fn hot_reload_config_change_invalid_removal() {
     let invalid_result = runtime.registry.rebuild_from_resolved(&invalid_resolved);
     assert!(invalid_result.is_err(), "invalid config must fail");
     assert!(
-        invalid_result.unwrap_err().to_string().to_lowercase().contains("responses"),
+        invalid_result
+            .unwrap_err()
+            .to_string()
+            .to_lowercase()
+            .contains("responses"),
         "error must mention responses protocol"
     );
     assert_eq!(
@@ -1590,7 +1610,10 @@ fn hot_reload_config_change_invalid_removal() {
         "revision must increase after removal: {removal_revision} > {new_revision}"
     );
     assert!(
-        !runtime.snapshot().providers.contains_key(&ProviderId::new("test-provider")),
+        !runtime
+            .snapshot()
+            .providers
+            .contains_key(&ProviderId::new("test-provider")),
         "removed provider must not be in snapshot"
     );
 
@@ -1628,11 +1651,10 @@ fn hot_reload_in_flight_request_uses_original_snapshot() {
         );
         let toml: toml::Value = toml::from_str(&toml_str).unwrap();
 
-        let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
-            &toml, None, None,
-        )
-        .await
-        .expect("bootstrap must succeed");
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
 
         (server, runtime)
     });
@@ -1715,7 +1737,8 @@ fn hot_reload_in_flight_request_uses_original_snapshot() {
     );
 
     // Wait for the in-flight stream to complete
-    let stream_text = rx.recv_timeout(std::time::Duration::from_secs(10))
+    let stream_text = rx
+        .recv_timeout(std::time::Duration::from_secs(10))
         .expect("in-flight stream must complete within timeout");
 
     // The stream must have completed successfully — the old SamplerConfig

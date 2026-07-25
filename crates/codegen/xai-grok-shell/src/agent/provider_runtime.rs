@@ -9,7 +9,9 @@ use xai_grok_provider::provider::SharedProvider;
 use xai_grok_provider::registry::{ProviderRegistry, RegistrySnapshot};
 use xai_grok_provider::types::{ModelListFormat, ProviderDefaults, ProviderId};
 
-use super::provider_catalog::{self, CatalogShutdownError, ProviderCatalogService, derive_model_list_url};
+use super::provider_catalog::{
+    self, CatalogShutdownError, ProviderCatalogService, derive_model_list_url,
+};
 
 /// Runtime container holding the provider registry and catalog service.
 ///
@@ -68,10 +70,7 @@ impl ProviderRuntime {
                         defaults.id = pid.clone();
                         defaults.name = entry.display_name.clone();
                         defaults.base_url = entry.config.base_url.clone().unwrap_or_default();
-                        defaults.model_list_format = match entry
-                            .config
-                            .model_list_format
-                            .as_deref()
+                        defaults.model_list_format = match entry.config.model_list_format.as_deref()
                         {
                             Some("ollama_tags" | "ollama") => ModelListFormat::OllamaTags,
                             _ => ModelListFormat::OpenAiCompatible,
