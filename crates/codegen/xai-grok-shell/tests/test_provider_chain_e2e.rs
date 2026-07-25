@@ -950,6 +950,60 @@ fn ambiguous_model_hard_fail_no_requests() {
     );
 }
 
+/// R3-E2E-04: Unknown route hard fail — request count zero.
+///
+/// A model entry with a nonexistent route_id is rejected during
+/// resolve_model_execution before any inference HTTP request is made.
+#[test]
+fn unknown_route_hard_fail_no_requests() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server, snapshot) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.test-provider]
+            kind = "openai_compatible"
+            base_url = "{mock_url}"
+            api_key = "test-key"
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime =
+            xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+                .await
+                .expect("bootstrap must succeed");
+
+        (server, runtime.snapshot())
+    });
+
+    let mut model = custom_model_entry("test-provider", "test-model");
+    model.route_id = Some("nonexistent-route".to_string());
+
+    let result = execution_to_sampler_config(&model, &snapshot, Some("test-key"), None);
+
+    assert!(
+        result.is_err(),
+        "unknown route must fail, got Ok: {:?}",
+        result
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.to_lowercase().contains("route"),
+        "error must mention route, got: {err}"
+    );
+
+    let requests = server.requests();
+    assert!(
+        requests.len() <= 1,
+        "at most 1 bootstrap model-discovery request on unknown route, got: {}",
+        requests.len()
+    );
+}
+
 // ── Test helpers for credential backend failure ──
 
 struct FailingSessionResolver;

@@ -1024,3 +1024,16 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `cargo test -p xai-grok-provider`: 276/276 pass ✅
 - `cargo check -p xai-grok-provider -p xai-grok-shell`: clean ✅
 - `cargo clippy -p xai-grok-provider -p xai-grok-shell`: 0 warnings ✅
+
+## R3-E2E-04: Unknown route hard fail — 2026-07-25
+
+### Changes
+- Added `unknown_route_hard_fail_no_requests` E2E test: nonexistent route_id → `DefaultRouteNotFound` error, zero inference HTTP requests to mock server (only bootstrap discovery)
+
+### Files modified
+- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — new test
+
+### Key results
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 16/16 pass ✅
+- `cargo check -p xai-grok-shell`: clean ✅
+- `cargo clippy -p xai-grok-shell`: 0 warnings ✅
