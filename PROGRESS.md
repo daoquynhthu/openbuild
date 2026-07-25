@@ -833,24 +833,27 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - **R3-CFG-06** `ec0e953`: OpenCode — uses helpers, conditional auth (`None`/bearer), merge extra headers ✅
 - **R3-CFG-07** `ec0e953`: Ollama — uses helpers, conditional auth (`None`/bearer), merge extra headers ✅
 - **R3-CFG-08** `446753e`: removed `unimplemented!()` from `FactoryProvider::defaults()`; added `defaults` field; populates in `create()` with spec-based values ✅
-- **R3-CFG-09` (current)`: fixed `builtin_config_fidelity.rs` tests — 5 assertions flipped from `!has_extra` to `has_extra` (headers now correctly merged); renamed test functions from `*_silently_lost` to `*_merged` ✅
+- **R3-CFG-09** `4ee9079` `d3e44c2`: comprehensive field fidelity tests — each built-in provider verified for `base_url`, `api_key`, `env_key`, `extra_headers`, and `protocol` consumption; `validate_insecure_http_policy` helper added with 4 unit tests ✅
 
 ### Files modified (CFG series)
-- `crates/codegen/xai-grok-provider/src/providers/configure.rs` — shared helpers (new)
+- `crates/codegen/xai-grok-provider/src/providers/configure.rs` — shared helpers (new) + `validate_insecure_http_policy` helper + tests
 - `crates/codegen/xai-grok-provider/src/providers/xai.rs` — header merge + helpers
 - `crates/codegen/xai-grok-provider/src/providers/openai.rs` — header merge + helpers
 - `crates/codegen/xai-grok-provider/src/providers/anthropic.rs` — header merge + helpers
 - `crates/codegen/xai-grok-provider/src/providers/opencode.rs` — header merge + helpers
 - `crates/codegen/xai-grok-provider/src/providers/ollama.rs` — header merge + helpers
 - `crates/codegen/xai-grok-provider/src/providers/openai_compatible_factory.rs` — defaults fix
-- `crates/codegen/xai-grok-provider/tests/builtin_config_fidelity.rs` — assertions flipped, tests renamed
+- `crates/codegen/xai-grok-provider/tests/builtin_config_fidelity.rs` — comprehensive field fidelity tests
 
 ### Phase 4 gate
 - `cargo check -p xai-grok-provider` — PASS ✅
 - `cargo clippy -p xai-grok-provider -- -D warnings` — PASS ✅
-- `cargo test -p xai-grok-provider --test builtin_config_fidelity` — 5/5 pass ✅
+- `cargo test -p xai-grok-provider --test builtin_config_fidelity` — 6/6 pass ✅
+- `cargo test -p xai-grok-provider -- configure::tests` — 4/4 pass (validate_insecure_http_policy) ✅
 - All 5 built-in providers consume `extra_headers` into route `static_headers` ✅
+- All 5 built-in providers reflect `base_url`, `api_key`, `env_key`, `extra_headers`, `protocol` into configured route ✅
 - `unimplemented!()` eliminated from `FactoryProvider::defaults()` ✅
+- `validate_insecure_http_policy` helper added with 4 tests ✅
 
 ### Next
 - Proceed to Phase 5 (ROUTE series) or address deferred R3-ERR-03

@@ -49,6 +49,23 @@ pub fn merge_extra_headers(
     headers
 }
 
+/// Validate that an endpoint URL respects the insecure HTTP policy.
+/// Returns an error if the URL uses `http://` without `allow_insecure_http=true`.
+pub fn validate_insecure_http_policy(
+    base_url: &str,
+    allow_insecure_http: bool,
+) -> Result<(), String> {
+    if base_url.starts_with("http://") && !allow_insecure_http {
+        Err(
+            "endpoint uses http:// but allow_insecure_http is not enabled; "
+                .to_owned()
+                    + "set allow_insecure_http=true to allow HTTP URLs",
+        )
+    } else {
+        Ok(())
+    }
+}
+
 /// Resolve model list source: user-configured path/format, or provider default.
 pub fn resolve_model_source(
     public: &ProviderPublicConfig,
@@ -59,4 +76,37 @@ pub fn resolve_model_source(
         return Some((path.clone(), fmt));
     }
     defaults.model_list_endpoint.as_ref().map(|url| (url.clone(), defaults.model_list_format))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_insecure_http_https_allows_without_flag() {
+        assert!(
+            validate_insecure_http_policy("https://api.example.com/v1", false).is_ok()
+        );
+    }
+
+    #[test]
+    fn validate_insecure_http_https_allows_with_flag() {
+        assert!(
+            validate_insecure_http_policy("https://api.example.com/v1", true).is_ok()
+        );
+    }
+
+    #[test]
+    fn validate_insecure_http_http_rejects_without_flag() {
+        let err = validate_insecure_http_policy("http://localhost:11434/v1", false)
+            .unwrap_err();
+        assert!(err.contains("allow_insecure_http"));
+    }
+
+    #[test]
+    fn validate_insecure_http_http_allows_with_flag() {
+        assert!(
+            validate_insecure_http_policy("http://localhost:11434/v1", true).is_ok()
+        );
+    }
 }
