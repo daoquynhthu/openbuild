@@ -1186,27 +1186,13 @@ impl MvpAgent {
 
         let mut config = match registry_result {
             Ok(c) => c,
-            Err(e) if has_provider_binding && has_registry => {
+            Err(e) => {
                 tracing::error!(
-                    "route compiler hard error for provider-bound model `{}`: {e}",
+                    "route compiler hard error for model `{}`: {e}",
                     model.info.model
                 );
                 return Err(e.into());
             }
-            Err(_) => crate::agent::config::sampling_config_for_model(
-                model,
-                crate::agent::config::ResolvedCredentials {
-                    api_key: None,
-                    base_url: String::new(),
-                    auth_type: xai_chat_state::AuthType::ApiKey,
-                    auth_scheme: xai_grok_sampler::AuthScheme::None,
-                },
-                alpha_test_key,
-                client_version,
-                deployment_id,
-                user_id,
-                None,
-            ),
         };
         config.origin_client = origin_client;
         Ok(config)
