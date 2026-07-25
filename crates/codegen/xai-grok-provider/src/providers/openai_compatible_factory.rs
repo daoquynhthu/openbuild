@@ -7,7 +7,7 @@ use crate::endpoint::{Endpoint, EndpointPart};
 use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider, SharedProvider};
 use crate::resolution::{ProviderImplementation, ResolvedProviderSpec};
 use crate::route::Route;
-use crate::types::{ModelSourceSpec, ProviderDefaults, ProviderId, RouteId};
+use crate::types::{ApiBackend, AuthScheme, ModelSourceSpec, ProviderDefaults, ProviderId, RouteId};
 
 pub type SharedProviderFactory = Arc<dyn ProviderFactory + Send + Sync>;
 
@@ -25,6 +25,7 @@ struct FactoryProvider {
     id: ProviderId,
     base_url: String,
     profile_env_key: Vec<String>,
+    defaults: ProviderDefaults,
 }
 
 fn protocol_path(protocol: &str) -> Result<&'static str, crate::error::ProviderError> {
@@ -47,9 +48,10 @@ impl Provider for FactoryProvider {
     }
 
     fn defaults(&self) -> &ProviderDefaults {
-        // FactoryProvider doesn't expose defaults — configuration comes from
-        // the resolved spec. Delegates to configure() which uses spec fields.
-        unimplemented!("use configure() to obtain ConfiguredProvider with full defaults")
+        // FactoryProvider construction relies on the resolved spec for all
+        // configuration. The defaults singleton is still required for trait
+        // conformance but callers must use configure() for the full picture.
+        &self.defaults
     }
 
     fn configure(&self, overrides: crate::config::ProviderConfig) -> ConfiguredProvider {
@@ -152,10 +154,23 @@ impl ProviderFactory for OpenAiCompatibleProviderFactory {
 
         let profile_env_key = Self::env_key_for_profile(profile.as_deref());
 
+        let defaults = ProviderDefaults {
+            id: spec.id.clone(),
+            name: format!("{} (OpenAI Compatible)", spec.id.0),
+            base_url: base_url.clone(),
+            api_backend: ApiBackend::ChatCompletions,
+            auth_scheme: AuthScheme::Bearer,
+            env_key: profile_env_key.clone(),
+            context_window: std::num::NonZeroU64::new(128_000).unwrap_or_else(|| unreachable!()),
+            model_list_endpoint: None,
+            ..ProviderDefaults::default()
+        };
+
         Ok(Arc::new(FactoryProvider {
             id: spec.id.clone(),
             base_url,
             profile_env_key,
+            defaults,
         }))
     }
 }
