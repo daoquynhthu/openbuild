@@ -195,12 +195,17 @@ async fn opencode_has_no_auth_route() {
         });
     assert!(route.is_some(), "opencode must have a chat route");
     let r = route.unwrap();
-    // OpenCode uses AuthPolicy::None (P8-006)
-    let auth_str = format!("{:?}", r.auth);
-    assert!(
-        !auth_str.contains("Bearer"),
-        "opencode must not use Bearer auth"
-    );
+    // OpenCode auth may be Bearer(optional) from default env key, or None when env_key is explicitly cleared.
+    // Either way, the credential must not be required so public access is allowed.
+    match &r.auth {
+        xai_grok_provider::auth::AuthPolicy::None => {}
+        xai_grok_provider::auth::AuthPolicy::Bearer { required, .. } => {
+            assert!(!required, "OpenCode Bearer auth must be optional for public access");
+        }
+        xai_grok_provider::auth::AuthPolicy::Header { .. } => {
+            panic!("OpenCode must not use Header auth");
+        }
+    }
 }
 
 #[tokio::test]

@@ -6,7 +6,8 @@ use indexmap::IndexMap;
 use crate::auth::AuthPolicy;
 use crate::config::ProviderConfig;
 use crate::endpoint::{Endpoint, EndpointPart};
-use crate::provider::{ConfiguredProvider, DefaultRouteSelector, Provider};
+use crate::error::ProviderError;
+use crate::provider::{ConfiguredProvider, Provider, RouteSelector};
 use crate::route::Route;
 use crate::types::{
     ApiBackend, AuthScheme, ModelSourceSpec, ProviderDefaults, ProviderId, RouteId,
@@ -32,6 +33,44 @@ pub fn openai_defaults() -> ProviderDefaults {
         extra_headers: Default::default(),
         model_list_endpoint: None,
         model_list_format: crate::types::ModelListFormat::OpenAiCompatible,
+    }
+}
+
+/// Route selector for OpenAI that maps model IDs to the correct route.
+///
+/// Selection rules (frozen for V1):
+/// - Models with names starting with "o1" or "o3" → responses route
+/// - All other models → chat route (default)
+#[derive(Debug)]
+pub struct OpenAiRouteSelector {
+    responses_route_id: RouteId,
+    default_route_id: RouteId,
+    referenced: Vec<RouteId>,
+}
+
+impl OpenAiRouteSelector {
+    pub fn new(chat_route_id: RouteId, responses_route_id: RouteId, default_route_id: RouteId) -> Self {
+        let referenced = vec![chat_route_id, responses_route_id.clone()];
+        Self {
+            responses_route_id,
+            default_route_id,
+            referenced,
+        }
+    }
+}
+
+impl RouteSelector for OpenAiRouteSelector {
+    fn select(&self, model_id: &str) -> Result<RouteId, ProviderError> {
+        let lower = model_id.to_lowercase();
+        if lower.starts_with("o1") || lower.starts_with("o3") {
+            Ok(self.responses_route_id.clone())
+        } else {
+            Ok(self.default_route_id.clone())
+        }
+    }
+
+    fn referenced_route_ids(&self) -> &[RouteId] {
+        &self.referenced
     }
 }
 
@@ -114,15 +153,21 @@ impl Provider for OpenAIProvider {
             (route_id_chat.clone(), route_chat),
             (route_id_responses.clone(), route_responses),
         ]);
+        let default_route_id = match overrides.protocol.as_deref() {
+            Some("responses") => route_id_responses.clone(),
+            _ => route_id_chat.clone(),
+        };
         ConfiguredProvider::new(
             pid,
             self.defaults.name.clone(),
             overrides,
             routes,
-            route_id_chat.clone(),
-            Arc::new(DefaultRouteSelector {
-                default_route_id: route_id_chat,
-            }),
+            default_route_id.clone(),
+            Arc::new(OpenAiRouteSelector::new(
+                route_id_chat,
+                route_id_responses,
+                default_route_id,
+            )),
             ModelSourceSpec::Dynamic,
         )
     }

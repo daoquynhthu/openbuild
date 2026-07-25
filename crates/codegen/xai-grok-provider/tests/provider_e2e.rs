@@ -1,6 +1,12 @@
+use std::sync::LazyLock;
+use std::sync::Mutex;
+
 use indexmap::IndexMap;
 
 use futures_util::stream::StreamExt;
+
+/// Serializes tests that mutate environment variables.
+static ENV_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::registry::{ProviderRegistry, ProviderRouteKey};
 use xai_grok_provider::types::{ProviderId, RouteId};
@@ -188,10 +194,10 @@ fn legacy_bare_model_defaults_to_xai() {
 /// Legacy xAI compatibility: XAI_API_KEY env var detection.
 #[test]
 fn legacy_xai_api_key_env_detected() {
+    let guard = ENV_LOCK.lock().unwrap();
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
 
-    // SAFETY: test-only env mutation, single-threaded.
     unsafe {
         std::env::set_var("XAI_API_KEY", "test-env-key-not-real");
     }
@@ -208,6 +214,7 @@ fn legacy_xai_api_key_env_detected() {
         Some("test-env-key-not-real"),
         "XAI_API_KEY must be detected for xAI provider"
     );
+    drop(guard);
 }
 
 /// Anthropic: Messages protocol with x-api-key auth header.
@@ -423,6 +430,7 @@ fn provider_config_with_env_key() {
 /// Env var detection sets api_key via default env key.
 #[test]
 fn precedence_env_var_sets_api_key() {
+    let guard = ENV_LOCK.lock().unwrap();
     unsafe {
         std::env::set_var("XAI_API_KEY", "from-env");
     }
@@ -441,6 +449,7 @@ fn precedence_env_var_sets_api_key() {
         Some("from-env"),
         "env var must set xAI api_key"
     );
+    drop(guard);
 }
 
 /// TOML config overrides env-detected api_key.

@@ -310,6 +310,14 @@ impl ProviderRegistry {
                 }
             }
 
+            // Validate default route exists in route set
+            if !configured.routes.contains_key(&configured.default_route_id) {
+                return Err(ProviderError::Config(format!(
+                    "default route `{}` for provider `{}` is not in route set",
+                    configured.default_route_id.0, pid.0
+                )));
+            }
+
             // Validate each route
             for (rid, route) in &configured.routes {
                 let key = ProviderRouteKey {
@@ -322,6 +330,14 @@ impl ProviderRegistry {
                         rid.0, pid.0
                     )));
                 }
+                // Route ownership: route provider_id must match owning provider
+                if route.provider_id != *pid {
+                    return Err(ProviderError::Config(format!(
+                        "route `{}` has provider_id `{}` but belongs to provider `{}`",
+                        rid.0, route.provider_id.0, pid.0
+                    )));
+                }
+
                 route
                     .validate()
                     .map_err(|e| ProviderError::InvalidRouteId(format!("route {}: {e}", rid.0)))?;

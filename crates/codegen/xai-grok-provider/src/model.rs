@@ -21,6 +21,11 @@ pub struct ModelDefaults {
     pub generation: Option<GenerationOptions>,
     pub provider_options: Option<HashMap<String, serde_json::Value>>,
     pub http: Option<HttpOptions>,
+    /// Preferred protocol for route selection (e.g. "chat_completions", "responses").
+    /// When set, route selectors may use this to pick a compatible route.
+    /// Defaults to None, meaning the provider's default route is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preferred_protocol: Option<String>,
 }
 
 /// Context and output token limits for a model.
@@ -141,6 +146,7 @@ mod tests {
             }),
             provider_options: None,
             http: None,
+            preferred_protocol: None,
         };
         let model = Model::make(
             ModelId::new("gpt-4o"),

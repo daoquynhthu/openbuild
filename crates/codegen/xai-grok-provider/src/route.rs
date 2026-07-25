@@ -78,6 +78,16 @@ impl Route {
         )
     }
 
+    /// Returns true if this route's protocol matches the given protocol string.
+    pub fn supports_protocol(&self, protocol: &str) -> bool {
+        self.protocol_id.0 == protocol
+    }
+
+    /// Returns the protocol identifier string.
+    pub fn protocol(&self) -> &str {
+        &self.protocol_id.0
+    }
+
     /// Validate the route's fields.
     pub fn validate(&self) -> Result<(), ProviderError> {
         if self.id.0.trim().is_empty() {

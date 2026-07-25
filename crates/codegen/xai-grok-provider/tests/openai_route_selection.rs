@@ -43,22 +43,7 @@ fn explicit_responses_route_returns_responses() {
 }
 
 #[test]
-fn generic_model_selects_chat_by_default() {
-    let configured = openai_configured(None);
-
-    let selected = configured
-        .route_selector
-        .select("gpt-4o")
-        .expect("selector must succeed");
-
-    assert_eq!(
-        selected.0, "openai-chat",
-        "generic model must select chat route"
-    );
-}
-
-#[test]
-fn protocol_responses_does_not_affect_default_selection() {
+fn protocol_responses_makes_responses_default() {
     let configured = openai_configured(Some("responses"));
 
     let selected = configured
@@ -66,27 +51,85 @@ fn protocol_responses_does_not_affect_default_selection() {
         .select("gpt-4o")
         .expect("selector must succeed");
 
-    // BUG: protocol=responses is configured but the default route is still chat.
-    // After Phase 5, setting protocol=responses should make responses the default.
     assert_eq!(
-        selected.0, "openai-chat",
-        "R3-RED-06: protocol=responses does NOT affect default route selection (BUG)"
+        selected.0, "openai-responses",
+        "R3-ROUTE-02: protocol=responses should make responses the default"
     );
 }
 
 #[test]
-fn no_incompatibility_error_for_conflicting_protocol_and_model() {
+fn o1_model_selects_responses_route() {
     let configured = openai_configured(None);
 
-    // There is no mechanism to express "this model requires responses protocol"
-    // or to check incompatibility. The selector never returns an error for
-    // any model ID — it always returns the default.
-    let result = configured.route_selector.select("any-nonexistent-model");
-    assert!(
-        result.is_ok(),
-        "R3-RED-06: selector should FAIL for unknown model (BUG — no incompatibility check)"
+    let selected = configured
+        .route_selector
+        .select("o1-preview")
+        .expect("selector must succeed");
+    assert_eq!(
+        selected.0, "openai-responses",
+        "o1-preview must select responses route"
     );
 
-    // After Phase 5, model metadata should be able to require responses,
-    // and an incompatible combination should return Err.
+    let selected = configured
+        .route_selector
+        .select("o1-mini")
+        .expect("selector must succeed");
+    assert_eq!(
+        selected.0, "openai-responses",
+        "o1-mini must select responses route"
+    );
+
+    let selected = configured
+        .route_selector
+        .select("o3-mini")
+        .expect("selector must succeed");
+    assert_eq!(
+        selected.0, "openai-responses",
+        "o3-mini must select responses route"
+    );
+}
+
+#[test]
+fn generic_model_selects_chat_by_default() {
+    let configured = openai_configured(None);
+
+    let selected = configured
+        .route_selector
+        .select("gpt-4o")
+        .expect("selector must succeed");
+    assert_eq!(
+        selected.0, "openai-chat",
+        "gpt-4o must select chat route"
+    );
+
+    let selected = configured
+        .route_selector
+        .select("any-nonexistent-model")
+        .expect("selector must succeed for unknown models");
+    assert_eq!(
+        selected.0, "openai-chat",
+        "unknown models must default to chat route"
+    );
+}
+
+#[test]
+fn default_route_id_matches_selector_default() {
+    let configured = openai_configured(None);
+    let selected = configured
+        .route_selector
+        .select("gpt-4o")
+        .expect("selector must succeed");
+    assert_eq!(
+        selected.0, configured.default_route_id.0,
+        "default route ID must match selector default for generic models"
+    );
+}
+
+#[test]
+fn default_route_id_is_responses_when_protocol_responses() {
+    let configured = openai_configured(Some("responses"));
+    assert_eq!(
+        configured.default_route_id.0, "openai-responses",
+        "default_route_id must be responses when protocol=responses"
+    );
 }
