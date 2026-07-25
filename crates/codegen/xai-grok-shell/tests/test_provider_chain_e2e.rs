@@ -1328,3 +1328,133 @@ fn catalog_model_discovery_and_refresh() {
         "catalog revision must increment after refresh: {cat_rev_after} > {cat_rev_before}"
     );
 }
+
+/// R3-E2E-05: Hot-reload matrix — valid config change, invalid config rejection, provider removal.
+///
+/// Simulates hot-reload lifecycle:
+/// 1. Bootstrap valid config → baseline snapshot
+/// 2. Rebuild with changed endpoint → new revision, config takes effect
+/// 3. Rebuild with invalid config → error, old snapshot preserved
+/// 4. Rebuild with provider removed → provider absent from snapshot
+#[test]
+fn hot_reload_config_change_invalid_removal() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server, runtime) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.test-provider]
+            kind = "openai_compatible"
+            base_url = "{mock_url}"
+            api_key = "test-key"
+            protocol = "chat_completions"
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
+            &toml, None, None,
+        )
+        .await
+        .expect("bootstrap must succeed");
+
+        (server, runtime)
+    });
+
+    let original_revision = runtime.snapshot().revision;
+    let requests_before = server.request_count();
+
+    // ── 1. Valid config change: new endpoint ──
+    let changed_resolved = ResolvedProviderSet {
+        providers: IndexMap::from([(
+            ProviderId::new("test-provider"),
+            ResolvedProviderSpec {
+                id: ProviderId::new("test-provider"),
+                implementation: ProviderImplementation::OpenAiCompatible { profile: None },
+                config: ProviderRuntimeConfig {
+                    public: ProviderPublicConfig {
+                        base_url: Some("http://127.0.0.1:9999/v1".into()),
+                        protocol: Some("chat_completions".into()),
+                        model_list_path: None,
+                        allow_insecure_http: true,
+                        model_list_format: None,
+                        extra_headers: IndexMap::new(),
+                    },
+                    inline_api_key: Some(xai_grok_provider::auth::SecretValue::new(
+                        "new-key".into(),
+                    )),
+                    env_keys: vec![],
+                },
+            },
+        )]),
+    };
+    let result = runtime.registry.rebuild_from_resolved(&changed_resolved);
+    assert!(result.is_ok(), "valid config change must succeed: {:?}", result);
+    let new_revision = result.unwrap();
+    assert!(
+        new_revision > original_revision,
+        "revision must increase after valid change: {new_revision} <= {original_revision}"
+    );
+
+    // ── 2. Invalid config: protocol=responses → error, revision unchanged ──
+    let invalid_resolved = ResolvedProviderSet {
+        providers: IndexMap::from([(
+            ProviderId::new("test-provider"),
+            ResolvedProviderSpec {
+                id: ProviderId::new("test-provider"),
+                implementation: ProviderImplementation::OpenAiCompatible { profile: None },
+                config: ProviderRuntimeConfig {
+                    public: ProviderPublicConfig {
+                        base_url: Some("http://127.0.0.1:9999/v1".into()),
+                        protocol: Some("responses".into()),
+                        model_list_path: None,
+                        allow_insecure_http: false,
+                        model_list_format: None,
+                        extra_headers: IndexMap::new(),
+                    },
+                    inline_api_key: Some(xai_grok_provider::auth::SecretValue::new(
+                        "test-key".into(),
+                    )),
+                    env_keys: vec![],
+                },
+            },
+        )]),
+    };
+    let invalid_result = runtime.registry.rebuild_from_resolved(&invalid_resolved);
+    assert!(invalid_result.is_err(), "invalid config must fail");
+    assert!(
+        invalid_result.unwrap_err().to_string().to_lowercase().contains("responses"),
+        "error must mention responses protocol"
+    );
+    assert_eq!(
+        runtime.snapshot().revision,
+        new_revision,
+        "snapshot revision must be preserved after failed hot-reload"
+    );
+
+    // ── 3. Provider removal → provider absent ──
+    let removal_resolved = ResolvedProviderSet {
+        providers: IndexMap::new(),
+    };
+    let removal_result = runtime.registry.rebuild_from_resolved(&removal_resolved);
+    assert!(removal_result.is_ok(), "provider removal must succeed");
+    let removal_revision = removal_result.unwrap();
+    assert!(
+        removal_revision > new_revision,
+        "revision must increase after removal: {removal_revision} > {new_revision}"
+    );
+    assert!(
+        !runtime.snapshot().providers.contains_key(&ProviderId::new("test-provider")),
+        "removed provider must not be in snapshot"
+    );
+
+    // ── 4. No additional HTTP requests from any of the above operations ──
+    assert_eq!(
+        server.request_count(),
+        requests_before,
+        "no additional HTTP requests must reach mock server after hot-reload operations"
+    );
+}

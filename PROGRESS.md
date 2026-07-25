@@ -1079,3 +1079,22 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 ### Key results
 - `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 18/18 pass ✅
 - `cargo clippy -p xai-grok-provider -p xai-grok-shell -- -D warnings`: 0 warnings ✅
+
+## R3-E2E-05: Hot reload matrix (partial) — 2026-07-25
+
+### Changes
+- Added `hot_reload_config_change_invalid_removal` E2E test covering:
+  - Valid config change (endpoint + credential) → revision increases ✅ (items 1-3)
+  - Invalid config rejection → error, revision preserved ✅ (item 5)
+  - Provider removal → absent from snapshot, revision increases ✅ (item 6)
+  - Zero additional HTTP requests to mock server for all operations
+
+### Remaining
+- Item 4: in-flight request uses old snapshot during hot-reload (requires concurrency test with streaming delay)
+
+### Files modified
+- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — new hot-reload matrix test
+
+### Key results
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 19/19 pass ✅
+- `cargo clippy -p xai-grok-provider -p xai-grok-shell --tests -- -D warnings`: 0 warnings ✅
