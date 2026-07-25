@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use indexmap::IndexMap;
 use tokio::sync::RwLock;
@@ -6,9 +7,9 @@ use tokio_util::sync::CancellationToken;
 use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::provider::SharedProvider;
 use xai_grok_provider::registry::{ProviderRegistry, RegistrySnapshot};
-use xai_grok_provider::types::ProviderId;
+use xai_grok_provider::types::{ModelListFormat, ProviderDefaults, ProviderId};
 
-use super::provider_catalog::{self, CatalogShutdownError, ProviderCatalogService};
+use super::provider_catalog::{self, CatalogShutdownError, ProviderCatalogService, derive_model_list_url};
 
 /// Runtime container holding the provider registry and catalog service.
 ///
@@ -48,10 +49,42 @@ impl ProviderRuntime {
 
     /// Bootstrap catalog from persisted snapshot (F3a). Must be called after
     /// construction from an async context.
+    /// Fires a non-blocking background refresh for enabled providers (R3-CAT-04).
     pub async fn bootstrap_catalog(&self) {
         let persisted = provider_catalog::load_catalog_snapshot();
         if !persisted.providers.is_empty() {
             self.catalog.bootstrap_from_snapshot(persisted).await;
+        }
+        // R3-CAT-04: start background refresh for enabled dynamic providers
+        // without blocking full startup beyond bounded snapshot I/O.
+        let snap = self.registry.snapshot();
+        if !snap.providers.is_empty() {
+            self.catalog
+                .refresh_changed(
+                    &snap.providers,
+                    |pid| {
+                        let entry = snap.providers.get(pid)?;
+                        let mut defaults = ProviderDefaults::default();
+                        defaults.id = pid.clone();
+                        defaults.name = entry.display_name.clone();
+                        defaults.base_url = entry.config.base_url.clone().unwrap_or_default();
+                        defaults.model_list_format = match entry
+                            .config
+                            .model_list_format
+                            .as_deref()
+                        {
+                            Some("ollama_tags" | "ollama") => ModelListFormat::OllamaTags,
+                            _ => ModelListFormat::OpenAiCompatible,
+                        };
+                        defaults.env_key = entry.config.env_key.clone().unwrap_or_default();
+                        defaults.extra_headers =
+                            entry.config.extra_headers.clone().unwrap_or_default();
+                        let url = derive_model_list_url(&defaults, None);
+                        Some((url, defaults))
+                    },
+                    Duration::from_secs(300),
+                )
+                .await;
         }
     }
 

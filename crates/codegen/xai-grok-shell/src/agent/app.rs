@@ -20,6 +20,8 @@ use crate::agent::config::{Config as AgentConfig, ModelEntry};
 use crate::agent::init::{bootstrap, exit_on_config_error};
 use crate::agent::models::{ModelFetchAuth, prefetch_models_blocking};
 use crate::agent::mvp_agent::MvpAgent;
+use crate::agent::provider_catalog::derive_model_list_url;
+use xai_grok_provider::types::{ModelListFormat, ProviderDefaults};
 use crate::auth::{AuthManager, AuthMode, GrokAuth, run_auth_flow};
 use crate::util::grok_home;
 use dirs;
@@ -1224,6 +1226,7 @@ pub async fn run_leader(
         .as_ref()
         .map(|rt| rt.subscribe_catalog_revision());
     let provider_runtime_for_catalog = agent_config_for_spawn.provider_runtime.clone();
+    let provider_runtime_for_config = agent_config_for_spawn.provider_runtime.clone();
 
     // Resolve `mcp.recursive_config_watch`
     // ONCE here, before the channel is created, so a kill-switch
@@ -1696,9 +1699,55 @@ pub async fn run_leader(
                             let _ = ipc_tx_for_config.send(notification.to_string());
                         }
                         ConfigUpdate::ProvidersChanged => {
-                            info!("Provider config change detected — rebuild pending");
-                            // The session actor handles the actual rebuild
-                            // via provider runtime when it receives this signal.
+                            info!("Provider config change detected — refreshing catalog");
+                            if let Some(ref rt) = provider_runtime_for_config {
+                                let snap = rt.snapshot();
+                                if !snap.providers.is_empty() {
+                                    rt.catalog
+                                        .refresh_changed(
+                                            &snap.providers,
+                                            |pid| {
+                                                let entry = snap.providers.get(pid)?;
+                                                let mut defaults = ProviderDefaults::default();
+                                                defaults.id = pid.clone();
+                                                defaults.name = entry.display_name.clone();
+                                                defaults.base_url = entry
+                                                    .config
+                                                    .base_url
+                                                    .clone()
+                                                    .unwrap_or_default();
+                                                defaults.model_list_format = match entry
+                                                    .config
+                                                    .model_list_format
+                                                    .as_deref()
+                                                {
+                                                    Some("ollama_tags" | "ollama") =>
+                                                        ModelListFormat::OllamaTags,
+                                                    _ => ModelListFormat::OpenAiCompatible,
+                                                };
+                                                defaults.env_key = entry
+                                                    .config
+                                                    .env_key
+                                                    .clone()
+                                                    .unwrap_or_default();
+                                                defaults.extra_headers = entry
+                                                    .config
+                                                    .extra_headers
+                                                    .clone()
+                                                    .unwrap_or_default();
+                                                let url = derive_model_list_url(
+                                                    &defaults,
+                                                    None,
+                                                );
+                                                Some((url, defaults))
+                                            },
+                                            Duration::from_secs(300),
+                                        )
+                                        .await;
+                                }
+                            }
+                            // Catalog revision watcher (above) detects the
+                            // revision change and rebuilds the model view.
                         }
                     }
                 }

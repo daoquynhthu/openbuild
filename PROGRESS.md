@@ -952,3 +952,29 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - Unknown fields rejected at parse time (`deny_unknown_fields`) — ✅
 - Invalid config produces error diagnostics, provider skipped during resolution — ✅
 - Old snapshot preserved after failed hot reload (existing test) — ✅
+
+## Phase 7: CAT — Catalog Lifecycle — 2026-07-25
+
+### Completed
+- **R3-CAT-03**: bootstrap_gen revision guard:
+  - Added `std::sync::atomic::AtomicU64` and `bootstrap_gen` field to `ProviderCatalogService`
+  - `bootstrap_from_snapshot` increments generation; `refresh_all` captures `start_gen` before spawning and checks `bootstrap_gen` before publishing each result (lines 539-541)
+  - `superseded_refresh_cannot_publish_after_newer_revision` test (R3-RED-08 #4) passes ✅
+- **R3-CAT-04**: Start refresh after bootstrap:
+  - `ProviderRuntime::bootstrap_catalog()` now calls `catalog.refresh_changed()` after loading snapshot, firing a non-blocking background refresh for enabled dynamic providers
+- **R3-CAT-05**: Wire hot reload to catalog refresh:
+  - `ConfigUpdate::ProvidersChanged` handler in `app.rs:1698` now calls `catalog.refresh_changed()` with current registry snapshot
+  - Catalog revision watcher (existing) picks up changes and rebuilds model view
+- **R3-CAT-06 (fix)**: `refresh_changed()` now sends revision notification via `revision_tx` after provider deletion — `provider_deletion_emits_revision_notification` test passes ✅
+- `bootstrap_from_snapshot` preserves original `catalog_revision` instead of resetting to 0; sends revision via `revision_tx`
+
+### Files modified
+- `provider_catalog.rs` — bootstrap_gen, start_gen guard, revision_tx.send on deletion
+- `provider_runtime.rs` — bootstrap_catalog starts refresh after snapshot load
+- `app.rs` — ProvidersChanged handler wired to catalog.refresh_changed()
+
+### Key results
+- `cargo check -p xai-grok-shell` — clean ✅
+- `cargo clippy -p xai-grok-shell` — 0 warnings ✅
+- `cargo test -p xai-grok-shell --test provider_catalog_lifecycle` — 5/5 pass ✅
+- `cargo clean -p xai-grok-shell` — freed 14.6 GiB

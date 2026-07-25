@@ -5,6 +5,7 @@
 //! Readers receive immutable `Arc<ModelCatalogSnapshot>`.
 
 use std::num::NonZeroU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -154,14 +155,16 @@ pub enum RefreshStrategy {
     ForceRefresh,
 }
 
-/// Asynchronous provider catalog service with bounded concurrent refresh,
-/// TTL cache, cancellation, stale fallback, and revision events (P9-014).
 pub struct ProviderCatalogService {
     snapshot: Arc<RwLock<Arc<ModelCatalogSnapshot>>>,
     http_client: reqwest::Client,
     cancel_token: CancellationToken,
     concurrency: Arc<tokio::sync::Semaphore>,
     active_refresh: tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
+    /// Monotonic bootstrap generation counter.
+    /// Incremented each time bootstrap_from_snapshot replaces the catalog,
+    /// allowing spawned refresh tasks to detect supersession (R3-CAT-03).
+    bootstrap_gen: Arc<AtomicU64>,
     revision_tx: tokio::sync::watch::Sender<u64>,
 }
 
@@ -259,6 +262,7 @@ impl ProviderCatalogService {
             cancel_token: CancellationToken::new(),
             concurrency: Arc::new(tokio::sync::Semaphore::new(max_concurrency as usize)),
             active_refresh: tokio::sync::Mutex::new(None),
+            bootstrap_gen: Arc::new(AtomicU64::new(0)),
             revision_tx,
         }
     }
@@ -283,6 +287,7 @@ impl ProviderCatalogService {
             cancel_token,
             concurrency: Arc::new(tokio::sync::Semaphore::new(max_concurrency as usize)),
             active_refresh: tokio::sync::Mutex::new(None),
+            bootstrap_gen: Arc::new(AtomicU64::new(0)),
             revision_tx,
         }
     }
@@ -402,6 +407,8 @@ impl ProviderCatalogService {
     /// Refresh all providers with bounded concurrency and TTL-awareness.
     /// Skips providers whose cache is still fresh.
     /// Spawned tasks check the shared cancellation token (P9-009).
+    /// Tracks per-provider JoinHandles and checks bootstrap generation
+    /// before publishing results (R3-CAT-03).
     pub async fn refresh_all(
         &self,
         provider_ids: &[ProviderId],
@@ -436,6 +443,8 @@ impl ProviderCatalogService {
         let client = self.http_client.clone();
         let snapshot = Arc::clone(&self.snapshot);
         let revision_tx = self.revision_tx.clone();
+        let bootstrap_gen = Arc::clone(&self.bootstrap_gen);
+        let start_gen = bootstrap_gen.load(Ordering::SeqCst);
 
         let handle = tokio::spawn(async move {
             let mut spawned = Vec::new();
@@ -513,6 +522,10 @@ impl ProviderCatalogService {
                     break; // P9-009: stop collecting on cancellation
                 }
                 if let Ok((pid, models_opt, error)) = handle.await {
+                    // R3-CAT-03: reject result if bootstrap superseded this refresh
+                    if bootstrap_gen.load(Ordering::SeqCst) != start_gen {
+                        continue;
+                    }
                     let mut snap = snapshot.write().await;
                     if cancel_token.is_cancelled() {
                         break; // P9-009: don't publish half-complete snapshot
@@ -611,6 +624,8 @@ impl ProviderCatalogService {
     /// Bootstrap the catalog from a persisted snapshot (F3a).
     /// Sets the initial catalog state to Stale for all providers so that
     /// the next refresh_all() will refresh them.
+    /// Increments bootstrap generation so in-flight refresh tasks can
+    /// detect supersession and discard their results (R3-CAT-03).
     pub async fn bootstrap_from_snapshot(&self, persisted: ModelCatalogSnapshot) {
         let mut snap = self.snapshot.write().await;
         let mut providers = IndexMap::new();
@@ -623,10 +638,12 @@ impl ProviderCatalogService {
                 },
             );
         }
+        let bootstrap_gen_value = self.bootstrap_gen.fetch_add(1, Ordering::SeqCst) + 1;
         *snap = Arc::new(ModelCatalogSnapshot {
-            catalog_revision: 0,
+            catalog_revision: persisted.catalog_revision,
             providers,
         });
+        let _ = self.revision_tx.send(persisted.catalog_revision);
     }
 
     /// Refresh only providers whose configuration has changed since the last
@@ -665,7 +682,9 @@ impl ProviderCatalogService {
                 new_snapshot.providers.swap_remove(&pid);
             }
             new_snapshot.catalog_revision += 1;
+            let rev = new_snapshot.catalog_revision;
             *snap = Arc::new(new_snapshot);
+            let _ = self.revision_tx.send(rev);
         }
     }
 
