@@ -159,3 +159,5 @@ class TestScannerOutput:
         assert "ProviderRuntime::new() in Pager production paths" in names
         assert "route-compiler error followed by legacy sampling_config_for_model fallback" in names
         assert "continue-on-error in release-gate workflows" in names
+        assert "unknown protocol silently defaulted to ChatCompletions" in names
+        assert "manual ModelEntry construction in provider crate (bypasses config resolution)" in names

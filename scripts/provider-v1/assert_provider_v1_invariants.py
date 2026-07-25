@@ -48,6 +48,18 @@ CHECKS = [
         ["xai-grok-shell"],
     ),
     (
+        "unknown protocol silently defaulted to ChatCompletions",
+        "*.rs",
+        r"_\s*=>\s*(?:.*\s*::\s*)?ApiBackend::ChatCompletions",
+        ["xai-grok-provider"],
+    ),
+    (
+        "manual ModelEntry construction in provider crate (bypasses config resolution)",
+        "*.rs",
+        r"ModelEntry",
+        ["xai-grok-provider"],
+    ),
+    (
         "continue-on-error in release-gate workflows",
         "*.yml",
         r"continue-on-error:\s*true",
