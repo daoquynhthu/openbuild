@@ -21,7 +21,11 @@ fn config_with_extra(
     extra_key: &str,
     extra_val: &str,
 ) -> ProviderConfig {
-    let mut c = ProviderConfig::new(Some(pid.into()), api_key.map(|k| k.into()), Some(base_url.into()));
+    let mut c = ProviderConfig::new(
+        Some(pid.into()),
+        api_key.map(|k| k.into()),
+        Some(base_url.into()),
+    );
     let mut h = IndexMap::new();
     h.insert(extra_key.into(), extra_val.into());
     c.extra_headers = Some(h);
@@ -39,10 +43,20 @@ fn openai_extra_headers_silently_lost() {
     let configured = configured_for(
         &reg,
         "openai",
-        config_with_extra("openai", "https://custom.example.com/v1", Some("test-key"), "X-Custom-OpenAI", "openai-value"),
+        config_with_extra(
+            "openai",
+            "https://custom.example.com/v1",
+            Some("test-key"),
+            "X-Custom-OpenAI",
+            "openai-value",
+        ),
     );
 
-    let route = configured.routes.values().next().expect("at least one route");
+    let route = configured
+        .routes
+        .values()
+        .next()
+        .expect("at least one route");
     let has_base = route.endpoint.base_url.as_deref() == Some("https://custom.example.com/v1");
     assert!(has_base, "openai base_url must be consumed");
 
@@ -64,10 +78,20 @@ fn anthropic_extra_headers_silently_lost() {
     let configured = configured_for(
         &reg,
         "anthropic",
-        config_with_extra("anthropic", "https://custom.example.com/v1", Some("test-key"), "X-Custom-Anthropic", "anthropic-value"),
+        config_with_extra(
+            "anthropic",
+            "https://custom.example.com/v1",
+            Some("test-key"),
+            "X-Custom-Anthropic",
+            "anthropic-value",
+        ),
     );
 
-    let route = configured.routes.values().next().expect("at least one route");
+    let route = configured
+        .routes
+        .values()
+        .next()
+        .expect("at least one route");
     let has_extra = route.static_headers.contains_key("X-Custom-Anthropic");
     assert!(
         !has_extra,
@@ -86,10 +110,20 @@ fn xai_extra_headers_silently_lost() {
     let configured = configured_for(
         &reg,
         "xai",
-        config_with_extra("xai", "https://custom.example.com/v1", Some("test-key"), "X-Custom-xAI", "xai-value"),
+        config_with_extra(
+            "xai",
+            "https://custom.example.com/v1",
+            Some("test-key"),
+            "X-Custom-xAI",
+            "xai-value",
+        ),
     );
 
-    let route = configured.routes.values().next().expect("at least one route");
+    let route = configured
+        .routes
+        .values()
+        .next()
+        .expect("at least one route");
     let has_extra = route.static_headers.contains_key("X-Custom-xAI");
     assert!(
         !has_extra,
@@ -108,10 +142,20 @@ fn opencode_extra_headers_silently_lost() {
     let configured = configured_for(
         &reg,
         "opencode",
-        config_with_extra("opencode", "https://custom.example.com/v1", None, "X-Custom-OpenCode", "opencode-value"),
+        config_with_extra(
+            "opencode",
+            "https://custom.example.com/v1",
+            None,
+            "X-Custom-OpenCode",
+            "opencode-value",
+        ),
     );
 
-    let route = configured.routes.values().next().expect("at least one route");
+    let route = configured
+        .routes
+        .values()
+        .next()
+        .expect("at least one route");
     let has_extra = route.static_headers.contains_key("X-Custom-OpenCode");
     assert!(
         !has_extra,
@@ -130,10 +174,20 @@ fn ollama_extra_headers_silently_lost() {
     let configured = configured_for(
         &reg,
         "ollama",
-        config_with_extra("ollama", "https://custom.example.com/v1", None, "X-Custom-Ollama", "ollama-value"),
+        config_with_extra(
+            "ollama",
+            "https://custom.example.com/v1",
+            None,
+            "X-Custom-Ollama",
+            "ollama-value",
+        ),
     );
 
-    let route = configured.routes.values().next().expect("at least one route");
+    let route = configured
+        .routes
+        .values()
+        .next()
+        .expect("at least one route");
     let has_extra = route.static_headers.contains_key("X-Custom-Ollama");
     assert!(
         !has_extra,

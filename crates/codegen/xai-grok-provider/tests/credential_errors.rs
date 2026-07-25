@@ -1,6 +1,6 @@
 use xai_grok_provider::auth::{
-    CredentialError, CredentialCandidate, EnvironmentReader,
-    SessionCredentialResolver, RequestCredentialContext, SecretValue,
+    CredentialCandidate, CredentialError, EnvironmentReader, RequestCredentialContext, SecretValue,
+    SessionCredentialResolver,
 };
 
 struct TestEnvReader(Result<Option<SecretValue>, String>);
@@ -43,12 +43,11 @@ async fn absent_credential_returns_none() {
     let session = TestSession(Ok(None));
     let c = ctx(&env, &session);
     let result = c
-        .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec!["MY_KEY".into()])])
+        .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec![
+            "MY_KEY".into(),
+        ])])
         .await;
-    assert!(
-        result.is_none(),
-        "absent credential should return None"
-    );
+    assert!(result.is_none(), "absent credential should return None");
 }
 
 #[tokio::test]
@@ -57,7 +56,9 @@ async fn backend_not_found_is_silently_dropped() {
     let session = TestSession(Ok(None));
     let c = ctx(&env, &session);
     let result = c
-        .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec!["MY_KEY".into()])])
+        .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec![
+            "MY_KEY".into(),
+        ])])
         .await;
     // BUG: `resolve_candidates` uses `if let Ok(Some(v)) = ...` so Err is silently skipped.
     // After fixing, errors should propagate instead of being dropped.
@@ -100,7 +101,9 @@ async fn malformed_credential_error_is_silently_dropped() {
     let session = TestSession(Ok(None));
     let c = ctx(&env, &session);
     let result = c
-        .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec!["BAD_KEY".into()])])
+        .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec![
+            "BAD_KEY".into(),
+        ])])
         .await;
     assert!(
         result.is_none(),

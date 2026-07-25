@@ -3,10 +3,7 @@ use xai_grok_provider::config::parse_provider_toml;
 fn parse_accepts(src: &str) {
     let toml = toml::from_str::<toml::Value>(src).expect("valid TOML");
     let parsed = parse_provider_toml(&toml).expect("parse must succeed");
-    assert!(
-        !parsed.entries.is_empty(),
-        "must have at least one entry"
-    );
+    assert!(!parsed.entries.is_empty(), "must have at least one entry");
 }
 
 #[test]

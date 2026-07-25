@@ -3,9 +3,8 @@ use std::time::Duration;
 
 use xai_grok_provider::types::{ProviderDefaults, ProviderId};
 use xai_grok_shell::agent::provider_catalog::{
-    ProviderCatalogService, RefreshStrategy::ForceRefresh,
-    ProviderCatalogState, ModelCatalogSnapshot, ProviderCatalogEntry,
-    parse_ollama_tags_models,
+    ModelCatalogSnapshot, ProviderCatalogEntry, ProviderCatalogService, ProviderCatalogState,
+    RefreshStrategy::ForceRefresh, parse_ollama_tags_models,
 };
 
 fn dummy_defaults() -> ProviderDefaults {
@@ -118,10 +117,8 @@ async fn provider_deletion_emits_revision_notification() {
 
     let rev_before = *rx.borrow();
 
-    let reg: indexmap::IndexMap<
-        ProviderId,
-        Arc<xai_grok_provider::provider::ConfiguredProvider>,
-    > = indexmap::IndexMap::new();
+    let reg: indexmap::IndexMap<ProviderId, Arc<xai_grok_provider::provider::ConfiguredProvider>> =
+        indexmap::IndexMap::new();
 
     svc.refresh_changed(
         &reg,
@@ -162,7 +159,9 @@ async fn superseded_refresh_cannot_publish_after_newer_revision() {
     let slow_addr = slow_listener.local_addr().unwrap();
     tokio::spawn(async move {
         let _ = axum::serve(slow_listener, slow_app)
-            .with_graceful_shutdown(async { slow_rx.await.ok(); })
+            .with_graceful_shutdown(async {
+                slow_rx.await.ok();
+            })
             .await;
     });
     let slow_url = format!("http://{slow_addr}/v1/models");
@@ -240,7 +239,9 @@ async fn shutdown_awaits_active_refresh() {
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
         let _ = axum::serve(listener, app)
-            .with_graceful_shutdown(async { server_rx.await.ok(); })
+            .with_graceful_shutdown(async {
+                server_rx.await.ok();
+            })
             .await;
     });
     let url = format!("http://{addr}/v1/models");

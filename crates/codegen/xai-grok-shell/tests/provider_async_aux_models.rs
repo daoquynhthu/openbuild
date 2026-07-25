@@ -21,9 +21,11 @@ use xai_grok_shell::agent::config::{
     resolve_web_search_sampling_config,
 };
 
-fn build_agent_and_snapshot()
-    -> (tokio::runtime::Runtime, tokio::task::LocalSet, std::sync::Arc<xai_grok_provider::registry::RegistrySnapshot>)
-{
+fn build_agent_and_snapshot() -> (
+    tokio::runtime::Runtime,
+    tokio::task::LocalSet,
+    std::sync::Arc<xai_grok_provider::registry::RegistrySnapshot>,
+) {
     let rt = tokio::runtime::Runtime::new().expect("threaded runtime");
     let local = tokio::task::LocalSet::new();
 
@@ -65,7 +67,10 @@ fn aux_model_nested_runtime_panic() {
     let (rt, local, snapshot) = build_agent_and_snapshot();
 
     let mut catalog = IndexMap::new();
-    catalog.insert(AUX_MODEL.to_string(), make_model_entry("test-aux", AUX_MODEL));
+    catalog.insert(
+        AUX_MODEL.to_string(),
+        make_model_entry("test-aux", AUX_MODEL),
+    );
 
     let endpoints = EndpointsConfig::default();
 
@@ -88,9 +93,13 @@ fn aux_model_nested_runtime_panic() {
         Ok(()) => {}
         Err(e) if e.is_panic() => {
             let boxed: Box<dyn std::any::Any + Send> = e.into_panic();
-            let msg = if let Some(s) = boxed.downcast_ref::<String>() { s.clone() }
-                      else if let Some(s) = boxed.downcast_ref::<&str>() { s.to_string() }
-                      else { "unknown panic".to_string() };
+            let msg = if let Some(s) = boxed.downcast_ref::<String>() {
+                s.clone()
+            } else if let Some(s) = boxed.downcast_ref::<&str>() {
+                s.to_string()
+            } else {
+                "unknown panic".to_string()
+            };
             panic!("R3-RED-03 aux: nested-runtime panic (pre-fix expected): {msg}");
         }
         Err(e) => panic!("R3-RED-03 aux: unexpected JoinError: {e}"),
@@ -128,9 +137,13 @@ fn web_search_nested_runtime_panic() {
         Ok(()) => {}
         Err(e) if e.is_panic() => {
             let boxed: Box<dyn std::any::Any + Send> = e.into_panic();
-            let msg = if let Some(s) = boxed.downcast_ref::<String>() { s.clone() }
-                      else if let Some(s) = boxed.downcast_ref::<&str>() { s.to_string() }
-                      else { "unknown panic".to_string() };
+            let msg = if let Some(s) = boxed.downcast_ref::<String>() {
+                s.clone()
+            } else if let Some(s) = boxed.downcast_ref::<&str>() {
+                s.to_string()
+            } else {
+                "unknown panic".to_string()
+            };
             panic!("R3-RED-03 web: nested-runtime panic (pre-fix expected): {msg}");
         }
         Err(e) => panic!("R3-RED-03 web: unexpected JoinError: {e}"),

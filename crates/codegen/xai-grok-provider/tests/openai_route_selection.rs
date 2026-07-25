@@ -2,9 +2,7 @@ use xai_grok_provider::config::ProviderConfig;
 use xai_grok_provider::registry::ProviderRegistry;
 use xai_grok_provider::types::ProviderId;
 
-fn openai_configured(
-    protocol: Option<&str>,
-) -> xai_grok_provider::provider::ConfiguredProvider {
+fn openai_configured(protocol: Option<&str>) -> xai_grok_provider::provider::ConfiguredProvider {
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
 
@@ -35,8 +33,7 @@ fn explicit_responses_route_returns_responses() {
     let configured = openai_configured(None);
 
     let routes = &configured.routes;
-    let resp_route =
-        routes.get(&xai_grok_provider::types::RouteId::new("openai-responses"));
+    let resp_route = routes.get(&xai_grok_provider::types::RouteId::new("openai-responses"));
     assert!(resp_route.is_some(), "openai-responses route must exist");
     assert_eq!(
         resp_route.unwrap().protocol_id.0,

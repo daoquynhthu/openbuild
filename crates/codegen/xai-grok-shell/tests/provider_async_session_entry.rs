@@ -48,10 +48,7 @@ fn nested_runtime_panic_in_acp_session() {
         };
 
         let temp_dir = tempfile::tempdir().unwrap();
-        let auth_manager = Arc::new(AuthManager::new(
-            temp_dir.path(),
-            GrokComConfig::default(),
-        ));
+        let auth_manager = Arc::new(AuthManager::new(temp_dir.path(), GrokComConfig::default()));
 
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
         let gateway = AcpAgentGatewaySender::new(tx);
@@ -86,9 +83,7 @@ fn nested_runtime_panic_in_acp_session() {
             } else {
                 "unknown panic".to_string()
             };
-            panic!(
-                "R3-RED-01: nested-runtime panic detected (pre-fix expected): {msg}"
-            );
+            panic!("R3-RED-01: nested-runtime panic detected (pre-fix expected): {msg}");
         }
         Err(e) => {
             panic!("R3-RED-01: unexpected JoinError (not a panic): {e}");

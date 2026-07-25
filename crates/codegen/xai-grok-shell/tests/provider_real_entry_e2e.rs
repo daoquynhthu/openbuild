@@ -15,8 +15,7 @@ use std::num::NonZeroU64;
 
 use indexmap::IndexMap;
 use xai_grok_provider::registry::RegistrySnapshot;
-use xai_grok_shell::agent::config::{default_agent_type, ModelEntry, ModelInfo};
-
+use xai_grok_shell::agent::config::{ModelEntry, ModelInfo, default_agent_type};
 
 fn make_entry(provider_id: &str, model: &str) -> ModelEntry {
     ModelEntry {
@@ -62,9 +61,10 @@ fn make_entry(provider_id: &str, model: &str) -> ModelEntry {
 
 async fn bootstrap(toml_str: &str) -> RegistrySnapshot {
     let toml: toml::Value = toml::from_str(toml_str).unwrap();
-    let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
-        .await
-        .expect("bootstrap must succeed");
+    let runtime =
+        xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None)
+            .await
+            .expect("bootstrap must succeed");
     runtime.snapshot().as_ref().clone()
 }
 
@@ -90,10 +90,7 @@ async fn e2e_provider_inline_key_dropped() {
     let model = make_entry("test", "m");
 
     let config = xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
-        &model,
-        &snapshot,
-        None,
-        None,
+        &model, &snapshot, None, None,
     )
     .await
     .expect("execution_to_sampler_config must succeed");
@@ -130,10 +127,7 @@ async fn e2e_responses_protocol_respected() {
     let model = make_entry("test", "m");
 
     let config = xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
-        &model,
-        &snapshot,
-        None,
-        None,
+        &model, &snapshot, None, None,
     )
     .await
     .expect("execution_to_sampler_config must succeed");
@@ -166,10 +160,7 @@ async fn e2e_missing_credential_hard_error() {
     let model = make_entry("test", "m");
 
     let result = xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
-        &model,
-        &snapshot,
-        None,
-        None,
+        &model, &snapshot, None, None,
     )
     .await;
 
@@ -199,10 +190,7 @@ async fn e2e_custom_provider_inline_key_lost() {
     let model = make_entry("custom", "m");
 
     let config = xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
-        &model,
-        &snapshot,
-        None,
-        None,
+        &model, &snapshot, None, None,
     )
     .await
     .expect("execution_to_sampler_config must succeed");
@@ -242,10 +230,7 @@ async fn e2e_openai_builtin_inline_key_dropped() {
     let model = make_entry("openai", "gpt-4o");
 
     let result = xai_grok_shell::agent::provider_resolution::execution_to_sampler_config(
-        &model,
-        &snapshot,
-        None,
-        None,
+        &model, &snapshot, None, None,
     )
     .await;
 

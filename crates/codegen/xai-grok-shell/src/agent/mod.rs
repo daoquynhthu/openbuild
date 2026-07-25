@@ -1,6 +1,6 @@
 pub mod activity;
-pub mod app;
 pub mod agent_config_error;
+pub mod app;
 pub mod auth_method;
 pub mod chat_modes;
 pub mod config;

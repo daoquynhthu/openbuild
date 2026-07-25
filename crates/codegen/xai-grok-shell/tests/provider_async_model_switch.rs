@@ -45,10 +45,7 @@ fn build_agent() -> (tokio::runtime::Runtime, tokio::task::LocalSet, MvpAgent) {
         };
 
         let temp_dir = tempfile::tempdir().unwrap();
-        let auth_manager = Arc::new(AuthManager::new(
-            temp_dir.path(),
-            GrokComConfig::default(),
-        ));
+        let auth_manager = Arc::new(AuthManager::new(temp_dir.path(), GrokComConfig::default()));
 
         let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
         let gateway = xai_acp_lib::AcpAgentGatewaySender::new(tx);
@@ -90,9 +87,7 @@ fn model_switch_nested_runtime_panic() {
             } else {
                 "unknown panic".to_string()
             };
-            panic!(
-                "R3-RED-02 model_switch path: nested-runtime panic (pre-fix expected): {msg}"
-            );
+            panic!("R3-RED-02 model_switch path: nested-runtime panic (pre-fix expected): {msg}");
         }
         Err(e) => {
             panic!("R3-RED-02: unexpected JoinError (not a panic): {e}");

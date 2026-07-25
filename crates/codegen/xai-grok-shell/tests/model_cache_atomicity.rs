@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use xai_grok_provider::types::ProviderId;
 use xai_grok_shell::agent::provider_catalog::{
-    ProviderCatalogService, ModelCatalogSnapshot, ProviderCatalogEntry,
-    ProviderCatalogState,
+    ModelCatalogSnapshot, ProviderCatalogEntry, ProviderCatalogService, ProviderCatalogState,
 };
 
 fn sample_entry(provider_id: ProviderId) -> ProviderCatalogEntry {
@@ -27,8 +26,10 @@ async fn persist_and_load_roundtrip() {
         catalog_revision: 1,
         providers: Default::default(),
     };
-    snap.providers
-        .insert(ProviderId::new("test"), sample_entry(ProviderId::new("test")));
+    snap.providers.insert(
+        ProviderId::new("test"),
+        sample_entry(ProviderId::new("test")),
+    );
     svc.bootstrap_from_snapshot(snap).await;
     svc.persist_snapshot(&path).await.unwrap();
     assert!(path.exists());
@@ -49,8 +50,10 @@ async fn persist_leaves_no_temp_files() {
         catalog_revision: 1,
         providers: Default::default(),
     };
-    snap.providers
-        .insert(ProviderId::new("test"), sample_entry(ProviderId::new("test")));
+    snap.providers.insert(
+        ProviderId::new("test"),
+        sample_entry(ProviderId::new("test")),
+    );
     svc.bootstrap_from_snapshot(snap).await;
     svc.persist_snapshot(&path).await.unwrap();
 
@@ -62,10 +65,7 @@ async fn persist_leaves_no_temp_files() {
         .iter()
         .filter(|e| e.file_name().to_string_lossy().contains(".tmp_"))
         .count();
-    assert_eq!(
-        tmp_count, 0,
-        "R3-RED-12: no .tmp files after persist"
-    );
+    assert_eq!(tmp_count, 0, "R3-RED-12: no .tmp files after persist");
 }
 
 #[tokio::test]

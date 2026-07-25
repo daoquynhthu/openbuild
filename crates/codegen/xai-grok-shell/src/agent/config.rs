@@ -11718,18 +11718,19 @@ default = "grok-4.5"
         models.insert("grok-search".into(), model);
 
         let endpoints = EndpointsConfig::default();
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(resolve_web_search_sampling_config(
-                "grok-search",
-                &models,
-                Some("session-token"),
-                false,
-                None,
-                None,
-                &endpoints,
-                Some(&rt.snapshot()),
-            ));
+        let result =
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(resolve_web_search_sampling_config(
+                    "grok-search",
+                    &models,
+                    Some("session-token"),
+                    false,
+                    None,
+                    None,
+                    &endpoints,
+                    Some(&rt.snapshot()),
+                ));
         assert!(result.is_some());
         let config = result.unwrap();
         assert_eq!(

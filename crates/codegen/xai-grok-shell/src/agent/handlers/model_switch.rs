@@ -115,7 +115,12 @@ pub(crate) async fn apply(
     let mut model_sampling = agent
         .prepare_sampling_config_for_model(&model, handle.origin_client.clone())
         .await
-        .map_err(|e| acp::Error::invalid_params().data(format!("failed to configure model '{}': {e}", model.info.model)))?;
+        .map_err(|e| {
+            acp::Error::invalid_params().data(format!(
+                "failed to configure model '{}': {e}",
+                model.info.model
+            ))
+        })?;
     if let Some(eff) = effort_override {
         if agent
             .models_manager
@@ -248,8 +253,10 @@ impl MvpAgent {
         &self,
         model: &crate::agent::config::ModelEntry,
         origin_client: Option<crate::http::OriginClientInfo>,
-    ) -> Result<xai_grok_sampler::SamplerConfig, crate::agent::agent_config_error::AgentConfigError> {
-        self.prepare_sampling_config_for_model(model, origin_client).await
+    ) -> Result<xai_grok_sampler::SamplerConfig, crate::agent::agent_config_error::AgentConfigError>
+    {
+        self.prepare_sampling_config_for_model(model, origin_client)
+            .await
     }
 }
 
