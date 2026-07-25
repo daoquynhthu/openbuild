@@ -9,6 +9,7 @@
 use std::pin::Pin;
 use std::future::Future;
 
+use indexmap::IndexMap;
 use serial_test::serial;
 
 use futures_util::StreamExt;
@@ -23,6 +24,7 @@ use xai_grok_provider::registry::RegistrySnapshot;
 use xai_grok_provider::types::{ModelId, ProviderId, RouteId};
 use xai_grok_provider::model::{GenerationOptions, ModelLimits};
 use xai_grok_provider::protocol::ProtocolId;
+use xai_grok_provider::resolution::{ProviderImplementation, ProviderPublicConfig, ProviderRuntimeConfig, ResolvedProviderSet, ResolvedProviderSpec};
 use xai_grok_sampler::SamplerConfig;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
 use xai_grok_shell::agent::provider_resolution::ProviderResolutionError;
@@ -991,6 +993,93 @@ fn responses_protocol_rejected_for_openai_compatible_no_requests() {
         server.request_count(),
         0,
         "no HTTP request must reach mock server when protocol=responses is rejected"
+    );
+}
+
+/// R3-E2E-04: Hot-reload with invalid config preserves snapshot — no requests.
+///
+/// After bootstrapping a valid provider to a mock server, an invalid
+/// resolved provider set (protocol=responses for openai_compatible) must
+/// be rejected by `rebuild_from_resolved`, preserving the current snapshot
+/// revision with no additional HTTP requests.
+#[test]
+fn hot_reload_invalid_config_preserves_snapshot_no_requests() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server, runtime) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.valid-provider]
+            kind = "openai_compatible"
+            base_url = "{mock_url}"
+            api_key = "test-key"
+            protocol = "chat_completions"
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
+            &toml, None, None,
+        )
+        .await
+        .expect("bootstrap must succeed");
+
+        (server, runtime)
+    });
+
+    let original_revision = runtime.snapshot().revision;
+    let requests_before = server.request_count();
+
+    // Construct an invalid resolved set: openai_compatible with protocol=responses
+    let invalid_resolved = ResolvedProviderSet {
+        providers: IndexMap::from([(
+            ProviderId::new("invalid-provider"),
+            ResolvedProviderSpec {
+                id: ProviderId::new("invalid-provider"),
+                implementation: ProviderImplementation::OpenAiCompatible { profile: None },
+                config: ProviderRuntimeConfig {
+                    public: ProviderPublicConfig {
+                        base_url: Some(format!("{}/v1", "http://127.0.0.1:0")),
+                        protocol: Some("responses".into()),
+                        model_list_path: None,
+                        allow_insecure_http: false,
+                        model_list_format: None,
+                        extra_headers: IndexMap::new(),
+                    },
+                    inline_api_key: Some(xai_grok_provider::auth::SecretValue::new(
+                        "test-key".into(),
+                    )),
+                    env_keys: vec![],
+                },
+            },
+        )]),
+    };
+
+    let result = runtime.registry.rebuild_from_resolved(&invalid_resolved);
+
+    assert!(
+        result.is_err(),
+        "hot-reload with invalid config must fail"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.to_lowercase().contains("responses"),
+        "error must mention responses protocol, got: {err}"
+    );
+
+    let after_revision = runtime.snapshot().revision;
+    assert_eq!(
+        after_revision, original_revision,
+        "snapshot revision must be preserved after failed hot-reload"
+    );
+
+    assert_eq!(
+        server.request_count(),
+        requests_before,
+        "no additional HTTP requests must reach mock server after failed hot-reload"
     );
 }
 

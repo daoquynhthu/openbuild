@@ -1062,3 +1062,20 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `cargo test -p xai-grok-provider`: 285/285 pass ✅
 - `cargo check -p xai-grok-provider -p xai-grok-shell`: clean ✅
 - `cargo clippy -p xai-grok-provider -p xai-grok-shell`: 0 warnings ✅
+
+## R3-E2E-04: Hot-reload validation failure — 2026-07-25
+
+### Changes
+- Added `hot_reload_invalid_config_preserves_snapshot_no_requests` E2E test:
+  - Bootstraps valid openai_compatible provider to mock server
+  - Constructs invalid `ResolvedProviderSet` (protocol=responses) and calls `registry.rebuild_from_resolved()`
+  - Asserts error mentions "responses" protocol
+  - Asserts snapshot revision is preserved after failed rebuild
+  - Asserts zero additional HTTP requests to mock server
+
+### Files modified
+- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — new hot-reload E2E test
+
+### Key results
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 18/18 pass ✅
+- `cargo clippy -p xai-grok-provider -p xai-grok-shell -- -D warnings`: 0 warnings ✅
