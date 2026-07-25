@@ -1458,3 +1458,134 @@ fn hot_reload_config_change_invalid_removal() {
         "no additional HTTP requests must reach mock server after hot-reload operations"
     );
 }
+
+/// R3-E2E-05: In-flight request uses the snapshot it started with during hot-reload.
+///
+/// A streaming request started before a hot-reload must complete successfully
+/// using its original config, even though the registry snapshot has been
+/// replaced by the hot-reload.
+#[test]
+#[serial]
+fn hot_reload_in_flight_request_uses_original_snapshot() {
+    use std::sync::mpsc;
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let (server, runtime) = rt.block_on(async {
+        let server = MockInferenceServer::start().await.unwrap();
+        let mock_url = server.url();
+
+        let toml_str = format!(
+            r#"
+            [provider.test-provider]
+            kind = "openai_compatible"
+            base_url = "{mock_url}"
+            api_key = "test-key"
+            "#
+        );
+        let toml: toml::Value = toml::from_str(&toml_str).unwrap();
+
+        let runtime = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(
+            &toml, None, None,
+        )
+        .await
+        .expect("bootstrap must succeed");
+
+        (server, runtime)
+    });
+
+    let snapshot = runtime.snapshot();
+    let model = custom_model_entry("test-provider", "test-model");
+
+    // Build SamplerConfig from the current snapshot (pre-hot-reload)
+    let config = execution_to_sampler_config(&model, &snapshot, Some("test-key"), None)
+        .expect("execution_to_sampler_config must succeed before hot-reload");
+
+    let original_revision = snapshot.revision;
+
+    // Pace events so the stream stays in-flight long enough to hot-reload
+    server.set_chunk_delay(Some(std::time::Duration::from_millis(200)));
+
+    // Spawn the streaming request in a background thread with its own runtime
+    let (tx, rx) = mpsc::channel();
+
+    std::thread::spawn(move || {
+        let thread_rt = tokio::runtime::Runtime::new().unwrap();
+        thread_rt.block_on(async {
+            use futures_util::StreamExt;
+            let client = xai_grok_sampler::SamplingClient::new(config)
+                .expect("SamplingClient::new must succeed");
+            let request = xai_grok_sampling_types::ConversationRequest::from_items(vec![
+                xai_grok_sampling_types::ConversationItem::user("Hello from in-flight!"),
+            ]);
+            let (mut stream, _metadata) = client.conversation_stream(request).await.unwrap();
+            let mut text = String::new();
+            while let Some(chunk_result) = stream.next().await {
+                let chunk = chunk_result.unwrap();
+                for choice in chunk.choices {
+                    if let Some(ref t) = choice.delta.content {
+                        text.push_str(t);
+                    }
+                }
+            }
+            tx.send(text).unwrap();
+        });
+    });
+
+    // Give the stream time to start
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    // Trigger hot-reload with a different config while the stream is in-flight
+    let hot_reload_resolved = ResolvedProviderSet {
+        providers: IndexMap::from([(
+            ProviderId::new("test-provider"),
+            ResolvedProviderSpec {
+                id: ProviderId::new("test-provider"),
+                implementation: ProviderImplementation::OpenAiCompatible { profile: None },
+                config: ProviderRuntimeConfig {
+                    public: ProviderPublicConfig {
+                        base_url: Some("http://127.0.0.1:9999/v1".into()),
+                        protocol: Some("chat_completions".into()),
+                        model_list_path: None,
+                        allow_insecure_http: true,
+                        model_list_format: None,
+                        extra_headers: IndexMap::new(),
+                    },
+                    inline_api_key: Some(xai_grok_provider::auth::SecretValue::new(
+                        "new-key".into(),
+                    )),
+                    env_keys: vec![],
+                },
+            },
+        )]),
+    };
+    let hot_reload_result = runtime.registry.rebuild_from_resolved(&hot_reload_resolved);
+    assert!(
+        hot_reload_result.is_ok(),
+        "hot-reload must succeed: {:?}",
+        hot_reload_result
+    );
+    let hot_reload_revision = hot_reload_result.unwrap();
+    assert!(
+        hot_reload_revision > original_revision,
+        "hot-reload must increase revision: {hot_reload_revision} > {original_revision}"
+    );
+
+    // Wait for the in-flight stream to complete
+    let stream_text = rx.recv_timeout(std::time::Duration::from_secs(10))
+        .expect("in-flight stream must complete within timeout");
+
+    // The stream must have completed successfully — the old SamplerConfig
+    // (built from pre-hot-reload snapshot) remained valid throughout
+    assert!(
+        stream_text.contains("Echo:"),
+        "in-flight request must complete successfully: {stream_text}"
+    );
+
+    // The hot-reload snapshot has the new revision
+    assert_eq!(
+        runtime.snapshot().revision,
+        hot_reload_revision,
+        "post-hot-reload snapshot must have the new revision"
+    );
+}
