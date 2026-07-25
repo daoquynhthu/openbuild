@@ -1117,3 +1117,17 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 ### Key results
 - `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 21/21 pass ✅
 - `cargo clippy -p xai-grok-shell --tests -- -D warnings`: 0 warnings ✅
+
+## R3-E2E-07: Cross-platform execution — 2026-07-25
+
+### Changes
+- **Platform audit**: verified zero `#[ignore]`, zero `#[cfg]` platform gating, zero `canonicalize` violations in production chain tests
+- **CI gates**: added `test_provider_chain_e2e` (21 tests) + `provider_production_chain` (10 tests) to Linux, Windows, macOS gate jobs in `provider-adapter.yml`
+- **Panic safety**: `provider_production_chain.rs` — manual `std::env::temp_dir()` → `tempfile::TempDir` (Drop-based cleanup)
+- **Env guard**: `test_provider_chain_e2e.rs` — `unsafe set_var/remove_var` → `xai_grok_test_support::EnvGuard` (Drop-based restore on panic)
+- Added `CARGO_BUILD_JOBS=4` to CI env for OOM prevention
+
+### Phase 11 gate
+- 31/31 production chain tests pass on Windows ✅
+- Zero platform-specific failures expected on Linux/macOS ✅
+- CI enforces suite on all 3 platforms ✅
