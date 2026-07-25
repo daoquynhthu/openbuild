@@ -792,3 +792,35 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - All 6 gating checks pass (fmt, check, clippy, test --no-run, test --list, doc) ✅
 - No new warnings in targeted crates (provider, shell, pager, sampler) ✅
 - Baseline evidence committed at `e86a265` ✅
+
+## Phase 3: ERR Series — Error hardening — 2026-07-25
+
+### Completed
+- **R3-ERR-01** `82fae42`: deleted route-error fallback in `agent_ops.rs:1187-1210` — `sampling_config_for_model` no longer called on registry error ✅
+- **R3-ERR-02**: `resolve_sampling_config_for_model` already propagates errors (from ASYNC-02); no code change needed ✅
+- **R3-ERR-03**: deferred — depends on Phase 4+ config/auth unification ✅
+- **R3-ERR-04**: verified — no post-preparation mutation of `api_key`/`base_url`/`auth_scheme`/`api_backend` in production callers ✅
+- **R3-ERR-05** `7ad93ea`: `From<PreparedSamplerConfig>` → `TryFrom<PreparedSamplerConfig>` — unknown protocols produce `UnsupportedProtocolError` instead of silently defaulting. Updated all 4 call sites (config.rs, provider_resolution.rs, trace_classifier/mod.rs, tests/provider_production_chain.rs) ✅
+- **R3-ERR-06** `542be58`: added 2 new static fallback prohibition checks to invariant scanner:
+  - unknown protocol silently defaulted to ChatCompletions — regex `_.*=>.*ChatCompletions` in provider crate
+  - manual ModelEntry construction in provider crate — regex `ModelEntry` in provider crate
+  Both checks produce 0 violations; test updated ✅
+
+### Files modified (ERR series)
+- `crates/codegen/xai-grok-provider/src/prepared.rs` — TryFrom + UnsupportedProtocolError
+- `crates/codegen/xai-grok-shell/src/agent/config.rs` — call site update
+- `crates/codegen/xai-grok-shell/src/agent/provider_resolution.rs` — call site update
+- `crates/codegen/xai-grok-shell/src/trace_classifier/mod.rs` — call site update
+- `crates/codegen/xai-grok-shell/tests/provider_production_chain.rs` — test call site update
+- `scripts/provider-v1/assert_provider_v1_invariants.py` — 2 new checks
+- `scripts/provider-v1/tests/test_assert_provider_v1_invariants.py` — check names test updated
+
+### Phase 3 gate
+- `cargo check -p xai-grok-provider -p xai-grok-shell --all-targets` — PASS ✅
+- `cargo clippy -p xai-grok-provider -p xai-grok-shell --all-targets -- -D warnings` — PASS ✅
+- `python scripts/provider-v1/assert_provider_v1_invariants.py` — 5 baseline violations (unchanged), 2 new checks pass ✅
+- No production route error can produce a Sampler ✅
+- All unsupported protocols fail before HTTP construction ✅
+
+### Next
+- Proceed to Phase 4 (CFG series) or address deferred ERR-03 when config/auth unification lands
