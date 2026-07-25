@@ -12,6 +12,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
+  CARGO_BUILD_JOBS: 4
 
 jobs:
   # ── Job 1: Linux targeted gate ──────────────────────────────────────────
@@ -40,6 +41,10 @@ jobs:
         run: cargo test -p xai-grok-provider --all-targets
       - name: Test sampler crate
         run: cargo test -p xai-grok-sampler --all-targets
+      - name: Production chain E2E suite
+        run: cargo test -p xai-grok-shell --test test_provider_chain_e2e -- --test-threads=4
+      - name: Production chain RED/GREEN suite
+        run: cargo test -p xai-grok-shell --test provider_production_chain
 
   # ── Job 2: Windows targeted gate ────────────────────────────────────────
   windows-gate:
@@ -64,6 +69,10 @@ jobs:
         run: cargo test -p xai-grok-provider --all-targets
       - name: Test pager crate (lib)
         run: cargo test -p xai-grok-pager --lib
+      - name: Production chain E2E suite
+        run: cargo test -p xai-grok-shell --test test_provider_chain_e2e -- --test-threads=4
+      - name: Production chain RED/GREEN suite
+        run: cargo test -p xai-grok-shell --test provider_production_chain
 
   # ── Job 3: macOS targeted gate ──────────────────────────────────────────
   macos-gate:
@@ -86,6 +95,10 @@ jobs:
         run: cargo check -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets
       - name: Test provider crate
         run: cargo test -p xai-grok-provider --all-targets
+      - name: Production chain E2E suite
+        run: cargo test -p xai-grok-shell --test test_provider_chain_e2e -- --test-threads=4
+      - name: Production chain RED/GREEN suite
+        run: cargo test -p xai-grok-shell --test provider_production_chain
 
   # ── Job 4: Full workspace gate ──────────────────────────────────────────
   workspace-gate:

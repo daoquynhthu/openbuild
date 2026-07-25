@@ -295,15 +295,8 @@ async fn obpa008_cli_base_url_override_survives_reload() {
 
     // Reload through coordinator path (production reload path which
     // preserves the startup CLI override context).
-    let dir = std::env::temp_dir().join(format!(
-        "obpa008-test-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir_all(&dir).unwrap();
-    let config_path = dir.join("config.toml");
+    let dir = tempfile::tempdir().expect("temp dir must succeed");
+    let config_path = dir.path().join("config.toml");
     std::fs::write(&config_path, toml_str).unwrap();
 
     let ctx = std::sync::Arc::new(
@@ -343,8 +336,6 @@ async fn obpa008_cli_base_url_override_survives_reload() {
         "CLI base_url override must survive coordinator reload (OBPA-008), got: {}",
         config_after.base_url
     );
-
-    let _ = std::fs::remove_dir_all(&dir);
 }
 
 // ---------------------------------------------------------------------------

@@ -313,8 +313,7 @@ fn openai_chat_chain_endpoint_bearer_model_events_usage() {
 #[serial]
 fn openai_responses_chain_selects_responses_route() {
     // xAI provider requires XAI_API_KEY environment variable for auth
-    // SAFETY: test-only, single-threaded access to env var
-    unsafe { std::env::set_var("XAI_API_KEY", "xai-test-key-for-responses") };
+    let _guard = xai_grok_test_support::EnvGuard::set("XAI_API_KEY", "xai-test-key-for-responses");
 
     let rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -360,9 +359,6 @@ fn openai_responses_chain_selects_responses_route() {
         config.request_url
     );
 
-    // Clean up environment variable
-    // SAFETY: test-only, single-threaded access to env var
-    unsafe { std::env::remove_var("XAI_API_KEY") };
 }
 
 /// P14-005: Anthropic Messages chain — verify x-api-key, anthropic-version, path, decoder.
@@ -376,8 +372,7 @@ fn openai_responses_chain_selects_responses_route() {
 #[serial]
 fn anthropic_messages_chain_x_api_key_version_path() {
     // Anthropic provider requires ANTHROPIC_API_KEY environment variable
-    // SAFETY: test-only, single-threaded access to env var
-    unsafe { std::env::set_var("ANTHROPIC_API_KEY", "sk-ant-test-key") };
+    let _guard = xai_grok_test_support::EnvGuard::set("ANTHROPIC_API_KEY", "sk-ant-test-key");
 
     let rt = tokio::runtime::Runtime::new().unwrap();
 
@@ -444,9 +439,6 @@ fn anthropic_messages_chain_x_api_key_version_path() {
         "anthropic-version must be 2023-06-01"
     );
 
-    // Clean up environment variable
-    // SAFETY: test-only, single-threaded access to env var
-    unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
 }
 
 /// P14-006: OpenCode public chain — no auth header, anonymous inference succeeds.
@@ -766,8 +758,7 @@ fn two_custom_providers_no_state_cross_contamination() {
 #[serial]
 fn missing_auth_hard_fail_request_count_zero() {
     // Ensure ANTHROPIC_API_KEY is NOT set
-    // SAFETY: test-only, single-threaded access to env var
-    unsafe { std::env::remove_var("ANTHROPIC_API_KEY") };
+    let _guard = xai_grok_test_support::EnvGuard::unset("ANTHROPIC_API_KEY");
 
     let rt = tokio::runtime::Runtime::new().unwrap();
 
