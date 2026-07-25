@@ -646,7 +646,16 @@ All 12 P13 tasks resolved:
 - Added `unknown_protocol_hard_fail_at_parse_no_requests` test in `test_provider_chain_e2e.rs`
 - Fixed factory fallback: replaced `unwrap_or("/chat/completions")` with `unwrap_or_else(|_| protocol.clone())` — no silent fallback to chat completions
 - The existing `ProviderConfigInput::validate` already produces error diagnostics for unknown protocols, causing `bootstrap_from_config` to reject them at parse time
-- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 13/13 pass ✅
+
+### R3-E2E-04: Ambiguous model reference hard failure — 2026-07-25
+
+- Added `ambiguous_model_hard_fail_no_requests` test in `test_provider_chain_e2e.rs`
+- Verifies `resolve_cli_model_reference` returns `AmbiguousModel` for bare model matching two providers
+- Only bootstrap model-discovery requests reach mock (≤2), no additional HTTP during resolution failure
+- Commit: `dc349bd`
+
+### Key results (current)
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 14/14 pass ✅
 
 ### Phase 14后续：全方位审计与修复（2026-07-23）
 
