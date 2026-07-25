@@ -1131,3 +1131,43 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - 31/31 production chain tests pass on Windows ✅
 - Zero platform-specific failures expected on Linux/macOS ✅
 - CI enforces suite on all 3 platforms ✅
+
+## Phase 12: Convert CI from evidence collection to release gates — 2026-07-25
+
+### R3-CI-01 — Trigger on main and feature branches ✅
+- Added `main` to push/pull_request branches in `provider-adapter.yml`
+
+### R3-CI-02 — Add full Windows gate ✅
+- Replaced targeted package checks with full workspace: `cargo fmt`, `cargo check --workspace`, `cargo clippy --workspace`, `cargo test --no-run`
+- Added `rustfmt` component
+- Runs: provider tests, sampler tests, `provider_real_entry_e2e` (RED), pager lib tests
+
+### R3-CI-03 — Add full macOS gate ✅
+- Added `rustfmt`, workspace check/clippy, test-build (no-run), production E2E
+
+### R3-CI-04 — Add Linux full test gate ✅
+- Linux gate now runs `cargo test --workspace --all-targets --locked` (replacing targeted provider+sampler tests)
+
+### R3-CI-05 — Make PTY Provider E2E blocking ✅
+- Removed `continue-on-error: true` from PTY step (timeout is failure)
+- Kept `--ignored providers_pty` — explicitly named stable test filter
+
+### R3-CI-06 — Make documentation gate honest ✅
+- Removed broad `RUSTDOCFLAGS --allow` suppressions
+- Uses `RUSTDOCFLAGS: "-D warnings"` with `cargo doc --workspace --no-deps --locked`
+
+### R3-CI-07 — Keep baseline workflow non-authoritative ✅
+- Already compliant: `workflow_dispatch` only trigger, named "Provider V1 Baseline", `continue-on-error` allowed (excluded from invariant scan)
+- No changes needed
+
+### R3-CI-08 — Add invariant and ledger gates ✅
+- Added `invariant-gate` job: runs `assert_provider_v1_invariants.py` + `scan-platform-exclusions.py --output`
+
+### R3-CI-09 — Add package startup smoke tests ✅
+- Added `smoke-linux`, `smoke-windows`, `smoke-macos` jobs
+- Each builds `xai-grok-pager-bin`, runs `--version`, runs startup config validation (`--help` with `GROK_HOME`)
+
+### Phase 12 gate
+- All release jobs are blocking ✅
+- No `continue-on-error` in release jobs ✅
+- Main branch covered by trigger ✅

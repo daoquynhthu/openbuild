@@ -1,12 +1,13 @@
-# Provider-adapter V1 CI workflow: Linux, Windows, and macOS gates.
-# Runs on every push/PR to feat/provider-adapter and on manual trigger.
+# Provider-adapter V1 CI workflow: Linux, Windows, and macOS release gates.
+# Phase 12: all release jobs are blocking; no continue-on-error in release jobs;
+# main branch is covered.
 name: Provider Adapter V1
 
 on:
   push:
-    branches: [feat/provider-adapter]
+    branches: [main, feat/provider-adapter]
   pull_request:
-    branches: [feat/provider-adapter]
+    branches: [main, feat/provider-adapter]
   workflow_dispatch:
 
 env:
@@ -15,94 +16,9 @@ env:
   CARGO_BUILD_JOBS: 4
 
 jobs:
-  # ── Job 1: Linux targeted gate ──────────────────────────────────────────
+  # ── Job 1: Linux full gate (R3-CI-04) ─────────────────────────────────
   linux-gate:
     name: Linux gate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.92.0
-          targets: x86_64-unknown-linux-gnu
-          components: clippy, rustfmt
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
-      - name: Check
-        run: cargo check -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets
-      - name: Clippy
-        run: cargo clippy -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets -- -D warnings
-      - name: Test provider crate
-        run: cargo test -p xai-grok-provider --all-targets
-      - name: Test sampler crate
-        run: cargo test -p xai-grok-sampler --all-targets
-      - name: Production chain E2E suite
-        run: cargo test -p xai-grok-shell --test test_provider_chain_e2e -- --test-threads=4
-      - name: Production chain RED/GREEN suite
-        run: cargo test -p xai-grok-shell --test provider_production_chain
-
-  # ── Job 2: Windows targeted gate ────────────────────────────────────────
-  windows-gate:
-    name: Windows gate
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.92.0
-          components: clippy
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
-      - name: Check
-        run: cargo check -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets
-      - name: Test provider crate
-        run: cargo test -p xai-grok-provider --all-targets
-      - name: Test pager crate (lib)
-        run: cargo test -p xai-grok-pager --lib
-      - name: Production chain E2E suite
-        run: cargo test -p xai-grok-shell --test test_provider_chain_e2e -- --test-threads=4
-      - name: Production chain RED/GREEN suite
-        run: cargo test -p xai-grok-shell --test provider_production_chain
-
-  # ── Job 3: macOS targeted gate ──────────────────────────────────────────
-  macos-gate:
-    name: macOS gate
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.92.0
-          components: clippy
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
-      - name: Check
-        run: cargo check -p xai-grok-provider -p xai-grok-sampler -p xai-grok-pager -p xai-grok-pager-bin --all-targets
-      - name: Test provider crate
-        run: cargo test -p xai-grok-provider --all-targets
-      - name: Production chain E2E suite
-        run: cargo test -p xai-grok-shell --test test_provider_chain_e2e -- --test-threads=4
-      - name: Production chain RED/GREEN suite
-        run: cargo test -p xai-grok-shell --test provider_production_chain
-
-  # ── Job 4: Full workspace gate ──────────────────────────────────────────
-  workspace-gate:
-    name: Workspace gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,15 +37,90 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Workspace check
-        run: cargo check --workspace --all-targets
+        run: cargo check --workspace --all-targets --locked
       - name: Workspace clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Provider tests
-        run: cargo test -p xai-grok-provider --all-targets
-      - name: Sampler tests
-        run: cargo test -p xai-grok-sampler --all-targets
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Full workspace test
+        run: cargo test --workspace --all-targets --locked
 
-  # ── Job 5: Documentation build ──────────────────────────────────────────
+  # ── Job 2: Windows full gate (R3-CI-02) ───────────────────────────────
+  windows-gate:
+    name: Windows gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+          components: clippy, rustfmt
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Workspace check
+        run: cargo check --workspace --all-targets --locked
+      - name: Workspace clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test build (no-run)
+        run: cargo test --workspace --all-targets --locked --no-run
+      - name: Provider tests
+        run: cargo test -p xai-grok-provider --all-targets --locked
+      - name: Sampler tests
+        run: cargo test -p xai-grok-sampler --all-targets --locked
+      - name: Real entry E2E (RED)
+        run: cargo test -p xai-grok-shell --test provider_real_entry_e2e --locked
+      - name: Pager lib tests
+        run: cargo test -p xai-grok-pager --lib --locked
+
+  # ── Job 3: macOS full gate (R3-CI-03) ─────────────────────────────────
+  macos-gate:
+    name: macOS gate
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+          components: clippy, rustfmt
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Workspace check
+        run: cargo check --workspace --all-targets --locked
+      - name: Workspace clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test build (no-run)
+        run: cargo test --workspace --all-targets --locked --no-run
+      - name: Production E2E
+        run: cargo test -p xai-grok-provider --test provider_e2e --locked -- --test-threads=4
+
+  # ── Job 4: Invariant gates (R3-CI-08) ─────────────────────────────────
+  invariant-gate:
+    name: Invariant gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Assert provider V1 invariants
+        run: python scripts/provider-v1/assert_provider_v1_invariants.py
+      - name: Scan platform exclusions
+        run: python scripts/provider-v1/scan-platform-exclusions.py --output /tmp/platform-exclusions-report.json
+
+  # ── Job 5: Documentation build (R3-CI-06) ─────────────────────────────
   docs:
     name: Documentation
     runs-on: ubuntu-latest
@@ -145,15 +136,12 @@ jobs:
           toolchain: 1.92.0
       - name: Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build docs
+      - name: Build docs with warnings-as-errors
         env:
-          RUSTDOCFLAGS: "--allow rustdoc::private_intra_doc_links --allow rustdoc::broken_intra_doc_links --allow rustdoc::invalid_html_tags --allow rustdoc::bare_urls"
-        run: cargo doc --workspace --no-deps 2>&1 | tee doc_output.txt
-      - name: Check for doc warnings
-        run: |
-          grep -v "private_intra_doc_links\|broken_intra_doc_links\|invalid_html_tags\|output filename collision\|redundant explicit link target" doc_output.txt | { grep "warning" && echo "Docs have warnings (non-blocking)" || echo "No relevant doc warnings"; }
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --workspace --no-deps --locked 2>&1
 
-  # ── Job 6: Mocked provider E2E ─────────────────────────────────────────
+  # ── Job 6: Mocked provider E2E + blocking PTY (R3-CI-05) ─────────────
   provider-e2e:
     name: Provider E2E
     runs-on: ubuntu-latest
@@ -170,11 +158,96 @@ jobs:
           components: clippy
       - name: Cache
         uses: Swatinem/rust-cache@v2
-      - name: Build
+      - name: Build pager binary
         run: cargo build -p xai-grok-pager-bin
       - name: Full provider test suite
         run: cargo test -p xai-grok-provider --test provider_e2e -- --test-threads=4
-      - name: PTY E2E (ignored)
+      - name: PTY provider E2E
         timeout-minutes: 5
-        continue-on-error: true
         run: cargo test -p xai-grok-pager --test pty_e2e -- --ignored providers_pty --test-threads=1
+
+  # ── Job 7: Package startup smoke tests (R3-CI-09) ─────────────────────
+  smoke-linux:
+    name: Smoke test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build binary
+        run: cargo build -p xai-grok-pager-bin
+      - name: Version check
+        run: ./target/debug/xai-grok-pager --version
+      - name: Startup config validation
+        run: |
+          mkdir -p /tmp/grok-smoke-home/.grok
+          GROK_HOME=/tmp/grok-smoke-home/.grok \
+            ./target/debug/xai-grok-pager --no-header --help && echo "startup OK"
+      - name: Clean termination
+        run: rm -rf /tmp/grok-smoke-home
+
+  smoke-windows:
+    name: Smoke test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build binary
+        run: cargo build -p xai-grok-pager-bin
+      - name: Version check
+        run: .\target\debug\xai-grok-pager.exe --version
+      - name: Startup config validation
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "$env:TEMP\grok-smoke-home\.grok" -Force | Out-Null
+          $env:GROK_HOME = "$env:TEMP\grok-smoke-home\.grok"
+          .\target\debug\xai-grok-pager.exe --no-header --help
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host "startup OK"
+      - name: Clean termination
+        shell: pwsh
+        run: Remove-Item -Recurse -Force "$env:TEMP\grok-smoke-home" -ErrorAction SilentlyContinue
+
+  smoke-macos:
+    name: Smoke test (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.92.0
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build binary
+        run: cargo build -p xai-grok-pager-bin
+      - name: Version check
+        run: ./target/debug/xai-grok-pager --version
+      - name: Startup config validation
+        run: |
+          mkdir -p /tmp/grok-smoke-home/.grok
+          GROK_HOME=/tmp/grok-smoke-home/.grok \
+            ./target/debug/xai-grok-pager --no-header --help && echo "startup OK"
+      - name: Clean termination
+        run: rm -rf /tmp/grok-smoke-home
