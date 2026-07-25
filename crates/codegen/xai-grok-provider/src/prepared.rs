@@ -4,7 +4,7 @@
 
 use indexmap::IndexMap;
 
-use crate::auth::{AuthPolicy, RequestCredentialContext};
+use crate::auth::{AuthPolicy, CredentialError, RequestCredentialContext};
 use crate::headers::{RequestHeaderOverrides, SensitiveHeaderMap};
 use crate::model::{GenerationOptions, ModelLimits};
 use crate::protocol::ProtocolId;
@@ -85,6 +85,8 @@ impl TryFrom<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig {
 pub enum RequestPreparationError {
     #[error("credential resolution failed: {0}")]
     Credential(String),
+    #[error("credential backend failure: {0}")]
+    CredentialBackend(#[from] CredentialError),
     #[error("header conflict: {0}")]
     HeaderConflict(String),
     #[error("invalid header: {0}")]
@@ -147,7 +149,7 @@ pub(crate) async fn resolve_auth_from_policy(
             candidates,
             required,
         } => {
-            let value = ctx.resolve_candidates(candidates).await;
+            let value = ctx.resolve_candidates(candidates).await?;
             match value {
                 Some(v) => Ok(Some(("Authorization".to_string(), format!("Bearer {v}")))),
                 None if *required => Err(RequestPreparationError::Credential(
@@ -161,7 +163,7 @@ pub(crate) async fn resolve_auth_from_policy(
             candidates,
             required,
         } => {
-            let value = ctx.resolve_candidates(candidates).await;
+            let value = ctx.resolve_candidates(candidates).await?;
             match value {
                 Some(v) => Ok(Some((name.to_string(), v))),
                 None if *required => Err(RequestPreparationError::Credential(format!(

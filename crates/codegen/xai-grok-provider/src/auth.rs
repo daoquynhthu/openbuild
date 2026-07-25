@@ -141,6 +141,8 @@ fn resolve_candidates_legacy(candidates: &[CredentialCandidate]) -> Option<Strin
 pub enum CredentialError {
     #[error("{0}")]
     Read(String),
+    #[error("credential backend failure: {0}")]
+    Backend(String),
 }
 
 /// Environment reader — only resolves variables at request time (P8-003).
@@ -189,7 +191,13 @@ impl<'a> RequestCredentialContext<'a> {
     /// Resolve a credential from a list of candidates following system-fixed priority:
     /// request override > model inline > provider inline > model env > provider env >
     /// built-in env > session.
-    pub async fn resolve_candidates(&self, candidates: &[CredentialCandidate]) -> Option<String> {
+    ///
+    /// Returns `Ok(Some(value))` on success, `Ok(None)` when no candidate provides a value,
+    /// or `Err(CredentialError)` on backend/environment failure (distinguishable from absence).
+    pub async fn resolve_candidates(
+        &self,
+        candidates: &[CredentialCandidate],
+    ) -> Result<Option<String>, CredentialError> {
         let has_req = candidates
             .iter()
             .any(|c| matches!(c, CredentialCandidate::RequestOverride));
@@ -229,39 +237,49 @@ impl<'a> RequestCredentialContext<'a> {
 
         // 1. RequestOverride
         if let Some(v) = self.request_override.filter(|_| has_req) {
-            return Some(v.inner().to_string());
+            return Ok(Some(v.inner().to_string()));
         }
         // 2. ModelInline
         if let Some(v) = self.model_inline.filter(|_| has_model) {
-            return Some(v.inner().to_string());
+            return Ok(Some(v.inner().to_string()));
         }
         // 3. ProviderInline
         if let Some(v) = self.provider_inline.filter(|_| has_prov) {
-            return Some(v.inner().to_string());
+            return Ok(Some(v.inner().to_string()));
         }
         // 4. Model environment variables
         for key in &model_env_keys {
-            if let Ok(Some(v)) = self.environment.read(key) {
-                return Some(v.inner().to_string());
+            match self.environment.read(key) {
+                Ok(Some(v)) => return Ok(Some(v.inner().to_string())),
+                Ok(None) => continue,
+                Err(e) => return Err(e),
             }
         }
         // 5. Provider environment variables
         for key in &provider_env_keys {
-            if let Ok(Some(v)) = self.environment.read(key) {
-                return Some(v.inner().to_string());
+            match self.environment.read(key) {
+                Ok(Some(v)) => return Ok(Some(v.inner().to_string())),
+                Ok(None) => continue,
+                Err(e) => return Err(e),
             }
         }
         // 6. Built-in environment variables
         for key in &builtin_env_keys {
-            if let Ok(Some(v)) = self.environment.read(key) {
-                return Some(v.inner().to_string());
+            match self.environment.read(key) {
+                Ok(Some(v)) => return Ok(Some(v.inner().to_string())),
+                Ok(None) => continue,
+                Err(e) => return Err(e),
             }
         }
         // 7. Session (always last)
-        if has_sess && let Ok(Some(v)) = self.session.resolve().await {
-            return Some(v.inner().to_string());
+        if has_sess {
+            match self.session.resolve().await {
+                Ok(Some(v)) => return Ok(Some(v.inner().to_string())),
+                Ok(None) => {}
+                Err(e) => return Err(e),
+            }
         }
-        None
+        Ok(None)
     }
 }
 

@@ -6,10 +6,23 @@
 //!
 //! **Prohibited**: manual `SamplerConfig` or `PreparedSamplerConfig` construction.
 
+use std::pin::Pin;
+use std::future::Future;
+
 use serial_test::serial;
 
 use futures_util::StreamExt;
+use xai_grok_provider::auth::{
+    AuthPolicy, CredentialError, CredentialCandidate, EnvironmentReader,
+    RequestCredentialContext, SecretValue, SessionCredentialResolver, SessionKind,
+};
+use xai_grok_provider::headers::RequestHeaderOverrides;
+use xai_grok_provider::prepared::{prepare_sampler_config, RequestPreparationError};
+use xai_grok_provider::resolution::ResolvedModelExecution;
 use xai_grok_provider::registry::RegistrySnapshot;
+use xai_grok_provider::types::{ModelId, ProviderId, RouteId};
+use xai_grok_provider::model::{GenerationOptions, ModelLimits};
+use xai_grok_provider::protocol::ProtocolId;
 use xai_grok_sampler::SamplerConfig;
 use xai_grok_shell::agent::config::{EndpointsConfig, ModelEntry};
 use xai_grok_shell::agent::provider_resolution::ProviderResolutionError;
@@ -934,6 +947,71 @@ fn ambiguous_model_hard_fail_no_requests() {
         requests.len() <= 2,
         "at most 2 bootstrap model-discovery requests on ambiguous model, got: {}",
         requests.len()
+    );
+}
+
+// ── Test helpers for credential backend failure ──
+
+struct FailingSessionResolver;
+
+impl SessionCredentialResolver for FailingSessionResolver {
+    fn resolve(
+        &self,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<SecretValue>, CredentialError>> + Send>>
+    {
+        Box::pin(async { Err(CredentialError::Backend("session store unreachable".into())) })
+    }
+}
+
+struct EmptyEnvReader;
+
+impl EnvironmentReader for EmptyEnvReader {
+    fn read(&self, _var: &str) -> Result<Option<SecretValue>, CredentialError> {
+        Ok(None)
+    }
+}
+
+/// R3-E2E-04: Credential backend failure is distinguishable from credential absence — no requests.
+///
+/// When the session resolver returns Err(CredentialError::Backend), the chain must
+/// propagate this error (not silently convert to None) and produce zero HTTP requests.
+#[test]
+fn credential_backend_hard_fail_no_requests() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let server = rt.block_on(MockInferenceServer::start()).unwrap();
+    let mock_url = server.url();
+
+    // Construct a ResolvedModelExecution with a Session-based auth policy
+    let execution = ResolvedModelExecution {
+        provider_id: ProviderId::new("test-backend-fail"),
+        route_id: RouteId::new("test-route"),
+        protocol_id: ProtocolId::from("chat_completions"),
+        request_url: url::Url::parse(&format!("{mock_url}/chat/completions")).unwrap(),
+        static_headers: Default::default(),
+        auth_policy: AuthPolicy::bearer(
+            vec![CredentialCandidate::Session(SessionKind::Xai)],
+            true,
+        ),
+        model_id: ModelId::new("test-model"),
+        generation: GenerationOptions::default(),
+        limits: ModelLimits::default(),
+    };
+
+    let env = EmptyEnvReader;
+    let session = FailingSessionResolver;
+    let creds = RequestCredentialContext::new(None, None, None, &env, &session);
+    let headers = RequestHeaderOverrides::new();
+    let result = rt.block_on(async { prepare_sampler_config(&execution, &creds, &headers).await });
+
+    let err = result.expect_err("credential backend failure must produce an error");
+    assert!(
+        matches!(&err, RequestPreparationError::CredentialBackend(CredentialError::Backend(msg)) if msg.contains("session store unreachable")),
+        "error must be distinguishable as CredentialBackend, got: {err:?}"
+    );
+
+    assert_eq!(
+        server.request_count(), 0,
+        "no HTTP request must reach mock server on credential backend failure"
     );
 }
 

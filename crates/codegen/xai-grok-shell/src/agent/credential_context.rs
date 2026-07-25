@@ -136,7 +136,7 @@ mod tests {
                 CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
             ])
             .await;
-        assert_eq!(result.as_deref(), Some("req"));
+        assert_eq!(result.unwrap().as_deref(), Some("req"));
     }
 
     #[tokio::test]
@@ -153,7 +153,7 @@ mod tests {
                 CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
             ])
             .await;
-        assert_eq!(result.as_deref(), Some("model-inline"));
+        assert_eq!(result.unwrap().as_deref(), Some("model-inline"));
     }
 
     #[tokio::test]
@@ -167,7 +167,7 @@ mod tests {
                 CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
             ])
             .await;
-        assert_eq!(result.as_deref(), Some("from-env"));
+        assert_eq!(result.unwrap().as_deref(), Some("from-env"));
     }
 
     #[tokio::test]
@@ -184,7 +184,7 @@ mod tests {
                 CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
             ])
             .await;
-        assert_eq!(result.as_deref(), Some("sess-token"));
+        assert_eq!(result.unwrap().as_deref(), Some("sess-token"));
     }
 
     #[tokio::test]
@@ -200,7 +200,7 @@ mod tests {
                 CredentialCandidate::Session(xai_grok_provider::auth::SessionKind::Xai),
             ])
             .await;
-        assert!(result.is_none());
+        assert!(result.unwrap().is_none());
     }
 
     #[test]

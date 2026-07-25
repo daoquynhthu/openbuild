@@ -995,3 +995,32 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - `cargo clippy -p xai-grok-shell` — 0 warnings ✅
 - `cargo test -p xai-grok-shell --test provider_catalog_lifecycle` — 5/5 pass ✅
 - `cargo clean -p xai-grok-shell` — freed 14.6 GiB
+
+## R3-E2E-04: Credential backend failure distinguishable — 2026-07-25
+
+### Changes
+- Added `CredentialError::Backend(String)` variant to `auth.rs` — distinguishes backend failure from environment read errors
+- Changed `resolve_candidates` return type from `Option<String>` to `Result<Option<String>, CredentialError>` — backend/environment errors propagate instead of being silently converted to `None`
+- Changed environment variable reads (model, provider, builtin) to propagate `Err` from `EnvironmentReader::read()`
+- Changed session resolution to propagate `Err` from `SessionCredentialResolver::resolve()`
+- Added `RequestPreparationError::CredentialBackend(#[from] CredentialError)` variant to `prepared.rs`
+- Updated `resolve_auth_from_policy` to use `?` operator — `CredentialError` auto-converts to `CredentialBackend` via `#[from]`
+- Updated 5 test callers in `credential_context.rs` to unwrap `Result`
+- Updated 3 RED tests in `credential_errors.rs` (was "silently dropped") to assert error propagation
+- Fixed pre-existing RED test `red04_invalid_endpoint_produces_chain_error` — empty base_url now rejected by bootstrap config validation; rewritten to assert bootstrap error directly
+- Added `credential_backend_hard_fail_no_requests` E2E test: FailingSessionResolver + Session auth policy → `RequestPreparationError::CredentialBackend`, zero HTTP requests to mock server
+
+### Files modified
+- `crates/codegen/xai-grok-provider/src/auth.rs` — `CredentialError::Backend`, `resolve_candidates` Result return type
+- `crates/codegen/xai-grok-provider/src/prepared.rs` — `CredentialBackend` variant, `?` operator
+- `crates/codegen/xai-grok-provider/tests/credential_errors.rs` — 4 tests updated (3 → error propagation, 1 → unwrap)
+- `crates/codegen/xai-grok-shell/src/agent/credential_context.rs` — 5 tests unwrap Result
+- `crates/codegen/xai-grok-shell/tests/provider_production_chain.rs` — RED test fixed for bootstrap validation
+- `crates/codegen/xai-grok-shell/tests/test_provider_chain_e2e.rs` — new `credential_backend_hard_fail_no_requests` test
+
+### Key results
+- `cargo test -p xai-grok-shell --test test_provider_chain_e2e`: 15/15 pass ✅
+- `cargo test -p xai-grok-shell --test provider_production_chain`: 10/10 pass ✅
+- `cargo test -p xai-grok-provider`: 276/276 pass ✅
+- `cargo check -p xai-grok-provider -p xai-grok-shell`: clean ✅
+- `cargo clippy -p xai-grok-provider -p xai-grok-shell`: 0 warnings ✅

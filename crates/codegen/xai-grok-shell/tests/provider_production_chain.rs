@@ -454,7 +454,7 @@ async fn request_override_header_appears_in_request() {
 
 #[tokio::test]
 async fn red04_invalid_endpoint_produces_chain_error() {
-    let snapshot = bootstrap_async(
+    let toml: toml::Value = toml::from_str(
         r#"
         [provider.bad-endpoint]
         kind = "openai_compatible"
@@ -462,19 +462,17 @@ async fn red04_invalid_endpoint_produces_chain_error() {
         api_key = "test-key"
     "#,
     )
-    .await
-    .snapshot();
+    .unwrap();
+    let result = xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None).await;
 
-    let model = model_entry("bad-endpoint", "test-model");
-
-    let result = execution_to_sampler_config(&model, &snapshot, Some("test-key"), None).await;
-
-    // Lower chain correctly rejects empty base_url.
-    // The BUG is at the agent level (agent_ops.rs:1185) which catches this
-    // error and falls back to legacy — visible after Phase 2.
+    // Empty base_url is rejected at bootstrap by config validation.
+    // The BUG was that the agent-level code (agent_ops.rs:1185) would catch
+    // this error and fall back to legacy behavior instead of propagating it.
+    let err = result.expect_err("empty base_url must produce bootstrap error");
+    let err_str = err.to_string();
     assert!(
-        result.is_err(),
-        "R3-RED-04 invalid-endpoint: chain must return Err — agent-level fallback is the bug"
+        err_str.contains("base_url") && err_str.contains("malformed"),
+        "R3-RED-04 invalid-endpoint: bootstrap must reject empty base_url, got: {err_str}"
     );
 }
 

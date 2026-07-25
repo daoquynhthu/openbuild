@@ -42,16 +42,16 @@ async fn absent_credential_returns_none() {
     let env = TestEnvReader(Ok(None));
     let session = TestSession(Ok(None));
     let c = ctx(&env, &session);
-    let result = c
-        .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec![
-            "MY_KEY".into(),
-        ])])
-        .await;
-    assert!(result.is_none(), "absent credential should return None");
+        let result = c
+            .resolve_candidates(&[CredentialCandidate::ProviderEnvironment(vec![
+                "MY_KEY".into(),
+            ])])
+            .await;
+    assert!(result.unwrap().is_none(), "absent credential should return None");
 }
 
 #[tokio::test]
-async fn backend_not_found_is_silently_dropped() {
+async fn backend_not_found_propagates_error() {
     let env = TestEnvReader(Err("not found".into()));
     let session = TestSession(Ok(None));
     let c = ctx(&env, &session);
@@ -60,11 +60,9 @@ async fn backend_not_found_is_silently_dropped() {
             "MY_KEY".into(),
         ])])
         .await;
-    // BUG: `resolve_candidates` uses `if let Ok(Some(v)) = ...` so Err is silently skipped.
-    // After fixing, errors should propagate instead of being dropped.
     assert!(
-        result.is_none(),
-        "R3-RED-09: 'not found' error is silently dropped instead of propagated"
+        result.is_err(),
+        "environment reader error must propagate, not be silently dropped"
     );
 }
 
@@ -80,7 +78,7 @@ async fn not_found_and_session_expired_have_same_variant() {
 }
 
 #[tokio::test]
-async fn session_backend_error_is_silently_dropped() {
+async fn session_backend_error_propagates() {
     let env = TestEnvReader(Ok(None));
     let session = TestSession(Err("session backend I/O failure".into()));
     let c = ctx(&env, &session);
@@ -90,13 +88,13 @@ async fn session_backend_error_is_silently_dropped() {
         )])
         .await;
     assert!(
-        result.is_none(),
-        "R3-RED-09: session backend error is silently dropped"
+        result.is_err(),
+        "session backend error must propagate, not be silently dropped"
     );
 }
 
 #[tokio::test]
-async fn malformed_credential_error_is_silently_dropped() {
+async fn malformed_credential_error_propagates() {
     let env = TestEnvReader(Err("malformed credential: invalid bytes".into()));
     let session = TestSession(Ok(None));
     let c = ctx(&env, &session);
@@ -106,7 +104,7 @@ async fn malformed_credential_error_is_silently_dropped() {
         ])])
         .await;
     assert!(
-        result.is_none(),
-        "R3-RED-09: malformed credential error is silently dropped"
+        result.is_err(),
+        "malformed credential error must propagate, not be silently dropped"
     );
 }
