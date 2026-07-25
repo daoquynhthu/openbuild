@@ -742,3 +742,53 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 #### Key results
 - `cargo check -p xai-grok-shell --lib --tests`: clean ✅
 - `cargo clippy -p xai-grok-shell --lib`: clean ✅
+
+## Phase R3-BASE-04: Invariant Scanner Baseline — 2026-07-25
+
+### Completed
+- Created `scripts/provider-v1/assert_provider_v1_invariants.py` with 6 checks:
+  - V-01: `Handle::block_on` / `Runtime::block_on` in provider request preparation (crate-filtered to provider crates)
+  - V-02: `unimplemented!()` / `todo!()` in `xai-grok-provider`
+  - V-03: `ProviderRuntime::new()` in Pager production paths
+  - V-04: Legacy fallback `sampling_config_for_model` in agent_ops.rs
+  - V-05: `continue-on-error: true` in release-gate workflow
+  - V-06: Missing `#[serde(deny_unknown_fields)]` on provider config types
+- Fixed scanner: hyphens in filename → underscores (Python import compat)
+- Fixed scanner: `_find_test_ranges` no longer produces duplicate ranges
+- Fixed scanner: `_is_test_file` / `_passes_crate_filter` don't depend on `REPO_ROOT`
+- Added crate filter for Handle/Runtime block_on checks (only provider crates)
+- Added `/benches/` exclusion
+- Added `rel.endswith("/tests.rs")` for files named `tests.rs`
+- Added `scan_unknown_fields()` check for missing `#[serde(deny_unknown_fields)]`
+- Filtered out `servers.rs:4578` (inside `#[cfg(test)]`)
+- Scanner unit tests: 15/15 pass (TestIsTestFile, TestFindTestRanges, TestIsTestModule, TestScanUnknownFields, TestScannerOutput)
+- Scanner output: 6 violations across 6 checks
+- Created `docs/provider-adapter-v1/execution-v3/baseline/invariants.md` with all 6 violations documented and disposition references
+
+### Key results
+- `python scripts/provider-v1/tests/test_assert_provider_v1_invariants.py`: 15/15 pass ✅
+- Scanner reports 6 violations (all known and documented) ✅
+- Baseline evidence committed at `4f1ae8c` ✅
+
+## Phase R3-BASE-03: Windows Compilation Baseline — 2026-07-25
+
+### Completed
+- `cargo fmt --all -- --check`: 13 files fixed, committed as `6505f2f` ✅
+- `cargo check --workspace --all-targets --locked --keep-going`: 0 errors ✅
+- `cargo clippy --workspace --all-targets --locked --keep-going -- -D warnings`: PASS after fixing 4 RefCell-across-await violations:
+  - `subagent_coordinator.rs:444,464` — `RefCell<SharedGlobalToolRegistry>` borrow across `.await`
+  - `agent_ops.rs:1392,1395` — `RefCell<Option<PeriodicRefreshEntry>>` borrow across `.await`
+- `cargo test --workspace --all-targets --locked --no-run --no-fail-fast`: PASS (all test binaries compiled; `--jobs 2` used to stay within host memory limit) ✅
+- `cargo test --workspace --all-targets --locked -- --list`: PASS (3 bench targets unsupported by `--list`, upstream cargo limitation) ✅
+- `cargo doc --workspace --no-deps --locked`: PASS (pre-existing doc warnings only) ✅
+- `cargo clean` + rebuild: target directory significant; standard workspace build behavior
+
+### Files modified
+- `crates/codegen/xai-grok-shell/src/agent/mvp_agent/subagent_coordinator.rs` — RefCell-across-await fix
+- `crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs` — RefCell-across-await fix
+- `docs/provider-adapter-v1/execution-v3/baseline/windows.md` — baseline evidence (new)
+
+### Key results
+- All 6 gating checks pass (fmt, check, clippy, test --no-run, test --list, doc) ✅
+- No new warnings in targeted crates (provider, shell, pager, sampler) ✅
+- Baseline evidence committed at `e86a265` ✅
