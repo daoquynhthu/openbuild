@@ -71,7 +71,9 @@ pub async fn execution_to_sampler_config(
         xai_grok_provider::prepared::prepare_sampler_config(&execution, &creds, &headers)
             .await
             .map_err(|e| ProviderResolutionError::AuthCredential(e.to_string()))?;
-    Ok(xai_grok_sampler::SamplerConfig::from(prepared))
+    let config = xai_grok_sampler::SamplerConfig::try_from(prepared)
+        .map_err(|e| ProviderResolutionError::Protocol(e.to_string()))?;
+    Ok(config)
 }
 
 /// Merge generation parameters with fixed precedence: route defaults < model info < request overrides.

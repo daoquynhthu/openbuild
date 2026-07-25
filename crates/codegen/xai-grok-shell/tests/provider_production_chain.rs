@@ -77,7 +77,8 @@ async fn resolve_prepare_with_overrides(
         &session,
     );
     let prepared = prepare_sampler_config(&execution, &creds, request_headers).await?;
-    Ok(xai_grok_sampler::SamplerConfig::from(prepared))
+    Ok(xai_grok_sampler::SamplerConfig::try_from(prepared)
+        .expect("valid protocol in test"))
 }
 
 async fn resolve_prepare(

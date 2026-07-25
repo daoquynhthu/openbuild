@@ -25,19 +25,26 @@ pub struct PreparedSamplerConfig {
     pub limits: ModelLimits,
 }
 
+/// Unsupported protocol identifier encountered during conversion.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("unsupported protocol `{0}` — expected chat_completions, responses, or messages")]
+pub struct UnsupportedProtocolError(pub String);
+
 /// Bridge conversion for P8-011: `PreparedSamplerConfig` → `SamplerConfig`.
 ///
 /// This conversion preserves the resolved auth headers from the prepared config
 /// and infers the `auth_scheme` from the header contents. The resulting
 /// `SamplerConfig` can be passed to `SamplingClient::new`.
-impl From<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig {
-    fn from(prepared: PreparedSamplerConfig) -> Self {
+impl TryFrom<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig {
+    type Error = UnsupportedProtocolError;
+
+    fn try_from(prepared: PreparedSamplerConfig) -> Result<Self, Self::Error> {
         let protocol_id = prepared.protocol_id.clone();
         let api_backend = match &*protocol_id {
             "chat_completions" => xai_grok_sampler::ApiBackend::ChatCompletions,
             "responses" => xai_grok_sampler::ApiBackend::Responses,
             "messages" => xai_grok_sampler::ApiBackend::Messages,
-            _ => xai_grok_sampler::ApiBackend::ChatCompletions,
+            other => return Err(UnsupportedProtocolError(other.to_string())),
         };
 
         let mut extra_headers = IndexMap::new();
@@ -56,7 +63,7 @@ impl From<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig {
             }
         }
 
-        Self {
+        Ok(Self {
             model: prepared.model_id.0,
             base_url: prepared.request_url.to_string(),
             request_url: Some(prepared.request_url.to_string()),
@@ -69,7 +76,7 @@ impl From<PreparedSamplerConfig> for xai_grok_sampler::SamplerConfig {
             temperature: prepared.generation.temperature,
             top_p: prepared.generation.top_p,
             ..Default::default()
-        }
+        })
     }
 }
 

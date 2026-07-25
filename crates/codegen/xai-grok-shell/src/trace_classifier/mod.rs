@@ -1163,7 +1163,12 @@ async fn build_sampler_client(
     .await
     .map_err(|e| anyhow!("prepare sampler config: {e}"))?;
 
-    xai_grok_sampler::SamplingClient::from_prepared(prepared)
+    let config: xai_grok_sampler::SamplerConfig = prepared
+        .try_into()
+        .map_err(|e: xai_grok_provider::prepared::UnsupportedProtocolError|
+            anyhow!("unsupported protocol: {e}")
+        )?;
+    xai_grok_sampler::SamplingClient::from_prepared(config)
         .map_err(|e| anyhow!("build SamplingClient: {e}"))
 }
 
