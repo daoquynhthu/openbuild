@@ -44,11 +44,18 @@ api_key = "test-groq-key-not-real"
 api_key = "test-openrouter-key-not-real"
 
 # ── Arbitrary user-defined OpenAI-compatible provider ───────────────
+# Use `profile = "openai-compatible"` (reusable defaults) or `kind = "openai-compatible"` (standalone).
 [provider.my-company]
 profile = "openai-compatible"
 base_url = "https://api.my-company.com/v1"
 api_key = "test-my-company-key-not-real"
 extra_headers = { "X-Company-Version" = "2.0" }
+
+# Alternative: using `kind` instead of profile
+[provider.my-other]
+kind = "openai-compatible"
+base_url = "https://api.other.com/v1"
+env_key = ["MY_OTHER_KEY"]
 
 # ── Manual model provider/route binding ─────────────────────────────
 [model.my-custom-model]

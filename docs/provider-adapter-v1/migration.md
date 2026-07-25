@@ -36,7 +36,6 @@ env_key = ["XAI_API_KEY"]
 ```toml
 [provider.openai]
 env_key = ["OPENAI_API_KEY"]
-base_url = "https://api.openai.com/v1"
 ```
 
 ### Anthropic (Claude)
@@ -44,14 +43,13 @@ base_url = "https://api.openai.com/v1"
 ```toml
 [provider.anthropic]
 env_key = ["ANTHROPIC_API_KEY"]
-base_url = "https://api.anthropic.com/v1"
 ```
 
 ### OpenCode Zen
 
 ```toml
 [provider.opencode]
-base_url = "https://api.opencode.ai/v1"
+# No api_key → public mode (free models only)
 ```
 
 ### Ollama (local)
@@ -61,19 +59,29 @@ base_url = "https://api.opencode.ai/v1"
 base_url = "http://localhost:11434"
 ```
 
-### Custom OpenAI-compatible
+### Custom OpenAI-compatible (with profile)
 
 ```toml
 [provider."my-provider"]
+profile = "openai-compatible"
+env_key = ["MY_PROVIDER_KEY"]
+base_url = "https://my-custom-proxy.example.com/v1"
+```
+
+### Custom OpenAI-compatible (with kind)
+
+```toml
+[provider."my-provider"]
+kind = "openai-compatible"
 env_key = ["MY_PROVIDER_KEY"]
 base_url = "https://my-custom-proxy.example.com/v1"
 ```
 
 ## Model reference syntax
 
-- **Bare model**: `grok-3` — resolved to default provider (xAI)
 - **Provider/model**: `openai/gpt-4o` — explicit provider routing
-- **Provider with route**: `openai/gpt-4o` — route selected by API backend
+- **Bare model**: resolved to provider by config precedence
+- **Provider with route**: `openai/gpt-4o` — route selected by model protocol
 
 ## CLI usage
 

@@ -1,14 +1,11 @@
 # Provider Adapter V1 — Public API Contracts
 
-> Exact public type fields, ownership, fallible constructors, error variants,
-> and test names that Phase 2 must implement.
+> Provider type definitions, error handling, and contract guarantees.
 
 ## Validated IDs
 
-```rust
-// ProviderId, RouteId, ModelId validate non-empty trimmed values.
-// Reject whitespace-only strings and invalid separators.
-```
+`ProviderId`, `RouteId`, `ModelId` validate non-empty trimmed values.
+Reject whitespace-only strings and invalid separators.
 
 ## ProviderError Variants
 
@@ -23,33 +20,83 @@
 - `InvalidHeader` — header name/value violates HTTP token rules
 - `UnknownProtocol` — protocol ID not recognized
 - `AmbiguousModel` — bare model ID matches more than one provider
-- `Config` — configuration-level error
+- `Config` — configuration-level error with diagnostic details
 
 Error display text must never contain secret values.
 
-## Mandatory Test Cases
+## Configuration Fields
 
-| Test Name | What It Proves |
-|-----------|----------------|
-| `configured_provider_contains_multiple_routes` | ConfiguredProvider owns IndexMap of routes, not a single route |
-| `registry_snapshot_revision_increments_once` | Each successful rebuild increments revision by exactly 1 |
-| `registry_snapshot_order_is_deterministic` | Route/provider iteration order is deterministic across rebuilds |
-| `openai_selector_routes_chat_model` | OpenAI route selector sends known chat model to Chat Completions route |
-| `openai_selector_routes_responses_model` | OpenAI route selector sends known responses model to Responses route |
-| `selector_rejects_unknown_route` | Route selector returns error for model not in its table |
-| `provider_config_debug_redacts_secret` | Debug output does not contain sentinel secret values |
-| `invalid_endpoint_never_falls_back_to_localhost` | Malformed endpoint URL produces error, not http://localhost |
+| Field | Type | Description |
+|-------|------|-------------|
+| `kind` | string (optional) | Provider implementation kind: `"openai-compatible"` for custom |
+| `profile` | string (optional) | Named profile: `"openai-compatible"`, `"deepseek"`, `"groq"`, `"openrouter"` |
+| `base_url` | string (optional) | Provider base URL; remote endpoints require `https`, loopback allows `http` |
+| `api_key` | string (optional) | Inline API key (deprecated — prefer `env_key`) |
+| `env_key` | string array (optional) | Environment variable names to read credential from |
+| `extra_headers` | table (optional) | Additional HTTP headers to include in requests |
+| `model_list_format` | string (optional) | Model discovery format: `"openai_compatible"`, `"ollama_tags"`, `"ollama"` |
+| `model_list_path` | string (optional) | Custom model list URL path |
+| `allow_insecure_http` | bool (optional) | Allow `http://` for non-loopback endpoints |
+| `protocol` | string (optional) | Route protocol: `"chat_completions"`, `"responses"`, `"messages"` |
 
-## Phase 2 Contract
+## Credential Priority
 
-Phase 2 must implement all of the above in `xai-grok-provider`:
-1. ID validation types and tests
-2. Declarative AuthPolicy (AD-05)
-3. Fallible safe endpoint rendering
-4. Route per AD-02 shape (no route-level framing)
-5. ConfiguredProvider with route set and RouteSelector
-6. Transactional registry snapshots (AD-04)
-7. Focused `pub` API with doc comments and `cargo doc` passing
+```
+1. Inline api_key (from config or CLI)
+2. ProviderEnvironment (env_key variables, in declaration order)
+3. Session token (XAI_SESSION_TOKEN or auth-managed)
+4. Public/None (no auth)
+```
 
-No compile-failing tests are added in Phase 1. Each test is created immediately
-before its implementation under the normal red/green task cycle in Phase 2.
+## Built-in Providers
+
+| Provider ID | Default Base URL | Auth Required | Insecure HTTP |
+|-------------|-----------------|---------------|---------------|
+| `xai` | `https://api.x.ai/v1` | Yes | No |
+| `openai` | `https://api.openai.com/v1` | Yes | No |
+| `anthropic` | `https://api.anthropic.com/v1` | Yes | No |
+| `opencode` | `https://opencode.ai/zen/v1` | No (public mode) | No |
+| `ollama` | `http://localhost:11434/v1` | No | Yes (loopback only) |
+
+## Named Profiles
+
+`deepseek`, `groq`, `openrouter` — inherit base URL and env key conventions.
+
+## Custom OpenAI-Compatible Provider
+
+Use `kind = "openai-compatible"` or `profile = "openai-compatible"` with explicit `base_url`.
+
+## Route Selection
+
+Determined by the model's `protocol` field or the provider's default protocol.
+- `chat_completions` → Chat Completions route
+- `responses` → Responses route
+- `messages` → Messages route (Anthropic)
+
+## Hot-Reload Semantics
+
+`rebuild_from_resolved` creates a new RegistrySnapshot atomically:
+- On success: revision increments by 1, new snapshot replaces old
+- On failure: old snapshot preserved, error returned
+- In-flight requests continue using their acquired snapshot reference
+
+## Stale Catalog
+
+When model discovery fails:
+- Catalog state transitions to `Stale`
+- Previously discovered models remain visible
+- Next refresh retries discovery
+
+## Supported Platforms
+
+Linux, Windows, macOS — all CI-gated with identical contract tests.
+
+## Hard Errors (no HTTP request sent)
+
+| Condition | Error |
+|-----------|-------|
+| Missing required credential | `MissingCredential` |
+| Invalid endpoint URL | `InvalidEndpoint` |
+| Unknown protocol | `UnknownProtocol` |
+| Ambiguous model reference | `AmbiguousModel` |
+| Insecure HTTP on remote endpoint | `InvalidEndpoint` |

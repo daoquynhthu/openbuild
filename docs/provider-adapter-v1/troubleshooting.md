@@ -5,17 +5,22 @@
 **Symptom**: A `[provider."my-id"]` entry in `config.toml` does not
 show up in the `/providers` TUI or `grok providers` output.
 
-**Cause**: Only the six built-in provider IDs are registered:
-`xai`, `openai`, `anthropic`, `opencode`, `ollama`,
-`openai-compatible`. Unknown IDs are silently ignored by the registry.
+**Causes**:
 
-**Fix**: Use one of the known IDs. For custom OpenAI-compatible
-endpoints, use the `openai-compatible` ID:
+1. **Missing `kind` or `profile`**: Custom providers need
+   `kind = "openai-compatible"` or `profile = "openai-compatible"`.
+
+2. **Unregistered provider ID**: Only `xai`, `openai`, `anthropic`,
+   `opencode`, `ollama` are auto-registered. For custom providers,
+   set `kind` or `profile` explicitly.
+
+**Fix**:
 
 ```toml
-[provider."openai-compatible"]
-env_key = ["MY_KEY"]
+[provider."my-custom"]
+profile = "openai-compatible"
 base_url = "https://my-proxy/v1"
+env_key = ["MY_KEY"]
 ```
 
 ## Model not selectable
@@ -31,9 +36,10 @@ for selection.
 
 2. **Model list format mismatch**: The mock server or provider API
    returns models in an unexpected format. Verify the `/v1/models`
-   response matches the expected schema.
+   response matches the expected schema, or set `model_list_format`
+   to `"ollama_tags"` for Ollama-style responses.
 
-3. **No matching route**: The model's `apiBackend` field must match
+3. **No matching route**: The model's `protocol` field must match
    a route on the provider. For example, `chat_completions` requires
    an OpenAI Chat route; `responses` requires a Responses route.
 
@@ -52,6 +58,27 @@ save or shows an error.
 
 3. **Config.toml not writable**: Check file permissions on
    `~/.grok/config.toml`.
+
+## Credential not resolving
+
+**Symptom**: Provider configures but requests fail with auth errors.
+
+**Resolution order** (first wins):
+1. Inline `api_key` in config
+2. Environment variable listed in `env_key`
+3. Session token (xAI only)
+4. Public/no-auth (OpenCode only)
+
+**Tip**: Use `env_key` instead of inline `api_key` for security.
+
+## Hot-reload failure
+
+**Symptom**: After editing `config.toml`, provider config reverts.
+
+**Behavior**: If the new config is invalid (bad URL, missing auth,
+unknown protocol), the registry preserves the old snapshot and
+returns an error. The application displays the error but continues
+with the last valid configuration.
 
 ## Legacy xAI config stops working
 
