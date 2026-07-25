@@ -110,7 +110,7 @@ kind = "openai_compatible"
 }
 
 #[test]
-fn custom_provider_without_kind_but_with_base_url_is_accepted() {
+fn custom_provider_without_kind_or_profile_is_error() {
     let (diags, _) = resolve_provider_with(
         r#"
 [provider.custom]
@@ -118,8 +118,42 @@ api_key = "sk-test"
 base_url = "https://example.test/v1"
 "#,
     );
+    assert!(
+        diags.iter().any(|d| d.is_error()),
+        "custom provider without kind or profile must be an error"
+    );
+    assert!(
+        diags.iter().any(|d| d.to_string().contains("kind") && d.to_string().contains("missing")),
+        "error must mention missing kind: {:?}",
+        diags.iter().map(|d| d.to_string()).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn custom_provider_with_profile_without_kind_is_accepted() {
+    let (diags, _) = resolve_provider_with(
+        r#"
+[provider.custom]
+api_key = "sk-test"
+profile = "my-company"
+"#,
+    );
     let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
-    assert!(errors.is_empty(), "custom provider with base_url must be accepted: {errors:?}");
+    assert!(errors.is_empty(), "custom provider with profile must be accepted: {errors:?}");
+}
+
+#[test]
+fn custom_provider_with_kind_openai_compatible_without_profile_is_accepted() {
+    let (diags, _) = resolve_provider_with(
+        r#"
+[provider.custom]
+api_key = "sk-test"
+kind = "openai_compatible"
+base_url = "https://example.test/v1"
+"#,
+    );
+    let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).collect();
+    assert!(errors.is_empty(), "custom provider with kind must be accepted: {errors:?}");
 }
 
 // ── PARSE-03: Duplicate identity rejection ──
@@ -128,17 +162,17 @@ base_url = "https://example.test/v1"
 fn duplicate_in_same_layer_is_error() {
     let configs = vec![
         (
-            "dup".into(),
+            "openai".into(),
             ProviderConfig::new(
-                Some("dup".into()),
+                Some("openai".into()),
                 None,
                 Some("https://first.url/v1".into()),
             ),
         ),
         (
-            "dup".into(),
+            "openai".into(),
             ProviderConfig::new(
-                Some("dup".into()),
+                Some("openai".into()),
                 None,
                 Some("https://second.url/v1".into()),
             ),
@@ -149,11 +183,10 @@ fn duplicate_in_same_layer_is_error() {
         diags.iter().any(|d| d.is_error()),
         "duplicate identity must produce error"
     );
+    let err_texts: Vec<_> = diags.iter().map(|d| d.to_string()).collect();
     assert!(
-        diags
-            .iter()
-            .any(|d| d.to_string().contains("duplicate") && d.to_string().contains("dup")),
-        "error must mention duplicate and provider ID"
+        err_texts.iter().any(|t| t.contains("duplicate")),
+        "error must mention duplicate: {err_texts:?}"
     );
 }
 

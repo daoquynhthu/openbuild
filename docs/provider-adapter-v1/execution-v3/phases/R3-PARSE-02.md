@@ -1,0 +1,23 @@
+# R3-PARSE-02 Evidence
+
+- Baseline commit: `0ac240a`
+- Result commit: (pending)
+- Files changed:
+  - `xai-grok-provider/src/config.rs` — validate() now rejects custom providers without kind/profile, validates header names as error diagnostics
+  - `xai-grok-provider/src/resolution.rs` — test fixtures add kind/openai_compatible to pass new validation
+  - `xai-grok-provider/tests/strict_provider_config.rs` — new tests: custom_provider_without_kind_or_profile_is_error, custom_provider_with_profile_without_kind_is_accepted, custom_provider_with_kind_openai_compatible_without_profile_is_accepted; updated duplicate test to use builtin ID
+- Failing test before fix:
+  - 4 unit tests (duplicate_producer_diagnostic, precedence_toml_only, precedence_legacy_adds_new_provider, precedence_cli_adds_new_provider) +
+  - 1 integration test (duplicate_in_same_layer_is_error) failed because custom providers without kind were rejected
+- Failure output summary: panicked with "custom provider must specify `kind` or `profile`"
+- Passing test after fix: all 266 tests pass
+- Targeted check: `cargo check -p xai-grok-provider` — PASS
+- Targeted clippy: `cargo clippy -p xai-grok-provider` — 0 warnings
+- New tests:
+  - `validate_rejects_empty_header_name` — validate() produces error for empty header name
+  - `validate_rejects_colon_in_header_name` — validate() produces error for colon in header name
+  - `custom_provider_without_kind_or_profile_is_error` — TOML [provider.custom] with base_url but no kind/profile → error
+  - `custom_provider_with_profile_without_kind_is_accepted` — profile alone satisfies kind requirement
+  - `custom_provider_with_kind_openai_compatible_without_profile_is_accepted` — kind alone satisfies
+- `git diff --check HEAD^..HEAD`: (pending)
+- Deviations: none

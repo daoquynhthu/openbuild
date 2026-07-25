@@ -309,6 +309,7 @@ mod tests {
                 "dup".into(),
                 ProviderConfig {
                     id: Some("dup".into()),
+                    kind: Some("openai_compatible".into()),
                     base_url: Some("https://first.url/v1".into()),
                     ..Default::default()
                 },
@@ -317,6 +318,7 @@ mod tests {
                 "dup".into(),
                 ProviderConfig {
                     id: Some("dup".into()),
+                    kind: Some("openai_compatible".into()),
                     base_url: Some("https://other".into()),
                     ..Default::default()
                 },
@@ -374,6 +376,7 @@ mod tests {
                 ProviderId::new("test"),
                 ProviderConfig {
                     id: Some("test".into()),
+                    kind: Some("openai_compatible".into()),
                     api_key: Some("toml-key".into()),
                     base_url: Some("https://test.api/v1".into()),
                     ..Default::default()
@@ -461,6 +464,7 @@ mod tests {
         };
         let legacy = Some(ProviderConfig {
             id: Some("legacy-only".into()),
+            kind: Some("openai_compatible".into()),
             api_key: Some("legacy-key".into()),
             base_url: Some("https://legacy.api/v1".into()),
             ..Default::default()
@@ -479,6 +483,7 @@ mod tests {
         };
         let cli = Some(ProviderConfig {
             id: Some("cli-only".into()),
+            kind: Some("openai_compatible".into()),
             api_key: Some("cli-key".into()),
             base_url: Some("https://cli.api/v1".into()),
             ..Default::default()

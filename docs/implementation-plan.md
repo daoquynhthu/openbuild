@@ -3,7 +3,7 @@
 > **⚠️ 作废 — 以 V2 计划为准**
 >
 > 本文件保留为历史记录。Provider Adapter V1 生产闭环的**唯一执行权威**是：
-> `docs/openbuild_provider_adapter_production_v1_closure_plan_v2_2026_07.md`
+> `"docs\provider-adapter-v1\openbuild_provider_adapter_production_closure_remediation_6875625.md"`
 >
 > **禁止使用本文件进行任何执行决策。**
 >

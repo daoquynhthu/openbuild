@@ -371,19 +371,33 @@ impl ProviderConfig {
             }
         }
 
-        // Missing kind for non-builtin provider without id match, no profile, and no base_url
+        // Missing kind for non-builtin provider (plan: requires explicit `kind` or `profile`)
         if self.kind.is_none() {
             let is_builtin_id = matches!(
                 provider_id,
                 "xai" | "openai" | "anthropic" | "opencode" | "ollama"
             );
-            if !is_builtin_id && self.base_url.is_none() && self.profile.is_none() {
+            if !is_builtin_id && self.profile.is_none() {
                 diags.push(ConfigDiagnostic::new_error(
                     provider_id,
                     "kind",
                     "missing_field",
-                    "custom provider must specify `kind`, `profile`, `base_url`, or use a built-in provider ID",
+                    "custom provider must specify `kind`, `profile`, or use a built-in provider ID",
                 ));
+            }
+        }
+
+        // Invalid header names (PARSE-02: must be error diagnostic)
+        if let Some(ref headers) = self.extra_headers {
+            for (name, _) in headers {
+                if name.is_empty() || name.bytes().any(|b| b <= 32 || b > 126 || b == 58) {
+                    diags.push(ConfigDiagnostic::new_error(
+                        provider_id,
+                        "extra_headers",
+                        "invalid_value",
+                        format!("invalid header name: {name:?}"),
+                    ));
+                }
             }
         }
 
@@ -485,6 +499,36 @@ mod tests {
             ..Default::default()
         };
         assert!(invalid.validate_headers().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_empty_header_name() {
+        let cfg = ProviderConfig {
+            id: Some("test".into()),
+            extra_headers: Some([("".into(), "value".into())].into()),
+            kind: Some("openai_compatible".into()),
+            ..Default::default()
+        };
+        let diags = cfg.validate();
+        assert!(
+            diags.iter().any(|d| d.is_error() && d.to_string().contains("header")),
+            "validate() must produce error for empty header name: {diags:?}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_colon_in_header_name() {
+        let cfg = ProviderConfig {
+            id: Some("test".into()),
+            extra_headers: Some([("Invalid:Name".into(), "value".into())].into()),
+            kind: Some("openai_compatible".into()),
+            ..Default::default()
+        };
+        let diags = cfg.validate();
+        assert!(
+            diags.iter().any(|d| d.is_error() && d.to_string().contains("header")),
+            "validate() must produce error for colon in header name: {diags:?}"
+        );
     }
 
     #[test]
