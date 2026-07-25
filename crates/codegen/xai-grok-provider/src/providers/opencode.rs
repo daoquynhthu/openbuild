@@ -76,7 +76,7 @@ impl Provider for OpenCodeProvider {
         } else {
             AuthPolicy::bearer(candidates, false)
         };
-        let route = Route::make(
+        let mut route = Route::make(
             "opencode-chat",
             Some(self.defaults.id.clone()),
             "chat_completions",
@@ -87,6 +87,11 @@ impl Provider for OpenCodeProvider {
             },
             auth,
         );
+        if let Some(ref extra) = overrides.extra_headers {
+            for (key, value) in extra {
+                route.static_headers.insert(key.clone(), value.clone());
+            }
+        }
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("opencode-chat");
         let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);

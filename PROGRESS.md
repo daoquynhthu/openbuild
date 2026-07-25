@@ -822,5 +822,35 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - No production route error can produce a Sampler ✅
 - All unsupported protocols fail before HTTP construction ✅
 
+## Phase 4: CFG Series — Provider Configuration Unification — 2026-07-25
+
+### Completed
+- **R3-CFG-01** `2079e7e`: unified `From<ProviderConfig> for ProviderRuntimeConfig`; deleted duplicate `model_list_format` path in `resolve_one()` ✅
+- **R3-CFG-02** `ec0e953`: created `providers/configure.rs` with shared helpers (`resolve_base_url`, `resolve_protocol`, `build_credential_candidates`, `merge_extra_headers`, `resolve_model_source`) ✅
+- **R3-CFG-03** `ec0e953`: xAI — uses helpers, inline/configured env keys, merge extra headers, legacy `x-grok-auth-mode` header preserved ✅
+- **R3-CFG-04** `ec0e953`: OpenAI — uses helpers, inline/configured env keys, merge extra headers (both chat and responses routes) ✅
+- **R3-CFG-05** `ec0e953`: Anthropic — uses helpers, inline/configured env keys, merge extra headers, `anthropic-version` header preserved ✅
+- **R3-CFG-06** `ec0e953`: OpenCode — uses helpers, conditional auth (`None`/bearer), merge extra headers ✅
+- **R3-CFG-07** `ec0e953`: Ollama — uses helpers, conditional auth (`None`/bearer), merge extra headers ✅
+- **R3-CFG-08** `446753e`: removed `unimplemented!()` from `FactoryProvider::defaults()`; added `defaults` field; populates in `create()` with spec-based values ✅
+- **R3-CFG-09` (current)`: fixed `builtin_config_fidelity.rs` tests — 5 assertions flipped from `!has_extra` to `has_extra` (headers now correctly merged); renamed test functions from `*_silently_lost` to `*_merged` ✅
+
+### Files modified (CFG series)
+- `crates/codegen/xai-grok-provider/src/providers/configure.rs` — shared helpers (new)
+- `crates/codegen/xai-grok-provider/src/providers/xai.rs` — header merge + helpers
+- `crates/codegen/xai-grok-provider/src/providers/openai.rs` — header merge + helpers
+- `crates/codegen/xai-grok-provider/src/providers/anthropic.rs` — header merge + helpers
+- `crates/codegen/xai-grok-provider/src/providers/opencode.rs` — header merge + helpers
+- `crates/codegen/xai-grok-provider/src/providers/ollama.rs` — header merge + helpers
+- `crates/codegen/xai-grok-provider/src/providers/openai_compatible_factory.rs` — defaults fix
+- `crates/codegen/xai-grok-provider/tests/builtin_config_fidelity.rs` — assertions flipped, tests renamed
+
+### Phase 4 gate
+- `cargo check -p xai-grok-provider` — PASS ✅
+- `cargo clippy -p xai-grok-provider -- -D warnings` — PASS ✅
+- `cargo test -p xai-grok-provider --test builtin_config_fidelity` — 5/5 pass ✅
+- All 5 built-in providers consume `extra_headers` into route `static_headers` ✅
+- `unimplemented!()` eliminated from `FactoryProvider::defaults()` ✅
+
 ### Next
-- Proceed to Phase 4 (CFG series) or address deferred ERR-03 when config/auth unification lands
+- Proceed to Phase 5 (ROUTE series) or address deferred R3-ERR-03

@@ -36,7 +36,7 @@ fn config_with_extra(
 // OpenAI
 // ---------------------------------------------------------------------------
 #[test]
-fn openai_extra_headers_silently_lost() {
+fn openai_extra_headers_merged() {
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
 
@@ -61,17 +61,14 @@ fn openai_extra_headers_silently_lost() {
     assert!(has_base, "openai base_url must be consumed");
 
     let has_extra = route.static_headers.contains_key("X-Custom-OpenAI");
-    assert!(
-        !has_extra,
-        "R3-RED-05 openai: extra_headers SILENTLY LOST in route (BUG)"
-    );
+    assert!(has_extra, "R3-CFG-09 openai: extra_headers must be present in route");
 }
 
 // ---------------------------------------------------------------------------
 // Anthropic
 // ---------------------------------------------------------------------------
 #[test]
-fn anthropic_extra_headers_silently_lost() {
+fn anthropic_extra_headers_merged() {
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
 
@@ -93,17 +90,14 @@ fn anthropic_extra_headers_silently_lost() {
         .next()
         .expect("at least one route");
     let has_extra = route.static_headers.contains_key("X-Custom-Anthropic");
-    assert!(
-        !has_extra,
-        "R3-RED-05 anthropic: extra_headers SILENTLY LOST in route (BUG)"
-    );
+    assert!(has_extra, "R3-CFG-09 anthropic: extra_headers must be present in route");
 }
 
 // ---------------------------------------------------------------------------
 // xAI
 // ---------------------------------------------------------------------------
 #[test]
-fn xai_extra_headers_silently_lost() {
+fn xai_extra_headers_merged() {
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
 
@@ -125,17 +119,14 @@ fn xai_extra_headers_silently_lost() {
         .next()
         .expect("at least one route");
     let has_extra = route.static_headers.contains_key("X-Custom-xAI");
-    assert!(
-        !has_extra,
-        "R3-RED-05 xai: extra_headers SILENTLY LOST in route (BUG)"
-    );
+    assert!(has_extra, "R3-CFG-09 xai: extra_headers must be present in route");
 }
 
 // ---------------------------------------------------------------------------
 // OpenCode
 // ---------------------------------------------------------------------------
 #[test]
-fn opencode_extra_headers_silently_lost() {
+fn opencode_extra_headers_merged() {
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
 
@@ -157,17 +148,14 @@ fn opencode_extra_headers_silently_lost() {
         .next()
         .expect("at least one route");
     let has_extra = route.static_headers.contains_key("X-Custom-OpenCode");
-    assert!(
-        !has_extra,
-        "R3-RED-05 opencode: extra_headers SILENTLY LOST in route (BUG)"
-    );
+    assert!(has_extra, "R3-CFG-09 opencode: extra_headers must be present in route");
 }
 
 // ---------------------------------------------------------------------------
 // Ollama
 // ---------------------------------------------------------------------------
 #[test]
-fn ollama_extra_headers_silently_lost() {
+fn ollama_extra_headers_merged() {
     let reg = ProviderRegistry::new();
     xai_grok_provider::providers::register_all(&reg);
 
@@ -189,8 +177,5 @@ fn ollama_extra_headers_silently_lost() {
         .next()
         .expect("at least one route");
     let has_extra = route.static_headers.contains_key("X-Custom-Ollama");
-    assert!(
-        !has_extra,
-        "R3-RED-05 ollama: extra_headers SILENTLY LOST in route (BUG)"
-    );
+    assert!(has_extra, "R3-CFG-09 ollama: extra_headers must be present in route");
 }

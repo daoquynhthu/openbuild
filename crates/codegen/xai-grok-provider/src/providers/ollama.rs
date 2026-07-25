@@ -75,7 +75,7 @@ impl Provider for OllamaProvider {
         } else {
             crate::auth::AuthPolicy::bearer(candidates, false)
         };
-        let route = Route::make(
+        let mut route = Route::make(
             "ollama-chat",
             Some(self.defaults.id.clone()),
             "chat_completions",
@@ -86,6 +86,11 @@ impl Provider for OllamaProvider {
             },
             auth,
         );
+        if let Some(ref extra) = overrides.extra_headers {
+            for (key, value) in extra {
+                route.static_headers.insert(key.clone(), value.clone());
+            }
+        }
         let pid = self.defaults.id.clone();
         let route_id = RouteId::new("ollama-chat");
         let routes = IndexMap::from([(route_id.clone(), Arc::new(route))]);

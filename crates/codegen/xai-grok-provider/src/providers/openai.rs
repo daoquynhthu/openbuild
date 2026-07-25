@@ -72,7 +72,7 @@ impl Provider for OpenAIProvider {
             &self.defaults.env_key,
         );
         let auth = AuthPolicy::bearer(candidates, true);
-        let route_chat = Arc::new(Route::make(
+        let mut route_chat = Route::make(
             "openai-chat",
             Some(self.defaults.id.clone()),
             "chat_completions",
@@ -82,8 +82,14 @@ impl Provider for OpenAIProvider {
                 query: None,
             },
             auth.clone(),
-        ));
-        let route_responses = Arc::new(Route::make(
+        );
+        if let Some(ref extra) = overrides.extra_headers {
+            for (key, value) in extra {
+                route_chat.static_headers.insert(key.clone(), value.clone());
+            }
+        }
+        let route_chat = Arc::new(route_chat);
+        let mut route_responses = Route::make(
             "openai-responses",
             Some(self.defaults.id.clone()),
             "responses",
@@ -93,7 +99,13 @@ impl Provider for OpenAIProvider {
                 query: None,
             },
             auth,
-        ));
+        );
+        if let Some(ref extra) = overrides.extra_headers {
+            for (key, value) in extra {
+                route_responses.static_headers.insert(key.clone(), value.clone());
+            }
+        }
+        let route_responses = Arc::new(route_responses);
 
         let pid = self.defaults.id.clone();
         let route_id_chat = RouteId::new("openai-chat");
