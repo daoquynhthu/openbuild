@@ -55,6 +55,34 @@ pub struct ProviderRuntimeConfig {
     pub env_keys: Vec<String>,
 }
 
+impl From<crate::config::ProviderConfig> for ProviderRuntimeConfig {
+    fn from(config: crate::config::ProviderConfig) -> Self {
+        let model_list_format = config.model_list_format.as_deref().and_then(|s| match s {
+            "openai_compatible" => Some(ModelListFormat::OpenAiCompatible),
+            "ollama_tags" | "ollama" => Some(ModelListFormat::OllamaTags),
+            _ => {
+                tracing::warn!(
+                    "unknown model_list_format `{s}` for provider `{}`, falling back to default",
+                    config.id.as_deref().unwrap_or("?"),
+                );
+                None
+            }
+        });
+        Self {
+            public: ProviderPublicConfig {
+                base_url: config.base_url,
+                protocol: config.protocol,
+                model_list_path: config.model_list_path,
+                allow_insecure_http: config.allow_insecure_http.unwrap_or(false),
+                model_list_format,
+                extra_headers: config.extra_headers.unwrap_or_default(),
+            },
+            inline_api_key: config.api_key.map(SecretValue::new),
+            env_keys: config.env_key.unwrap_or_default(),
+        }
+    }
+}
+
 /// Public (non-secret) configuration for diagnostics and display.
 #[derive(Clone, Debug)]
 pub struct ProviderPublicConfig {
@@ -76,36 +104,10 @@ fn is_builtin_id(id: &str) -> bool {
 fn resolve_one(id: String, config: ProviderConfig) -> (ProviderId, ResolvedProviderSpec) {
     let pid = ProviderId::new(&id);
     let implementation = resolve_implementation(&id, &config);
-
-    let model_list_format = config.model_list_format.as_deref().and_then(|s| match s {
-        "openai_compatible" => Some(ModelListFormat::OpenAiCompatible),
-        "ollama_tags" => Some(ModelListFormat::OllamaTags),
-        _ => {
-            tracing::warn!(
-                "unknown model_list_format `{s}` for provider `{id}`, falling back to default"
-            );
-            None
-        }
-    });
-    let public = ProviderPublicConfig {
-        base_url: config.base_url,
-        protocol: config.protocol,
-        model_list_path: config.model_list_path,
-        allow_insecure_http: config.allow_insecure_http.unwrap_or(false),
-        model_list_format,
-        extra_headers: config.extra_headers.unwrap_or_default(),
-    };
-    let inline_api_key = config.api_key.map(SecretValue::new);
-    let env_keys = config.env_key.unwrap_or_default();
-
     let spec = ResolvedProviderSpec {
         id: pid.clone(),
         implementation,
-        config: ProviderRuntimeConfig {
-            public,
-            inline_api_key,
-            env_keys,
-        },
+        config: ProviderRuntimeConfig::from(config),
     };
     (pid, spec)
 }

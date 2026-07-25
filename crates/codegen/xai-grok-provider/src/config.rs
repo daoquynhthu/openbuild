@@ -108,22 +108,20 @@ impl ProviderConfigInput {
     /// Consume this input and produce a `ProviderRuntimeConfig`.
     /// `api_key` is wrapped in `SecretValue` and never returned as `String`.
     pub fn into_runtime_config(self) -> crate::resolution::ProviderRuntimeConfig {
-        let env_keys = self.env_key.unwrap_or_default();
-        crate::resolution::ProviderRuntimeConfig {
-            public: crate::resolution::ProviderPublicConfig {
-                base_url: self.base_url,
-                protocol: self.protocol,
-                model_list_path: self.model_list_path,
-                allow_insecure_http: self.allow_insecure_http.unwrap_or(false),
-                model_list_format: self.model_list_format.map(|s| match s.as_str() {
-                    "ollama_tags" | "ollama" => crate::types::ModelListFormat::OllamaTags,
-                    _ => crate::types::ModelListFormat::OpenAiCompatible,
-                }),
-                extra_headers: self.extra_headers.unwrap_or_default(),
-            },
-            inline_api_key: self.api_key.map(crate::auth::SecretValue::new),
-            env_keys,
-        }
+        crate::resolution::ProviderRuntimeConfig::from(ProviderConfig {
+            id: None,
+            enabled: None,
+            kind: None,
+            profile: None,
+            api_key: self.api_key,
+            env_key: self.env_key,
+            base_url: self.base_url,
+            protocol: self.protocol,
+            model_list_path: self.model_list_path,
+            model_list_format: self.model_list_format,
+            allow_insecure_http: self.allow_insecure_http,
+            extra_headers: self.extra_headers,
+        })
     }
 }
 
