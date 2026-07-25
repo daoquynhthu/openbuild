@@ -1176,4 +1176,43 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - All release jobs are blocking ✅
 - No `continue-on-error` in release jobs ✅
 - Main branch covered by trigger ✅
-- Main branch covered by trigger ✅
+
+## Phase 13: Repository hygiene and documentation truth — 2026-07-26
+
+### R3-HYGIENE-01 — Repair whitespace and line-ending debt
+- Created `.gitattributes` with `* text=auto eol=lf` + `*.ps1 text eol=crlf`
+- Fixed trailing whitespace in `provider_production_chain.rs` and `test_provider_chain_e2e.rs`
+- `git diff --check origin/HEAD...HEAD`: clean ✅
+
+### R3-HYGIENE-02 — Remove obsolete comments and phase markers
+- Updated 7 stale phase marker comments across `prepared.rs`, `auth.rs`, `registry.rs`, `providers/mod.rs`
+- Removed references to P5-007, P8-002, P8-011, P8-001 — replaced with current-behavior descriptions
+
+### R3-HYGIENE-03 — Remove dead compatibility APIs
+- Removed `register_route` no-op function from `registry.rs:160` (zero production callers)
+- `rg "sampling_config_for_model|configure_providers|register_route"`: `register_route` — 0 production references ✅
+- `configure_providers` — test-only usage (kept)
+
+### R3-DOC-01 — Update public Provider contracts
+- `public-contracts.md` — completely rewritten: credential priority, route selection, hot-reload semantics, stale catalog, hard errors, supported platforms
+- `troubleshooting.md` — updated: `kind`/`profile` for custom providers, credential resolution order, hot-reload failure behavior
+- `migration.md` — updated: `kind`/`profile` syntax in examples, removed bare model default language
+- `config-reference.md` — added `kind` vs `profile` alternatives for custom OpenAI-compatible
+
+### R3-DOC-02 — Update project status
+- PROGRESS.md updated with Phase 13 completion
+
+### Formatting
+- `cargo fmt --all`: fixed pre-existing formatting drift across 20 files
+
+### Key results
+- `cargo fmt --all -- --check`: clean ✅
+- `cargo check -p xai-grok-provider --all-targets`: clean ✅
+- `cargo clippy -p xai-grok-provider --all-targets -- -D warnings`: clean ✅
+- `git diff --check`: clean ✅
+- Force-pushed `feat/provider-adapter` to origin (replaced 8 stale CI/doc commits)
+
+### Remaining (deferred/out of scope)
+- Removing `configure_providers` test-only usage (no production callers, but called from tests)
+- Updating `provider-matrix.md` and `rollback.md` (content still accurate)
+- Full workspace `cargo doc` verification (disk space constrained)
