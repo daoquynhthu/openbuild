@@ -22,7 +22,7 @@ use std::process::Command;
 
 fn script_path(name: &str) -> Option<PathBuf> {
     xai_grok_paths::normalize::normalized_absolute(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../xai-grok-pager/scripts/{name}")),
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../xai-grok-pager/scripts/{name}")),
     )
     .ok()
     .filter(|p| p.exists())

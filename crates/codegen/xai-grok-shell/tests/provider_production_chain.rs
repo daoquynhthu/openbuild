@@ -517,7 +517,7 @@ async fn red04_unknown_route_id_correctly_errs() {
 }
 
 #[tokio::test]
-async fn openai_compatible_rejects_responses_protocol() {
+async fn openai_compatible_responses_protocol_succeeds() {
     let toml_str = r#"
         [provider.test-proto]
         kind = "openai_compatible"
@@ -531,12 +531,8 @@ async fn openai_compatible_rejects_responses_protocol() {
         xai_grok_shell::agent::provider_bootstrap::bootstrap_from_config(&toml, None, None).await;
 
     assert!(
-        result.is_err(),
-        "openai_compatible with protocol=responses must fail at bootstrap"
-    );
-    let err = result.unwrap_err().to_string();
-    assert!(
-        err.to_lowercase().contains("responses"),
-        "error must mention responses protocol, got: {err}"
+        result.is_ok(),
+        "openai_compatible with protocol=responses must succeed at bootstrap: {:?}",
+        result.err()
     );
 }

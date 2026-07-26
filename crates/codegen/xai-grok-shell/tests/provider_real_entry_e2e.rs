@@ -205,7 +205,6 @@ async fn e2e_openai_builtin_inline_key_dropped() {
     let snapshot = bootstrap(
         r#"
         [provider.openai]
-        implementation = "openai"
         base_url = "http://127.0.0.1:0"
         api_key = "sk-openai"
         "#,

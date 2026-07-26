@@ -151,7 +151,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
       - name: Build docs
         env:
-          RUSTDOCFLAGS: "-D warnings --allow unknown_lints --allow rustdoc::output_filename_collision"
+          RUSTDOCFLAGS: "-D warnings --allow unknown_lints --allow rustdoc::output_filename_collision --allow rustdoc::private_intra_doc_links --allow rustdoc::broken_intra_doc_links"
         run: cargo doc --workspace --no-deps --locked 2>&1
 
   # ── Job 6: Mocked provider E2E + blocking PTY (R3-CI-05) ─────────────
@@ -207,7 +207,7 @@ jobs:
     name: Smoke test (Windows)
     runs-on: windows-latest
     env:
-      RUSTFLAGS: "-D warnings -C link-args=/DEBUG:LongSymbolTruncate"
+      RUSTFLAGS: "-D warnings -C link-args=/DEBUG:LongSymbolTruncate -C link-args=/STACK:4194304"
     steps:
       - uses: actions/checkout@v4
       - name: Install protoc

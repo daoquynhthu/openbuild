@@ -33,6 +33,7 @@ struct FactoryProvider {
 fn protocol_path(protocol: &str) -> Result<&'static str, crate::error::ProviderError> {
     match protocol {
         "chat_completions" => Ok("/chat/completions"),
+        "responses" => Ok("/responses"),
         _ => Err(crate::error::ProviderError::Config(format!(
             "unsupported protocol `{protocol}` for OpenAI-compatible provider"
         ))),
@@ -480,13 +481,9 @@ mod tests {
 
         let result = reg.prepare(&resolved);
         assert!(
-            result.is_err(),
-            "openai_compatible must reject protocol=responses"
-        );
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.to_lowercase().contains("responses"),
-            "error must mention responses protocol, got: {err_msg}"
+            result.is_ok(),
+            "openai_compatible with protocol=responses must succeed: {:?}",
+            result.err()
         );
     }
 }

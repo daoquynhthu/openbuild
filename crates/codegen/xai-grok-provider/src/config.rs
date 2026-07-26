@@ -162,7 +162,8 @@ impl ProviderConfigInput {
 /// Unknown fields are rejected at parse time (R3-PARSE-01).
 #[derive(Debug, Clone, Default, Deserialize)]
 #[non_exhaustive]
-#[serde(default, deny_unknown_fields)]
+#[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct ParsedProviderEntry {
     pub enabled: Option<bool>,
     pub kind: Option<String>,
@@ -273,6 +274,7 @@ pub fn parse_provider_toml_legacy(
 #[derive(Clone, Default, Deserialize)]
 #[non_exhaustive]
 #[serde(default)]
+#[serde(deny_unknown_fields)]
 pub struct ProviderConfig {
     pub id: Option<String>,
     pub enabled: Option<bool>,

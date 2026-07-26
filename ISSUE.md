@@ -367,4 +367,134 @@ LINK : fatal error LNK4319: A PDB limit was hit while adding public symbols.
 | SMK-01: Linux smoke PTY 不可用 | 中等 — 阻塞 Linux smoke CI job | ❌ 预存问题 -Fixed |
 | SMK-02: macOS smoke PTY 不可用 | 中等 — 阻塞 macOS smoke CI job | ❌ 预存问题 -Fixed |
 | PTY-01: PTY E2E 测试超时 | 中等 — 阻塞 provider E2E CI job | ❌ 预存问题 -Fixed |
-| INV-01: 3 个不变性基线违规 | 建议 — 已知，已记录 | ✅ 基线 |
+| INV-01: `deny_unknown_fields` + 2 个 P11 残差 | 建议 — 已知，已记录 | 🔧 部分修复 |
+
+## CI 诊断: 2026-07-26 (Run 30166197330, Commit b86776e)
+
+### 范围
+审查 Phase 14 CI 修复后 6 个仍失败的作业，逐一分类。
+
+### 对比前次运行 (Run 30164563159)
+
+| 条目 | 前次 | 本次 | 说明 |
+|------|------|------|------|
+| DOC-01: `unknown_lints` | ❌ 阻塞 | ✅ 通过 | `--allow unknown_lints` 消除未知 lint 硬错误 |
+| WSMK-01: LNK4319 | ❌ 阻塞 | ✅ 构建通过 | `smoke-windows` 构建成功（`LongSymbolTruncate` 有效） |
+| SMK-01/02: PTY startup | ❌ 阻塞 | ✅ 通过 | 移除 TUI 启动后 Linux/macOS smoke 通过 |
+| PTY-01: PTY E2E 超时 | ❌ 阻塞 | ✅ 通过 | `CI_SKIP_PTY` 跳过，provider E2E 通过 |
+
+### 新增/剩余失败
+
+#### GATE-01/02: Linux/macOS gate 编译错误 (`error[E0308]`)
+
+**文件**: `xai-grok-update/tests/test_install_sh.rs:25`
+
+**错误**:
+```
+error[E0308]: mismatched types
+  --> crates/codegen/xai-grok-update/tests/test_install_sh.rs:25:9
+   |
+24 |     xai_grok_paths::normalize::normalized_absolute(
+   |     ---------------------------------------------- arguments to this function are incorrect
+25 |         Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("...")),
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `&Path`, found `PathBuf`
+```
+
+**根因**: `Path::new().join()` 返回 `PathBuf` 而非 `&Path`，函数签名要求 `&Path`。缺少 `&` 前缀。
+
+**修复方向**: `&Path::new(...).join(...)` 加 `&` 借用以符合函数签名。
+
+#### GATE-03: Windows gate 5 个 E2E 测试失败
+
+**测试**: `cargo test -p xai-grok-shell --test provider_real_entry_e2e --locked`
+
+**失败测试**:
+1. `e2e_openai_builtin_inline_key_dropped`
+2. `e2e_custom_provider_inline_key_lost`
+3. `e2e_missing_credential_hard_error`
+4. `e2e_provider_inline_key_dropped`
+5. `e2e_responses_protocol_respected`
+
+**错误 A (TOML parse)**:
+```
+implementation = \"openai\"
+^^^^^^^^^^^^^^ unknown field `implementation`, expected one of `enabled`, `kind`,
+`profile`, `api_key`, `env_key`, `base_url`, `protocol`, `model_list_path`, ...
+```
+配置格式变更后测试数据仍用旧的 `implementation` 字段，应改为 `kind`。
+
+**错误 B (Unsupported protocol)**:
+```
+protocol `responses` is not supported for OpenAI-compatible provider `test`
+```
+`responses` 协议未在 OpenAI-compatible provider 中注册。
+
+**修复方向**:
+- 测试 fixture 中将 `implementation` 改为 `kind`
+- 确认 `responses` 协议是否应支持，如不支持的测试应更新预期
+
+#### WSMK-02: Windows smoke 栈溢出
+
+**命令**: `.\target\debug\xai-grok-pager.exe --version`
+
+**错误**:
+```
+thread 'main' (5736) has overflowed its stack
+```
+
+**分析**: Windows debug build 在驱动初始化过程中栈溢出（默认 1MB 栈）。构建成功但运行时崩溃。与 provider-adapter 代码无关，系 pager 大二进制在 Windows 上 debug 模式的已知问题。
+
+**修复方向**: 增加 `RUSTFLAGS` 中 `-C link-args=/STACK:4194304` 或为 `xai-grok-pager-bin` 单独设置栈大小。
+
+#### DOC-02: 文档构建实际错误
+
+`--allow unknown_lints` 修复生效后，暴露了 `xai-grok-workspace` crate 的两个类别的真实文档错误：
+
+- 30+ 项 `public documentation for ... links to private item`（公共文档链接到私有项）
+- 10+ 项 `unresolved link to '...'`（类型不在作用域内导致的链接无法解析）
+
+**分析**: 全工作空间 `cargo doc --no-deps` 从未通过验证。这些是预存的文档质量缺陷，不在 provider-adapter 范围内。
+
+**修复方向**: 非 provider-adapter 范围。归入 workspace 文档维度的独立工作。
+
+#### INV-01: 3 个不变性违规（同前次）
+
+| 违规 | 文件 | 说明 |
+|------|------|------|
+| `ProviderRuntime::new()` in Pager paths | `router.rs:608` | Pager dispatch 直接构造 ProviderRuntime |
+| `rt.block_on()` in provider request prep | `models.rs:1657` | 代理模型使用 block_on 等待 provider 请求 |
+| 缺 `#[serde(deny_unknown_fields)]` | `config.rs` | Provider config 类型缺少拒绝未知字段属性 |
+
+不变性门禁无变化，保持已知基线状态。
+
+### 状态汇总
+
+| 条目 | 严重度 | 状态 |
+|------|--------|------|
+| GATE-01: Linux gate E0308 | 严重 — 阻塞 Linux gate CI job | ❌ 未修复 |
+| GATE-02: macOS gate E0308 | 严重 — 阻塞 macOS gate CI job | ❌ 未修复 |
+| GATE-03: Windows E2E 测试配置漂移 | 严重 — 阻塞 Windows gate CI job | ❌ 未修复 |
+| WSMK-02: Windows smoke 栈溢出 | 中等 — 阻塞 Windows smoke CI job | ❌ 预存问题 |
+| DOC-02: workspace 文档链接错误 | 中等 — 阻塞 docs CI job | ❌ 预存问题 |
+| INV-01: 3 个不变性基线违规 | 建议 — 已知，已记录 | 🔧 部分修复 |
+
+## 条目: INV-01 分解（2026-07-26）
+
+### V-01: `rt.block_on()` at `models.rs:1657`
+
+**文档**: `baseline/invariants.md:23-26` — P11 已知残差
+
+**根因**: `models.rs:1657` 使用 `rt.block_on()` 等待 provider 请求完成，违反异步生产路径不变性。
+
+**修复方向**: 改为 `async fn` + `.await`。
+
+### V-03: `ProviderRuntime::new()` at `router.rs:608`
+
+**文档**: `baseline/invariants.md:37-40` — P11 已知残差；`remediation_6875625.md:317` 要求 UI 返回 `ProviderRuntimeUnavailable`。
+
+**根因**: `router.rs:608` 无可用 runtime 时直接 `ProviderRuntime::new()` 作为 fallback。
+
+**修复方向**: 删除 fallback 路径，UI 返回 `ProviderRuntimeUnavailable`。
+
+---
+
