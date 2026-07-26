@@ -1649,12 +1649,9 @@ fn spawn_prefetch_thread(env: PrefetchEnv) -> EarlyPrefetchHandle {
                 &crate::managed_config::current_serving_identity(),
             )
             && crate::managed_config::is_fetch_enabled()
-            && let Ok(rt) = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
         {
             crate::managed_config::clear_orphan();
-            let _ = rt.block_on(crate::managed_config::sync());
+            let _ = futures::executor::block_on(crate::managed_config::sync());
         }
 
         EarlyPrefetchResult { models, settings }

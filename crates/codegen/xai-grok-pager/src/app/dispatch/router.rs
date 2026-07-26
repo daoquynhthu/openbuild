@@ -601,13 +601,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             let Some(agent) = app.agents.get_mut(&id) else {
                 return vec![];
             };
-            let provider_state = crate::provider_state::runtime()
+            let Some(provider_state) = crate::provider_state::runtime()
                 .map(|rt| ProviderState::new(rt.clone()))
-                .unwrap_or_else(|| {
-                    ProviderState::new(std::sync::Arc::new(
-                        xai_grok_shell::agent::provider_runtime::ProviderRuntime::new(),
-                    ))
-                });
+            else {
+                return vec![];
+            };
             let modal = ActiveModal::Providers {
                 state: Box::new(ProvidersModalState::new(provider_state)),
             };

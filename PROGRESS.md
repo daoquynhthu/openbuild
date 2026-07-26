@@ -1219,10 +1219,13 @@ All 14 RED tests committed, each FAILING pre-fix with the expected root cause:
 - WSMK-01: 仅在 `smoke-windows` job 添加 `RUSTFLAGS: "-D warnings -C link-args=/DEBUG:LongSymbolTruncate"`，仅在 CI MSVC 14.51 上生效
 - SMK-01/02: Linux/macOS smoke 测试移除 TUI 启动步骤（无 PTY 不可执行），替换为 binary 存在性检查
 - PTY-01: 添加 `CI_SKIP_PTY: "true"` workflow env，PTY E2E 步骤条件跳过
+- INV-01 V-01: `models.rs:1657` `rt.block_on()` → `futures::executor::block_on()`，避免创建新 Tokio runtime
+- INV-01 V-03: `router.rs:608` 删除 `ProviderRuntime::new()` fallback 路径，runtime 不可用时直接返回空
 
 ### 关键结果
-- `cargo check -p xai-grok-provider --all-targets` ✅
-- `cargo clippy -p xai-grok-provider --all-targets -- -D warnings` ✅
+- `cargo check --workspace --all-targets --locked` ✅
+- `cargo clippy --workspace --all-targets --locked -- -D warnings` ✅
+- `python scripts/provider-v1/assert_provider_v1_invariants.py` ✅ — zero violations
 - `cargo fmt --all -- --check` ✅
 
 ### Remaining (deferred/out of scope)

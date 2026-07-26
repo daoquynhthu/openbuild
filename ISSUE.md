@@ -476,25 +476,7 @@ thread 'main' (5736) has overflowed its stack
 | GATE-03: Windows E2E 测试配置漂移 | 严重 — 阻塞 Windows gate CI job | ❌ 未修复 |
 | WSMK-02: Windows smoke 栈溢出 | 中等 — 阻塞 Windows smoke CI job | ❌ 预存问题 |
 | DOC-02: workspace 文档链接错误 | 中等 — 阻塞 docs CI job | ❌ 预存问题 |
-| INV-01: 3 个不变性基线违规 | 建议 — 已知，已记录 | 🔧 部分修复 |
-
-## 条目: INV-01 分解（2026-07-26）
-
-### V-01: `rt.block_on()` at `models.rs:1657`
-
-**文档**: `baseline/invariants.md:23-26` — P11 已知残差
-
-**根因**: `models.rs:1657` 使用 `rt.block_on()` 等待 provider 请求完成，违反异步生产路径不变性。
-
-**修复方向**: 改为 `async fn` + `.await`。
-
-### V-03: `ProviderRuntime::new()` at `router.rs:608`
-
-**文档**: `baseline/invariants.md:37-40` — P11 已知残差；`remediation_6875625.md:317` 要求 UI 返回 `ProviderRuntimeUnavailable`。
-
-**根因**: `router.rs:608` 无可用 runtime 时直接 `ProviderRuntime::new()` 作为 fallback。
-
-**修复方向**: 删除 fallback 路径，UI 返回 `ProviderRuntimeUnavailable`。
+| INV-01: 3 个不变性基线违规 | 建议 — 已全部修复 | ✅ 已修复 |
 
 ---
 
